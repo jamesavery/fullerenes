@@ -5,41 +5,13 @@
 #include <cuda_runtime_api.h>
 #include <iostream>
 #include <fullerenes/sycl-headers/sycl-vector.hh>
+#include <fullerenes/mempool.hh>
 #include "../../../primitives.cc"
 #include "../../../../linalg/linalg-impl.hh"
 
 using namespace linalg;
 
 //Non-owning memory pool
-struct Mempool {
-    void* data;
-    size_t byte_size;
-
-    Mempool(void* data, size_t byte_size): data(data), byte_size(byte_size){}
-
-    template<typename T>
-    static size_t allocation_size(size_t size) {
-        std::uintptr_t alignment_padding = alignof(T) - 1;
-        return (size * sizeof(T)) + alignment_padding;
-    }
-
-    template<typename T>
-    T* allocate(size_t size){
-        size_t alloc_size = allocation_size<T>(size);
-        if (alloc_size > byte_size){
-            throw std::runtime_error("Out of memory");
-        }
-        std::uintptr_t addr = reinterpret_cast<std::uintptr_t>(data);
-        std::uintptr_t aligned = (addr + alignof(T) - 1) & ~(alignof(T) - 1);
-        T* ptr = reinterpret_cast<T*>(aligned);
-
-        data = reinterpret_cast<void*>(ptr + size);
-        byte_size -= (reinterpret_cast<char*>(data) - reinterpret_cast<char*>(ptr));
-
-        return ptr;
-    }
-};
-
 
 template <typename T>
 void chol_qr_batched(SyclQueue& ctx,
