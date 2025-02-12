@@ -5,8 +5,6 @@
 #include <CL/sycl.hpp>
 
 //Signature adapter
-
-
 namespace linalg {
     template <Backend B, typename T, BatchType BT>
     SyclEvent gemm(SyclQueue& ctx,
@@ -16,50 +14,40 @@ namespace linalg {
                    T alpha,
                    T beta,
                    Transpose transA,
-                   Transpose transB) {
+                   Transpose transB,
+                   ComputePrecision precision) {
         // Call cuBLAS
         static LinalgHandle<B> handle;
         handle.setStream(ctx);
-        //cublasSetStream(handle, sycl::get_native<sycl::backend::ext_oneapi_cuda>(*ctx));
-
-        const auto opA = backendTransposeOp(transA);
-        const auto opB = backendTransposeOp(transB);
-        const auto m = transA == Transpose::NoTrans ? descrA.rows_ : descrA.cols_;
-        const auto n = transB == Transpose::NoTrans ? descrB.cols_ : descrB.rows_;
-        const auto k = transA == Transpose::NoTrans ? descrA.cols_ : descrA.rows_;        
+        
+        auto [m, k] = get_effective_dims(descrA, transA);
+        auto [kB, n] = get_effective_dims(descrB, transB);
 
         if constexpr (BT == BatchType::Single) {
-            auto status = cublasGemmEx(handle,
-                         opA, opB,
-                            m, n, k,
-                         &alpha,
-                         descrA.data_, BackendScalar<T,B>::type, descrA.ld_,
-                         descrB.data_, BackendScalar<T,B>::type, descrB.ld_,
-                         &beta,
-                         descrC.data_, BackendScalar<T,B>::type, descrC.ld_,
-                         BackendScalar<T,B>::type,
-                         CUBLAS_GEMM_DFALT);
-
-            if (status != CUBLAS_STATUS_SUCCESS) {
-                std::cerr << "cuBLAS GEMM failed with status: " << status << std::endl;
-                throw std::runtime_error("cuBLAS GEMM failed");
-            }
+            //Can't really use the call_backend function here, because cublasGemmEx is an overloaded function
+            cublasGemmEx(handle,
+                enum_convert<B>(transA), enum_convert<B>(transB),
+                m, n, k,
+                &alpha,
+                descrA.data_, BackendScalar<T,B>::type, descrA.ld_,
+                descrB.data_, BackendScalar<T,B>::type, descrB.ld_,
+                &beta,
+                descrC.data_, BackendScalar<T,B>::type, descrC.ld_,
+                enum_convert<B, T>(precision),
+                CUBLAS_GEMM_DFALT);
         } else {
-            auto status = cublasGemmStridedBatchedEx(handle,
-                                       opA, opB,
-                                        m, n, k,
-                                       &alpha,
-                                       descrA.data_, BackendScalar<T,B>::type, descrA.ld_, descrA.stride_,
-                                       descrB.data_, BackendScalar<T,B>::type, descrB.ld_, descrB.stride_,
-                                       &beta,
-                                       descrC.data_, BackendScalar<T,B>::type, descrC.ld_, descrC.stride_,
-                                       descrA.batch_size_,
-                                       BackendScalar<T,B>::type,
-                                       CUBLAS_GEMM_DFALT);
-            if (status != CUBLAS_STATUS_SUCCESS) {
-                std::cerr << "cuBLAS GEMM failed with status: " << status << std::endl;
-                throw std::runtime_error("cuBLAS GEMM failed");
-            }
+            //Can't really use the call_backend function here, because cublasGemmStridedBatchedEx is an overloaded function
+            cublasGemmStridedBatchedEx(handle,
+                enum_convert<B>(transA), enum_convert<B>(transB),
+                m, n, k,
+                &alpha,
+                descrA.data_, BackendScalar<T,B>::type, descrA.ld_, descrA.stride_,
+                descrB.data_, BackendScalar<T,B>::type, descrB.ld_, descrB.stride_,
+                &beta,
+                descrC.data_, BackendScalar<T,B>::type, descrC.ld_, descrC.stride_,
+                descrA.batch_size_,
+                enum_convert<B, T>(precision),
+                CUBLAS_GEMM_DFALT);
         }
 
         return ctx.get_event();
