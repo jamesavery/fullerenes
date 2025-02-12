@@ -28,85 +28,11 @@
 
 
 namespace linalg{
-
-    template<typename T>
-    struct blas_precision;
-
-    template<>
-    struct blas_precision<float> {
-        static constexpr char value = 'S';
-    };
-
-    template<>
-    struct blas_precision<double> {
-        static constexpr char value = 'D';
-    };
-
-    template<>
-    struct blas_precision<std::complex<float>> {
-        static constexpr char value = 'C';
-    };
-
-    template<>
-    struct blas_precision<std::complex<double>> {
-        static constexpr char value = 'Z';
-    };
-
-    // Function existence checker
-    template<typename T>
-    struct function_exists {
-        template<typename U>
-        static auto test(U*) -> decltype(std::declval<U>()(), std::true_type{});
-        template<typename U>
-        static auto test(...) -> std::false_type;
-        static constexpr bool value = decltype(test<T>(nullptr))::value;
-    };
-
-    // Function name generator
-    template<typename T, Backend B, bool Batched>
-    struct blas_function {
-        template<const char* Name>
-        static constexpr auto get() {
-            if constexpr (B == Backend::CUDA) {
-                using namespace std::string_literals;
-                constexpr std::string_view prefix = "cublas";
-                constexpr std::string_view batched_suffix = Batched ? "Batched" : "";
-                return prefix + blas_precision<T>::value + Name + batched_suffix;
-            }
-            // Add similar cases for other backends
-            else {
-                static_assert(std::false_type{}, "Unsupported backend");
-            }
-        }
-
-        template<const char* Name>
-        static constexpr auto get_fallback() {
-            if constexpr (Batched) {
-                return get<Name, false>(); // Fallback to non-batched version
-            } else {
-                return nullptr; // No fallback available
-            }
-        }
-    };
-
-
-    // Macro for function retrieval with fallback
-    #define GET_BLAS_FUNC(backend, name, T, batched) \
-    []() { \
-        constexpr auto func = blas_function<T, backend, batched>::get<#name>(); \
-        if constexpr (function_exists<decltype(func)>::value) { \
-            return func; \
-        } else { \
-            constexpr auto fallback = blas_function<T, backend, batched>::get_fallback<#name>(); \
-            static_assert(function_exists<decltype(fallback)>::value, \
-                         "Neither primary nor fallback function exists"); \
-            return fallback; \
-        } \
-    }()
-
-
     template <typename T, Backend B>
     struct BackendScalar;
+
+    template <typename T, ComputePrecision P, Backend B>
+    struct BlasComputeType;
 
     template <Transpose T, Backend B>
     struct BackendTranspose;
