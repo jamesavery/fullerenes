@@ -398,6 +398,7 @@ namespace linalg{
             cusolverDnHandle_t solver_handle_;
 
             LinalgHandle() {
+                cudaDeviceSynchronize();
                 auto blas_status = cublasCreate(&blas_handle_);
                 if (blas_status != CUBLAS_STATUS_SUCCESS) {
                     std::cerr << "CUBLAS initialization failed with status: " << blas_status << std::endl;
@@ -415,12 +416,31 @@ namespace linalg{
                     std::cerr << "CUSOLVER initialization failed with status: " << solver_status << std::endl;
                     throw std::runtime_error("CUSOLVER initialization failed");
                 }
+                cudaDeviceSynchronize();
             }
 
+            LinalgHandle(const LinalgHandle&) = delete;
+            LinalgHandle& operator=(const LinalgHandle&) = delete;
+
+            LinalgHandle(LinalgHandle&& other) = delete;
+            LinalgHandle& operator=(LinalgHandle&& other) = delete;
+
+
             ~LinalgHandle() {
-                cublasDestroy(blas_handle_);
-                cusparseDestroy(sparse_handle_);
-                cusolverDnDestroy(solver_handle_);
+                cudaDeviceSynchronize();
+                auto blas_status = cublasDestroy(blas_handle_);
+                if (blas_status != CUBLAS_STATUS_SUCCESS) {
+                    std::cerr << "CUBLAS initialization failed with status: " << blas_status << std::endl;
+                }
+                auto sparse_status = cusparseDestroy(sparse_handle_);
+                if (sparse_status != CUSPARSE_STATUS_SUCCESS) {
+                    std::cerr << "CUSPARSE initialization failed with status: " << sparse_status << std::endl;
+                }
+                auto solver_status = cusolverDnDestroy(solver_handle_);
+                if (solver_status != CUSOLVER_STATUS_SUCCESS) {
+                    std::cerr << "CUSOLVER initialization failed with status: " << solver_status << std::endl;
+                }
+                cudaDeviceSynchronize();
             }
 
             constexpr inline operator cublasHandle_t() const {
@@ -437,9 +457,11 @@ namespace linalg{
 
             void setStream(const SyclQueue& ctx) {
                 cudaStream_t stream = sycl::get_native<sycl::backend::ext_oneapi_cuda>(*ctx);
+                cudaStreamSynchronize(stream);
                 cublasSetStream(blas_handle_, stream);
                 cusparseSetStream(sparse_handle_, stream);
                 cusolverDnSetStream(solver_handle_, stream);
+                cudaStreamSynchronize(stream);
             }
         };
     #endif
