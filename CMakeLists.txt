@@ -58,7 +58,7 @@ if(ENABLE_SYCL)
   set(SYCL_TARGETS ${SYCL_DEFAULT_TARGET} CACHE STRING "AMD|NVIDIA|X86 (Currently only single target supported.") # TODO: Multi-target compiles.
   message("SYCL compile enabled with ${SYCL_TARGETS} target")
 
-  set(DPCPP_FLAGS "-Wno-pass-failed -Wno-unused-local-typedef -Wno-unused-command-line-argument -Wno-deprecated-declarations -Wall -O3 -fsycl -fsycl-unnamed-lambda") # Use regardless of target.
+  set(DPCPP_FLAGS "-Wno-pass-failed -Wno-unused-local-typedef -Wno-unused-command-line-argument -Wno-deprecated-declarations -Wno-recommended-option -Wno-unused-local-typedef -Wall -O3 -fsycl -fsycl-unnamed-lambda") # Use regardless of target.
   
   if(SYCL_TARGETS STREQUAL "AMD") 
     add_definitions(-DSOLVER_BACKEND=ROCSOLVER_BACKEND)
@@ -74,7 +74,7 @@ if(ENABLE_SYCL)
     "SHELL:-Xcuda-ptxas --warn-on-double-precision-use"
     "SHELL:-Xcuda-ptxas --warn-on-spills"
     )
-    set(DPCPP_TARGET_FLAGS "-Xcuda-ptxas --generate-line-info -Xcuda-ptxas --verbose -fsycl-targets=nvptx64-nvidia-cuda -Xsycl-target-backend=nvptx64-nvidia-cuda --cuda-gpu-arch=sm_${CMAKE_CUDA_ARCHITECTURES} --cuda-path=${CUDA_TOOLKIT_ROOT_DIR}")
+    set(DPCPP_TARGET_FLAGS "-Xcuda-ptxas --generate-line-info -fsycl-targets=nvptx64-nvidia-cuda -Xsycl-target-backend=nvptx64-nvidia-cuda --cuda-gpu-arch=sm_${CMAKE_CUDA_ARCHITECTURES} --cuda-path=$ENV{CUDA_PATH}")
     set(DPCPP_LINK_FLAGS   "-O3 -fsycl -fsycl-unnamed-lambda ${DPCPP_TARGET_FLAGS}")    
   elseif(SYCL_TARGETS STREQUAL "X86")
     set(DPCPP_TARGET_FLAGS "-fsycl-targets=x86_64 -march=native -mcpu=native")
@@ -82,7 +82,7 @@ if(ENABLE_SYCL)
 
   set(DPCPP_INCLUDE ${SYCL_DIR}include)
   message("Using SYCL include path: ${DPCPP_INCLUDE}")  
-  set(DPCPP_FLAGS "${DPCPP_FLAGS} -fsycl -fsycl-unnamed-lambda ${DPCPP_TARGET_FLAGS} -I${DPCPP_INCLUDE} -I${DPCPP_INCLUDE}/sycl")
+  set(DPCPP_FLAGS "${DPCPP_FLAGS} -fsycl -fsycl-unnamed-lambda ${DPCPP_TARGET_FLAGS} -I${DPCPP_INCLUDE} -I${DPCPP_INCLUDE}/sycl -I$ENV{CUDA_INCLUDE}")
 
 endif()
 
@@ -124,20 +124,29 @@ set(CMAKE_CXX_FLAGS "-fPIC -O3 -m64 -pthread -fopenmp")
 
 if(ENABLE_CUDA)
   enable_language(CUDA)
+  find_package(CUDAToolkit)
   set(CUDA_INCLUDE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
   
   # Include the directory containing curand.h
   include_directories(${CURAND_INCLUDE_DIR})
   message("CUDA include path at:" ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
+  message("")
+  message("CUDA libraries at:" ${CUDAToolkit_LIBRARY_DIR})
+  message("CUDA Binaries at:" ${CUDAToolkit_BIN_DIR})
+  message("CUDA include path at:" ${CUDAToolkit_INCLUDE_DIRS})
+  include_directories(${CUDAToolkit_INCLUDE_DIRS})
+
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}")
   message("CUDA found: " ${CMAKE_CUDA_COMPILER} ".")
 #NOTE: -gencode arch argument is EXTREMELY important to get right, the program will simply crash with a cudaError: invalid device function if the architecture does not match the GPU
 
 set(CUDA_MAXREGCOUNT "--maxrregcount=80")
 
+  message("Include Path :))) " $ENV{CUDA_INCLUDE})
   # Optional extra CUDA libraries
-  find_library(CUSOLVER_LIBRARY cusolver HINTS ${CUDAToolkit_LIBRARaY_DIR})
-  find_library(CUSPARSE_LIBRARY cusparse HINTS ${CUDAToolkit_LIBRARY_DIR})
+  find_library(CUSOLVER_LIBRARY cusolver HINTS "/opt/nvidia/hpc_sdk/Linux_x86_64/24.11/math_libs/12.6/targets/x86_64-linux/lib")
+  find_library(CUSPARSE_LIBRARY cusparse HINTS "/opt/nvidia/hpc_sdk/Linux_x86_64/24.11/math_libs/12.6/targets/x86_64-linux/lib")
+  find_library(CUBLAS_LIBRARY cublas HINTS "/opt/nvidia/hpc_sdk/Linux_x86_64/24.11/math_libs/12.6/targets/x86_64-linux/lib")
   if( CUSOLVER_LIBRARY )
     set(CMAKE_CUDA_LIBS  ${CMAKE_CUDA_LIBS} ${CUSOLVER_LIBRARY})
     message("CUSOLVER library found: " ${CUSOLVER_LIBRARY} ".")
@@ -147,6 +156,12 @@ set(CUDA_MAXREGCOUNT "--maxrregcount=80")
     set(CMAKE_CUDA_LIBS  ${CMAKE_CUDA_LIBS} ${CUSPARSE_LIBRARY})
     message("CUSPARSE library found: " ${CUSPARSE_LIBRARY} ".")
   endif()
+
+  if( CUBLAS_LIBRARY )
+    set(CMAKE_CUDA_LIBS  ${CMAKE_CUDA_LIBS} ${CUBLAS_LIBRARY})
+    message("CUBLAS library found: " ${CUBLAS_LIBRARY} ".")
+  endif()
+  
 endif()
 
 configure_file(
