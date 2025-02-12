@@ -14,7 +14,7 @@ using namespace linalg;
 //Non-owning memory pool
 
 template <typename T>
-void chol_qr_batched(SyclQueue& ctx,
+void chol_qr_batched(   SyclQueue& ctx,
                         bool transpose_op,
                         int batch_size,
                         int Astride,
@@ -23,89 +23,26 @@ void chol_qr_batched(SyclQueue& ctx,
                         Span<T> A,
                         Span<std::byte> workspace) 
 {
-    Mempool pool(workspace.data(), workspace.size());
+    BumpAllocator pool(workspace.data(), workspace.size());
     //static SyclVector<int> d_info(batch_size);    
-    auto d_info =   Span(pool.allocate<int>(batch_size), batch_size);
-    auto A_ptrs =   Span(pool.allocate<T*>(batch_size), batch_size);
-    auto ATA_ptrs = Span(pool.allocate<T*>(batch_size), batch_size);
-    auto ATA =      Span(pool.allocate<T>(n*n*batch_size), n*n*batch_size);
-
+    auto d_info =   pool.allocate<int>(ctx, batch_size);
+    auto ATA =      pool.allocate<T>(ctx, n*n*batch_size);
     auto ATA_stride = n*n;
-    
-    ctx -> parallel_for(batch_size, [=](sycl::id<1> id){
-        A_ptrs[id] = A.data() + id*Astride;
-        ATA_ptrs[id] = ATA.data() + id*ATA_stride;
-    });
-    ctx.wait();
-
-    static bool initialized = false;
-    static LinalgHandle<Backend::CUDA> handle;
-    handle.setStream(ctx);
-
-    std::cout << "A size: " << A.size() << std::endl;
-    std::cout << "Workspace size: " << workspace.size() << std::endl;
-
-
-/*     cublasHandle_t handle; 
-    auto blas_status = cublasCreate(&handle);
-    if (blas_status != CUBLAS_STATUS_SUCCESS) {
-        std::cerr << "cuBLAS initialization failed (in chol_qr.cc) with status: " << blas_status << std::endl;
-        throw std::runtime_error("cuBLAS initialization failed");
-    }
- */    //cublasSetStream(handle, sycl::get_native<sycl::backend::ext_oneapi_cuda>(*ctx));
-
-    /* cusolverDnHandle_t solver_handle; 
-    auto solver_status = cusolverDnCreate(&solver_handle);
-    if (solver_status != CUSOLVER_STATUS_SUCCESS) {
-        std::cerr << "cusolver initialization failed (in chol_qr.cc) with status: " << solver_status << std::endl;
-        throw std::runtime_error("cusolver initialization failed");
-    } */
-    //cusolverDnSetStream(solver_handle, sycl::get_native<sycl::backend::ext_oneapi_cuda>(*ctx));
 
     constexpr T alpha = 1.0;
     constexpr T beta = 0.0;
-    auto descrA = MatHandle<T, BatchType::Batched>(A_ptrs.front(), m, n, m, Astride, batch_size);
-    auto descrC = MatHandle<T, BatchType::Batched>(ATA_ptrs.front(), n, n, n, ATA_stride, batch_size);
-
+    auto descrA = MatHandle<T, BatchType::Batched>(A.data(), m, n, m, Astride, batch_size);
+    auto descrC = MatHandle<T, BatchType::Batched>(ATA.data(), n, n, n, ATA_stride, batch_size);
+    
+    auto workspace_size = potrf_buffer_size<Backend::CUDA>(ctx, descrC, Uplo::Lower);
+    SyclVector<std::byte> workspace2(workspace_size);
     //Compute StS = S^T * S
     gemm<Backend::CUDA>(ctx, descrA, descrA, descrC, alpha, beta, Transpose::Trans, Transpose::NoTrans);
-    
-
-    //cublasSgemmStridedBatched(blas_handle, CUBLAS_OP_T, CUBLAS_OP_N,
-    //                            n, /* m */
-    //                            n, /* n */
-    //                            m, /* k */
-    //                            &alpha, /* alpha */
-    //                            A_ptrs.front(), /* A */
-    //                            m, /* lda */
-    //                            Astride, /* strideA */
-    //                            A_ptrs.front(), /* B */
-    //                            m, /* ldb */
-    //                            Astride, /* strideB */
-    //                            &beta, /* beta */
-    //                            ATA_ptrs.front(), /* C */
-    //                            n, /* ldc */
-    //                            ATA_stride, /* strideC */
-    //                            batch_size);
-
     //Compute the Cholesky Factorization of StS
-    cusolverDnSpotrfBatched(handle, CUBLAS_FILL_MODE_LOWER, n, ATA_ptrs.data(), n, d_info.data(), batch_size);
-    //cublasSgetrfBatched(blas_handle, SN, ATA_ptrs.data(), SN, NULL, d_info.data(), batch_size);
-
-    //Compute Q = S * StS^-1
-    cublasStrsmBatched( handle,
-                        CUBLAS_SIDE_RIGHT, 
-                        CUBLAS_FILL_MODE_LOWER, 
-                        CUBLAS_OP_T, 
-                        CUBLAS_DIAG_NON_UNIT, 
-                        m, 
-                        n, 
-                        &alpha, 
-                        ATA_ptrs.data(), 
-                        n, 
-                        A_ptrs.data(), 
-                        m, batch_size);
-
+    potrf<Backend::CUDA>(ctx, descrC, Uplo::Lower, workspace2);
+    //Compute Q = S * StS^-1 (S is overwritten with Q)
+    trsm<Backend::CUDA>(ctx, descrC, descrA, Side::Right, Uplo::Lower, Transpose::Trans, Diag::NonUnit, alpha);
+    //Compute the QR factorization of Q
     gemm<Backend::CUDA>(ctx, descrA, descrA, descrC, alpha, beta, Transpose::Trans, Transpose::NoTrans);
     
     print_matrix(ATA, n, n);
@@ -120,7 +57,9 @@ size_t chol_qr_batched_buffer_size(SyclQueue& ctx,
                                 int m,
                                 int n,
                                 Span<T> A) {
-    return Mempool::allocation_size<T>(batch_size) + 2*Mempool::allocation_size<T*>(batch_size) + Mempool::allocation_size<T>(n*n*batch_size);
+    return  BumpAllocator::allocation_size<T>(ctx, batch_size) + 
+            2*BumpAllocator::allocation_size<T*>(ctx, batch_size) + 
+            BumpAllocator::allocation_size<T>(ctx, n*n*batch_size);
 }
 
 template <typename T>
