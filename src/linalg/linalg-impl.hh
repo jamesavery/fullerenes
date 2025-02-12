@@ -115,6 +115,230 @@ namespace linalg{
     struct LinalgHandle;
 
 
+    // Helper type traits to identify our enum types
+    template<typename T>
+    struct is_linalg_enum : std::false_type {};
+    
+    template<> struct is_linalg_enum<Side> : std::true_type {};
+    template<> struct is_linalg_enum<Uplo> : std::true_type {};
+    template<> struct is_linalg_enum<Transpose> : std::true_type {};
+    template<> struct is_linalg_enum<Diag> : std::true_type {};
+
+    template<class T>
+    struct is_complex_or_floating_point : std::is_floating_point<T> { };
+
+    template<class T>
+    struct is_complex_or_floating_point<std::complex<T>> : std::is_floating_point<T> { };
+
+    template<typename T>
+    struct base_type {
+        using type = T;
+    };
+
+    template<typename T>
+    struct base_type<std::complex<T>> {
+        using type = T;
+    };
+
+    // Individual enum conversions for CUDA backend
+    template<Backend B>
+    constexpr auto enum_convert(Side side) {
+        if constexpr (B == Backend::CUDA) {
+            return static_cast<cublasSideMode_t>(
+                side == Side::Left ? CUBLAS_SIDE_LEFT : CUBLAS_SIDE_RIGHT
+            );
+        }
+    }
+
+    template<Backend B>
+    constexpr auto enum_convert(Uplo uplo) {
+        if constexpr (B == Backend::CUDA) {
+            return static_cast<cublasFillMode_t>(
+                uplo == Uplo::Upper ? CUBLAS_FILL_MODE_UPPER : CUBLAS_FILL_MODE_LOWER
+            );
+        }
+    }
+
+    template<Backend B>
+    constexpr auto enum_convert(Transpose trans) {
+        if constexpr (B == Backend::CUDA) {
+            return static_cast<cublasOperation_t>(
+                trans == Transpose::NoTrans ? CUBLAS_OP_N : CUBLAS_OP_T
+            );
+        }
+    }
+
+    template<Backend B>
+    constexpr auto enum_convert(Diag diag) {
+        if constexpr (B == Backend::CUDA) {
+            return static_cast<cublasDiagType_t>(
+                diag == Diag::Unit ? CUBLAS_DIAG_UNIT : CUBLAS_DIAG_NON_UNIT
+            );
+        }
+    }
+
+    template<Backend B, typename T>
+    constexpr auto enum_convert(ComputePrecision precision) {
+        if constexpr (B == Backend::CUDA) {
+            using BaseType = typename base_type<T>::type;
+            
+            // Handle default precision first
+            if (precision == ComputePrecision::Default) {
+                if constexpr (std::is_same_v<BaseType, float>) {
+                    return CUBLAS_COMPUTE_32F;
+                } else if constexpr (std::is_same_v<BaseType, double>) {
+                    return CUBLAS_COMPUTE_64F;
+                }
+            }
+
+            // Handle specific precision requests
+            if constexpr (std::is_same_v<BaseType, float>) {
+                switch (precision) {
+                    case ComputePrecision::F32:  return CUBLAS_COMPUTE_32F;
+                    case ComputePrecision::F16:  return CUBLAS_COMPUTE_32F_FAST_16F;
+                    case ComputePrecision::BF16: return CUBLAS_COMPUTE_32F_FAST_16BF;
+                    case ComputePrecision::TF32: return CUBLAS_COMPUTE_32F_FAST_TF32;
+                    default:
+                        throw std::runtime_error("Unsupported precision for single precision type");
+                }
+            } 
+            else if constexpr (std::is_same_v<BaseType, double>) {
+                if (precision == ComputePrecision::F64) {
+                    return CUBLAS_COMPUTE_64F;
+                }
+                throw std::runtime_error("Only F64 precision supported for double precision type");
+            }
+        }
+        throw std::runtime_error("Unsupported backend or type combination");
+    }
+
+    template<Backend B, typename T>
+    constexpr auto ptr_convert(T** ptr) {
+        if constexpr (B == Backend::CUDA) {
+            if constexpr (std::is_same_v<T, float> || std::is_same_v<T, double>) {
+                return ptr; // No conversion needed
+            } else if constexpr (std::is_same_v<T, std::complex<float>>) {
+                return reinterpret_cast<cuComplex**>(ptr);
+            } else if constexpr (std::is_same_v<T, std::complex<double>>) {
+                return reinterpret_cast<cuDoubleComplex**>(ptr);
+            }
+        }
+    }
+
+    
+
+
+    template<Backend B, typename T>
+    constexpr auto ptr_convert(T* ptr) {
+        if constexpr (B == Backend::CUDA) {
+            if constexpr (std::is_same_v<T, float> || std::is_same_v<T, double>) {
+                return ptr; // No conversion needed
+            } else if constexpr (std::is_same_v<T, std::complex<float>>) {
+                return reinterpret_cast<cuComplex*>(ptr);
+            } else if constexpr (std::is_same_v<T, std::complex<double>>) {
+                return reinterpret_cast<cuDoubleComplex*>(ptr);
+            }
+        }
+    }
+
+    // Const pointer version
+    template<Backend B, typename T>
+    constexpr auto ptr_convert(const T* ptr) {
+        if constexpr (B == Backend::CUDA) {
+            if constexpr (std::is_same_v<T, float> || std::is_same_v<T, double>) {
+                return ptr; // No conversion needed
+            } else if constexpr (std::is_same_v<T, std::complex<float>>) {
+                return reinterpret_cast<const cuComplex*>(ptr);
+            } else if constexpr (std::is_same_v<T, std::complex<double>>) {
+                return reinterpret_cast<const cuDoubleComplex*>(ptr);
+            }
+        }
+    }
+
+    /* template<Backend B, typename T>
+    constexpr auto ptr_convert(T* ptr) {
+        if constexpr (B == Backend::CUDA) {
+            using BaseT = std::remove_const_t<T>;
+            using CudaT = std::conditional_t<std::is_same_v<BaseT, float> || std::is_same_v<BaseT, double>,
+                                           BaseT,
+                                           std::conditional_t<std::is_same_v<BaseT, std::complex<float>>,
+                                                            cuComplex,
+                                                            cuDoubleComplex>>;
+            using ReturnT = std::conditional_t<std::is_const_v<T>,
+                                             const CudaT*,
+                                             CudaT*>;
+            
+            if constexpr (std::is_same_v<BaseT, float> || std::is_same_v<BaseT, double>) {
+                return ptr; // No conversion needed
+            } else {
+                return reinterpret_cast<ReturnT>(ptr);
+            }
+        }
+    } */
+
+    // Variadic template for converting multiple pointers
+    namespace detail {
+        template <Backend B, typename T>
+        constexpr auto convert_arg(T&& arg) {
+            if constexpr (is_linalg_enum<std::remove_reference_t<T>>::value) {
+                return enum_convert<B>(std::forward<T>(arg));
+            } else if constexpr (std::is_integral_v<std::remove_reference_t<T>>) {
+                return std::forward<T>(arg);
+            } else if constexpr (std::is_integral_v<std::remove_pointer_t<std::remove_reference_t<T>>>) {
+                return std::forward<T>(arg);
+            } else if constexpr (std::is_pointer_v<std::remove_reference_t<T>>) {
+                return ptr_convert<B>(std::forward<T>(arg));
+            } else {
+                return std::forward<T>(arg);
+            }
+        }
+
+        template <typename F, typename Tuple, std::size_t... I>
+        auto apply_tuple_impl(F&& f, Tuple&& t, std::index_sequence<I...>) {
+            return f(std::get<I>(std::forward<Tuple>(t))...);
+        }
+
+        template <typename F, typename Tuple>
+        auto apply_tuple(F&& f, Tuple&& t) {
+            return apply_tuple_impl(
+                std::forward<F>(f),
+                std::forward<Tuple>(t),
+                std::make_index_sequence<std::tuple_size_v<std::remove_reference_t<Tuple>>>{}
+            );
+        }
+    }
+
+    // Combined enum and pointer conversion
+    template <Backend B, typename... Args>
+    auto backend_convert(Args&&... args) {
+        return std::make_tuple(detail::convert_arg<B>(std::forward<Args>(args))...);
+    }
+    
+    template <typename T, Backend B, typename Fun1, typename Fun2, typename Fun3, typename Fun4, typename... Args>
+    auto call_backend(const Fun1& fun1, const Fun2& fun2, const Fun3& fun3, const Fun4& fun4, const LinalgHandle<B>& handle, Args&&... args) {
+        if constexpr (std::is_same_v<T,float>) {
+            return std::apply(fun1, std::tuple_cat(std::forward_as_tuple(handle), backend_convert<B>(std::forward<Args>(args)...)));
+        } else if constexpr (std::is_same_v<T,double>) {
+            return std::apply(fun2, std::tuple_cat(std::forward_as_tuple(handle), backend_convert<B>(std::forward<Args>(args)...)));
+        } else if constexpr (std::is_same_v<T,std::complex<float>>) {
+            return std::apply(fun3, std::tuple_cat(std::forward_as_tuple(handle), backend_convert<B>(std::forward<Args>(args)...)));
+        } else if constexpr (std::is_same_v<T,std::complex<double>>) {
+            return std::apply(fun4, std::tuple_cat(std::forward_as_tuple(handle), backend_convert<B>(std::forward<Args>(args)...)));
+        }
+    }
+
+    // Variadic template for converting multiple enums
+/*     template <Backend B, typename... Args>
+    auto enum_convert(Args&&... args) {
+        static_assert((is_linalg_enum<std::remove_reference_t<Args>>::value && ...), 
+                     "All arguments must be linalg enum types");
+        return std::make_tuple(enum_convert<B>(std::forward<Args>(args))...);
+    }
+ */
+
+
+        
+
 
     #ifdef USE_CUDA
         template <>
@@ -136,6 +360,13 @@ namespace linalg{
         struct BackendScalar<std::complex<double>, Backend::CUDA> {
             static constexpr cudaDataType_t type = CUDA_C_64F;
         };
+
+        template <typename T>
+        struct BlasComputeType<T, ComputePrecision::Default, Backend::CUDA> {
+            static constexpr cublasComputeType_t type = (std::is_same_v<T, float> || std::is_same_v<T, std::complex<float>>) ? CUBLAS_COMPUTE_32F : CUBLAS_COMPUTE_64F;
+        };
+
+
         /* template <>
         struct BackendTranspose<Transpose::NoTrans, Layout::ColMajor, Backend::CUDA> {
             static constexpr cublasOperation_t type = CUBLAS_OP_N;
