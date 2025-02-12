@@ -200,15 +200,28 @@ namespace linalg{
                     T alpha,
                     T beta,
                     Transpose transA,
-                    Transpose transB);
+                    Transpose transB,
+                    ComputePrecision precision = ComputePrecision::Default);
     
     template <Backend B, typename T, BatchType BT>
     SyclEvent trsm(SyclQueue& ctx,
-                    Side side,
-                    Uplo uplo,
-                    Diag diag,
                     MatHandle<T,BT>& descrA,
                     MatHandle<T,BT>& descrB,
+                    Side side,
+                    Uplo uplo,
+                    Transpose transA,
+                    Diag diag,
                     T alpha);
+    
+    template <Backend B, typename T, BatchType BT>
+    size_t potrf_buffer_size(SyclQueue& ctx,
+                                MatHandle<T,BT>& A,
+                                Uplo uplo);
+
+    template <Backend B, typename T, BatchType BT>
+    SyclEvent potrf(SyclQueue& ctx,
+                    MatHandle<T,BT>& descrA,
+                    Uplo uplo,
+                    Span<std::byte> workspace);
 
 }
