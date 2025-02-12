@@ -391,6 +391,11 @@ namespace linalg{
             return (t == Transpose::NoTrans) ? CUBLAS_OP_N : CUBLAS_OP_T;
         }
 
+        template <typename T, BatchType BT>
+        auto get_effective_dims(const MatHandle<T,BT>& handle, Transpose trans_op){
+            return trans_op == Transpose::NoTrans ? std::make_tuple(handle.rows_, handle.cols_) : std::make_tuple(handle.cols_, handle.rows_);
+        }
+
         template <>
         struct LinalgHandle<Backend::CUDA> {
             cublasHandle_t blas_handle_;
