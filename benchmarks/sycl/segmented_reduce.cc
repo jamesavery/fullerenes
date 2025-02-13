@@ -1,5 +1,5 @@
 #include <sycl/sycl.hpp>
-using namespace cl::sycl;
+using namespace sycl;
 //Typename T, is a floating point type, e.g. float, double
 //N is the number of elements in each segment (Regular segment size)
 //EPT is the number of elements processed by each thread in a segment
