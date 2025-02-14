@@ -25,21 +25,19 @@ void chol_qr_batched(   SyclQueue& ctx,
 {
     BumpAllocator pool(workspace.data(), workspace.size());
     //static SyclVector<int> d_info(batch_size);    
-    auto d_info =   pool.allocate<int>(ctx, batch_size);
     auto ATA =      pool.allocate<T>(ctx, n*n*batch_size);
     auto ATA_stride = n*n;
 
     constexpr T alpha = 1.0;
     constexpr T beta = 0.0;
-    auto descrA = MatHandle<T, BatchType::Batched>(A.data(), m, n, m, Astride, batch_size);
-    auto descrC = MatHandle<T, BatchType::Batched>(ATA.data(), n, n, n, ATA_stride, batch_size);
+    auto descrA = DenseMatHandle<T, BatchType::Batched>(A.data(), m, n, m, Astride, batch_size);
+    auto descrC = DenseMatHandle<T, BatchType::Batched>(ATA.data(), n, n, n, ATA_stride, batch_size);
     
-    auto workspace_size = potrf_buffer_size<Backend::CUDA>(ctx, descrC, Uplo::Lower);
-    SyclVector<std::byte> workspace2(workspace_size);
+    auto potrf_workspace = pool.allocate<std::byte>(ctx, potrf_buffer_size<Backend::CUDA>(ctx, descrC, Uplo::Lower));
     //Compute StS = S^T * S
     gemm<Backend::CUDA>(ctx, descrA, descrA, descrC, alpha, beta, Transpose::Trans, Transpose::NoTrans);
     //Compute the Cholesky Factorization of StS
-    potrf<Backend::CUDA>(ctx, descrC, Uplo::Lower, workspace2);
+    potrf<Backend::CUDA>(ctx, descrC, Uplo::Lower, potrf_workspace);
     //Compute Q = S * StS^-1 (S is overwritten with Q)
     trsm<Backend::CUDA>(ctx, descrC, descrA, Side::Right, Uplo::Lower, Transpose::Trans, Diag::NonUnit, alpha);
     //Compute the QR factorization of Q

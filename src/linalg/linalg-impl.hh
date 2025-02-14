@@ -319,7 +319,7 @@ namespace linalg{
         }
 
         template <typename T, BatchType BT>
-        auto get_effective_dims(const MatHandle<T,BT>& handle, Transpose trans_op){
+        auto get_effective_dims(const DenseMatHandle<T,BT>& handle, Transpose trans_op){
             return trans_op == Transpose::NoTrans ? std::make_tuple(handle.rows_, handle.cols_) : std::make_tuple(handle.cols_, handle.rows_);
         }
 

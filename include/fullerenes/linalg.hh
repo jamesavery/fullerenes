@@ -60,10 +60,14 @@ namespace linalg{
         BLOCKED_ELL //Blocked ELLPACK
     };
 
+    enum class Layout {
+        RowMajor,
+        ColMajor
+    };
 
 
     template <typename T, BatchType BT>
-    struct MatHandle;
+    struct DenseMatHandle;
 
 
     template <typename T, Format F, BatchType BT>
@@ -71,17 +75,18 @@ namespace linalg{
 
 
     template <typename T>
-    struct MatHandle<T, BatchType::Single> {
-        MatHandle(T* data, int rows, int cols, int ld) 
+    struct DenseMatHandle<T, BatchType::Single> {
+        DenseMatHandle(T* data, int rows, int cols, int ld) 
             : data_(data), rows_(rows), cols_(cols), ld_(ld) {}
         // Accessors...
         T* data_;
         int rows_, cols_, ld_;
+        Layout layout_ = Layout::ColMajor; //Most backends don't support row-major dense matrices
     };
 
     template <typename T>
-    struct MatHandle<T, BatchType::Batched> {
-        MatHandle(T* data, int rows, int cols, int ld, int stride, int batch_size)
+    struct DenseMatHandle<T, BatchType::Batched> {
+        DenseMatHandle(T* data, int rows, int cols, int ld, int stride, int batch_size)
             : data_(data), rows_(rows), cols_(cols), ld_(ld), stride_(stride), batch_size_(batch_size), data_ptrs_(batch_size) {
                 for (int i = 0; i < batch_size; i++) {
                     data_ptrs_[i] = data + i * stride;
@@ -91,6 +96,7 @@ namespace linalg{
         T* data_;
         SyclVector<T*> data_ptrs_;
         int rows_, cols_, ld_, stride_, batch_size_;
+        Layout layout_ = Layout::ColMajor; //Most backends don't support row-major dense matrices
     };
 
     template <typename T>
@@ -103,9 +109,10 @@ namespace linalg{
          * @param nnz Number of non-zero elements
          * @param rows Number of rows
          * @param cols Number of columns
+         * @param layout Layout of the matrix
          */
-        SparseMatHandle(T* data, int* row_offsets, int* col_indices, int nnz, int rows, int cols)
-            : data_(data), row_offsets_(row_offsets), col_indices_(col_indices), nnz_(nnz), rows_(rows), cols_(cols) {
+        SparseMatHandle(T* data, int* row_offsets, int* col_indices, int nnz, int rows, int cols, Layout layout = Layout::RowMajor)
+            : data_(data), row_offsets_(row_offsets), col_indices_(col_indices), nnz_(nnz), rows_(rows), cols_(cols), layout_(layout) {
             assert(data && row_offsets && col_indices && "Null pointer provided");
             assert(nnz > 0 && rows > 0 && cols > 0 && "Invalid dimensions");
         }
@@ -115,6 +122,9 @@ namespace linalg{
         int* row_offsets_;     // [rows + 1] row offsets
         int* col_indices_;     // [nnz] column indices
         int nnz_, rows_, cols_;
+        Layout layout_ = Layout::RowMajor;
+
+        
     };
 
     template <typename T>
@@ -131,20 +141,19 @@ namespace linalg{
          * @param batch_size Number of matrices in batch
          */
         SparseMatHandle(T* data, int* row_offsets, int* col_indices, 
-                        int nnz, int rows, int cols, int stride, int batch_size)
-            : data_(data), row_offsets_(row_offsets), col_indices_(col_indices),
-              nnz_(nnz), rows_(rows), cols_(cols), stride_(stride), batch_size_(batch_size),
-              data_ptrs_(batch_size), row_offsets_ptrs_(batch_size), col_indices_ptrs_(batch_size) {
-                assert(data && row_offsets && col_indices && "Null pointer provided");
-                assert(nnz > 0 && rows > 0 && cols > 0 && "Invalid dimensions");
-                assert(stride >= nnz && "Stride must be >= nnz");
-                assert(batch_size > 0 && "Batch size must be positive");
-                
-                for (int i = 0; i < batch_size; i++) {
-                    data_ptrs_[i] = data + i * stride;
-                    row_offsets_ptrs_[i] = row_offsets + i * (rows + 1);
-                    col_indices_ptrs_[i] = col_indices + i * nnz;
-                }
+            int nnz, int rows, int cols, int stride, int batch_size)
+            :    data_(data), row_offsets_(row_offsets), col_indices_(col_indices),
+                nnz_(nnz), rows_(rows), cols_(cols), stride_(stride), batch_size_(batch_size) {
+            assert(data && row_offsets && col_indices && "Null pointer provided");
+            assert(nnz > 0 && rows > 0 && cols > 0 && "Invalid dimensions");
+            assert(stride >= nnz && "Stride must be >= nnz");
+            assert(batch_size > 0 && "Batch size must be positive");
+            
+            for (int i = 0; i < batch_size; i++) {
+                data_ptrs_[i] = data + i * stride;
+                row_offsets_ptrs_[i] = row_offsets + i * (rows + 1);
+                col_indices_ptrs_[i] = col_indices + i * nnz;
+            }
         }
 
         // Raw pointers to externally owned memory
@@ -157,6 +166,7 @@ namespace linalg{
         SyclVector<int*> row_offsets_ptrs_, col_indices_ptrs_;
         
         int nnz_, rows_, cols_, stride_, batch_size_;
+        Layout layout_ = Layout::RowMajor;
     };
 
     //Uniform accessor for data
@@ -202,9 +212,9 @@ namespace linalg{
 
     template <Backend B, typename T, BatchType BT>
     SyclEvent gemm(SyclQueue& ctx,
-                    MatHandle<T,BT>& descrA,
-                    MatHandle<T,BT>& descrB,
-                    MatHandle<T,BT>& descrC,
+                    DenseMatHandle<T,BT>& descrA,
+                    DenseMatHandle<T,BT>& descrB,
+                    DenseMatHandle<T,BT>& descrC,
                     T alpha,
                     T beta,
                     Transpose transA,
@@ -213,8 +223,8 @@ namespace linalg{
     
     template <Backend B, typename T, BatchType BT>
     SyclEvent trsm(SyclQueue& ctx,
-                    MatHandle<T,BT>& descrA,
-                    MatHandle<T,BT>& descrB,
+                    DenseMatHandle<T,BT>& descrA,
+                    DenseMatHandle<T,BT>& descrB,
                     Side side,
                     Uplo uplo,
                     Transpose transA,
@@ -223,12 +233,12 @@ namespace linalg{
     
     template <Backend B, typename T, BatchType BT>
     size_t potrf_buffer_size(SyclQueue& ctx,
-                                MatHandle<T,BT>& A,
+                                DenseMatHandle<T,BT>& A,
                                 Uplo uplo);
 
     template <Backend B, typename T, BatchType BT>
     SyclEvent potrf(SyclQueue& ctx,
-                    MatHandle<T,BT>& descrA,
+                    DenseMatHandle<T,BT>& descrA,
                     Uplo uplo,
                     Span<std::byte> workspace);
 

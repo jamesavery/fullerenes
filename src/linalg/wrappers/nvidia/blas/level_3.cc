@@ -8,9 +8,9 @@
 namespace linalg {
     template <Backend B, typename T, BatchType BT>
     SyclEvent gemm(SyclQueue& ctx,
-                   MatHandle<T,BT>& descrA,
-                   MatHandle<T,BT>& descrB,
-                   MatHandle<T,BT>& descrC,
+                   DenseMatHandle<T,BT>& descrA,
+                   DenseMatHandle<T,BT>& descrB,
+                   DenseMatHandle<T,BT>& descrC,
                    T alpha,
                    T beta,
                    Transpose transA,
@@ -55,8 +55,8 @@ namespace linalg {
 
     template <Backend B, typename T, BatchType BT>
     SyclEvent trsm(SyclQueue& ctx,
-                   MatHandle<T,BT>& descrA,
-                   MatHandle<T,BT>& descrB,
+                   DenseMatHandle<T,BT>& descrA,
+                   DenseMatHandle<T,BT>& descrB,
                    Side side,
                    Uplo uplo,
                    Transpose transA,
@@ -79,7 +79,7 @@ namespace linalg {
 
     template <Backend B, typename T, BatchType BT>
     size_t potrf_buffer_size(SyclQueue& ctx,
-                                MatHandle<T,BT>& A,
+                                DenseMatHandle<T,BT>& A,
                                 Uplo uplo) {
         static LinalgHandle<B> handle;
         handle.setStream(ctx);
@@ -95,7 +95,7 @@ namespace linalg {
 
     template <Backend B, typename T, BatchType BT>
     SyclEvent potrf(SyclQueue& ctx,
-                    MatHandle<T,BT>& descrA,
+                    DenseMatHandle<T,BT>& descrA,
                     Uplo uplo,
                     Span<std::byte> workspace) {        
         static LinalgHandle<B> handle;
@@ -122,29 +122,29 @@ namespace linalg {
     #define GEMM_INSTANTIATE(fp, BT) \
     template SyclEvent gemm<Backend::CUDA, fp, BT>( \
         SyclQueue&, \
-        MatHandle<fp, BT>&, \
-        MatHandle<fp, BT>&, \
-        MatHandle<fp, BT>&, \
+        DenseMatHandle<fp, BT>&, \
+        DenseMatHandle<fp, BT>&, \
+        DenseMatHandle<fp, BT>&, \
         fp, fp, Transpose, Transpose, ComputePrecision);
 
     #define TRSM_INSTANTIATE(fp, BT) \
     template SyclEvent trsm<Backend::CUDA, fp, BT>( \
         SyclQueue&, \
-        MatHandle<fp, BT>&, \
-        MatHandle<fp, BT>&, \
+        DenseMatHandle<fp, BT>&, \
+        DenseMatHandle<fp, BT>&, \
         Side, Uplo, Transpose, Diag, fp);
 
     #define POTRF_INSTANTIATE(fp, BT) \
     template SyclEvent potrf<Backend::CUDA, fp, BT>( \
         SyclQueue&, \
-        MatHandle<fp, BT>&, \
+        DenseMatHandle<fp, BT>&, \
         Uplo, \
         Span<std::byte>);
     
     #define POTRF_BUFFER_SIZE_INSTANTIATE(fp, BT) \
     template size_t potrf_buffer_size<Backend::CUDA, fp, BT>( \
         SyclQueue&, \
-        MatHandle<fp, BT>&, \
+        DenseMatHandle<fp, BT>&, \
         Uplo);
     
     #define BLAS_INSTANTIATE(fp, BT) \
