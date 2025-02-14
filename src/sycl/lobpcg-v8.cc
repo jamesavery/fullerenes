@@ -580,7 +580,6 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
 
     cusolverDnHandle_t handle{};
     cudaStream_t stream{};
-    cudaDeviceProp props{};
     cusolverDnParams_t params{};
     cusolverDnCreate(&handle);
     cudaStreamCreate(&stream);
@@ -593,7 +592,7 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
     #if (SOLVER_BACKEND == CUSOLVER_BACKEND)
         T alpha = 1.0;
         T beta = 0.0;
-        cusolverStatus_t status = cusolverDnXsyevBatched_bufferSize(handle, 
+        cusolverDnXsyevBatched_bufferSize(handle, 
                                 params, 
                                 CUSOLVER_EIG_MODE_VECTOR, 
                                 CUBLAS_FILL_MODE_LOWER,
@@ -739,7 +738,6 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
             auto tid = item.get_local_linear_id();
             sycl::group<1> cta = item.get_group();
             auto bid = item.get_group_linear_id();
-            std::bitset<BlockVectors> converged;
             oneapi::dpl::uniform_real_distribution<T> distr(0.0, 1.0);            
             oneapi::dpl::minstd_rand engine(42, tid);
             DECLARE_SUBSPACE;
