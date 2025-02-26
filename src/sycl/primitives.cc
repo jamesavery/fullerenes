@@ -1,3 +1,4 @@
+#pragma once
 
 #if __INTEL_LLVM_COMPILER > 20240000
     #define ONEDPL_USE_PREDEFINED_POLICIES 0
