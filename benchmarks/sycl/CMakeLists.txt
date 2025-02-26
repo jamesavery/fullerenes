@@ -22,3 +22,4 @@ foreach(EXECUTABLE ${SYCL_EXECUTABLES})
 endforeach()
 
 target_link_libraries(batch_qr PRIVATE nvidia_blas chol_qr_lib)
+target_link_libraries(lobpcg-proto PRIVATE nvidia_blas chol_qr_lib)
