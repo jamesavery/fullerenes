@@ -372,9 +372,7 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
     primitives::transform(ctx, csr_row_offsets, csr_row_offsets, [&](int i){return i * NZ;}); 
 
     auto lambda_acc = lambdas.to_span();
-    /* LOBPCG_Helper<T, K> helper(stream, BlockVectors,
-                                m, NZ, batch_size, A.data(), cols.data(), csr_row_offsets.data(),
-                                S.data(), StAS.data(), S.data() + BlockVectors*9*m, lambdas.data()); */
+    
     const T tol = sycl::sqrt(std::numeric_limits<T>::epsilon()) * 1e-2 * T(m);
     
     SyclVector<T> Diag(3*BlockVectors * batch_size, 0);
@@ -489,15 +487,6 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
     auto converged_acc = converged.to_span();
     auto residuals_acc = residuals.to_span();
 
-
-    auto Tresiduals = std::chrono::duration<double>(0);
-    auto Tortho = std::chrono::duration<double>(0);
-    auto Tgemm = std::chrono::duration<double>(0);
-    auto Tspmm = std::chrono::duration<double>(0);
-    auto Teigen = std::chrono::duration<double>(0);
-    auto Tupdate = std::chrono::duration<double>(0);
-    auto Tmemcpy = std::chrono::duration<double>(0);
-
     auto iteration = [&](SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, size_t iter, bool restart){
         
         auto start = std::chrono::high_resolution_clock::now();
@@ -527,15 +516,6 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
             });
         });
         ctx -> wait();
-
-        /* std::cout << "Residuals: " << residuals << std::endl;
-        std::cout << "Converged: ";
-        for(int i = 0; i < BlockVectors; i++) std::cout << converged_acc[0][i] << " ";
-        std::cout << std::endl; */
-
-        auto end = std::chrono::high_resolution_clock::now();
-        Tresiduals += end - start;
-
         
         start = std::chrono::high_resolution_clock::now();
         if (restart){
@@ -543,10 +523,6 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
         } else {
             Ortho<T, 2*BlockVectors, BlockVectors>(ctx, S.subspan(2*m*BlockVectors), S, U, m, SubspaceStride, SubspaceStride, batch_size);
         }
-        end = std::chrono::high_resolution_clock::now();
-        Tortho += end - start;
-
-        start = std::chrono::high_resolution_clock::now();
         //Strided Copy Kernel:
         if (restart){
             ctx -> submit([&](sycl::handler& h){
@@ -565,35 +541,14 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
             });
             ctx.wait();
         }
-        end = std::chrono::high_resolution_clock::now();
-        Tmemcpy += end - start;
-        //ComputeGramMatrix<T,BlockVectors*3>(ctx, S, R_inv, m, BlockVectors*m*3, batch_size);
-        //print_matrix(R_inv.to_span(), BlockVectors*3 , BlockVectors*3 , false);
-
-        start = std::chrono::high_resolution_clock::now();
         //Compute AR
         linalg::spmm<Backend::CUDA>(ctx, handleA, restart ? handleP : handleR, restart ? handleAP : handleAR, alpha, beta, Transpose::NoTrans, Transpose::NoTrans, spmm_workspace.to_span());
-        
-
-        end = std::chrono::high_resolution_clock::now();
-        Tspmm += end - start;        
-
-        start = std::chrono::high_resolution_clock::now();
         //Compute S^T A S
         linalg::gemm<Backend::CUDA>(ctx, restart ? handleS_restart : handleS, restart ? handleAS_restart : handleAS, restart ? handleStAS_restart : handleStAS, alpha, beta, Transpose::Trans, Transpose::NoTrans);
 
         //Solve the eigenvalue problem
-        end = std::chrono::high_resolution_clock::now();
-        Tgemm += end - start;
-
-        start = std::chrono::high_resolution_clock::now();
-        //compute_eigenpairs(StAS.data(), lambdas.data(), restart ? BlockVectors*2 : BlockVectors*3, batch_size);
         linalg::syev<Backend::CUDA>(ctx, restart ? handleStAS_restart : handleStAS, lambdas.to_span(), Uplo::Lower, syev_workspace.to_span());
         ctx.wait();
-        end = std::chrono::high_resolution_clock::now();
-        Teigen += end - start;
-
-        start = std::chrono::high_resolution_clock::now();
         cudaMemcpy(R_inv.data(), StAS.data(), StAS.size() * sizeof(T), cudaMemcpyDeviceToDevice);
         cudaDeviceSynchronize();
 
@@ -644,63 +599,28 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
             });
         });
         ctx -> wait();
-        end = std::chrono::high_resolution_clock::now();
-        Tmemcpy += end - start;
-        start = std::chrono::high_resolution_clock::now();
         //Compute X = [X, R, P] * [Zx, Zr, Zp]^T
         linalg::gemm<Backend::CUDA>(ctx, restart ? handleS_restart : handleS, restart ? handleStAS_restart : handleStAS, handleU, alpha, beta, Transpose::NoTrans, Transpose::NoTrans); 
         //Make an implicit update of AX:
         linalg::gemm<Backend::CUDA>(ctx, restart ? handleAS_restart : handleAS, restart ? handleStAS_restart : handleStAS, handleStemp, alpha, beta, Transpose::NoTrans, Transpose::NoTrans);
-
         ctx.wait();
-        end = std::chrono::high_resolution_clock::now();
-        Tupdate += end - start;
-
-        start = std::chrono::high_resolution_clock::now();
         Ortho<T, BlockVectors, BlockVectors>(ctx, C_p, StAS, QRworkspace, restart ? BlockVectors*2 : BlockVectors*3, BlockVectors*BlockVectors * (restart? (2*2) : (3*3)), BlockVectors*BlockVectors *  3, batch_size);
-
-        end = std::chrono::high_resolution_clock::now();
-        Tortho += end - start;
-
-        start = std::chrono::high_resolution_clock::now();
-        end = std::chrono::high_resolution_clock::now();
-        Tmemcpy += end - start;
         //First compute P = [X, R, P] * C_p
-        start = std::chrono::high_resolution_clock::now();
 
         linalg::gemm<Backend::CUDA>(ctx, restart ? handleS_restart : handleS, restart ? handleC_p_restart : handleC_p, handleP_new, alpha, beta, Transpose::NoTrans, Transpose::NoTrans);
         //Make an implicit update of AP:
         linalg::gemm<Backend::CUDA>(ctx, restart ? handleAS_restart : handleAS, restart ? handleC_p_restart : handleC_p, handleAP_new, alpha, beta, Transpose::NoTrans, Transpose::NoTrans);
         ctx.wait();
-        end = std::chrono::high_resolution_clock::now();
-        Tupdate += end - start;
-
-        start = std::chrono::high_resolution_clock::now();
         cudaMemcpy(AS.data(), S_temp.data(), S_temp.size() * sizeof(T), cudaMemcpyDeviceToDevice);
         cudaMemcpy(S.data(), U.data(), U.size() * sizeof(T), cudaMemcpyDeviceToDevice);
         cudaDeviceSynchronize();
-        end = std::chrono::high_resolution_clock::now();
-        Tmemcpy += end - start;
-        //std::cout << "Post Update Gram Matrix" << std::endl;
-        //ComputeGramMatrix<T, BlockVectors*3>(ctx, S, StAS, m, BlockVectors*3*m, batch_size);
-        //print_matrix(StAS.to_span(), BlockVectors * 3, BlockVectors * 3, false);
     };
+
     auto T0 = std::chrono::high_resolution_clock::now();
     for(size_t i = 0; i < maxiters; i++){
         iteration(ctx, A, cols, batch_size, m, i, i < 1 ? true : false);
     }
     ctx.wait();   
-    auto T1 = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(T1 - T0).count();
-    std::cout << "LOBPCG V4 Total Iteration Time: " << duration / batch_size << " µs / fullerene" << std::endl;
-    std::cout << "Residuals Time: " << std::chrono::duration_cast<std::chrono::microseconds>(Tresiduals).count() / batch_size << " µs / fullerene" << std::endl;
-    std::cout << "Orthogonalization Time: " << std::chrono::duration_cast<std::chrono::microseconds>(Tortho).count() / batch_size << " µs / fullerene" << std::endl;
-    std::cout << "GEMM Time: " << std::chrono::duration_cast<std::chrono::microseconds>(Tgemm).count() / batch_size << " µs / fullerene" << std::endl;
-    std::cout << "SpMM Time: " << std::chrono::duration_cast<std::chrono::microseconds>(Tspmm).count() / batch_size << " µs / fullerene" << std::endl;
-    std::cout << "Eigenvalue Time: " << std::chrono::duration_cast<std::chrono::microseconds>(Teigen).count() / batch_size << " µs / fullerene" << std::endl;
-    std::cout << "Update Time: " << std::chrono::duration_cast<std::chrono::microseconds>(Tupdate).count() / batch_size << " µs / fullerene" << std::endl;
-    std::cout << "Memcpy Time: " << std::chrono::duration_cast<std::chrono::microseconds>(Tmemcpy).count() / batch_size << " µs / fullerene" << std::endl;
-
     for(int i = 0; i < batch_size; i++){
         primitives::copy(ctx, lambdas.subspan(i * (BlockVectors *3) + BlockVectors * 2, BlockVectors), out_eigvals.subspan(i * BlockVectors, BlockVectors));
         //primitives::copy(ctx, S_acc.subspan(i * BlockVectors * 3 * m, BlockVectors * m), eigvects.subspan(i * BlockVectors * m, BlockVectors * m));
