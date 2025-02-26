@@ -6,6 +6,7 @@
 
 //Signature adapter
 namespace linalg {
+
     template <Backend B, typename T, BatchType BT>
     SyclEvent gemm(SyclQueue& ctx,
                    DenseMatHandle<T,BT>& descrA,
@@ -26,19 +27,19 @@ namespace linalg {
         if constexpr (BT == BatchType::Single) {
             //Can't really use the call_backend function here, because cublasGemmEx is an overloaded function
             cublasGemmEx(handle,
-                enum_convert<B>(transA), enum_convert<B>(transB),
+                enum_convert<BackendLibrary::CUBLAS>(transA), enum_convert<BackendLibrary::CUBLAS>(transB),
                 m, n, k,
                 &alpha,
                 descrA.data_, BackendScalar<T,B>::type, descrA.ld_,
                 descrB.data_, BackendScalar<T,B>::type, descrB.ld_,
                 &beta,
                 descrC.data_, BackendScalar<T,B>::type, descrC.ld_,
-                enum_convert<B, T>(precision),
+                enum_convert<BackendLibrary::CUBLAS, T>(precision),
                 CUBLAS_GEMM_DFALT);
         } else {
             //Can't really use the call_backend function here, because cublasGemmStridedBatchedEx is an overloaded function
             cublasGemmStridedBatchedEx(handle,
-                enum_convert<B>(transA), enum_convert<B>(transB),
+                enum_convert<BackendLibrary::CUBLAS>(transA), enum_convert<BackendLibrary::CUBLAS>(transB),
                 m, n, k,
                 &alpha,
                 descrA.data_, BackendScalar<T,B>::type, descrA.ld_, descrA.stride_,
@@ -46,10 +47,9 @@ namespace linalg {
                 &beta,
                 descrC.data_, BackendScalar<T,B>::type, descrC.ld_, descrC.stride_,
                 descrA.batch_size_,
-                enum_convert<B, T>(precision),
+                enum_convert<BackendLibrary::CUBLAS, T>(precision),
                 CUBLAS_GEMM_DFALT);
         }
-
         return ctx.get_event();
     }
 
@@ -62,16 +62,15 @@ namespace linalg {
                    Transpose transA,
                    Diag diag,
                    T alpha) {
-
-        static LinalgHandle<B> handle{};
+        static LinalgHandle<B> handle;
         handle.setStream(ctx);
         auto [kB, n] = get_effective_dims(descrB, Transpose::NoTrans);
 
         if constexpr (BT == BatchType::Single) {
-            call_backend<T>(cublasStrsm, cublasDtrsm, cublasCtrsm, cublasZtrsm, 
+            call_backend<T, BackendLibrary::CUBLAS, B>(cublasStrsm, cublasDtrsm, cublasCtrsm, cublasZtrsm, 
                 handle, side, uplo, transA, diag, kB, n, &alpha, get_data(descrA), descrA.ld_, get_data(descrB), descrB.ld_); 
-        }else {
-            call_backend<T>(cublasStrsmBatched, cublasDtrsmBatched, cublasCtrsmBatched, cublasZtrsmBatched, 
+        } else {
+            call_backend<T, BackendLibrary::CUBLAS, B>(cublasStrsmBatched, cublasDtrsmBatched, cublasCtrsmBatched, cublasZtrsmBatched, 
                 handle, side, uplo, transA, diag, kB, n, &alpha, get_data(descrA), descrA.ld_, get_data(descrB), descrB.ld_, descrA.batch_size_);
         }
         return ctx.get_event();
@@ -85,10 +84,11 @@ namespace linalg {
         handle.setStream(ctx);
         int size = 0;
         if constexpr (BT == BatchType::Single) {
-            call_backend<T>(cusolverDnSpotrf_bufferSize, cusolverDnDpotrf_bufferSize, cusolverDnCpotrf_bufferSize, cusolverDnZpotrf_bufferSize,
+            call_backend<T, BackendLibrary::CUSOLVER, B>(cusolverDnSpotrf_bufferSize, cusolverDnDpotrf_bufferSize, cusolverDnCpotrf_bufferSize, cusolverDnZpotrf_bufferSize,
                 handle, uplo, A.rows_, get_data(A), A.ld_, &size);
+            size = BumpAllocator::allocation_size<std::byte>(ctx, size);
         } else {
-            return A.batch_size_ * sizeof(int);
+            size =  BumpAllocator::allocation_size<int>(ctx, A.batch_size_);
         }
         return size;
     }
@@ -102,15 +102,20 @@ namespace linalg {
         handle.setStream(ctx);
         BumpAllocator pool(workspace);
         auto Lwork = potrf_buffer_size<B>(ctx, descrA, uplo);
-        auto potrf_span = pool.allocate<std::byte>(ctx, Lwork);
-
+        
         if constexpr (BT == BatchType::Single) {
             int info;
-            call_backend<T>(cusolverDnSpotrf, cusolverDnDpotrf, cusolverDnCpotrf, cusolverDnZpotrf,
+            auto potrf_span = pool.allocate<std::byte>(ctx, Lwork);
+            call_backend<T, BackendLibrary::CUSOLVER, B>(cusolverDnSpotrf, cusolverDnDpotrf, cusolverDnCpotrf, cusolverDnZpotrf,
                 handle, uplo, descrA.rows_, get_data(descrA), descrA.ld_, reinterpret_cast<T*>(potrf_span.data()), Lwork, &info);
         } else {
-            call_backend<T>(cusolverDnSpotrfBatched, cusolverDnDpotrfBatched, cusolverDnCpotrfBatched, cusolverDnZpotrfBatched,
-                handle, uplo, descrA.rows_, get_data(descrA), descrA.ld_, reinterpret_cast<int*>(potrf_span.data()), descrA.batch_size_);
+            auto info = pool.allocate<int>(ctx, descrA.batch_size_);
+            call_backend<T, BackendLibrary::CUSOLVER, B>(cusolverDnSpotrfBatched, cusolverDnDpotrfBatched, cusolverDnCpotrfBatched, cusolverDnZpotrfBatched,
+                handle, uplo, descrA.rows_, get_data(descrA), descrA.ld_, info.data(), descrA.batch_size_);
+        }
+        return ctx.get_event();
+        
+    }
         }
         return ctx.get_event();
     }
