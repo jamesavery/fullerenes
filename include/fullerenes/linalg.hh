@@ -197,37 +197,54 @@ namespace linalg{
     template <typename T, BatchType BT>
     struct DenseMatHandle;
 
-
     template <typename T, Format F, BatchType BT>
     struct SparseMatHandle;
+
+    template <typename T>
+    struct BackendDenseMatrixHandle;
+
+    template <typename T, Format F>
+    struct BackendSparseMatrixHandle;
+
+    template <typename T>
+    struct BackendDenseVectorHandle;
+
+    template <typename T>
+    struct BackendSparseVectorHandle;
 
 
     template <typename T>
     struct DenseMatHandle<T, BatchType::Single> {
-        DenseMatHandle(T* data, int rows, int cols, int ld) 
-            : data_(data), rows_(rows), cols_(cols), ld_(ld) {}
+        DenseMatHandle(T* data, int rows, int cols, int ld);
+        ~DenseMatHandle();
         // Accessors...
         T* data_;
         int rows_, cols_, ld_;
         Layout layout_ = Layout::ColMajor; //Most backends don't support row-major dense matrices
+
+        BackendDenseMatrixHandle<T>* operator->();
+        BackendDenseMatrixHandle<T>& operator*();
+
+        private:
+            std::unique_ptr<BackendDenseMatrixHandle<T>> backend_handle_;
     };
 
     template <typename T>
     struct DenseMatHandle<T, BatchType::Batched> {
-        DenseMatHandle(T* data, int rows, int cols, int ld, int stride, int batch_size)
-            : data_(data), rows_(rows), cols_(cols), ld_(ld), stride_(stride), batch_size_(batch_size), data_ptrs_(batch_size) {
-                for (int i = 0; i < batch_size; i++) {
-                    data_ptrs_[i] = data + i * stride;
-                }
-            }
+        DenseMatHandle(T* data, int rows, int cols, int ld, int stride, int batch_size);
+        ~DenseMatHandle();
+
         // Accessors...
         T* data_;
         SyclVector<T*> data_ptrs_;
         int rows_, cols_, ld_, stride_, batch_size_;
         Layout layout_ = Layout::ColMajor; //Most backends don't support row-major dense matrices
 
+        BackendDenseMatrixHandle<T>* operator->();
+        BackendDenseMatrixHandle<T>& operator*();
+
         private:
-            void* backend_handle_;
+            std::unique_ptr<BackendDenseMatrixHandle<T>> backend_handle_;
     };
 
     template <typename T>
@@ -242,11 +259,8 @@ namespace linalg{
          * @param cols Number of columns
          * @param layout Layout of the matrix
          */
-        SparseMatHandle(T* data, int* row_offsets, int* col_indices, int nnz, int rows, int cols, Layout layout = Layout::RowMajor)
-            : data_(data), row_offsets_(row_offsets), col_indices_(col_indices), nnz_(nnz), rows_(rows), cols_(cols), layout_(layout) {
-            assert(data && row_offsets && col_indices && "Null pointer provided");
-            assert(nnz > 0 && rows > 0 && cols > 0 && "Invalid dimensions");
-        }
+        SparseMatHandle(T* data, int* row_offsets, int* col_indices, int nnz, int rows, int cols, Layout layout = Layout::RowMajor);
+        ~SparseMatHandle();
 
         // Raw pointers to externally owned memory
         T* data_;              // [nnz] non-zero values
@@ -255,8 +269,11 @@ namespace linalg{
         int nnz_, rows_, cols_;
         Layout layout_ = Layout::RowMajor;
 
+        BackendSparseMatrixHandle<T, Format::CSR>* operator->();
+        BackendSparseMatrixHandle<T, Format::CSR>& operator*();
+
         private:
-            void* backend_handle_;
+            std::unique_ptr<BackendSparseMatrixHandle<T, Format::CSR>> backend_handle_;
 
         
     };
@@ -275,20 +292,9 @@ namespace linalg{
          * @param batch_size Number of matrices in batch
          */
         SparseMatHandle(T* data, int* row_offsets, int* col_indices, 
-            int nnz, int rows, int cols, int stride, int batch_size)
-            :    data_(data), row_offsets_(row_offsets), col_indices_(col_indices),
-                nnz_(nnz), rows_(rows), cols_(cols), stride_(stride), batch_size_(batch_size) {
-            assert(data && row_offsets && col_indices && "Null pointer provided");
-            assert(nnz > 0 && rows > 0 && cols > 0 && "Invalid dimensions");
-            assert(stride >= nnz && "Stride must be >= nnz");
-            assert(batch_size > 0 && "Batch size must be positive");
-            
-            for (int i = 0; i < batch_size; i++) {
-                data_ptrs_[i] = data + i * stride;
-                row_offsets_ptrs_[i] = row_offsets + i * (rows + 1);
-                col_indices_ptrs_[i] = col_indices + i * nnz;
-            }
-        }
+            int nnz, int rows, int cols, int stride, int batch_size);
+
+        ~SparseMatHandle();
 
         // Raw pointers to externally owned memory
         T* data_;              // [batch_size * stride] non-zero values
@@ -302,8 +308,11 @@ namespace linalg{
         int nnz_, rows_, cols_, stride_, batch_size_;
         Layout layout_ = Layout::RowMajor;
 
+        BackendSparseMatrixHandle<T, Format::CSR>* operator->();
+        BackendSparseMatrixHandle<T, Format::CSR>& operator*();
+
         private:
-            void* backend_handle_;
+            std::unique_ptr<BackendSparseMatrixHandle<T, Format::CSR>> backend_handle_;
     };
 
     //Uniform accessor for data
@@ -341,7 +350,7 @@ namespace linalg{
         int size_, ldc_;
 
         private:
-            void* backend_handle_;
+            std::unique_ptr<BackendDenseVectorHandle<T>> backend_handle_;
     };
 
     template <typename T>
@@ -353,7 +362,7 @@ namespace linalg{
         int size_, ldc_, stride_, batch_size_;
 
         private:
-            void* backend_handle_;
+            std::unique_ptr<BackendDenseVectorHandle<T>> backend_handle_;
     };
 
     template <typename T>
@@ -365,7 +374,7 @@ namespace linalg{
         int size_;
 
         private:
-            void* backend_handle_;
+            std::unique_ptr<BackendDenseVectorHandle<T>> backend_handle_;
     };
 
     template <typename T>
@@ -378,7 +387,7 @@ namespace linalg{
         int size_, stride_, batch_size_;
 
         private:
-            void* backend_handle_;
+            std::unique_ptr<BackendSparseVectorHandle<T>> backend_handle_;
     };
 
     template <Backend B, typename T, BatchType BT>
