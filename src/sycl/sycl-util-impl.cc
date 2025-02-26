@@ -1,3 +1,4 @@
+#pragma once
 #include <sycl/sycl.hpp>
 #include <fullerenes/kernel-headers/sycl-parallel-primitives.hh>
 #include <fullerenes/sycl-headers/reference-wrapper.hh>
@@ -8,6 +9,7 @@
 #include <exception>
 #include <limits>
 #include <cstdint>
+#include <complex>
 #include "coord3d.cc"
 
 #ifndef DEVICE_CAST
@@ -402,6 +404,10 @@ template struct SyclVector<std::bitset<3>>;
 
 template struct SyclVector<float*>;
 template struct SyclVector<double*>;
+template struct SyclVector<std::complex<float>>;
+template struct SyclVector<std::complex<double>>;
+template struct SyclVector<int*>;
+template struct SyclVector<size_t*>;
 //template struct SyclVector<NodeNeighbours<uint16_t>>;
 //template struct SyclVector<NodeNeighbours<uint32_t>>;
 //template struct SyclVector<Constants<float,uint16_t>>;
