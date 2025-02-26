@@ -392,34 +392,56 @@ namespace linalg{
 
     template <Backend B, typename T, BatchType BT>
     SyclEvent gemm(SyclQueue& ctx,
-                    DenseMatHandle<T,BT>& descrA,
-                    DenseMatHandle<T,BT>& descrB,
-                    DenseMatHandle<T,BT>& descrC,
-                    T alpha,
-                    T beta,
-                    Transpose transA,
-                    Transpose transB,
-                    ComputePrecision precision = ComputePrecision::Default);
+        DenseMatHandle<T,BT>& descrA,
+        DenseMatHandle<T,BT>& descrB,
+        DenseMatHandle<T,BT>& descrC,
+        T alpha,
+        T beta,
+        Transpose transA,        
+        Transpose transB,
+        ComputePrecision precision = ComputePrecision::Default);
+
     
+    template <Backend B, typename T, Format F, BatchType BT>
+    SyclEvent spmm(SyclQueue& ctx,
+        SparseMatHandle<T, F, BT>& descrA,
+        DenseMatHandle<T,BT>& descrB,
+        DenseMatHandle<T,BT>& descrC,
+        T alpha,
+        T beta,
+        Transpose transA,
+        Transpose transB,
+        Span<std::byte> workspace);
+
+    template <Backend B, typename T, Format F, BatchType BT>
+    size_t spmm_buffer_size(SyclQueue& ctx,
+        SparseMatHandle<T, F, BT>& descrA,
+        DenseMatHandle<T,BT>& descrB,
+        DenseMatHandle<T,BT>& descrC,
+        T alpha,
+        T beta,
+        Transpose transA,        
+        Transpose transB);
+
     template <Backend B, typename T, BatchType BT>
     SyclEvent trsm(SyclQueue& ctx,
-                    DenseMatHandle<T,BT>& descrA,
-                    DenseMatHandle<T,BT>& descrB,
-                    Side side,
-                    Uplo uplo,
-                    Transpose transA,
-                    Diag diag,
-                    T alpha);
-    
+        DenseMatHandle<T,BT>& descrA,
+        DenseMatHandle<T,BT>& descrB,
+        Side side,
+        Uplo uplo,
+        Transpose transA,
+        Diag diag,
+        T alpha);
+
     template <Backend B, typename T, BatchType BT>
     size_t potrf_buffer_size(SyclQueue& ctx,
-                                DenseMatHandle<T,BT>& A,
-                                Uplo uplo);
- 
+                        DenseMatHandle<T,BT>& A,
+                        Uplo uplo);
+
     template <Backend B, typename T, BatchType BT>
     SyclEvent potrf(SyclQueue& ctx,
-                    DenseMatHandle<T,BT>& descrA,
-                    Uplo uplo,
-                    Span<std::byte> workspace);
+            DenseMatHandle<T,BT>& descrA,
+            Uplo uplo,
+            Span<std::byte> workspace); 
 
 }
