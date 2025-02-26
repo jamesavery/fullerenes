@@ -97,6 +97,9 @@ namespace linalg{
         SyclVector<T*> data_ptrs_;
         int rows_, cols_, ld_, stride_, batch_size_;
         Layout layout_ = Layout::ColMajor; //Most backends don't support row-major dense matrices
+
+        private:
+            void* backend_handle_;
     };
 
     template <typename T>
@@ -123,6 +126,9 @@ namespace linalg{
         int* col_indices_;     // [nnz] column indices
         int nnz_, rows_, cols_;
         Layout layout_ = Layout::RowMajor;
+
+        private:
+            void* backend_handle_;
 
         
     };
@@ -167,6 +173,9 @@ namespace linalg{
         
         int nnz_, rows_, cols_, stride_, batch_size_;
         Layout layout_ = Layout::RowMajor;
+
+        private:
+            void* backend_handle_;
     };
 
     //Uniform accessor for data
@@ -190,24 +199,58 @@ namespace linalg{
     }
 
     template <typename T, BatchType BT>
-    struct VecHandle;
+    struct DenseVecHandle;
+
+    template <typename T, BatchType BT>
+    struct SparseVecHandle;
 
     template <typename T>
-    struct VecHandle<T, BatchType::Single> {
-        VecHandle(T* data, int size, int ldc) : data_(data), size_(size), ldc_(ldc) {}
+    struct DenseVecHandle<T, BatchType::Single> {
+        DenseVecHandle(T* data, int size, int ldc) : data_(data), size_(size), ldc_(ldc) {}
         // Accessors...
         T* data_;
         SyclVector<T*> data_ptrs_;
         int size_, ldc_;
+
+        private:
+            void* backend_handle_;
     };
 
     template <typename T>
-    struct VecHandle<T, BatchType::Batched> {
-        VecHandle(T* data, int size, int ldc, int stride, int batch_size) 
+    struct DenseVecHandle<T, BatchType::Batched> {
+        DenseVecHandle(T* data, int size, int ldc, int stride, int batch_size) 
             : data_(data), size_(size), ldc_(ldc), stride_(stride), batch_size_(batch_size) {}
         // Accessors...
         T* data_;
         int size_, ldc_, stride_, batch_size_;
+
+        private:
+            void* backend_handle_;
+    };
+
+    template <typename T>
+    struct SparseVecHandle<T, BatchType::Single> {
+        SparseVecHandle(T* data, int* indices, int size) : data_(data), indices_(indices), size_(size) {}
+        // Accessors...
+        T* data_;
+        int* indices_;
+        int size_;
+
+        private:
+            void* backend_handle_;
+    };
+
+    template <typename T>
+    struct SparseVecHandle<T, BatchType::Batched> {
+        SparseVecHandle(T* data, int* indices, int size, int stride, int batch_size) 
+            : data_(data), indices_(indices), size_(size), stride_(stride), batch_size_(batch_size) {}
+        // Accessors...
+        T* data_;
+        int* indices_;
+        int size_, stride_, batch_size_;
+
+        private:
+            void* backend_handle_;
     };
 
     template <Backend B, typename T, BatchType BT>
@@ -235,7 +278,7 @@ namespace linalg{
     size_t potrf_buffer_size(SyclQueue& ctx,
                                 DenseMatHandle<T,BT>& A,
                                 Uplo uplo);
-
+ 
     template <Backend B, typename T, BatchType BT>
     SyclEvent potrf(SyclQueue& ctx,
                     DenseMatHandle<T,BT>& descrA,
