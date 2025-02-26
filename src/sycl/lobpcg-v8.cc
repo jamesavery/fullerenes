@@ -21,6 +21,11 @@
 #include <cuda_runtime_api.h>
 #include "primitives.cc"
 #include <iomanip>
+#include <fullerenes/mempool.hh>
+#include "../linalg/linalg-impl.hh"
+#include "linalg/batched/QR/chol_qr.cc"
+
+
 #define CEIL_DIV(x, y) (((x) + (y) - 1) / (y))
 #define DECLARE_SUBSPACE\
     auto subspace = S_acc.subspan(bid * BlockVectors*3 * m, BlockVectors * m * 3);\
@@ -52,38 +57,6 @@ template <typename T, typename K, int BlockVectors, int NZ> class LOBPCG_V8_3 {}
 template <typename T, typename K, int BlockVectors, int NZ> class LOBPCG_V8_4 {};
 
 using namespace sycl;
-
-template <typename T>
-void print_matrix(Span<T> matrix, int rows, int cols, bool transpose = false) {
-    std::cout << std::fixed << std::setprecision(6);
-    if (!transpose) {
-        std::cout << "[\n";
-        for (int i = 0; i < rows; i++) {
-            std::cout << "  [";
-            for (int j = 0; j < cols; j++) {
-                std::cout << std::setw(10) << matrix[i * cols + j];
-                if (j < cols - 1) std::cout << ", ";
-            }
-            std::cout << "]";
-            if (i < rows - 1) std::cout << ",";
-            std::cout << "\n";
-        }
-        std::cout << "]\n";
-    } else {
-        std::cout << "[\n";
-        for (int i = 0; i < cols; i++) { // Outer loop is cols for correct transposition
-            std::cout << "  [";
-            for (int j = 0; j < rows; j++) {
-                std::cout << std::setw(10) << matrix[j * cols + i]; // Transposed indexing
-                if (j < rows - 1) std::cout << ", ";
-            }
-            std::cout << "]";
-            if (i < cols - 1) std::cout << ",";
-            std::cout << "\n";
-        }
-        std::cout << "]\n";
-    }   
-}
 
 template <typename T, int SN>
 void inPlaceMatMatMul(sycl::group<1>& cta, Span<T> A, Span<T> B, int m, bool largest){
@@ -542,7 +515,9 @@ void Ortho(SyclQueue& ctx, Span<T*> S_ptrs /* Candidate Basis [k,CandDim] */,
                             size_t batch_size){
     for(int i = 0; i < 2; i++){
         ExternalOrthogonalization<T, ExtDim, CandDim>(ctx, Span<T>(S_ptrs.front(),CandStride*batch_size), Span<T>(E_ptrs.front(),ExtStride*batch_size), U, k, ExtStride, CandStride, batch_size);
-        Chol2QR<T, CandDim>(ctx, S_ptrs, StS_ptrs, k, batch_size);
+        //Chol2QR<T, CandDim>(ctx, S_ptrs, StS_ptrs, k, batch_size);
+        chol2_qr_batched_buffer_size(ctx, false, batch_size, CandStride, k, CandDim, Span<T>(S_ptrs.front(),CandStride*batch_size));
+        chol2_qr_batched(ctx, false, batch_size, CandStride, k, CandDim, Span<T>(S_ptrs.front(),CandStride*batch_size), U.template as_span<std::byte>());
     }
 }
                             
@@ -755,44 +730,40 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
     });
     ctx.wait();
     CholQR<T, BlockVectors>(ctx, S_ptrs, STS_ptrs, m, batch_size);
+    linalg::SparseMatHandle<T, Format::CSR, BatchType::Batched> handleA(A.data(), csr_row_offsets.data(), cols_32I.data(), m*NZ, m, m, m*NZ, batch_size);
+    linalg::DenseMatHandle<T, BatchType::Batched> handleS(S.data(), m, BlockVectors*3, m, m*3*BlockVectors, batch_size);
+    linalg::DenseMatHandle<T, BatchType::Batched> handleX(S.data(), m, BlockVectors, m, m*3*BlockVectors, batch_size);
+    linalg::DenseMatHandle<T, BatchType::Batched> handleR(S.data() + 2*BlockVectors*m, m, BlockVectors, m, m*3*BlockVectors, batch_size);
+    linalg::DenseMatHandle<T, BatchType::Batched> handleP(S.data() + BlockVectors*m, m, BlockVectors, m, m*3*BlockVectors, batch_size);
+    linalg::DenseMatHandle<T, BatchType::Batched> handleAS(AS.data(), m, BlockVectors*3, m, m*3*BlockVectors, batch_size);
+    linalg::DenseMatHandle<T, BatchType::Batched> handleAX(AS.data(), m, BlockVectors, m, m*3*BlockVectors, batch_size);
+    linalg::DenseMatHandle<T, BatchType::Batched> handleAR(AS.data() + 2*BlockVectors*m, m, BlockVectors, m, m*3*BlockVectors, batch_size);
+    linalg::DenseMatHandle<T, BatchType::Batched> handleAP(AS.data() + BlockVectors*m, m, BlockVectors, m, m*3*BlockVectors, batch_size);
+    linalg::DenseMatHandle<T, BatchType::Batched> handleXtAX(StAS.data(), BlockVectors, BlockVectors, BlockVectors, BlockVectors*BlockVectors, batch_size);
+    linalg::DenseMatHandle<T, BatchType::Batched> handleStAS(StAS.data(), BlockVectors*3, BlockVectors*3, BlockVectors*3, BlockVectors*3*3*BlockVectors, batch_size);
+    linalg::DenseMatHandle<T, BatchType::Batched> handleS_restart(S.data(), m, BlockVectors*2, m, m*3*BlockVectors, batch_size);
+    linalg::DenseMatHandle<T, BatchType::Batched> handleAS_restart(AS.data(), m, BlockVectors*2, m, m*3*BlockVectors, batch_size);
+    linalg::DenseMatHandle<T, BatchType::Batched> handleStAS_restart(StAS.data(), BlockVectors*2, BlockVectors*2, BlockVectors*2, BlockVectors*2*2*BlockVectors, batch_size);
+    linalg::DenseMatHandle<T, BatchType::Batched> handleU(U.data(), m, BlockVectors*3, m, m*3*BlockVectors, batch_size);
+    linalg::DenseMatHandle<T, BatchType::Batched> handleStemp(S_temp.data(), m, BlockVectors*3, m, m*3*BlockVectors, batch_size);
+    linalg::DenseMatHandle<T, BatchType::Batched> handleC_p(C_p.data(), BlockVectors*3, BlockVectors, BlockVectors*3, BlockVectors*3*BlockVectors, batch_size);
+    linalg::DenseMatHandle<T, BatchType::Batched> handleC_p_restart(C_p.data(), BlockVectors*2, BlockVectors, BlockVectors*2, BlockVectors*3*BlockVectors, batch_size);
+    linalg::DenseMatHandle<T, BatchType::Batched> handleP_new(U.data() + m*BlockVectors, m, BlockVectors, m, m*3*BlockVectors, batch_size);
+    linalg::DenseMatHandle<T, BatchType::Batched> handleAP_new(S_temp.data() + m*BlockVectors, m, BlockVectors, m, m*3*BlockVectors, batch_size);
+    SyclVector<std::byte> spmm_workspace(linalg::spmm_buffer_size<Backend::CUDA>(ctx, handleA, handleS, handleAS, alpha, beta, Transpose::NoTrans, Transpose::NoTrans));
+    SyclVector<std::byte> syev_workspace(linalg::syev_buffer_size<Backend::CUDA>(ctx, handleStAS, lambdas.to_span(), Uplo::Lower));
+
 
     //Compute AX
-    auto SpMM_status = cusparseSpMM(SpMM_AS_handle, 
-                                    CUSPARSE_OPERATION_NON_TRANSPOSE,
-                                    CUSPARSE_OPERATION_NON_TRANSPOSE,
-                                    &alpha,
-                                    descrA,
-                                    descrX,
-                                    &beta,
-                                    descrAX,
-                                    CUDA_R_32F,
-                                    CUSPARSE_SPMM_CSR_ALG1,
-                                    SpMM_buffer.data());
-
-    cudaStreamSynchronize(stream);
+    linalg::spmm<Backend::CUDA>(ctx, handleA, handleX, handleAX, alpha, beta, Transpose::NoTrans, Transpose::NoTrans, spmm_workspace.to_span());
     
     //Compute X^T AX
+    linalg::gemm<Backend::CUDA>(ctx, handleX, handleAX, handleXtAX, alpha, beta, Transpose::Trans, Transpose::NoTrans);
 
-    auto gemm_status = cublasSgemmStridedBatched(GEMM_STAS_handle,
-                                                CUBLAS_OP_T,
-                                                CUBLAS_OP_N,
-                                                BlockVectors,
-                                                BlockVectors,
-                                                m,
-                                                &alpha,
-                                                S.data(), 
-                                                m, m*3*BlockVectors,
-                                                AS.data(),
-                                                m, m*3*BlockVectors,
-                                                &beta,
-                                                StAS.data(),
-                                                BlockVectors, 
-                                                BlockVectors * BlockVectors,
-                                                batch_size); 
-    cudaStreamSynchronize(stream);
-    //ComputeGramMatrix<T, BlockVectors>(ctx, S, StAS, m, BlockVectors*3*m, batch_size);
-    compute_eigenpairs(StAS.data(), lambdas.data(), BlockVectors, batch_size);
-    cudaStreamSynchronize(stream);
+    //Solve the eigenvalue problem
+    linalg::syev<Backend::CUDA>(ctx, handleXtAX, lambdas.to_span(), Uplo::Lower, syev_workspace.to_span());
+    ctx.wait();
+
 
     ctx -> submit([&](sycl::handler& h){
         auto Scache = sycl::local_accessor<T, 1>(m, h);
@@ -896,12 +867,6 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
         }
         end = std::chrono::high_resolution_clock::now();
         Tortho += end - start;
-        /* ComputeGramMatrix<T, BlockVectors*3>(ctx, S_acc, StAS_acc, m, SubspaceStride, batch_size);
-        for (int i = 0; i < batch_size; i++ ){
-            std::cout << "StS matrix " << i << std::endl;
-            print_matrix(StAS.subspan(i * BlockVectors * 3 * BlockVectors * 3, BlockVectors * 3 * BlockVectors * 3), 3*BlockVectors, 3*BlockVectors, false);
-            
-        } */
 
         start = std::chrono::high_resolution_clock::now();
         //Strided Copy Kernel:
@@ -929,40 +894,16 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
 
         start = std::chrono::high_resolution_clock::now();
         //Compute AR
-        auto SpMM_status = cusparseSpMM(SpMM_AS_handle, 
-                                        CUSPARSE_OPERATION_NON_TRANSPOSE,
-                                        CUSPARSE_OPERATION_NON_TRANSPOSE,
-                                        &alpha,
-                                        descrA,
-                                        restart ? descrP : descrR,
-                                        &beta,
-                                        restart ? descrAP: descrAR,
-                                        CUDA_R_32F,
-                                        CUSPARSE_SPMM_CSR_ALG1,
-                                        SpMM_buffer.data());
+        linalg::spmm<Backend::CUDA>(ctx, handleA, restart ? handleP : handleR, restart ? handleAP : handleAR, alpha, beta, Transpose::NoTrans, Transpose::NoTrans, spmm_workspace.to_span());
+        
 
         cudaStreamSynchronize(stream);
         end = std::chrono::high_resolution_clock::now();
         Tspmm += end - start;        
 
         start = std::chrono::high_resolution_clock::now();
-        //Compute X^T AX
-        auto gemm_status = cublasSgemmStridedBatched(GEMM_STAS_handle,
-                                                    CUBLAS_OP_T,
-                                                    CUBLAS_OP_N,
-                                                    BlockVectors * (restart ? 2 : 3),
-                                                    BlockVectors * (restart ? 2 : 3),
-                                                    m,
-                                                    &alpha,
-                                                    S.data(), 
-                                                    m, m*3*BlockVectors,
-                                                    AS.data(),
-                                                    m, m*3*BlockVectors,
-                                                    &beta,
-                                                    StAS.data(),
-                                                    BlockVectors * (restart ? 2: 3), 
-                                                    BlockVectors * (restart ? 2*2: 3*3) * BlockVectors,
-                                                    batch_size); 
+        //Compute S^T A S
+        linalg::gemm<Backend::CUDA>(ctx, restart ? handleS_restart : handleS, restart ? handleAS_restart : handleAS, restart ? handleStAS_restart : handleStAS, alpha, beta, Transpose::Trans, Transpose::NoTrans);
 
         //Solve the eigenvalue problem
         cudaStreamSynchronize(stream);
@@ -970,7 +911,9 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
         Tgemm += end - start;
 
         start = std::chrono::high_resolution_clock::now();
-        compute_eigenpairs(StAS.data(), lambdas.data(), restart ? BlockVectors*2 : BlockVectors*3, batch_size);
+        //compute_eigenpairs(StAS.data(), lambdas.data(), restart ? BlockVectors*2 : BlockVectors*3, batch_size);
+        linalg::syev<Backend::CUDA>(ctx, restart ? handleStAS_restart : handleStAS, lambdas.to_span(), Uplo::Lower, syev_workspace.to_span());
+        ctx.wait();
         cudaStreamSynchronize(stream);
         end = std::chrono::high_resolution_clock::now();
         Teigen += end - start;
@@ -1030,44 +973,11 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
         Tmemcpy += end - start;
         start = std::chrono::high_resolution_clock::now();
         //Compute X = [X, R, P] * [Zx, Zr, Zp]^T
-        
-        cublasSgemmStridedBatched(GEMM_STAS_handle,
-                                CUBLAS_OP_N,
-                                CUBLAS_OP_N,
-                                m,
-                                BlockVectors,
-                                BlockVectors * (restart ? 2 : 3),
-                                &alpha,
-                                S.data(),
-                                m, m*3*BlockVectors,
-                                StAS.data(),
-                                BlockVectors * (restart ? 2 : 3),
-                                BlockVectors * (restart ? 2*2 : 3*3) * BlockVectors,
-                                &beta,
-                                U.data(),
-                                m,
-                                m*3*BlockVectors,
-                                batch_size);
-
+        linalg::gemm<Backend::CUDA>(ctx, restart ? handleS_restart : handleS, restart ? handleStAS_restart : handleStAS, handleU, alpha, beta, Transpose::NoTrans, Transpose::NoTrans); 
         //Make an implicit update of AX:
-        cublasSgemmStridedBatched(  GEMM_STAS_handle,
-                                    CUBLAS_OP_N,
-                                    CUBLAS_OP_N,
-                                    m,
-                                    BlockVectors,
-                                    BlockVectors * (restart ? 2 : 3),
-                                    &alpha,
-                                    AS.data(),
-                                    m, m*3*BlockVectors,
-                                    StAS.data(),
-                                    BlockVectors * (restart ? 2 : 3),
-                                    BlockVectors * (restart ? 2*2 : 3*3) * BlockVectors,
-                                    &beta,
-                                    S_temp.data(),
-                                    m,
-                                    m*3*BlockVectors,
-                                    batch_size);
+        linalg::gemm<Backend::CUDA>(ctx, restart ? handleAS_restart : handleAS, restart ? handleStAS_restart : handleStAS, handleStemp, alpha, beta, Transpose::NoTrans, Transpose::NoTrans);
 
+        ctx.wait();
         cudaStreamSynchronize(stream);
         end = std::chrono::high_resolution_clock::now();
         Tupdate += end - start;
@@ -1084,44 +994,12 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
         start = std::chrono::high_resolution_clock::now();
         end = std::chrono::high_resolution_clock::now();
         Tmemcpy += end - start;
-        //First compute P = [X, R, P] * C_p^T
+        //First compute P = [X, R, P] * C_p
         start = std::chrono::high_resolution_clock::now();
-        cublasSgemmStridedBatched(GEMM_STAS_handle,
-                                CUBLAS_OP_N,
-                                CUBLAS_OP_N,
-                                m, /* m */
-                                BlockVectors, /* n */
-                                BlockVectors * (restart ? 2 : 3), /* k */
-                                &alpha, /* alpha */
-                                S.data(),    /* A */
-                                m, m*3*BlockVectors, /* lda, strideA */
-                                C_p.data(), /* B */
-                                BlockVectors * (restart ? 2 : 3), /* ldb */
-                                BlockVectors * 3 * BlockVectors, /* strideB */
-                                &beta, /* beta */
-                                U.data() + BlockVectors*1*m, /* C */
-                                m, /* ldc */
-                                m*3*BlockVectors, /* strideC */
-                                batch_size);
-        
+
+        linalg::gemm<Backend::CUDA>(ctx, restart ? handleS_restart : handleS, restart ? handleC_p_restart : handleC_p, handleP_new, alpha, beta, Transpose::NoTrans, Transpose::NoTrans);
         //Make an implicit update of AP:
-        cublasSgemmStridedBatched(  GEMM_STAS_handle,
-                                    CUBLAS_OP_N,
-                                    CUBLAS_OP_N,
-                                    m,
-                                    BlockVectors,
-                                    BlockVectors * (restart ? 2 : 3),
-                                    &alpha,
-                                    AS.data(),
-                                    m, m*3*BlockVectors,
-                                    C_p.data(),
-                                    BlockVectors * (restart ? 2 : 3),
-                                    BlockVectors * 3 * BlockVectors,
-                                    &beta,
-                                    S_temp.data() + m*BlockVectors*1,
-                                    m,
-                                    m*3*BlockVectors,
-                                    batch_size);
+        linalg::gemm<Backend::CUDA>(ctx, restart ? handleAS_restart : handleAS, restart ? handleC_p_restart : handleC_p, handleAP_new, alpha, beta, Transpose::NoTrans, Transpose::NoTrans);
 
         cudaStreamSynchronize(stream);
         end = std::chrono::high_resolution_clock::now();
