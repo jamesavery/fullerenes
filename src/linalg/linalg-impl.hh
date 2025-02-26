@@ -1,7 +1,9 @@
+#pragma once
 #include <fullerenes/linalg.hh>
 #include "../sycl/queue-impl.cc"
 #include <sycl/sycl.hpp>
 #include <fullerenes/mempool.hh>
+#include <execution>
 
 #define USE_CUDA
 #ifdef USE_CUDA

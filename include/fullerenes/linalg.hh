@@ -3,6 +3,8 @@
 #include <fullerenes/sycl-headers/sycl-device-queue.hh>
 #include <fullerenes/sycl-headers/sycl-span.hh>
 #include <fullerenes/sycl-headers/sycl-vector.hh>
+#include <memory>
+#include <array>  // Add this include at the top with other includes
 
 namespace linalg{
     enum class Backend {
@@ -52,6 +54,14 @@ namespace linalg{
     enum class Side {
         Left,
         Right
+    };
+    
+    enum class OrthoAlgorithm {
+        Chol2,      //Default
+        Cholesky,   //Rarely sufficient
+        ShiftChol3, //More stable than Chol2
+        Householder, //Most numerically stable
+        ModifiedGramSchmidt
     };
     
     //Some of the types are not supported by all backends, compilation errors will make this apparent
@@ -389,6 +399,84 @@ namespace linalg{
         private:
             std::unique_ptr<BackendSparseVectorHandle<T>> backend_handle_;
     };
+    
+
+    namespace detail {
+        // Type trait to check for complex or floating point types
+        template<typename T>
+        struct is_complex_or_floating_point : 
+            std::bool_constant<std::is_floating_point_v<T> || 
+                             std::is_same_v<T, std::complex<float>> || 
+                             std::is_same_v<T, std::complex<double>>> {};
+
+        template<Backend B>
+        [[noreturn]] void throw_unsupported() {
+            throw std::runtime_error("Operation not supported for selected backend: " + std::to_string(static_cast<int>(B)));
+        }
+
+        template<typename T>
+        using enable_if_scalar_t = typename std::enable_if<
+            is_complex_or_floating_point<T>::value
+        >::type;
+
+        // Base template for CRTP-style function declarations
+        /* template<typename Name, typename RetType>
+        struct LinalgFuncBase {
+            // Default implementation that throws
+            template <Backend B, typename T, BatchType BT, typename... Args>
+            static RetType impl(detail::fallback_tag, Args&&... args) {
+                detail::throw_unsupported<B>();
+            }
+
+            // Backend-specific version declaration
+            template <Backend B, typename T, BatchType BT, typename... Args>
+            static RetType impl(detail::backend_tag<B>, Args&&... args);
+
+            // Wrapper that forwards to implementation with appropriate tag
+            template <Backend B, typename T, BatchType BT, typename... Args>
+            static RetType call(Args&&... args) {
+                return impl<B, T, BT>(detail::backend_tag<B>{}, std::forward<Args>(args)...);
+            }
+
+            // Auto-dispatching version
+            template <typename T, BatchType BT, typename... Args>
+            static RetType dispatch(SyclQueue& ctx, Args&&... args) {
+                Backend backend = BackendSelector::get(ctx);
+                
+                switch (backend) {
+                    case Backend::CUDA:
+                        #ifdef USE_CUDA
+                            return impl<Backend::CUDA, T, BT>(detail::backend_tag<Backend::CUDA>{}, std::forward<Args>(args)...);
+                        #endif
+                    case Backend::ROCM:
+                        #ifdef USE_ROCM
+                            return impl<Backend::ROCM, T, BT>(detail::backend_tag<Backend::ROCM>{}, std::forward<Args>(args)...);
+                        #endif
+                    case Backend::MKL:
+                        #ifdef USE_MKL
+                            return impl<Backend::MKL, T, BT>(detail::backend_tag<Backend::MKL>{}, std::forward<Args>(args)...);
+                        #endif
+                    case Backend::MAGMA:
+                        #ifdef USE_MAGMA
+                            return impl<Backend::MAGMA, T, BT>(detail::backend_tag<Backend::MAGMA>{}, std::forward<Args>(args)...);
+                        #endif
+                    case Backend::SYCL:
+                        #ifdef USE_SYCL
+                            return impl<Backend::SYCL, T, BT>(detail::backend_tag<Backend::SYCL>{}, std::forward<Args>(args)...);
+                        #endif
+                    case Backend::NETLIB:
+                        return impl<Backend::NETLIB, T, BT>(detail::backend_tag<Backend::NETLIB>{}, std::forward<Args>(args)...);
+                    default:
+                        return impl<Backend::AUTO, T, BT>(detail::fallback_tag{}, std::forward<Args>(args)...);
+                }
+            }
+        }; */
+    }
+    /* struct Gemm : detail::LinalgFuncBase<Gemm, SyclEvent> {};
+    struct Trsm : detail::LinalgFuncBase<Trsm, SyclEvent> {};
+    struct Potrf : detail::LinalgFuncBase<Potrf, SyclEvent> {};
+    struct PotrfBufferSize : detail::LinalgFuncBase<PotrfBufferSize, size_t> {}; */
+
 
     template <Backend B, typename T, BatchType BT>
     SyclEvent gemm(SyclQueue& ctx,
