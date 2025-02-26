@@ -11,8 +11,22 @@ namespace linalg{
         ROCM,
         MKL,
         MAGMA,
-        SYCL
+        SYCL,
+        NETLIB
         // Add more as needed
+    };
+
+    enum class BackendLibrary {
+        CUBLAS,     //Belongs to CUDA backend
+        CUSPARSE,   //Belongs to CUDA backend
+        CUSOLVER,   //Belongs to CUDA backend
+        ROCBLAS,    //Belongs to ROCM backend
+        ROCSPARSE,  //Belongs to ROCM backend
+        ROCSOLVER,  //Belongs to ROCM backend
+        MAGMA,      //Belongs to MAGMA backend
+        MKL,        //Belongs to MKL backend
+        NETLIB,     //Belongs to NETLIB backend
+        LAPACK      //Belongs to NETLIB backend
     };
 
     enum class BatchType {
