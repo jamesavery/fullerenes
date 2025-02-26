@@ -323,201 +323,18 @@ void ExternalOrthogonalization(SyclQueue& ctx,  Span<T> S  /* Candidate Basis [k
     cudaDeviceSynchronize();
 }
 
-template <typename T, int SN>
-void ComputeGramMatrix(SyclQueue& ctx, Span<T> A,
-                                        Span<T> Gram,
-                                        size_t m,
-                                        size_t Astride,
-                                        size_t batch_size){
-    static cublasHandle_t handle;
-    static size_t stored_SN = 0;
-    if (stored_SN != SN){
-        cublasCreate(&handle);
-        stored_SN = SN;
-    }
-    constexpr T alpha = 1.0;
-    constexpr T beta = 0.0;
-    cublasSgemmStridedBatched(handle, CUBLAS_OP_T, CUBLAS_OP_N,
-                                SN, /* m */
-                                SN, /* n */
-                                m, /* k */
-                                &alpha, /* alpha */
-                                A.data(), /* A */
-                                m, /* lda */
-                                Astride, /* strideA */
-                                A.data(), /* B */
-                                m, /* ldb */
-                                Astride, /* strideB */
-                                &beta, /* beta */
-                                Gram.data(), /* C */
-                                SN, /* ldc */
-                                SN*SN, /* strideC */
-                                batch_size);
-    cudaDeviceSynchronize();
-}
-
-
-template <typename T, int SN>
-void CholQR(SyclQueue &ctx, Span<T*> S_ptrs /* Subspace */,
-                            Span<T*> STS_ptrs /* Subspace Gram Matrix*/,
-                            size_t m,
-                            size_t batch_size){
-    static cublasHandle_t blas_handle;
-    static cusolverDnHandle_t solver_handle;
-    static SyclVector<int> d_info(batch_size);    
-    static bool initialized = false;
-    if (!initialized){
-        cublasCreate(&blas_handle);
-        cusolverDnCreate(&solver_handle);
-        initialized = true;
-    }
-
-    auto S_stride = batch_size > 1 ? std::distance(S_ptrs[0], S_ptrs[1]) : m*SN;
-    auto STS_stride = batch_size > 1 ? std::distance(STS_ptrs[0], STS_ptrs[1]) : SN*SN;
-
-    constexpr T alpha = 1.0;
-    constexpr T beta = 0.0;
-
-    //Compute StS = S^T * S
-    cublasSgemmStridedBatched(blas_handle, CUBLAS_OP_T, CUBLAS_OP_N,
-                                SN, /* m */
-                                SN, /* n */
-                                m, /* k */
-                                &alpha, /* alpha */
-                                S_ptrs.front(), /* A */
-                                m, /* lda */
-                                S_stride, /* strideA */
-                                S_ptrs.front(), /* B */
-                                m, /* ldb */
-                                S_stride, /* strideB */
-                                &beta, /* beta */
-                                STS_ptrs.front(), /* C */
-                                SN, /* ldc */
-                                STS_stride, /* strideC */
-                                batch_size);
-
-
-    cudaDeviceSynchronize();
-
-    //Compute the Cholesky Factorization of StS
-    cusolverDnSpotrfBatched(solver_handle, CUBLAS_FILL_MODE_LOWER, SN, STS_ptrs.data(), SN, d_info.data(), batch_size);
-    //cublasSgetrfBatched(blas_handle, SN, Sts_ptrs.data(), SN, NULL, d_info.data(), batch_size);
-    cudaDeviceSynchronize();
-    //Compute Q = S * StS^-1
-    cublasStrsmBatched( blas_handle,
-                        CUBLAS_SIDE_RIGHT, 
-                        CUBLAS_FILL_MODE_LOWER, 
-                        CUBLAS_OP_T, 
-                        CUBLAS_DIAG_NON_UNIT, 
-                        m, 
-                        SN, 
-                        &alpha, 
-                        STS_ptrs.data(), 
-                        SN, 
-                        S_ptrs.data(), 
-                        m, batch_size);
-    cudaDeviceSynchronize();
-}
-
-template <typename T, int SN>
-void Chol2QR(SyclQueue &ctx, Span<float*> S_ptrs /* Subspace */,
-                            Span<float*> STS_ptrs /* Subspace Gram Matrix*/,
-                            size_t m,
-                            size_t batch_size){
-    CholQR<T,SN>(ctx, S_ptrs, STS_ptrs, m, batch_size);
-    CholQR<T,SN>(ctx, S_ptrs, STS_ptrs, m, batch_size);
-}
-
-template <typename T, int SN>
-void ShiftCholQR3(SyclQueue &ctx, Span<T*> S_ptrs /* Subspace */,
-                            Span<T*> STS_ptrs /* Subspace Gram Matrix*/,
-                            size_t m,
-                            size_t batch_size){
-    static cublasHandle_t blas_handle;
-    static cusolverDnHandle_t solver_handle;
-    static bool initialized = false;
-    static SyclVector<int> d_info(batch_size);    
-    if (!initialized){
-        cublasCreate(&blas_handle);
-        cusolverDnCreate(&solver_handle);
-        initialized = true;
-    }
-
-    auto S_stride = batch_size > 1 ? std::distance(S_ptrs[0], S_ptrs[1]) : m*SN;
-    auto STS_stride = batch_size > 1 ? std::distance(STS_ptrs[0], STS_ptrs[1]) : SN*SN;
-
-    constexpr T alpha = 1.0;
-    constexpr T beta = 0.0;
-
-    //Compute StS = S^T * S
-    cublasSgemmStridedBatched(blas_handle, CUBLAS_OP_T, CUBLAS_OP_N,
-                                SN, /* m */
-                                SN, /* n */
-                                m, /* k */
-                                &alpha, /* alpha */
-                                S_ptrs.front(), /* A */
-                                m, /* lda */
-                                S_stride, /* strideA */
-                                S_ptrs.front(), /* B */
-                                m, /* ldb */
-                                S_stride, /* strideB */
-                                &beta, /* beta */
-                                STS_ptrs.front(), /* C */
-                                SN, /* ldc */
-                                STS_stride, /* strideC */
-                                batch_size);
-
-    ctx -> submit([&](sycl::handler& h){
-        h.parallel_for(nd_range<1>(sycl::range{size_t(batch_size*SN)}, sycl::range{size_t(SN)}), [=](sycl::nd_item<1> item){
-            auto tid = item.get_local_linear_id();
-            auto bid = item.get_group_linear_id();
-            auto cta = item.get_group();
-            auto STS_acc = STS_ptrs[bid];
-            
-            auto g_norm = sycl::reduce_over_group(cta, sycl::sqrt(STS_acc[tid*SN + tid]), sycl::maximum<T>());
-            auto eps = std::numeric_limits<T>::epsilon();
-            auto shift = T(11.0) * (m*SN*eps +(SN + 1)*SN*eps) * g_norm;
-            STS_acc[tid*SN + tid] += shift;
-        });
-    });
-    ctx.wait();
-
-    //Compute the Cholesky Factorization of StS
-    cusolverDnSpotrfBatched(solver_handle, CUBLAS_FILL_MODE_LOWER, SN, STS_ptrs.data(), SN, d_info.data(), batch_size);
-    //cublasSgetrfBatched(blas_handle, SN, Sts_ptrs.data(), SN, NULL, d_info.data(), batch_size);
-    cudaDeviceSynchronize();
-    //Compute Q = S * StS^-1
-    cublasStrsmBatched( blas_handle,
-                        CUBLAS_SIDE_RIGHT, 
-                        CUBLAS_FILL_MODE_LOWER, 
-                        CUBLAS_OP_T, 
-                        CUBLAS_DIAG_NON_UNIT, 
-                        m, 
-                        SN, 
-                        &alpha, 
-                        STS_ptrs.data(), 
-                        SN, 
-                        S_ptrs.data(), 
-                        m, batch_size);
-    cudaDeviceSynchronize();
-
-    Chol2QR<T,SN>(ctx, S_ptrs, STS_ptrs, m, batch_size);
-}
-
 template <typename T, int ExtDim, int CandDim>
-void Ortho(SyclQueue& ctx, Span<T*> S_ptrs /* Candidate Basis [k,CandDim] */, 
-                            Span<T*> E_ptrs /* External Basis [k,ExtDim] */,
-                            Span<T*> StS_ptrs /* Subspace Gram Matrix [k, CandDim] */,
+void Ortho(SyclQueue& ctx, Span<T> S /* Candidate Basis [k,CandDim] */, 
+                            Span<T> E /* External Basis [k,ExtDim] */,
                             Span<T> U /* Workspace [ExtDim * CandDim] */,
                             size_t k,
                             size_t ExtStride,
                             size_t CandStride,
                             size_t batch_size){
     for(int i = 0; i < 2; i++){
-        ExternalOrthogonalization<T, ExtDim, CandDim>(ctx, Span<T>(S_ptrs.front(),CandStride*batch_size), Span<T>(E_ptrs.front(),ExtStride*batch_size), U, k, ExtStride, CandStride, batch_size);
+        ExternalOrthogonalization<T, ExtDim, CandDim>(ctx, S, E, U, k, ExtStride, CandStride, batch_size);
         //Chol2QR<T, CandDim>(ctx, S_ptrs, StS_ptrs, k, batch_size);
-        chol2_qr_batched_buffer_size(ctx, false, batch_size, CandStride, k, CandDim, Span<T>(S_ptrs.front(),CandStride*batch_size));
-        chol2_qr_batched(ctx, false, batch_size, CandStride, k, CandDim, Span<T>(S_ptrs.front(),CandStride*batch_size), U.template as_span<std::byte>());
+        chol2_qr_batched(ctx, false, batch_size, CandStride, k, CandDim, S, U.template as_span<std::byte>());
     }
 }
                             
@@ -537,6 +354,9 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
     auto AS_acc = AS.to_span();
     auto X0_acc = X0.to_span();
     auto StAS_acc = StAS.to_span();
+    constexpr T alpha = 1.0;
+    constexpr T beta = 0.0;
+    auto SubspaceStride = m*BlockVectors*3;
 
     SyclVector<int> cols_32I(cols.size());
     primitives::transform(ctx, cols, cols_32I, [](K i){return static_cast<int>(i);});
@@ -552,137 +372,9 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
     primitives::transform(ctx, csr_row_offsets, csr_row_offsets, [&](int i){return i * NZ;}); 
 
     auto lambda_acc = lambdas.to_span();
-
-    cusolverDnHandle_t handle{};
-    cudaStream_t stream{};
-    cusolverDnParams_t params{};
-    cusolverDnCreate(&handle);
-    cudaStreamCreate(&stream);
-    cusolverDnSetStream(handle, stream);
-    cusolverDnCreateParams(&params);
     /* LOBPCG_Helper<T, K> helper(stream, BlockVectors,
                                 m, NZ, batch_size, A.data(), cols.data(), csr_row_offsets.data(),
                                 S.data(), StAS.data(), S.data() + BlockVectors*9*m, lambdas.data()); */
-     
-    #if (SOLVER_BACKEND == CUSOLVER_BACKEND)
-        T alpha = 1.0;
-        T beta = 0.0;
-        cusolverDnXsyevBatched_bufferSize(handle, 
-                                params, 
-                                CUSOLVER_EIG_MODE_VECTOR, 
-                                CUBLAS_FILL_MODE_LOWER,
-                                m,
-                                std::is_same_v<T, float> ? CUDA_R_32F : CUDA_R_64F,
-                                A.data(),
-                                m,
-                                std::is_same_v<T, float> ? CUDA_R_32F : CUDA_R_64F,
-                                lambdas.data(),
-                                std::is_same_v<T, float> ? CUDA_R_32F : CUDA_R_64F,
-                                &syevd_scratchpad_size,
-                                &syevd_scratchpad_host_size,
-                                batch_size);
-
-        cusparseHandle_t SpMM_AS_handle;
-        CHECK_CUSPARSE(cusparseCreate(&SpMM_AS_handle))
-        CHECK_CUSPARSE(cusparseSetStream(SpMM_AS_handle, stream))
-        cusparseSpMatDescr_t descrA;    //Left matrix
-        cusparseDnMatDescr_t descrX;    //Right matrix
-        cusparseDnMatDescr_t descrR;    //Block Residual matrix
-        cusparseDnMatDescr_t descrP;    //Block Previous matrix
-        cusparseDnMatDescr_t descrS;    //The full subspace matrix [X, R, P]
-        cusparseDnMatDescr_t descrAX;  //The result of the matrix matrix multiplication
-        cusparseDnMatDescr_t descrAR; //The result of the matrix matrix multiplication
-        cusparseDnMatDescr_t descrAS;  //The result of the matrix matrix multiplication
-        cusparseDnMatDescr_t descrAP;  //The result of the matrix matrix multiplication
-        CHECK_CUSPARSE(cusparseCreateCsr(  &descrA,    m,  m, m*NZ, csr_row_offsets.data(), cols_32I.data(), A.data(), CUSPARSE_INDEX_32I, CUSPARSE_INDEX_32I, CUSPARSE_INDEX_BASE_ZERO, CUDA_R_32F))
-        CHECK_CUSPARSE(cusparseCreateDnMat(&descrX,    m,  BlockVectors,   m,  S.data(),   CUDA_R_32F, CUSPARSE_ORDER_COL))
-        CHECK_CUSPARSE(cusparseCreateDnMat(&descrR,    m,  BlockVectors,   m,  S.data() +  2*BlockVectors*m,   CUDA_R_32F, CUSPARSE_ORDER_COL)) 
-        CHECK_CUSPARSE(cusparseCreateDnMat(&descrP,    m,  BlockVectors,   m,  S.data() +  1*BlockVectors*m,   CUDA_R_32F, CUSPARSE_ORDER_COL))
-        CHECK_CUSPARSE(cusparseCreateDnMat(&descrS,    m,  BlockVectors*3, m,  S.data(),   CUDA_R_32F, CUSPARSE_ORDER_COL))
-        CHECK_CUSPARSE(cusparseCreateDnMat(&descrAX,   m,  BlockVectors,   m,  AS.data(),  CUDA_R_32F, CUSPARSE_ORDER_COL))
-        CHECK_CUSPARSE(cusparseCreateDnMat(&descrAR,   m,  BlockVectors,   m,  AS.data() + 2*BlockVectors*m,  CUDA_R_32F, CUSPARSE_ORDER_COL))
-        CHECK_CUSPARSE(cusparseCreateDnMat(&descrAP,   m,  BlockVectors,   m,  AS.data() + 1*BlockVectors*m,  CUDA_R_32F, CUSPARSE_ORDER_COL))
-        CHECK_CUSPARSE(cusparseCreateDnMat(&descrAS,   m,  BlockVectors*3, m,  AS.data(),   CUDA_R_32F, CUSPARSE_ORDER_COL))
-        CHECK_CUSPARSE(cusparseCsrSetStridedBatch(     descrA, batch_size, m*NZ, m*NZ))
-        auto SubspaceStride = m*BlockVectors*3; //[X_0, R_0, P_0, X_1, R_1, P_1, ...]
-
-        CHECK_CUSPARSE(cusparseDnMatSetStridedBatch(   descrX, batch_size,     SubspaceStride))
-        CHECK_CUSPARSE(cusparseDnMatSetStridedBatch(   descrR, batch_size,     SubspaceStride))
-        CHECK_CUSPARSE(cusparseDnMatSetStridedBatch(   descrS, batch_size,     SubspaceStride))
-        CHECK_CUSPARSE(cusparseDnMatSetStridedBatch(   descrP, batch_size,     SubspaceStride))
-        CHECK_CUSPARSE(cusparseDnMatSetStridedBatch(   descrAX, batch_size,    SubspaceStride)) //AX = A * X
-        CHECK_CUSPARSE(cusparseDnMatSetStridedBatch(   descrAR, batch_size,    SubspaceStride)) //AR = A * R
-        CHECK_CUSPARSE(cusparseDnMatSetStridedBatch(   descrAP, batch_size,    SubspaceStride)) //AP = A * P
-        CHECK_CUSPARSE(cusparseDnMatSetStridedBatch(   descrAS, batch_size,    SubspaceStride)) //AS = A * [X, R, P]
-
-        size_t SpMM_buffer_size = 0;
-        CHECK_CUSPARSE(cusparseSpMM_bufferSize(SpMM_AS_handle,
-                                CUSPARSE_OPERATION_NON_TRANSPOSE,
-                                CUSPARSE_OPERATION_NON_TRANSPOSE,
-                                &alpha,
-                                descrA,
-                                descrR,
-                                &beta,
-                                descrAR,
-                                CUDA_R_32F,
-                                CUSPARSE_SPMM_CSR_ALG1,
-                                &SpMM_buffer_size))
-        
-        
-        SyclVector<T> SpMM_buffer(SpMM_buffer_size);
-
-        CHECK_CUSPARSE(cusparseSpMM_preprocess(SpMM_AS_handle,
-                                CUSPARSE_OPERATION_NON_TRANSPOSE,
-                                CUSPARSE_OPERATION_NON_TRANSPOSE,
-                                &alpha,
-                                descrA,
-                                descrR,
-                                &beta,
-                                descrAR,
-                                CUDA_R_32F,
-                                CUSPARSE_SPMM_CSR_ALG1,
-                                SpMM_buffer.data()))
-
-        cublasHandle_t GEMM_STAS_handle;
-        cublasCreate(&GEMM_STAS_handle);
-        cublasSetStream(GEMM_STAS_handle, stream);
-    
-
-    #elif defined(USE_ROCSOLVER)
-        status_t status = rocsolver_ssyevd_bufferSize(handle, params, EIG_SOLVE_MODE, FILL_MODE_LOWER, m, A.data(), m, lambdas.data(), &syevd_scratchpad_size, &syevd_scratchpad_host_size, batch_size);
-    #endif
-
-    SyclVector<T> syevd_scratchpad (syevd_scratchpad_size);
-    SyclVector<T> syevd_scratchpad_host (syevd_scratchpad_host_size);
-
-    #if (SOLVER_BACKEND == CUSOLVER_BACKEND)
-        auto compute_eigenpairs = [&](T* A, T* lambdas, int m, int batch_size){
-            cusolverStatus_t status = cusolverDnXsyevBatched(handle, 
-                                params, 
-                                CUSOLVER_EIG_MODE_VECTOR, 
-                                CUBLAS_FILL_MODE_LOWER,
-                                m,
-                                std::is_same_v<T, float> ? CUDA_R_32F : CUDA_R_64F,
-                                A,
-                                m,
-                                std::is_same_v<T, float> ? CUDA_R_32F : CUDA_R_64F,
-                                lambdas,
-                                std::is_same_v<T, float> ? CUDA_R_32F : CUDA_R_64F,
-                                syevd_scratchpad.data(),
-                                syevd_scratchpad_size,
-                                syevd_scratchpad_host.data(),
-                                syevd_scratchpad_host_size,
-                                syevd_info.data(),
-                                batch_size);
-            if(status != CUSOLVER_STATUS_SUCCESS){
-                std::cerr << "Error in cusolverDnXsyevBatched: " << status << std::endl;
-            }
-        };
-    #elif defined(USE_ROCSOLVER)
-        auto compute_eigenpairs = [&](T* A, T* lambdas, T* eigenvectors, int m, int batch_size){
-            status_t status = rocsolver_ssyevd(handle, params, EIG_SOLVE_MODE, FILL_MODE_LOWER, m, A, m, lambdas, eigenvectors, m, syevd_scratchpad, syevd_scratchpad_size, syevd_scratchpad_host_size, syevd_info.data(), batch_size);
-        };
-    #endif
     const T tol = sycl::sqrt(std::numeric_limits<T>::epsilon()) * 1e-2 * T(m);
     
     SyclVector<T> Diag(3*BlockVectors * batch_size, 0);
@@ -690,21 +382,6 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
     SyclVector<T> U(batch_size * BlockVectors * 3 * m, 0);
     SyclVector<T> C_p(batch_size * BlockVectors * BlockVectors * 3, 0); //At most it will contain BlockVectors eigenvectors of size 3*BlockVectors
     SyclVector<T> QRworkspace(batch_size * BlockVectors * 3 * m, 0);
-    SyclVector<T*> S_ptrs(batch_size);
-    SyclVector<T*> R_ptrs(batch_size);
-    SyclVector<T*> STS_ptrs(batch_size);
-    SyclVector<T*> C_p_ptrs(batch_size);
-    SyclVector<T*> C_x_restart_ptrs(batch_size);
-    SyclVector<T*> R_inv_ptrs(batch_size);
-
-    for(int i = 0; i < batch_size; i++){
-        S_ptrs[i] = S.data() + i * SubspaceStride;
-        R_ptrs[i] = S.data() + i * (BlockVectors*3) * m + 2 * BlockVectors*m;
-        STS_ptrs[i] = StAS.data() + i * BlockVectors * 3 * BlockVectors * 3;
-        C_p_ptrs[i] = C_p.data() + i * BlockVectors * BlockVectors * 3;
-        C_x_restart_ptrs[i] = StAS.data() + i * BlockVectors * 2 * BlockVectors * 2;
-        R_inv_ptrs[i] = R_inv.data() + i * 3 * BlockVectors * 3 * BlockVectors;
-    }
     //Setup
     ctx -> submit([&](sycl::handler& h ){
         auto Scache = sycl::local_accessor<T, 1>(m, h);
@@ -729,7 +406,8 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
         });
     });
     ctx.wait();
-    CholQR<T, BlockVectors>(ctx, S_ptrs, STS_ptrs, m, batch_size);
+    //CholQR<T, BlockVectors>(ctx, S_ptrs, STS_ptrs, m, batch_size);
+    chol2_qr_batched(ctx, false, batch_size, m*3*BlockVectors, m, BlockVectors, S.to_span(), QRworkspace.to_span().template as_span<std::byte>());
     linalg::SparseMatHandle<T, Format::CSR, BatchType::Batched> handleA(A.data(), csr_row_offsets.data(), cols_32I.data(), m*NZ, m, m, m*NZ, batch_size);
     linalg::DenseMatHandle<T, BatchType::Batched> handleS(S.data(), m, BlockVectors*3, m, m*3*BlockVectors, batch_size);
     linalg::DenseMatHandle<T, BatchType::Batched> handleX(S.data(), m, BlockVectors, m, m*3*BlockVectors, batch_size);
@@ -861,9 +539,9 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
         
         start = std::chrono::high_resolution_clock::now();
         if (restart){
-            Ortho<T, BlockVectors, BlockVectors>(ctx, R_ptrs, S_ptrs, STS_ptrs, U, m, SubspaceStride, SubspaceStride, batch_size);
+            Ortho<T, BlockVectors, BlockVectors>(ctx, S.subspan(2*m*BlockVectors), S, U, m, SubspaceStride, SubspaceStride, batch_size);
         } else {
-            Ortho<T, 2*BlockVectors, BlockVectors>(ctx, R_ptrs, S_ptrs, STS_ptrs, U, m, SubspaceStride, SubspaceStride, batch_size);
+            Ortho<T, 2*BlockVectors, BlockVectors>(ctx, S.subspan(2*m*BlockVectors), S, U, m, SubspaceStride, SubspaceStride, batch_size);
         }
         end = std::chrono::high_resolution_clock::now();
         Tortho += end - start;
@@ -897,7 +575,6 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
         linalg::spmm<Backend::CUDA>(ctx, handleA, restart ? handleP : handleR, restart ? handleAP : handleAR, alpha, beta, Transpose::NoTrans, Transpose::NoTrans, spmm_workspace.to_span());
         
 
-        cudaStreamSynchronize(stream);
         end = std::chrono::high_resolution_clock::now();
         Tspmm += end - start;        
 
@@ -906,7 +583,6 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
         linalg::gemm<Backend::CUDA>(ctx, restart ? handleS_restart : handleS, restart ? handleAS_restart : handleAS, restart ? handleStAS_restart : handleStAS, alpha, beta, Transpose::Trans, Transpose::NoTrans);
 
         //Solve the eigenvalue problem
-        cudaStreamSynchronize(stream);
         end = std::chrono::high_resolution_clock::now();
         Tgemm += end - start;
 
@@ -914,7 +590,6 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
         //compute_eigenpairs(StAS.data(), lambdas.data(), restart ? BlockVectors*2 : BlockVectors*3, batch_size);
         linalg::syev<Backend::CUDA>(ctx, restart ? handleStAS_restart : handleStAS, lambdas.to_span(), Uplo::Lower, syev_workspace.to_span());
         ctx.wait();
-        cudaStreamSynchronize(stream);
         end = std::chrono::high_resolution_clock::now();
         Teigen += end - start;
 
@@ -978,15 +653,11 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
         linalg::gemm<Backend::CUDA>(ctx, restart ? handleAS_restart : handleAS, restart ? handleStAS_restart : handleStAS, handleStemp, alpha, beta, Transpose::NoTrans, Transpose::NoTrans);
 
         ctx.wait();
-        cudaStreamSynchronize(stream);
         end = std::chrono::high_resolution_clock::now();
         Tupdate += end - start;
 
         start = std::chrono::high_resolution_clock::now();
-        ExternalOrthogonalization<T, BlockVectors, BlockVectors>(ctx, C_p, StAS, R_inv, restart ? BlockVectors*2 : BlockVectors*3, BlockVectors*BlockVectors * (restart? (2*2) : (3*3)), BlockVectors*BlockVectors *  3, batch_size);
-        Chol2QR<T, BlockVectors>(ctx, C_p_ptrs, STS_ptrs, BlockVectors * (restart ? 2 : 3), batch_size); //Since we're done using StAS (eigenvectors of previous iteration), we can use it as a scratchpad
-        //Ortho<T, BlockVectors, BlockVectors>(ctx, C_p_ptrs, restart ? C_x_restart_ptrs : STS_ptrs, R_inv_ptrs, QRworkspace, BlockVectors * (restart ? 2 : 3), BlockVectors*BlockVectors * (restart? (2*2) : (3*3)), BlockVectors*BlockVectors *  3, batch_size);
-
+        Ortho<T, BlockVectors, BlockVectors>(ctx, C_p, StAS, QRworkspace, restart ? BlockVectors*2 : BlockVectors*3, BlockVectors*BlockVectors * (restart? (2*2) : (3*3)), BlockVectors*BlockVectors *  3, batch_size);
 
         end = std::chrono::high_resolution_clock::now();
         Tortho += end - start;
@@ -1000,8 +671,7 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
         linalg::gemm<Backend::CUDA>(ctx, restart ? handleS_restart : handleS, restart ? handleC_p_restart : handleC_p, handleP_new, alpha, beta, Transpose::NoTrans, Transpose::NoTrans);
         //Make an implicit update of AP:
         linalg::gemm<Backend::CUDA>(ctx, restart ? handleAS_restart : handleAS, restart ? handleC_p_restart : handleC_p, handleAP_new, alpha, beta, Transpose::NoTrans, Transpose::NoTrans);
-
-        cudaStreamSynchronize(stream);
+        ctx.wait();
         end = std::chrono::high_resolution_clock::now();
         Tupdate += end - start;
 
@@ -1030,10 +700,6 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
     std::cout << "Eigenvalue Time: " << std::chrono::duration_cast<std::chrono::microseconds>(Teigen).count() / batch_size << " µs / fullerene" << std::endl;
     std::cout << "Update Time: " << std::chrono::duration_cast<std::chrono::microseconds>(Tupdate).count() / batch_size << " µs / fullerene" << std::endl;
     std::cout << "Memcpy Time: " << std::chrono::duration_cast<std::chrono::microseconds>(Tmemcpy).count() / batch_size << " µs / fullerene" << std::endl;
-
-
-    //std::cout << "Eigenvalues: " << lambdas << std::endl;
-    //std::cout << "Residuals: " << residuals << std::endl;
 
     for(int i = 0; i < batch_size; i++){
         primitives::copy(ctx, lambdas.subspan(i * (BlockVectors *3) + BlockVectors * 2, BlockVectors), out_eigvals.subspan(i * BlockVectors, BlockVectors));
