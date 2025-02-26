@@ -444,4 +444,49 @@ namespace linalg{
             Uplo uplo,
             Span<std::byte> workspace); 
 
+    template <Backend B, typename T, BatchType BT>
+    SyclEvent syev(SyclQueue& ctx,
+            DenseMatHandle<T,BT>& descrA, //A is overwritten with eigenvectors
+            Span<T> eigenvalues,
+            Uplo uplo,
+            Span<std::byte> workspace);
+
+    template <Backend B, typename T, BatchType BT>
+    size_t syev_buffer_size(SyclQueue& ctx,
+            DenseMatHandle<T,BT>& A,
+            Span<T> eigenvalues,
+            Uplo uplo);
+
+    //Produces an orthonormal matrix in-place that spans the column space of A (if transA == NoTrans) or the row space of A (if transA == Trans)
+    template <Backend B, typename T, BatchType BT>
+    SyclEvent ortho(SyclQueue& ctx,
+            DenseMatHandle<T,BT>& A, //A is overwritten with orthogonal vectors
+            Transpose transA,
+            Span<std::byte> workspace,
+            OrthoAlgorithm algo = OrthoAlgorithm::Chol2);
+
+    //Produces an orthonormal matrix in-place that spans the column space of A (if transA == NoTrans) or the row space of A (if transA == Trans)
+    //The matrix A is orthogonalized with respect to the columns of M (if transM == NoTrans) or the rows of M (if transM == Trans)
+    template <Backend B, typename T, BatchType BT>
+    SyclEvent ortho(SyclQueue& ctx,
+            DenseMatHandle<T,BT>& A, //A is overwritten with orthogonal vectors
+            DenseMatHandle<T,BT>& M, //External metric
+            Transpose transA,
+            Transpose transM,
+            Span<std::byte> workspace,
+            OrthoAlgorithm algo = OrthoAlgorithm::Chol2);
+    
+    template <Backend B, typename T, BatchType BT>
+    size_t ortho_buffer_size(SyclQueue& ctx,
+            DenseMatHandle<T,BT>& A,
+            Transpose transA,
+            OrthoAlgorithm algo = OrthoAlgorithm::Chol2);
+
+    template <Backend B, typename T, BatchType BT>
+    size_t ortho_buffer_size(SyclQueue& ctx,
+            DenseMatHandle<T,BT>& A,
+            DenseMatHandle<T,BT>& M,
+            Transpose transA,
+            Transpose transM,
+            OrthoAlgorithm algo = OrthoAlgorithm::Chol2);
 }
