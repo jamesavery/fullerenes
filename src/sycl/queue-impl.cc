@@ -100,6 +100,10 @@ std::string Device::get_name() const  {
     return SyclQueueImpl::device_arrays.at(static_cast<int>(type)).at(idx).get_info<sycl::info::device::name>();
 }
 
+std::string Device::get_vendor() const {
+    return SyclQueueImpl::device_arrays.at(static_cast<int>(type)).at(idx).get_info<sycl::info::device::vendor>();
+}
+
 size_t Device::get_property(DeviceProperty property) const {
     auto d = SyclQueueImpl::device_arrays.at(static_cast<int>(type)).at(idx);
     
