@@ -58,6 +58,16 @@ struct Device{
 
     Device(const char* type) : Device(std::string(type)) {}
 
+    static Device default_device() {
+        if(!get_devices(DeviceType::GPU).empty()) {
+            return get_devices(DeviceType::GPU).at(0);
+        } else if(!get_devices(DeviceType::CPU).empty()) {
+            return get_devices(DeviceType::CPU).at(0);
+        } else {
+            return get_devices(DeviceType::HOST).at(0);
+        }
+    }
+
     inline static std::vector<Device> cpus_ =         get_devices(DeviceType::CPU);
     inline static std::vector<Device> gpus_ =         get_devices(DeviceType::GPU);
     inline static std::vector<Device> accelerators_ = get_devices(DeviceType::ACCELERATOR);
