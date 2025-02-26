@@ -65,7 +65,121 @@ namespace linalg{
         ColMajor
     };
 
+    namespace detail {
+        // Tag types for overload resolution
+        template<Backend B> struct backend_tag {};
+        struct fallback_tag : backend_tag<Backend::AUTO> {};
+    }
 
+    struct BackendSelector {
+        // Count available backends at compile time
+        static constexpr size_t num_backends = 1   // NETLIB is always available
+            #ifdef USE_CUDA
+                + 1
+            #endif
+            #ifdef USE_ROCM
+                + 1
+            #endif
+            #ifdef USE_MKL
+                + 1
+            #endif
+            #ifdef USE_MAGMA
+                + 1
+            #endif
+            #ifdef USE_SYCL
+                + 1
+            #endif
+        ;
+
+        static constexpr std::array<Backend, num_backends> available_backends = {{
+                #ifdef USE_CUDA
+                    Backend::CUDA,
+                #endif
+                #ifdef USE_ROCM
+                    Backend::ROCM,
+                #endif
+                #ifdef USE_MKL
+                    Backend::MKL,
+                #endif
+                #ifdef USE_MAGMA
+                    Backend::MAGMA,
+                #endif
+                #ifdef USE_SYCL
+                    Backend::SYCL,
+                #endif
+                Backend::NETLIB  // Always available as fallback
+        }};
+
+        static constexpr Backend get(SyclQueue& ctx) {
+            auto device = ctx.device();
+            switch (device.type) {
+                case DeviceType::CPU:
+                    #ifdef USE_MKL
+                        return Backend::MKL;
+                    #else
+                        return Backend::NETLIB;
+                    #endif
+
+                case DeviceType::GPU:
+                    if (device.get_vendor() == "NVIDIA Corporation") {
+                        #ifdef USE_CUDA
+                            return Backend::CUDA;
+                        #elif defined(USE_MAGMA)
+                            return Backend::MAGMA;
+                        #else
+                            return Backend::SYCL;  // SYCL fallback for NVIDIA
+                        #endif
+                    }
+                    else if (device.get_vendor() == "Advanced Micro Devices, Inc.") {
+                        #ifdef USE_ROCM
+                            return Backend::ROCM;
+                        #else
+                            return Backend::SYCL;  // SYCL fallback for AMD
+                        #endif
+                    }
+                    return Backend::SYCL;  // SYCL fallback for other GPUs
+
+                case DeviceType::ACCELERATOR:
+                    return Backend::SYCL;  // SYCL is primary backend for accelerators
+
+                case DeviceType::HOST:
+                    return Backend::NETLIB;
+
+                default:
+                    return Backend::AUTO;
+            }
+        }
+
+        template <typename... Args>
+        static constexpr auto select(SyclQueue& ctx, Args&&... args) {
+            constexpr size_t num_args = sizeof...(Args);
+            static_assert(num_args > 0, "At least one argument must be provided");
+            
+            // Convert args to array for indexed access
+            std::array<std::common_type_t<Args...>, num_args> implementations{std::forward<Args>(args)...};
+            
+            // Get the backend for this device
+            Backend backend = get(ctx);
+            
+            // Find the implementation index based on backend priority
+            size_t impl_index = 0;
+            for(size_t i = 0; i < available_backends.size() && i < num_args; ++i) {
+                if(available_backends[i] == backend) {
+                    impl_index = i;
+                    break;
+                }
+            }
+            
+            // If no matching backend found, use last argument as fallback
+            if(impl_index >= num_args) {
+                impl_index = num_args - 1;
+            }
+            
+            return implementations[impl_index];
+        }
+    };
+
+    //Forward declarations
     template <typename T, BatchType BT>
     struct DenseMatHandle;
 
