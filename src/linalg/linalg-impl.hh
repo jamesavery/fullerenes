@@ -440,9 +440,145 @@ namespace linalg{
                 cudaStreamSynchronize(stream);
             }
         };
+
+        template <typename T>
+        struct BackendDenseMatrixHandle{
+            #ifdef USE_CUDA
+              cusparseDnMatDescr_t descr_ = nullptr;
+                constexpr inline operator cusparseDnMatDescr_t() const {
+                    return descr_;
+                }
+            #endif
+            
+            BackendDenseMatrixHandle() = default;
+
+            BackendDenseMatrixHandle(T* data, int rows, int cols, int ld, Layout layout) {
+                #ifdef USE_CUDA
+                    cusparseCreateDnMat(&descr_, rows, cols, ld, data, BackendScalar<T, Backend::CUDA>::type, enum_convert<BackendLibrary::CUSPARSE>(layout));
+                #endif
+            }
+
+            BackendDenseMatrixHandle(T* data, int rows, int cols, int ld, Layout layout, int stride, int batch_size) {
+                #ifdef USE_CUDA
+                    cusparseCreateDnMat(&descr_, rows, cols, ld, data, BackendScalar<T, Backend::CUDA>::type, enum_convert<BackendLibrary::CUSPARSE>(layout));
+                    cusparseDnMatSetStridedBatch(descr_, batch_size, stride);
+                #endif
+            }
+
+
+
+            ~BackendDenseMatrixHandle() {
+                #ifdef USE_CUDA
+                    if(descr_) cusparseDestroyDnMat(descr_);
+                #endif
+            }
+        };
+
+        template <typename T>
+        struct BackendSparseMatrixHandle<T, Format::CSR>{
+            #ifdef USE_CUDA
+              cusparseSpMatDescr_t descr_ = nullptr;
+              constexpr inline operator cusparseSpMatDescr_t() const {
+                  return descr_;
+              }
+            #endif
+
+            BackendSparseMatrixHandle() = default;
+
+            BackendSparseMatrixHandle(int nnz, int rows, int cols, int* row_offsets, int* col_indices, T* values, Layout layout) {
+                #ifdef USE_CUDA
+                    cusparseCreateCsr(&descr_, rows, cols, nnz, row_offsets, col_indices, values, CUSPARSE_INDEX_32I, CUSPARSE_INDEX_32I, CUSPARSE_INDEX_BASE_ZERO, BackendScalar<T, Backend::CUDA>::type);
+                #endif
+            }
+
+            BackendSparseMatrixHandle(int nnz, int rows, int cols, int* row_offsets, int* col_indices, T* values, Layout layout, int stride, int batch_size) {
+                #ifdef USE_CUDA
+                    cusparseCreateCsr(&descr_, rows, cols, nnz, row_offsets, col_indices, values, CUSPARSE_INDEX_32I, CUSPARSE_INDEX_32I, CUSPARSE_INDEX_BASE_ZERO, BackendScalar<T, Backend::CUDA>::type);
+                    cusparseCsrSetStridedBatch(descr_, batch_size, stride, stride);
+                #endif
+            }
+
+            ~BackendSparseMatrixHandle() {
+                #ifdef USE_CUDA
+                    if(descr_) cusparseDestroySpMat(descr_);
+                #endif
+            }
+        };
+
+
+    
     #endif
 
+    template <typename T>
+    SparseMatHandle<T, Format::CSR, BatchType::Single>::SparseMatHandle(T* data, int* row_offsets, int* col_indices, int nnz, int rows, int cols, Layout layout) 
+        : data_(data), row_offsets_(row_offsets), col_indices_(col_indices), nnz_(nnz), rows_(rows), cols_(cols), layout_(layout), backend_handle_(std::make_unique<BackendSparseMatrixHandle<T, Format::CSR>>(nnz, rows, cols, row_offsets, col_indices, data, layout)) {}
     
-    
+    template <typename T>
+    SparseMatHandle<T, Format::CSR, BatchType::Single>::~SparseMatHandle() = default;
 
+    template <typename T>
+    BackendSparseMatrixHandle<T, Format::CSR>* SparseMatHandle<T, Format::CSR, BatchType::Single>::operator->() {
+        return backend_handle_.get();
+    }
+
+    template <typename T>
+    BackendSparseMatrixHandle<T, Format::CSR>& SparseMatHandle<T, Format::CSR, BatchType::Single>::operator*() {
+        return *backend_handle_;
+    }
+
+    template <typename T>
+    BackendSparseMatrixHandle<T, Format::CSR>* SparseMatHandle<T, Format::CSR, BatchType::Batched>::operator->() {
+        return backend_handle_.get();
+    }
+
+    template <typename T>
+    BackendSparseMatrixHandle<T, Format::CSR>& SparseMatHandle<T, Format::CSR, BatchType::Batched>::operator*() {
+        return *backend_handle_;
+    }
+
+    template <typename T>
+    BackendDenseMatrixHandle<T>* DenseMatHandle<T, BatchType::Single>::operator->() {
+        return backend_handle_.get();
+    }
+
+    template <typename T>
+    BackendDenseMatrixHandle<T>& DenseMatHandle<T, BatchType::Single>::operator*() {
+        return *backend_handle_;
+    }
+
+    template <typename T>
+    BackendDenseMatrixHandle<T>* DenseMatHandle<T, BatchType::Batched>::operator->() {
+        return backend_handle_.get();
+    }
+
+    
+    template <typename T>
+    BackendDenseMatrixHandle<T>& DenseMatHandle<T, BatchType::Batched>::operator*() {
+        return *backend_handle_;
+    }
+
+    template <typename T>
+    SparseMatHandle<T, Format::CSR, BatchType::Batched>::SparseMatHandle(T* data, int* row_offsets, int* col_indices, int nnz, int rows, int cols, int stride, int batch_size) 
+        : data_(data), row_offsets_(row_offsets), col_indices_(col_indices), nnz_(nnz), rows_(rows), cols_(cols), stride_(stride), batch_size_(batch_size), backend_handle_(std::make_unique<BackendSparseMatrixHandle<T, Format::CSR>>(nnz, rows, cols, row_offsets, col_indices, data, Layout::RowMajor, stride, batch_size)) {}
+
+    template <typename T>
+    SparseMatHandle<T, Format::CSR, BatchType::Batched>::~SparseMatHandle() = default;
+
+    template <typename T>
+    DenseMatHandle<T, BatchType::Single>::DenseMatHandle(T* data, int rows, int cols, int ld) 
+        : data_(data), rows_(rows), cols_(cols), ld_(ld), backend_handle_(std::make_unique<BackendDenseMatrixHandle<T>>(data, rows, cols, ld, layout_)) {}
+
+    template <typename T>
+    DenseMatHandle<T, BatchType::Batched>::DenseMatHandle(T* data, int rows, int cols, int ld, int stride, int batch_size) 
+        : data_(data), rows_(rows), cols_(cols), ld_(ld), stride_(stride), batch_size_(batch_size), data_ptrs_(batch_size), backend_handle_(std::make_unique<BackendDenseMatrixHandle<T>>(data, rows, cols, ld, layout_, stride, batch_size)) {
+            std::for_each(std::execution::par_unseq, data_ptrs_.begin(), data_ptrs_.end(), [&](T*& ptr) {
+                ptr = data + (std::addressof(ptr) - std::addressof(data_ptrs_[0])) * stride;
+            });
+        }
+
+    template <typename T>
+    DenseMatHandle<T, BatchType::Single>::~DenseMatHandle() = default;
+
+    template <typename T>
+    DenseMatHandle<T, BatchType::Batched>::~DenseMatHandle() = default;
 }
