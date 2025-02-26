@@ -69,3 +69,5 @@ target_link_libraries(
 )
 
 add_subdirectory(linalg/batched/QR)
+
+target_link_libraries(lobpcg-v8_lib PRIVATE nvidia_blas chol_qr_lib)
