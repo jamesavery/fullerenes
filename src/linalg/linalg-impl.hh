@@ -68,45 +68,62 @@ namespace linalg{
     };
 
     // Individual enum conversions for CUDA backend
-    template<Backend B>
+    template<BackendLibrary B>
     constexpr auto enum_convert(Side side) {
-        if constexpr (B == Backend::CUDA) {
+        if constexpr (B == BackendLibrary::CUBLAS) {
             return static_cast<cublasSideMode_t>(
                 side == Side::Left ? CUBLAS_SIDE_LEFT : CUBLAS_SIDE_RIGHT
             );
         }
     }
 
-    template<Backend B>
+    template<BackendLibrary B>
+    constexpr auto enum_convert(Diag diag) {
+        if constexpr (B == BackendLibrary::CUBLAS) {
+            return static_cast<cublasDiagType_t>(
+                diag == Diag::NonUnit ? CUBLAS_DIAG_NON_UNIT : CUBLAS_DIAG_UNIT
+            );
+        }
+    }
+
+    template<BackendLibrary B>
+    constexpr auto enum_convert(Layout layout) {
+        if constexpr (B == BackendLibrary::CUSPARSE) {
+            return static_cast<cusparseOrder_t>(
+                layout == Layout::RowMajor ? CUSPARSE_ORDER_ROW : CUSPARSE_ORDER_COL
+            );
+        }
+    }
+
+    template<BackendLibrary B>
     constexpr auto enum_convert(Uplo uplo) {
-        if constexpr (B == Backend::CUDA) {
+        if constexpr (B == BackendLibrary::CUBLAS || B == BackendLibrary::CUSOLVER) {
             return static_cast<cublasFillMode_t>(
                 uplo == Uplo::Upper ? CUBLAS_FILL_MODE_UPPER : CUBLAS_FILL_MODE_LOWER
             );
+        } else if constexpr (B == BackendLibrary::CUSPARSE) {
+            return static_cast<cusparseFillMode_t>(
+                uplo == Uplo::Upper ? CUSPARSE_FILL_MODE_UPPER : CUSPARSE_FILL_MODE_LOWER
+            );
         }
     }
 
-    template<Backend B>
+    template<BackendLibrary B>
     constexpr auto enum_convert(Transpose trans) {
-        if constexpr (B == Backend::CUDA) {
+        if constexpr (B == BackendLibrary::CUBLAS || B == BackendLibrary::CUSOLVER) {
             return static_cast<cublasOperation_t>(
                 trans == Transpose::NoTrans ? CUBLAS_OP_N : CUBLAS_OP_T
             );
-        }
-    }
-
-    template<Backend B>
-    constexpr auto enum_convert(Diag diag) {
-        if constexpr (B == Backend::CUDA) {
-            return static_cast<cublasDiagType_t>(
-                diag == Diag::Unit ? CUBLAS_DIAG_UNIT : CUBLAS_DIAG_NON_UNIT
+        } else if constexpr (B == BackendLibrary::CUSPARSE) {
+            return static_cast<cusparseOperation_t>(
+                trans == Transpose::NoTrans ? CUSPARSE_OPERATION_NON_TRANSPOSE : CUSPARSE_OPERATION_TRANSPOSE
             );
         }
     }
 
-    template<Backend B, typename T>
+    template<BackendLibrary B, typename T>
     constexpr auto enum_convert(ComputePrecision precision) {
-        if constexpr (B == Backend::CUDA) {
+        if constexpr (B == BackendLibrary::CUBLAS || B == BackendLibrary::CUSOLVER || B == BackendLibrary::CUSPARSE) {
             using BaseType = typename base_type<T>::type;
             
             // Handle default precision first
@@ -139,9 +156,9 @@ namespace linalg{
         throw std::runtime_error("Unsupported backend or type combination");
     }
 
-    template<Backend B, typename T>
+    template<BackendLibrary B, typename T>
     constexpr auto ptr_convert(T** ptr) {
-        if constexpr (B == Backend::CUDA) {
+        if constexpr (B == BackendLibrary::CUBLAS || B == BackendLibrary::CUSPARSE || B == BackendLibrary::CUSOLVER) {
             if constexpr (std::is_same_v<T, float> || std::is_same_v<T, double>) {
                 return ptr; // No conversion needed
             } else if constexpr (std::is_same_v<T, std::complex<float>>) {
@@ -149,15 +166,17 @@ namespace linalg{
             } else if constexpr (std::is_same_v<T, std::complex<double>>) {
                 return reinterpret_cast<cuDoubleComplex**>(ptr);
             }
+        } else {
+            static_assert(false, "Unsupported backend or type combination");
         }
     }
 
     
 
 
-    template<Backend B, typename T>
+    template<BackendLibrary B, typename T>
     constexpr auto ptr_convert(T* ptr) {
-        if constexpr (B == Backend::CUDA) {
+        if constexpr (B == BackendLibrary::CUBLAS || B == BackendLibrary::CUSPARSE || B == BackendLibrary::CUSOLVER) {
             if constexpr (std::is_same_v<T, float> || std::is_same_v<T, double>) {
                 return ptr; // No conversion needed
             } else if constexpr (std::is_same_v<T, std::complex<float>>) {
@@ -165,13 +184,15 @@ namespace linalg{
             } else if constexpr (std::is_same_v<T, std::complex<double>>) {
                 return reinterpret_cast<cuDoubleComplex*>(ptr);
             }
+        } else {
+            static_assert(false, "Unsupported backend or type combination");
         }
     }
 
     // Const pointer version
-    template<Backend B, typename T>
+    template<BackendLibrary B, typename T>
     constexpr auto ptr_convert(const T* ptr) {
-        if constexpr (B == Backend::CUDA) {
+        if constexpr (B == BackendLibrary::CUBLAS || B == BackendLibrary::CUSPARSE || B == BackendLibrary::CUSOLVER) {
             if constexpr (std::is_same_v<T, float> || std::is_same_v<T, double>) {
                 return ptr; // No conversion needed
             } else if constexpr (std::is_same_v<T, std::complex<float>>) {
@@ -179,6 +200,8 @@ namespace linalg{
             } else if constexpr (std::is_same_v<T, std::complex<double>>) {
                 return reinterpret_cast<const cuDoubleComplex*>(ptr);
             }
+        } else {
+            static_assert(false, "Unsupported backend or type combination");
         }
     }
 
@@ -205,7 +228,7 @@ namespace linalg{
 
     // Variadic template for converting multiple pointers
     namespace detail {
-        template <Backend B, typename T>
+        template <BackendLibrary B, typename T>
         constexpr auto convert_arg(T&& arg) {
             if constexpr (is_linalg_enum<std::remove_reference_t<T>>::value) {
                 return enum_convert<B>(std::forward<T>(arg));
@@ -236,21 +259,42 @@ namespace linalg{
     }
 
     // Combined enum and pointer conversion
-    template <Backend B, typename... Args>
+    template <BackendLibrary B, typename... Args>
     auto backend_convert(Args&&... args) {
         return std::make_tuple(detail::convert_arg<B>(std::forward<Args>(args))...);
     }
+
+    auto check_status(cublasStatus_t status) {
+        if (status != CUBLAS_STATUS_SUCCESS) {
+            throw std::runtime_error("CUBLAS error: " + std::to_string(status));
+        }
+        return status;
+    }
+
+    auto check_status(cusparseStatus_t status) {
+        if (status != CUSPARSE_STATUS_SUCCESS) {
+            throw std::runtime_error("CUSPARSE error: " + std::to_string(status));
+        }
+        return status;
+    }
+
+    auto check_status(cusolverStatus_t status) {
+        if (status != CUSOLVER_STATUS_SUCCESS) {
+            throw std::runtime_error("CUSOLVER error: " + std::to_string(status));
+        }
+        return status;
+    }
     
-    template <typename T, Backend B, typename Fun1, typename Fun2, typename Fun3, typename Fun4, typename... Args>
+    template <typename T, BackendLibrary BL, Backend B, typename Fun1, typename Fun2, typename Fun3, typename Fun4, typename... Args>
     auto call_backend(const Fun1& fun1, const Fun2& fun2, const Fun3& fun3, const Fun4& fun4, const LinalgHandle<B>& handle, Args&&... args) {
         if constexpr (std::is_same_v<T,float>) {
-            return std::apply(fun1, std::tuple_cat(std::forward_as_tuple(handle), backend_convert<B>(std::forward<Args>(args)...)));
+            return check_status(std::apply(fun1, std::tuple_cat(std::forward_as_tuple(handle), backend_convert<BL>(std::forward<Args>(args)...))));
         } else if constexpr (std::is_same_v<T,double>) {
-            return std::apply(fun2, std::tuple_cat(std::forward_as_tuple(handle), backend_convert<B>(std::forward<Args>(args)...)));
+            return check_status(std::apply(fun2, std::tuple_cat(std::forward_as_tuple(handle), backend_convert<BL>(std::forward<Args>(args)...))));
         } else if constexpr (std::is_same_v<T,std::complex<float>>) {
-            return std::apply(fun3, std::tuple_cat(std::forward_as_tuple(handle), backend_convert<B>(std::forward<Args>(args)...)));
+            return check_status(std::apply(fun3, std::tuple_cat(std::forward_as_tuple(handle), backend_convert<BL>(std::forward<Args>(args)...))));
         } else if constexpr (std::is_same_v<T,std::complex<double>>) {
-            return std::apply(fun4, std::tuple_cat(std::forward_as_tuple(handle), backend_convert<B>(std::forward<Args>(args)...)));
+            return check_status(std::apply(fun4, std::tuple_cat(std::forward_as_tuple(handle), backend_convert<BL>(std::forward<Args>(args)...))));
         }
     }
 
