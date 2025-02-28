@@ -117,11 +117,20 @@ void SyclVector<T>::reserve(size_t new_capacity) {
 
 template <typename T>
 SyclVector<T>& SyclVector<T>::operator=(const SyclVector<T>& other) {
-    if(data_) sycl::free(data_,  sycl::context(device(default_selector_v)));
     size_ = other.size_;
-    capacity_ = other.capacity_;
-    data_ = sycl::malloc_shared<T>(capacity_, sycl::device(default_selector_v), sycl::context(device(default_selector_v)));
-    for(size_t i = 0; i < size_; i++) data_[i] = other.data_[i];
+    //Only perform memory allocation if the new size is greater than the current capacity
+    if (capacity_ < other.capacity_) {
+        capacity_ = other.capacity_;
+        if(data_) sycl::free(data_,  sycl::context(device(default_selector_v)));
+        data_ = sycl::malloc_shared<T>(capacity_, sycl::device(default_selector_v), sycl::context(device(default_selector_v)));
+    }
+    //If the type is trivially copyable, use the sycl memcpy function
+    if constexpr(std::is_trivially_copyable_v<T>){
+        sycl::queue q{default_selector_v};
+        q.memcpy(data_, other.data_, size_*sizeof(T)).wait();
+    } else {
+        for(size_t i = 0; i < size_; i++) data_[i] = other.data_[i];
+    }
     return *this;
 }
 
@@ -388,6 +397,8 @@ template struct SyclVector<uint32_t>;
 template struct SyclVector<uint64_t>;
 template struct SyclVector<float>;
 template struct SyclVector<double>;
+template struct SyclVector<std::complex<float>>;
+template struct SyclVector<std::complex<double>>;
 template struct SyclVector<std::byte>;
 template struct SyclVector<StatusFlag>;
 template struct SyclVector<bool>;
@@ -404,8 +415,8 @@ template struct SyclVector<std::bitset<3>>;
 
 template struct SyclVector<float*>;
 template struct SyclVector<double*>;
-template struct SyclVector<std::complex<float>>;
-template struct SyclVector<std::complex<double>>;
+template struct SyclVector<std::complex<float>*>;
+template struct SyclVector<std::complex<double>*>;
 template struct SyclVector<int*>;
 template struct SyclVector<size_t*>;
 //template struct SyclVector<NodeNeighbours<uint16_t>>;
