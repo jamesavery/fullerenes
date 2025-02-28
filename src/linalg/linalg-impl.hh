@@ -512,75 +512,124 @@ namespace linalg{
     #endif
 
     template <typename T>
+    void SparseMatHandle<T, Format::CSR, BatchType::Single>::init_backend(){
+        if(!backend_handle_) backend_handle_ = std::make_unique<BackendSparseMatrixHandle<T, Format::CSR>>(nnz_, rows_, cols_, row_offsets_, col_indices_, data_, layout_);
+    }
+
+    template <typename T>
+    void SparseMatHandle<T, Format::CSR, BatchType::Batched>::init_backend(){
+        if(!backend_handle_){
+            backend_handle_ = std::make_unique<BackendSparseMatrixHandle<T, Format::CSR>>(nnz_, rows_, cols_, row_offsets_, col_indices_, data_, layout_, stride_, batch_size_);
+        }
+    }
+
+    template <typename T>
+    void DenseMatHandle<T, BatchType::Single>::init_backend(){
+        if(!backend_handle_) backend_handle_ = std::make_unique<BackendDenseMatrixHandle<T>>(data_, rows_, cols_, ld_, layout_);
+    }
+
+    template <typename T>
+    void DenseMatHandle<T, BatchType::Batched>::init_backend(){
+        if(!backend_handle_) backend_handle_ = std::make_unique<BackendDenseMatrixHandle<T>>(data_, rows_, cols_, ld_, layout_, stride_, batch_size_);
+    }
+
+    template <typename T>
+    void DenseMatHandle<T, BatchType::Single>::init(SyclQueue& ctx){
+        //Currently nothing to do here.
+    }
+
+    template <typename T>
+    void DenseMatHandle<T, BatchType::Batched>::init(SyclQueue& ctx){
+        //Certain algorithms require array of pointers to data rather than a single pointer + stride
+        //Here we ensure that the data_ptrs_ array is correctly populated (lazily) and done so on the device provided by the context
+        if(data_ptrs_.capacity() < batch_size_) data_ptrs_.resize(batch_size_);
+        auto data_ptrs = data_ptrs_.data();
+        auto data = data_;
+        auto stride = stride_;
+        ctx->parallel_for(batch_size_, [=](int i) {
+            data_ptrs[i] = data + i * stride;
+        });
+    }
+
+    template <typename T>
+    void SparseMatHandle<T, Format::CSR, BatchType::Batched>::init(SyclQueue& ctx) {
+        //Currently nothing to do here.
+    }
+
+    template <typename T>
+    void SparseMatHandle<T, Format::CSR, BatchType::Single>::init(SyclQueue& ctx) {
+        //Currently nothing to do here.
+    }
+
+
+
+
+
+    template <typename T>
     SparseMatHandle<T, Format::CSR, BatchType::Single>::SparseMatHandle(T* data, int* row_offsets, int* col_indices, int nnz, int rows, int cols, Layout layout) 
-        : data_(data), row_offsets_(row_offsets), col_indices_(col_indices), nnz_(nnz), rows_(rows), cols_(cols), layout_(layout), backend_handle_(std::make_unique<BackendSparseMatrixHandle<T, Format::CSR>>(nnz, rows, cols, row_offsets, col_indices, data, layout)) {}
+        : data_(data), row_offsets_(row_offsets), col_indices_(col_indices), nnz_(nnz), rows_(rows), cols_(cols), layout_(layout) {}
     
+        
+    template <typename T>
+    SparseMatHandle<T, Format::CSR, BatchType::Batched>::SparseMatHandle(T* data, int* row_offsets, int* col_indices, int nnz, int rows, int cols, int stride, int batch_size) 
+        : data_(data), row_offsets_(row_offsets), col_indices_(col_indices), nnz_(nnz), rows_(rows), cols_(cols), stride_(stride), batch_size_(batch_size) {}
+        
+    template <typename T>
+    DenseMatHandle<T, BatchType::Single>::DenseMatHandle(T* data, int rows, int cols, int ld) 
+        : data_(data), rows_(rows), cols_(cols), ld_(ld) {}
+
+    template <typename T>
+    DenseMatHandle<T, BatchType::Batched>::DenseMatHandle(T* data, int rows, int cols, int ld, int stride, int batch_size) 
+        : data_(data), rows_(rows), cols_(cols), ld_(ld), stride_(stride), batch_size_(batch_size) {}
+
     template <typename T>
     SparseMatHandle<T, Format::CSR, BatchType::Single>::~SparseMatHandle() = default;
+    template <typename T>
+    SparseMatHandle<T, Format::CSR, BatchType::Batched>::~SparseMatHandle() = default;
+    template <typename T>
+    DenseMatHandle<T, BatchType::Single>::~DenseMatHandle() = default;
+    template <typename T>
+    DenseMatHandle<T, BatchType::Batched>::~DenseMatHandle() = default;
+}
 
     template <typename T>
     BackendSparseMatrixHandle<T, Format::CSR>* SparseMatHandle<T, Format::CSR, BatchType::Single>::operator->() {
+        init_backend();
+        return backend_handle_.get();
+    }
+    template <typename T>
+    BackendSparseMatrixHandle<T, Format::CSR>* SparseMatHandle<T, Format::CSR, BatchType::Batched>::operator->() {
+        init_backend();
+        return backend_handle_.get();
+    }
+    template <typename T>
+    BackendDenseMatrixHandle<T>* DenseMatHandle<T, BatchType::Single>::operator->() {
+        init_backend();
+        return backend_handle_.get();
+    }
+    template <typename T>
+    BackendDenseMatrixHandle<T>* DenseMatHandle<T, BatchType::Batched>::operator->() {
+        init_backend();
         return backend_handle_.get();
     }
 
     template <typename T>
     BackendSparseMatrixHandle<T, Format::CSR>& SparseMatHandle<T, Format::CSR, BatchType::Single>::operator*() {
+        init_backend();
         return *backend_handle_;
     }
-
-    template <typename T>
-    BackendSparseMatrixHandle<T, Format::CSR>* SparseMatHandle<T, Format::CSR, BatchType::Batched>::operator->() {
-        return backend_handle_.get();
-    }
-
     template <typename T>
     BackendSparseMatrixHandle<T, Format::CSR>& SparseMatHandle<T, Format::CSR, BatchType::Batched>::operator*() {
+        init_backend();
         return *backend_handle_;
     }
-
-    template <typename T>
-    BackendDenseMatrixHandle<T>* DenseMatHandle<T, BatchType::Single>::operator->() {
-        return backend_handle_.get();
-    }
-
     template <typename T>
     BackendDenseMatrixHandle<T>& DenseMatHandle<T, BatchType::Single>::operator*() {
+        init_backend();
         return *backend_handle_;
     }
-
-    template <typename T>
-    BackendDenseMatrixHandle<T>* DenseMatHandle<T, BatchType::Batched>::operator->() {
-        return backend_handle_.get();
-    }
-
-    
     template <typename T>
     BackendDenseMatrixHandle<T>& DenseMatHandle<T, BatchType::Batched>::operator*() {
+        init_backend();
         return *backend_handle_;
     }
-
-    template <typename T>
-    SparseMatHandle<T, Format::CSR, BatchType::Batched>::SparseMatHandle(T* data, int* row_offsets, int* col_indices, int nnz, int rows, int cols, int stride, int batch_size) 
-        : data_(data), row_offsets_(row_offsets), col_indices_(col_indices), nnz_(nnz), rows_(rows), cols_(cols), stride_(stride), batch_size_(batch_size), backend_handle_(std::make_unique<BackendSparseMatrixHandle<T, Format::CSR>>(nnz, rows, cols, row_offsets, col_indices, data, Layout::RowMajor, stride, batch_size)) {}
-
-    template <typename T>
-    SparseMatHandle<T, Format::CSR, BatchType::Batched>::~SparseMatHandle() = default;
-
-    template <typename T>
-    DenseMatHandle<T, BatchType::Single>::DenseMatHandle(T* data, int rows, int cols, int ld) 
-        : data_(data), rows_(rows), cols_(cols), ld_(ld), backend_handle_(std::make_unique<BackendDenseMatrixHandle<T>>(data, rows, cols, ld, layout_)) {}
-
-    template <typename T>
-    DenseMatHandle<T, BatchType::Batched>::DenseMatHandle(T* data, int rows, int cols, int ld, int stride, int batch_size) 
-        : data_(data), rows_(rows), cols_(cols), ld_(ld), stride_(stride), batch_size_(batch_size), data_ptrs_(batch_size), backend_handle_(std::make_unique<BackendDenseMatrixHandle<T>>(data, rows, cols, ld, layout_, stride, batch_size)) {
-            std::for_each(std::execution::par_unseq, data_ptrs_.begin(), data_ptrs_.end(), [&](T*& ptr) {
-                ptr = data + (std::addressof(ptr) - std::addressof(data_ptrs_[0])) * stride;
-            });
-        }
-
-    template <typename T>
-    DenseMatHandle<T, BatchType::Single>::~DenseMatHandle() = default;
-
-    template <typename T>
-    DenseMatHandle<T, BatchType::Batched>::~DenseMatHandle() = default;
-}
