@@ -549,15 +549,16 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
         //Solve the eigenvalue problem
         linalg::syev<Backend::CUDA>(ctx, restart ? handleStAS_restart : handleStAS, lambdas.to_span(), Uplo::Lower, syev_workspace.to_span());
         ctx.wait();
-        cudaMemcpy(R_inv.data(), StAS.data(), StAS.size() * sizeof(T), cudaMemcpyDeviceToDevice);
-        cudaDeviceSynchronize();
+        //cudaMemcpy(R_inv.data(), StAS.data(), StAS.size() * sizeof(T), cudaMemcpyDeviceToDevice);
+        R_inv = StAS;
+        //cudaDeviceSynchronize();
 
         //If largest = true, then the order of the eigenvectors is reversed
         if (largest){
             ctx -> submit([&](sycl::handler& h){
                 auto cols = restart ? BlockVectors*2 : BlockVectors*3;
                 auto R_inv_acc = R_inv.to_span();
-                h.parallel_for(nd_range<1>(sycl::range{size_t(batch_size*256)}, sycl::range{size_t(256)}), [=](sycl::nd_item<1> item){
+                h.parallel_for(nd_range<1>(sycl::range{size_t(batch_size * 256)}, sycl::range{size_t(256)}), [=](sycl::nd_item<1> item){
                     auto tid = item.get_local_linear_id();
                     auto bid = item.get_group_linear_id();
                     auto cta = item.get_group();
@@ -611,9 +612,10 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
         //Make an implicit update of AP:
         linalg::gemm<Backend::CUDA>(ctx, restart ? handleAS_restart : handleAS, restart ? handleC_p_restart : handleC_p, handleAP_new, alpha, beta, Transpose::NoTrans, Transpose::NoTrans);
         ctx.wait();
-        cudaMemcpy(AS.data(), S_temp.data(), S_temp.size() * sizeof(T), cudaMemcpyDeviceToDevice);
-        cudaMemcpy(S.data(), U.data(), U.size() * sizeof(T), cudaMemcpyDeviceToDevice);
-        cudaDeviceSynchronize();
+        //AS = S_temp;
+        //AS.swap(S_temp);
+        AS = S_temp;
+        S = U;
     };
 
     auto T0 = std::chrono::high_resolution_clock::now();
