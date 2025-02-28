@@ -71,7 +71,7 @@ namespace linalg {
                 handle, side, uplo, transA, diag, kB, n, &alpha, get_data(descrA), descrA.ld_, get_data(descrB), descrB.ld_); 
         } else {
             call_backend<T, BackendLibrary::CUBLAS, B>(cublasStrsmBatched, cublasDtrsmBatched, cublasCtrsmBatched, cublasZtrsmBatched, 
-                handle, side, uplo, transA, diag, kB, n, &alpha, get_data(descrA), descrA.ld_, get_data(descrB), descrB.ld_, descrA.batch_size_);
+                handle, side, uplo, transA, diag, kB, n, &alpha, get_ptr_arr(ctx, descrA), descrA.ld_, get_ptr_arr(ctx, descrB), descrB.ld_, descrA.batch_size_);
         }
         return ctx.get_event();
     }
@@ -111,7 +111,7 @@ namespace linalg {
         } else {
             auto info = pool.allocate<int>(ctx, descrA.batch_size_);
             call_backend<T, BackendLibrary::CUSOLVER, B>(cusolverDnSpotrfBatched, cusolverDnDpotrfBatched, cusolverDnCpotrfBatched, cusolverDnZpotrfBatched,
-                handle, uplo, descrA.rows_, get_data(descrA), descrA.ld_, info.data(), descrA.batch_size_);
+                handle, uplo, descrA.rows_, get_ptr_arr(ctx, descrA), descrA.ld_, info.data(), descrA.batch_size_);
         }
         return ctx.get_event();
         
