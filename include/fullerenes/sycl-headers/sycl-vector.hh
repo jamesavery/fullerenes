@@ -88,8 +88,18 @@ struct SyclVector
     inline constexpr T &back() const { return data_[size_ - 1]; }
     inline constexpr T &front() const { return data_[0]; }
 
+    inline constexpr void swap(SyclVector<T> &other) {
+        std::swap(data_, other.data_);
+        std::swap(size_, other.size_);
+        std::swap(capacity_, other.capacity_);
+    }
 private:
     size_t size_;
     size_t capacity_;
     pointer data_;
 };
+
+template <typename T>
+inline constexpr void swap(SyclVector<T> &lhs, SyclVector<T> &rhs) {
+    lhs.swap(rhs);
+}
