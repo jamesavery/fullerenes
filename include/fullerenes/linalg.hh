@@ -227,6 +227,8 @@ namespace linalg{
     struct DenseMatHandle<T, BatchType::Single> {
         DenseMatHandle(T* data, int rows, int cols, int ld);
         ~DenseMatHandle();
+        void init(SyclQueue& ctx);
+        void init_backend();
         // Accessors...
         T* data_;
         int rows_, cols_, ld_;
@@ -243,6 +245,8 @@ namespace linalg{
     struct DenseMatHandle<T, BatchType::Batched> {
         DenseMatHandle(T* data, int rows, int cols, int ld, int stride, int batch_size);
         ~DenseMatHandle();
+        void init(SyclQueue& ctx);
+        void init_backend();
 
         // Accessors...
         T* data_;
@@ -271,6 +275,8 @@ namespace linalg{
          */
         SparseMatHandle(T* data, int* row_offsets, int* col_indices, int nnz, int rows, int cols, Layout layout = Layout::RowMajor);
         ~SparseMatHandle();
+        void init(SyclQueue& ctx);
+        void init_backend();
 
         // Raw pointers to externally owned memory
         T* data_;              // [nnz] non-zero values
@@ -305,15 +311,13 @@ namespace linalg{
             int nnz, int rows, int cols, int stride, int batch_size);
 
         ~SparseMatHandle();
+        void init(SyclQueue& ctx);
+        void init_backend();
 
         // Raw pointers to externally owned memory
         T* data_;              // [batch_size * stride] non-zero values
         int* row_offsets_;     // [batch_size * (rows + 1)] row offsets
         int* col_indices_;     // [batch_size * nnz] column indices
-        
-        // Per-matrix pointers for batch processing
-        SyclVector<T*> data_ptrs_;
-        SyclVector<int*> row_offsets_ptrs_, col_indices_ptrs_;
         
         int nnz_, rows_, cols_, stride_, batch_size_;
         Layout layout_ = Layout::RowMajor;
@@ -328,22 +332,21 @@ namespace linalg{
     //Uniform accessor for data
     template <template <typename, BatchType> class Handle, typename T, BatchType BT>
     auto get_data(Handle<T,BT>& handle) {
-        if constexpr (BT == BatchType::Single) {
-            return handle.data_;
-        } else {
-            return handle.data_ptrs_.data();
-        }
+        return handle.data_;
+    }
+    template <template <typename, BatchType> class Handle, typename T, BatchType BT, std::enable_if_t<BT == BatchType::Batched, int> = 0>
+    auto get_ptr_arr(SyclQueue& ctx, Handle<T,BT>& handle) {
+        handle.init(ctx);
+        return handle.data_ptrs_.data();
+
     }
 
     //Uniform accessor for data
     template <template <typename, Format, BatchType> class Handle, typename T, Format F, BatchType BT>
     auto get_data(Handle<T,F,BT>& handle) {
-        if constexpr (BT == BatchType::Single) {
-            return handle.data_;
-        } else {
-            return handle.data_ptrs_.data();
-        }
+        return handle.data_;
     }
+
 
     template <typename T, BatchType BT>
     struct DenseVecHandle;
@@ -399,7 +402,7 @@ namespace linalg{
         private:
             std::unique_ptr<BackendSparseVectorHandle<T>> backend_handle_;
     };
-    
+
 
     namespace detail {
         // Type trait to check for complex or floating point types
