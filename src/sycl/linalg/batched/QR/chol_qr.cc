@@ -109,7 +109,7 @@ void shift_chol3_qr_batched(SyclQueue& ctx,
             auto tid = item.get_local_linear_id();
             auto bid = item.get_group_linear_id();
             auto cta = item.get_group();
-            auto ATA_acc = ATA_ptrs[bid];
+            auto ATA_acc = ATA_ptrs + bid * ATA_stride;
             
             auto g_norm = sycl::reduce_over_group(cta, sycl::sqrt(ATA_acc[tid*n + tid]), sycl::maximum<T>());
             auto eps = std::numeric_limits<T>::epsilon();
