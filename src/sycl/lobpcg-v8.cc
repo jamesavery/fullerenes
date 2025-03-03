@@ -334,7 +334,7 @@ void Ortho(SyclQueue& ctx, Span<T> S /* Candidate Basis [k,CandDim] */,
     for(int i = 0; i < 2; i++){
         ExternalOrthogonalization<T, ExtDim, CandDim>(ctx, S, E, U, k, ExtStride, CandStride, batch_size);
         //Chol2QR<T, CandDim>(ctx, S_ptrs, StS_ptrs, k, batch_size);
-        chol2_qr_batched(ctx, false, batch_size, CandStride, k, CandDim, S, U.template as_span<std::byte>());
+        chol_qr_batched(ctx, false, batch_size, CandStride, k, CandDim, S, U.template as_span<std::byte>());
     }
 }
                             
@@ -426,18 +426,18 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
     linalg::DenseMatHandle<T, BatchType::Batched> handleC_p_restart(C_p.data(), BlockVectors*2, BlockVectors, BlockVectors*2, BlockVectors*3*BlockVectors, batch_size);
     linalg::DenseMatHandle<T, BatchType::Batched> handleP_new(U.data() + m*BlockVectors, m, BlockVectors, m, m*3*BlockVectors, batch_size);
     linalg::DenseMatHandle<T, BatchType::Batched> handleAP_new(S_temp.data() + m*BlockVectors, m, BlockVectors, m, m*3*BlockVectors, batch_size);
-    SyclVector<std::byte> spmm_workspace(linalg::spmm_buffer_size<Backend::CUDA>(ctx, handleA, handleS, handleAS, alpha, beta, Transpose::NoTrans, Transpose::NoTrans));
-    SyclVector<std::byte> syev_workspace(linalg::syev_buffer_size<Backend::CUDA>(ctx, handleStAS, lambdas.to_span(), Uplo::Lower));
-
+    SyclVector<std::byte> spmm_workspace(linalg::spmm_buffer_size<Backend::CUDA>(ctx, (handleA), handleS(), handleAS(), alpha, beta, Transpose::NoTrans, Transpose::NoTrans));
+    SyclVector<std::byte> syev_workspace(linalg::syev_buffer_size<Backend::CUDA>(ctx, handleStAS(), lambdas.to_span(), Uplo::Lower));
+    
 
     //Compute AX
-    linalg::spmm<Backend::CUDA>(ctx, handleA, handleX, handleAX, alpha, beta, Transpose::NoTrans, Transpose::NoTrans, spmm_workspace.to_span());
+    linalg::spmm<Backend::CUDA>(ctx, handleA, handleX(), handleAX(), alpha, beta, Transpose::NoTrans, Transpose::NoTrans, spmm_workspace.to_span());
     
     //Compute X^T AX
-    linalg::gemm<Backend::CUDA>(ctx, handleX, handleAX, handleXtAX, alpha, beta, Transpose::Trans, Transpose::NoTrans);
+    linalg::gemm<Backend::CUDA>(ctx, handleX(), handleAX(), handleXtAX(), alpha, beta, Transpose::Trans, Transpose::NoTrans);
 
     //Solve the eigenvalue problem
-    linalg::syev<Backend::CUDA>(ctx, handleXtAX, lambdas.to_span(), Uplo::Lower, syev_workspace.to_span());
+    linalg::syev<Backend::CUDA>(ctx, handleXtAX(), lambdas.to_span(), Uplo::Lower, syev_workspace.to_span());
     ctx.wait();
 
 
@@ -487,9 +487,17 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
     auto converged_acc = converged.to_span();
     auto residuals_acc = residuals.to_span();
 
+    auto Tresiduals = std::chrono::duration<double>(0);
+    auto Tortho = std::chrono::duration<double>(0);
+    auto Tgemm = std::chrono::duration<double>(0);
+    auto Tspmm = std::chrono::duration<double>(0);
+    auto Teigen = std::chrono::duration<double>(0);
+    auto Tupdate = std::chrono::duration<double>(0);
+    auto Tmemcpy = std::chrono::duration<double>(0);
+
     auto iteration = [&](SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, size_t iter, bool restart){
         
-        auto start = std::chrono::high_resolution_clock::now();
+        auto start = std::chrono::steady_clock::now();
         //Setup
         ctx -> submit([&](sycl::handler& h){
             auto Scache = sycl::local_accessor<T, 1>(m, h);
@@ -517,12 +525,16 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
         });
         ctx -> wait();
         
-        start = std::chrono::high_resolution_clock::now();
+        Tresiduals += std::chrono::steady_clock::now() - start;
+
+        start = std::chrono::steady_clock::now();
         if (restart){
             Ortho<T, BlockVectors, BlockVectors>(ctx, S.subspan(2*m*BlockVectors), S, U, m, SubspaceStride, SubspaceStride, batch_size);
         } else {
             Ortho<T, 2*BlockVectors, BlockVectors>(ctx, S.subspan(2*m*BlockVectors), S, U, m, SubspaceStride, SubspaceStride, batch_size);
         }
+        ctx.wait(); Tortho += std::chrono::steady_clock::now() - start;
+        start = std::chrono::steady_clock::now();
         //Strided Copy Kernel:
         if (restart){
             ctx -> submit([&](sycl::handler& h){
@@ -541,19 +553,28 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
             });
             ctx.wait();
         }
+        Tmemcpy += std::chrono::steady_clock::now() - start;
+        start = std::chrono::steady_clock::now();
         //Compute AR
-        linalg::spmm<Backend::CUDA>(ctx, handleA, restart ? handleP : handleR, restart ? handleAP : handleAR, alpha, beta, Transpose::NoTrans, Transpose::NoTrans, spmm_workspace.to_span());
+        linalg::spmm<Backend::CUDA>(ctx, handleA, restart ? handleP() : handleR(), restart ? handleAP() : handleAR(), alpha, beta, Transpose::NoTrans, Transpose::NoTrans, spmm_workspace.to_span());
+        ctx.wait(); Tspmm += std::chrono::steady_clock::now() - start;
         //Compute S^T A S
-        linalg::gemm<Backend::CUDA>(ctx, restart ? handleS_restart : handleS, restart ? handleAS_restart : handleAS, restart ? handleStAS_restart : handleStAS, alpha, beta, Transpose::Trans, Transpose::NoTrans);
+        start = std::chrono::steady_clock::now();
+        linalg::gemm<Backend::CUDA>(ctx, restart ? handleS_restart() : handleS(), restart ? handleAS_restart() : handleAS(), restart ? handleStAS_restart() : handleStAS(), alpha, beta, Transpose::Trans, Transpose::NoTrans);
+        ctx.wait(); Tgemm += std::chrono::steady_clock::now() - start;
 
         //Solve the eigenvalue problem
-        linalg::syev<Backend::CUDA>(ctx, restart ? handleStAS_restart : handleStAS, lambdas.to_span(), Uplo::Lower, syev_workspace.to_span());
-        ctx.wait();
+        start = std::chrono::steady_clock::now();
+        linalg::syev<Backend::CUDA>(ctx, restart ? handleStAS_restart() : handleStAS(), lambdas.to_span(), Uplo::Lower, syev_workspace.to_span());
+        ctx.wait(); Teigen += std::chrono::steady_clock::now() - start;
         //cudaMemcpy(R_inv.data(), StAS.data(), StAS.size() * sizeof(T), cudaMemcpyDeviceToDevice);
+        start = std::chrono::steady_clock::now();
         R_inv = StAS;
+        Tmemcpy += std::chrono::steady_clock::now() - start;
         //cudaDeviceSynchronize();
 
         //If largest = true, then the order of the eigenvectors is reversed
+        start = std::chrono::steady_clock::now();
         if (largest){
             ctx -> submit([&](sycl::handler& h){
                 auto cols = restart ? BlockVectors*2 : BlockVectors*3;
@@ -572,6 +593,7 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
             });
             ctx -> wait();
         }
+        Tmemcpy += std::chrono::steady_clock::now() - start;
 
         //X(i+1) =  [X(i), R(i), P(i)] * [Zx, Zr, Zp]^T
 
@@ -579,6 +601,7 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
         //                     0 
         //                     0]
 
+        start = std::chrono::steady_clock::now();
         ctx -> submit([&](sycl::handler& h){
             auto C_p_acc = C_p.to_span();
             auto C_x_acc = StAS.to_span();
@@ -600,22 +623,29 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
             });
         });
         ctx -> wait();
+        Tmemcpy += std::chrono::steady_clock::now() - start;
         //Compute X = [X, R, P] * [Zx, Zr, Zp]^T
-        linalg::gemm<Backend::CUDA>(ctx, restart ? handleS_restart : handleS, restart ? handleStAS_restart : handleStAS, handleU, alpha, beta, Transpose::NoTrans, Transpose::NoTrans); 
+        start = std::chrono::steady_clock::now();
+        linalg::gemm<Backend::CUDA>(ctx, restart ? handleS_restart() : handleS(), restart ? handleStAS_restart() : handleStAS(), handleU(), alpha, beta, Transpose::NoTrans, Transpose::NoTrans); 
         //Make an implicit update of AX:
-        linalg::gemm<Backend::CUDA>(ctx, restart ? handleAS_restart : handleAS, restart ? handleStAS_restart : handleStAS, handleStemp, alpha, beta, Transpose::NoTrans, Transpose::NoTrans);
-        ctx.wait();
+        linalg::gemm<Backend::CUDA>(ctx, restart ? handleAS_restart() : handleAS(), restart ? handleStAS_restart() : handleStAS(), handleStemp(), alpha, beta, Transpose::NoTrans, Transpose::NoTrans);
+        ctx.wait(); Tgemm += std::chrono::steady_clock::now() - start;
+        start = std::chrono::steady_clock::now();
         Ortho<T, BlockVectors, BlockVectors>(ctx, C_p, StAS, QRworkspace, restart ? BlockVectors*2 : BlockVectors*3, BlockVectors*BlockVectors * (restart? (2*2) : (3*3)), BlockVectors*BlockVectors *  3, batch_size);
+        ctx.wait(); Tortho += std::chrono::steady_clock::now() - start;
         //First compute P = [X, R, P] * C_p
-
-        linalg::gemm<Backend::CUDA>(ctx, restart ? handleS_restart : handleS, restart ? handleC_p_restart : handleC_p, handleP_new, alpha, beta, Transpose::NoTrans, Transpose::NoTrans);
+        start = std::chrono::steady_clock::now();
+        linalg::gemm<Backend::CUDA>(ctx, restart ? handleS_restart() : handleS(), restart ? handleC_p_restart() : handleC_p(), handleP_new(), alpha, beta, Transpose::NoTrans, Transpose::NoTrans);
         //Make an implicit update of AP:
-        linalg::gemm<Backend::CUDA>(ctx, restart ? handleAS_restart : handleAS, restart ? handleC_p_restart : handleC_p, handleAP_new, alpha, beta, Transpose::NoTrans, Transpose::NoTrans);
+        linalg::gemm<Backend::CUDA>(ctx, restart ? handleAS_restart() : handleAS(), restart ? handleC_p_restart() : handleC_p(), handleAP_new(), alpha, beta, Transpose::NoTrans, Transpose::NoTrans);
         ctx.wait();
+        Tgemm += std::chrono::steady_clock::now() - start;
         //AS = S_temp;
         //AS.swap(S_temp);
+        start = std::chrono::steady_clock::now();
         AS = S_temp;
         S = U;
+        Tmemcpy += std::chrono::steady_clock::now() - start;
     };
 
     auto T0 = std::chrono::high_resolution_clock::now();
@@ -623,10 +653,21 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
         iteration(ctx, A, cols, batch_size, m, i, i < 1 ? true : false);
     }
     ctx.wait();   
+    auto T1 = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>( T1 - T0 ).count();
+    std::cout << "Iteration time = " << duration/batch_size << " µs/fullerene" << std::endl;
     for(int i = 0; i < batch_size; i++){
         primitives::copy(ctx, lambdas.subspan(i * (BlockVectors *3) + BlockVectors * 2, BlockVectors), out_eigvals.subspan(i * BlockVectors, BlockVectors));
         //primitives::copy(ctx, S_acc.subspan(i * BlockVectors * 3 * m, BlockVectors * m), eigvects.subspan(i * BlockVectors * m, BlockVectors * m));
     }
+    std::cout << "LOBPCG V4 Total Iteration Time: " << duration / batch_size << " µs / fullerene" << std::endl;
+    std::cout << "Residuals Time: " << std::chrono::duration_cast<std::chrono::microseconds>(Tresiduals).count() / batch_size << " µs / fullerene" << std::endl;
+    std::cout << "Orthogonalization Time: " << std::chrono::duration_cast<std::chrono::microseconds>(Tortho).count() / batch_size << " µs / fullerene" << std::endl;
+    std::cout << "GEMM Time: " << std::chrono::duration_cast<std::chrono::microseconds>(Tgemm).count() / batch_size << " µs / fullerene" << std::endl;
+    std::cout << "SpMM Time: " << std::chrono::duration_cast<std::chrono::microseconds>(Tspmm).count() / batch_size << " µs / fullerene" << std::endl;
+    std::cout << "Eigenvalue Time: " << std::chrono::duration_cast<std::chrono::microseconds>(Teigen).count() / batch_size << " µs / fullerene" << std::endl;
+    std::cout << "Update Time: " << std::chrono::duration_cast<std::chrono::microseconds>(Tupdate).count() / batch_size << " µs / fullerene" << std::endl;
+    std::cout << "Memcpy Time: " << std::chrono::duration_cast<std::chrono::microseconds>(Tmemcpy).count() / batch_size << " µs / fullerene" << std::endl;
 }
 
 template void LOBPCG_V8<float, uint16_t, 3, 30>(SyclQueue &ctx, Span<float> A, Span<uint16_t> cols, int batch_size, int m, size_t maxiters, bool largest, Span<float> eigvects, Span<float> eigvals);
