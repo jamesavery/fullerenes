@@ -30,8 +30,8 @@ void chol_qr_batched(   SyclQueue& ctx,
 
     constexpr T alpha = 1.0;
     constexpr T beta = 0.0;
-    auto descrA = DenseMatHandle<T, BatchType::Batched>(A.data(), m, n, m, Astride, batch_size);
-    auto descrC = DenseMatHandle<T, BatchType::Batched>(ATA.data(), n, n, n, ATA_stride, batch_size);
+    auto descrA = DenseMatView<T, BatchType::Batched>(A.data(), m, n, m, Astride, batch_size, matAmem);
+    auto descrC = DenseMatView<T, BatchType::Batched>(ATA.data(), n, n, n, ATA_stride, batch_size, matATAmem);
     
     auto potrf_workspace = pool.allocate<std::byte>(ctx, potrf_buffer_size<Backend::CUDA>(ctx, descrC, Uplo::Lower));
     //Compute StS = S^T * S
@@ -97,8 +97,8 @@ void shift_chol3_qr_batched(SyclQueue& ctx,
     auto ATA = pool.allocate<T>(ctx, n*n*batch_size);
     
     auto ATA_stride = n*n;
-    auto descrA = DenseMatHandle<T, BatchType::Batched>(A.data(), m, n, m, Astride, batch_size);
-    auto descrC = DenseMatHandle<T, BatchType::Batched>(ATA.data(), n, n, n, ATA_stride, batch_size);
+    auto descrA = DenseMatView<T, BatchType::Batched>(A.data(), m, n, m, Astride, batch_size, matAmem);
+    auto descrC = DenseMatView<T, BatchType::Batched>(ATA.data(), n, n, n, ATA_stride, batch_size, matATAmem);
     auto potrf_workspace = pool.allocate<std::byte>(ctx, potrf_buffer_size<Backend::CUDA>(ctx, descrC, Uplo::Lower));
 
     gemm<Backend::CUDA>(ctx, descrA, descrA, descrC, alpha, beta, Transpose::Trans, Transpose::NoTrans);
