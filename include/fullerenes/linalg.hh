@@ -221,7 +221,9 @@ namespace linalg{
 
     template <typename T>
     struct BackendSparseVectorHandle;
-
+    
+    template <typename T, BatchType BT>
+    struct DenseMatView;
 
     template <typename T>
     struct DenseMatHandle<T, BatchType::Single> {
@@ -236,6 +238,10 @@ namespace linalg{
 
         BackendDenseMatrixHandle<T>* operator->();
         BackendDenseMatrixHandle<T>& operator*();
+        
+        DenseMatView<T, BatchType::Single> operator()() const {
+            return DenseMatView<T, BatchType::Single>(*this);
+        }
 
         private:
             std::unique_ptr<BackendDenseMatrixHandle<T>> backend_handle_;
@@ -257,9 +263,91 @@ namespace linalg{
         BackendDenseMatrixHandle<T>* operator->();
         BackendDenseMatrixHandle<T>& operator*();
 
+        DenseMatView<T, BatchType::Batched> operator()() const {
+            return DenseMatView<T, BatchType::Batched>(*this);
+        }
+
         private:
             std::unique_ptr<BackendDenseMatrixHandle<T>> backend_handle_;
     };
+
+    
+
+    template <typename T>
+    struct DenseMatView<T, BatchType::Batched> {
+        DenseMatView(T* data, int rows, int cols, int ld, int stride, int batch_size, Span<T*> data_ptrs);
+        DenseMatView(const DenseMatView<T, BatchType::Batched>& view);
+        DenseMatView(DenseMatView<T, BatchType::Batched>&& view);
+        DenseMatView<T, BatchType::Batched>& operator=(const DenseMatView<T, BatchType::Batched>& view);
+        DenseMatView<T, BatchType::Batched>& operator=(DenseMatView<T, BatchType::Batched>&& view);
+        // Allow lvalue reference construction but explicitly delete rvalue reference constructor
+        DenseMatView(const DenseMatHandle<T, BatchType::Batched>& handle);
+        // Allow for the view to be a reinterpreted view of the matrices
+        DenseMatView(const DenseMatHandle<T, BatchType::Batched>& handle, int rows, int cols, int ld, int stride, int batch_size);
+        DenseMatView(DenseMatHandle<T, BatchType::Batched>&& handle) = delete;
+
+        // Allow lvalue reference assignment but explicitly delete rvalue reference assignment
+        DenseMatView<T, BatchType::Batched>& operator=(const DenseMatHandle<T, BatchType::Batched>& handle);
+        DenseMatView<T, BatchType::Batched>& operator=(DenseMatHandle<T, BatchType::Batched>&& handle) = delete;
+        
+        ~DenseMatView();
+        void init(SyclQueue& ctx);
+        void init_backend();
+        // Accessors...
+        T* data_; 
+        Span<T*> data_ptrs_;
+        int rows_, cols_, ld_, stride_, batch_size_;
+        Layout layout_ = Layout::ColMajor; //Most backends don't support row-major dense matrices
+
+        BackendDenseMatrixHandle<T>* operator->();
+        BackendDenseMatrixHandle<T>& operator*();
+
+        private:
+            std::shared_ptr<BackendDenseMatrixHandle<T>> backend_handle_;
+    };
+    
+    
+
+    template <typename T>
+    struct DenseMatView<T, BatchType::Single> {
+        DenseMatView(T* data, int rows, int cols, int ld);
+        DenseMatView(const DenseMatView<T, BatchType::Single>& view);
+        DenseMatView(DenseMatView<T, BatchType::Single>&& view);
+        DenseMatView<T, BatchType::Single>& operator=(const DenseMatView<T, BatchType::Single>& view);
+        DenseMatView<T, BatchType::Single>& operator=(DenseMatView<T, BatchType::Single>&& view);
+        
+        //These handles are already non-owning, but for consistency, delete rvalue reference constructor
+        DenseMatView(const DenseMatHandle<T, BatchType::Single>& handle);
+        DenseMatView(const DenseMatHandle<T, BatchType::Single>& handle, int rows, int cols, int ld);
+        DenseMatView(DenseMatHandle<T, BatchType::Single>&& handle) = delete;
+
+        //These handles are already non-owning, but for consistency, delete rvalue reference assignment
+        DenseMatView<T, BatchType::Single>& operator=(const DenseMatHandle<T, BatchType::Single>& handle);
+        DenseMatView<T, BatchType::Single>& operator=(DenseMatHandle<T, BatchType::Single>&& handle) = delete;
+
+        ~DenseMatView();
+        void init(SyclQueue& ctx);
+        void init_backend();
+
+        // Accessors...
+        T* data_;
+        int rows_, cols_, ld_;
+        Layout layout_ = Layout::ColMajor;
+
+        BackendDenseMatrixHandle<T>* operator->();
+        BackendDenseMatrixHandle<T>& operator*();
+
+        private:
+            std::shared_ptr<BackendDenseMatrixHandle<T>> backend_handle_;
+    };
+
+    // Deduction guides for DenseMatView
+
+    template <typename T>
+    DenseMatView(const DenseMatHandle<T, BatchType::Single>&) -> DenseMatView<T, BatchType::Single>;
+
+    template <typename T>
+    DenseMatView(const DenseMatHandle<T, BatchType::Batched>&) -> DenseMatView<T, BatchType::Batched>;
 
     template <typename T>
     struct SparseMatHandle<T, Format::CSR, BatchType::Single> {
@@ -483,9 +571,9 @@ namespace linalg{
 
     template <Backend B, typename T, BatchType BT>
     SyclEvent gemm(SyclQueue& ctx,
-        DenseMatHandle<T,BT>& descrA,
-        DenseMatHandle<T,BT>& descrB,
-        DenseMatHandle<T,BT>& descrC,
+        DenseMatView<T,BT> descrA,
+        DenseMatView<T,BT> descrB,
+        DenseMatView<T,BT> descrC,
         T alpha,
         T beta,
         Transpose transA,        
@@ -496,8 +584,8 @@ namespace linalg{
     template <Backend B, typename T, Format F, BatchType BT>
     SyclEvent spmm(SyclQueue& ctx,
         SparseMatHandle<T, F, BT>& descrA,
-        DenseMatHandle<T,BT>& descrB,
-        DenseMatHandle<T,BT>& descrC,
+        DenseMatView<T,BT> descrB,
+        DenseMatView<T,BT> descrC,
         T alpha,
         T beta,
         Transpose transA,
@@ -507,8 +595,8 @@ namespace linalg{
     template <Backend B, typename T, Format F, BatchType BT>
     size_t spmm_buffer_size(SyclQueue& ctx,
         SparseMatHandle<T, F, BT>& descrA,
-        DenseMatHandle<T,BT>& descrB,
-        DenseMatHandle<T,BT>& descrC,
+        DenseMatView<T,BT> descrB,
+        DenseMatView<T,BT> descrC,
         T alpha,
         T beta,
         Transpose transA,        
@@ -516,8 +604,8 @@ namespace linalg{
 
     template <Backend B, typename T, BatchType BT>
     SyclEvent trsm(SyclQueue& ctx,
-        DenseMatHandle<T,BT>& descrA,
-        DenseMatHandle<T,BT>& descrB,
+        DenseMatView<T,BT> descrA,
+        DenseMatView<T,BT> descrB,
         Side side,
         Uplo uplo,
         Transpose transA,
@@ -526,32 +614,32 @@ namespace linalg{
 
     template <Backend B, typename T, BatchType BT>
     size_t potrf_buffer_size(SyclQueue& ctx,
-                        DenseMatHandle<T,BT>& A,
+                        DenseMatView<T,BT> A,
                         Uplo uplo);
 
     template <Backend B, typename T, BatchType BT>
     SyclEvent potrf(SyclQueue& ctx,
-            DenseMatHandle<T,BT>& descrA,
+            DenseMatView<T,BT> descrA,
             Uplo uplo,
             Span<std::byte> workspace); 
 
     template <Backend B, typename T, BatchType BT>
     SyclEvent syev(SyclQueue& ctx,
-            DenseMatHandle<T,BT>& descrA, //A is overwritten with eigenvectors
+            DenseMatView<T,BT> descrA, //A is overwritten with eigenvectors
             Span<T> eigenvalues,
             Uplo uplo,
             Span<std::byte> workspace);
 
     template <Backend B, typename T, BatchType BT>
     size_t syev_buffer_size(SyclQueue& ctx,
-            DenseMatHandle<T,BT>& A,
+            DenseMatView<T,BT> A,
             Span<T> eigenvalues,
             Uplo uplo);
 
     //Produces an orthonormal matrix in-place that spans the column space of A (if transA == NoTrans) or the row space of A (if transA == Trans)
     template <Backend B, typename T, BatchType BT>
     SyclEvent ortho(SyclQueue& ctx,
-            DenseMatHandle<T,BT>& A, //A is overwritten with orthogonal vectors
+            DenseMatView<T,BT> A, //A is overwritten with orthogonal vectors
             Transpose transA,
             Span<std::byte> workspace,
             OrthoAlgorithm algo = OrthoAlgorithm::Chol2);
@@ -560,8 +648,8 @@ namespace linalg{
     //The matrix A is orthogonalized with respect to the columns of M (if transM == NoTrans) or the rows of M (if transM == Trans)
     template <Backend B, typename T, BatchType BT>
     SyclEvent ortho(SyclQueue& ctx,
-            DenseMatHandle<T,BT>& A, //A is overwritten with orthogonal vectors
-            DenseMatHandle<T,BT>& M, //External metric
+            DenseMatView<T,BT> A, //A is overwritten with orthogonal vectors
+            DenseMatView<T,BT> M, //External metric
             Transpose transA,
             Transpose transM,
             Span<std::byte> workspace,
@@ -569,14 +657,14 @@ namespace linalg{
     
     template <Backend B, typename T, BatchType BT>
     size_t ortho_buffer_size(SyclQueue& ctx,
-            DenseMatHandle<T,BT>& A,
+            DenseMatView<T,BT> A,
             Transpose transA,
             OrthoAlgorithm algo = OrthoAlgorithm::Chol2);
 
     template <Backend B, typename T, BatchType BT>
     size_t ortho_buffer_size(SyclQueue& ctx,
-            DenseMatHandle<T,BT>& A,
-            DenseMatHandle<T,BT>& M,
+            DenseMatView<T,BT> A,
+            DenseMatView<T,BT> M,
             Transpose transA,
             Transpose transM,
             OrthoAlgorithm algo = OrthoAlgorithm::Chol2);
