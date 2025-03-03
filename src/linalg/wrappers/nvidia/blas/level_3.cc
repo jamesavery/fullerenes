@@ -9,9 +9,9 @@ namespace linalg {
 
     template <Backend B, typename T, BatchType BT>
     SyclEvent gemm(SyclQueue& ctx,
-                   DenseMatHandle<T,BT>& descrA,
-                   DenseMatHandle<T,BT>& descrB,
-                   DenseMatHandle<T,BT>& descrC,
+                   DenseMatView<T,BT> descrA,
+                   DenseMatView<T,BT> descrB,
+                   DenseMatView<T,BT> descrC,
                    T alpha,
                    T beta,
                    Transpose transA,
@@ -55,8 +55,8 @@ namespace linalg {
 
     template <Backend B, typename T, BatchType BT>
     SyclEvent trsm(SyclQueue& ctx,
-                   DenseMatHandle<T,BT>& descrA,
-                   DenseMatHandle<T,BT>& descrB,
+                   DenseMatView<T,BT> descrA,
+                   DenseMatView<T,BT> descrB,
                    Side side,
                    Uplo uplo,
                    Transpose transA,
@@ -78,7 +78,7 @@ namespace linalg {
 
     template <Backend B, typename T, BatchType BT>
     size_t potrf_buffer_size(SyclQueue& ctx,
-                                DenseMatHandle<T,BT>& A,
+                                DenseMatView<T,BT> A,
                                 Uplo uplo) {
         static LinalgHandle<B> handle;
         handle.setStream(ctx);
@@ -95,7 +95,7 @@ namespace linalg {
 
     template <Backend B, typename T, BatchType BT>
     SyclEvent potrf(SyclQueue& ctx,
-                    DenseMatHandle<T,BT>& descrA,
+                    DenseMatView<T,BT> descrA,
                     Uplo uplo,
                     Span<std::byte> workspace) {        
         static LinalgHandle<B> handle;
@@ -120,8 +120,8 @@ namespace linalg {
     template <Backend B, typename T, Format F, BatchType BT>
     SyclEvent spmm(SyclQueue& ctx,
                    SparseMatHandle<T, F, BT>& descrA,
-                   DenseMatHandle<T,BT>& descrB,
-                   DenseMatHandle<T,BT>& descrC,
+                   DenseMatView<T,BT> descrB,
+                   DenseMatView<T,BT> descrC,
                    T alpha,
                    T beta,
                    Transpose transA,
@@ -154,8 +154,8 @@ namespace linalg {
     template <Backend B, typename T, Format F, BatchType BT>
     size_t spmm_buffer_size(SyclQueue& ctx,
                                SparseMatHandle<T, F, BT>& descrA,
-                               DenseMatHandle<T,BT>& descrB,
-                               DenseMatHandle<T,BT>& descrC,
+                               DenseMatView<T,BT> descrB,
+                               DenseMatView<T,BT> descrC,
                                T alpha,
                                T beta,
                                Transpose transA,
@@ -184,7 +184,7 @@ namespace linalg {
 
     template <Backend B, typename T, BatchType BT>
     SyclEvent syev(SyclQueue& ctx,
-                   DenseMatHandle<T,BT>& descrA,
+                   DenseMatView<T,BT> descrA,
                    Span<T> eigenvalues,
                    Uplo uplo,
                    Span<std::byte> workspace) {
@@ -252,7 +252,7 @@ namespace linalg {
 
     template <Backend B, typename T, BatchType BT>
     size_t syev_buffer_size(SyclQueue& ctx,
-                            DenseMatHandle<T,BT>& descrA,                            
+                            DenseMatView<T,BT> descrA,                            
                             Span<T> eigenvalues,
                             Uplo uplo) {
         static LinalgHandle<B> handle;
@@ -274,7 +274,7 @@ namespace linalg {
 
     template <Backend B, typename T, BatchType BT>
     SyclEvent ortho(SyclQueue& ctx,
-                    DenseMatHandle<T,BT>& A,
+                    DenseMatView<T,BT> A,
                     Transpose transA,
                     Span<std::byte> workspace,
                     OrthoAlgorithm algo) {
@@ -291,51 +291,51 @@ namespace linalg {
     #define GEMM_INSTANTIATE(fp, BT) \
     template SyclEvent gemm<Backend::CUDA, fp, BT>( \
         SyclQueue&, \
-        DenseMatHandle<fp, BT>&, \
-        DenseMatHandle<fp, BT>&, \
-        DenseMatHandle<fp, BT>&, \
+        DenseMatView<fp, BT>, \
+        DenseMatView<fp, BT>, \
+        DenseMatView<fp, BT>, \
         fp, fp, Transpose, Transpose, ComputePrecision);
 
     #define TRSM_INSTANTIATE(fp, BT) \
     template SyclEvent trsm<Backend::CUDA, fp, BT>( \
         SyclQueue&, \
-        DenseMatHandle<fp, BT>&, \
-        DenseMatHandle<fp, BT>&, \
+        DenseMatView<fp, BT>, \
+        DenseMatView<fp, BT>, \
         Side, Uplo, Transpose, Diag, fp);
 
     #define POTRF_INSTANTIATE(fp, BT) \
     template SyclEvent potrf<Backend::CUDA, fp, BT>( \
         SyclQueue&, \
-        DenseMatHandle<fp, BT>&, \
+        DenseMatView<fp, BT>, \
         Uplo, \
         Span<std::byte>);
     
     #define POTRF_BUFFER_SIZE_INSTANTIATE(fp, BT) \
     template size_t potrf_buffer_size<Backend::CUDA, fp, BT>( \
         SyclQueue&, \
-        DenseMatHandle<fp, BT>&, \
+        DenseMatView<fp, BT>, \
         Uplo);
 
     #define SPMM_INSTANTIATE(fp, F, BT) \
     template SyclEvent spmm<Backend::CUDA, fp, F, BT>( \
         SyclQueue&, \
         SparseMatHandle<fp, F, BT>&, \
-        DenseMatHandle<fp, BT>&, \
-        DenseMatHandle<fp, BT>&, \
+        DenseMatView<fp, BT>, \
+        DenseMatView<fp, BT>, \
         fp, fp, Transpose, Transpose, Span<std::byte>);
     
     #define SPMM_BUFFER_SIZE_INSTANTIATE(fp, F, BT) \
     template size_t spmm_buffer_size<Backend::CUDA, fp, F, BT>( \
         SyclQueue&, \
         SparseMatHandle<fp, F, BT>&, \
-        DenseMatHandle<fp, BT>&, \
-        DenseMatHandle<fp, BT>&, \
+        DenseMatView<fp, BT>, \
+        DenseMatView<fp, BT>, \
         fp, fp, Transpose, Transpose);
 
     #define SYEV_INSTANTIATE(fp, BT) \
     template SyclEvent syev<Backend::CUDA, fp, BT>( \
         SyclQueue&, \
-        DenseMatHandle<fp, BT>&, \
+        DenseMatView<fp, BT>, \
         Span<fp>, \
         Uplo, \
         Span<std::byte>);
@@ -343,7 +343,7 @@ namespace linalg {
     #define SYEV_BUFFER_SIZE_INSTANTIATE(fp, BT) \
     template size_t syev_buffer_size<Backend::CUDA, fp, BT>( \
         SyclQueue&, \
-        DenseMatHandle<fp, BT>&, \
+        DenseMatView<fp, BT>, \
         Span<fp>, \
         Uplo);
     
