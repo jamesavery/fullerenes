@@ -25,7 +25,9 @@ void chol_qr_batched(   SyclQueue& ctx,
 {
     BumpAllocator pool(workspace.data(), workspace.size());
     //static SyclVector<int> d_info(batch_size);    
-    auto ATA =      pool.allocate<T>(ctx, n*n*batch_size);
+    auto ATA =          pool.allocate<T>(ctx, n*n*batch_size);
+    auto matAmem =      pool.allocate<T*>(ctx, batch_size);
+    auto matATAmem =    pool.allocate<T*>(ctx, batch_size);
     auto ATA_stride = n*n;
 
     constexpr T alpha = 1.0;
@@ -53,7 +55,7 @@ size_t chol_qr_batched_buffer_size(SyclQueue& ctx,
                                 int m,
                                 int n,
                                 Span<T> A) {
-    return  BumpAllocator::allocation_size<T>(ctx, batch_size) + 
+    return  BumpAllocator::allocation_size<std::byte>(ctx, potrf_buffer_size<Backend::CUDA>(ctx, DenseMatView<T, BatchType::Batched>(A.data(), m, n, m, Astride, batch_size, Span<T*>{}), Uplo::Lower)) + 
             2*BumpAllocator::allocation_size<T*>(ctx, batch_size) + 
             BumpAllocator::allocation_size<T>(ctx, n*n*batch_size);
 }
@@ -95,6 +97,8 @@ void shift_chol3_qr_batched(SyclQueue& ctx,
     
     BumpAllocator pool(workspace);
     auto ATA = pool.allocate<T>(ctx, n*n*batch_size);
+    auto matAmem = pool.allocate<T*>(ctx, batch_size);
+    auto matATAmem = pool.allocate<T*>(ctx, batch_size);
     
     auto ATA_stride = n*n;
     auto descrA = DenseMatView<T, BatchType::Batched>(A.data(), m, n, m, Astride, batch_size, matAmem);
