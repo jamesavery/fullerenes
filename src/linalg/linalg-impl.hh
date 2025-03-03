@@ -26,6 +26,7 @@
 
 #ifdef USE_MKL
     #include <mkl.h>
+#include "linalg.hh"
 #endif
 
 
@@ -364,8 +365,8 @@ namespace linalg{
             return (t == Transpose::NoTrans) ? CUBLAS_OP_N : CUBLAS_OP_T;
         }
 
-        template <typename T, BatchType BT>
-        auto get_effective_dims(const DenseMatHandle<T,BT>& handle, Transpose trans_op){
+        template <template <typename, BatchType> class Handle, typename T, BatchType BT>
+        auto get_effective_dims(const Handle<T,BT>& handle, Transpose trans_op){
             return trans_op == Transpose::NoTrans ? std::make_tuple(handle.rows_, handle.cols_) : std::make_tuple(handle.cols_, handle.rows_);
         }
 
@@ -534,6 +535,16 @@ namespace linalg{
     }
 
     template <typename T>
+    void DenseMatView<T, BatchType::Single>::init_backend(){
+        if(!backend_handle_) backend_handle_ = std::make_unique<BackendDenseMatrixHandle<T>>(data_, rows_, cols_, ld_, layout_);
+    }
+
+    template <typename T>
+    void DenseMatView<T, BatchType::Batched>::init_backend(){
+        if(!backend_handle_) backend_handle_ = std::make_unique<BackendDenseMatrixHandle<T>>(data_, rows_, cols_, ld_, layout_, stride_, batch_size_);
+    }
+
+    template <typename T>
     void DenseMatHandle<T, BatchType::Single>::init(SyclQueue& ctx){
         //Currently nothing to do here.
     }
@@ -543,6 +554,26 @@ namespace linalg{
         //Certain algorithms require array of pointers to data rather than a single pointer + stride
         //Here we ensure that the data_ptrs_ array is correctly populated (lazily) and done so on the device provided by the context
         if(data_ptrs_.capacity() < batch_size_) data_ptrs_.resize(batch_size_);
+        auto data_ptrs = data_ptrs_.data();
+        auto data = data_;
+        auto stride = stride_;
+        ctx->parallel_for(batch_size_, [=](int i) {
+            data_ptrs[i] = data + i * stride;
+        });
+    }
+
+    template <typename T>
+    void DenseMatView<T, BatchType::Single>::init(SyclQueue& ctx){
+       //Currently nothing to do here.
+    }
+
+    template <typename T>
+    void DenseMatView<T, BatchType::Batched>::init(SyclQueue& ctx){
+        //Certain algorithms require array of pointers to data rather than a single pointer + stride
+        //Here we ensure that the data_ptrs_ array is correctly populated (lazily) and done so on the device provided by the context
+        //Allocation is done from outside to allow for persistent allocation across invocations
+        assert(data_ptrs_.size() == batch_size_);
+        assert(data_ != nullptr);
         auto data_ptrs = data_ptrs_.data();
         auto data = data_;
         auto stride = stride_;
@@ -577,10 +608,90 @@ namespace linalg{
     template <typename T>
     DenseMatHandle<T, BatchType::Single>::DenseMatHandle(T* data, int rows, int cols, int ld) 
         : data_(data), rows_(rows), cols_(cols), ld_(ld) {}
-
+        
     template <typename T>
     DenseMatHandle<T, BatchType::Batched>::DenseMatHandle(T* data, int rows, int cols, int ld, int stride, int batch_size) 
         : data_(data), rows_(rows), cols_(cols), ld_(ld), stride_(stride), batch_size_(batch_size) {}
+
+    template <typename T>
+    DenseMatView<T, BatchType::Single>::DenseMatView(T* data, int rows, int cols, int ld) 
+        : data_(data), rows_(rows), cols_(cols), ld_(ld) {}
+        
+    template <typename T>
+    DenseMatView<T, BatchType::Batched>::DenseMatView(T* data, int rows, int cols, int ld, int stride, int batch_size, Span<T*> data_ptrs) 
+        : data_(data), rows_(rows), cols_(cols), ld_(ld), stride_(stride), batch_size_(batch_size), data_ptrs_(data_ptrs) {}
+
+
+    
+    /* template <typename T>
+    DenseMatView<T, BatchType::Single>::DenseMatView(const DenseMatHandle<T, BatchType::Single>& handle) 
+        : data_(handle.data_), rows_(handle.rows_), cols_(handle.cols_), ld_(handle.ld_), layout_(handle.layout_) {}
+
+    template <typename T>
+    DenseMatView<T, BatchType::Batched>::DenseMatView(const DenseMatHandle<T, BatchType::Batched>& handle) 
+        : data_(handle.data_), rows_(handle.rows_), cols_(handle.cols_), ld_(handle.ld_), stride_(handle.stride_), batch_size_(handle.batch_size_), layout_(handle.layout_), data_ptrs_(handle.data_ptrs_) {} */
+
+    template <typename T>
+    DenseMatView<T, BatchType::Single>::DenseMatView(const DenseMatView<T, BatchType::Single>& view) = default;
+
+    template <typename T>
+    DenseMatView<T, BatchType::Batched>::DenseMatView(const DenseMatView<T, BatchType::Batched>& view) = default;
+
+    template <typename T>
+    DenseMatView<T, BatchType::Single>::DenseMatView(DenseMatView<T, BatchType::Single>&& view) = default;
+    
+    template <typename T>
+    DenseMatView<T, BatchType::Batched>::DenseMatView(DenseMatView<T, BatchType::Batched>&& view) = default;
+
+    template <typename T>
+    DenseMatView<T, BatchType::Single>::DenseMatView(const DenseMatHandle<T, BatchType::Single>& handle, int rows, int cols, int ld) 
+        : data_(handle.data_), rows_(rows), cols_(cols), ld_(ld), layout_(handle.layout_) {
+            auto total_size_handle = handle.layout_ == Layout::RowMajor ? handle.rows_ * handle.ld_ : handle.cols_ * handle.ld_;
+            auto total_size_view = layout_ == Layout::RowMajor ? rows * ld : cols * ld;
+            if (total_size_handle != total_size_view) {
+                throw std::runtime_error("Size mismatch " + std::to_string(total_size_handle) + " != " + std::to_string(total_size_view));
+            }
+        }
+
+    template <typename T>
+    DenseMatView<T, BatchType::Batched>::DenseMatView(const DenseMatHandle<T, BatchType::Batched>& handle, int rows, int cols, int ld, int stride, int batch_size) 
+        : data_(handle.data_), rows_(rows), cols_(cols), ld_(ld), stride_(stride), batch_size_(batch_size), layout_(handle.layout_), data_ptrs_(handle.data_ptrs_) {
+            auto total_size_handle = handle.stride_ * handle.batch_size_;
+            auto total_size_view = stride * batch_size;
+            if (total_size_handle != total_size_view) {
+                throw std::runtime_error("Size mismatch " + std::to_string(total_size_handle) + " != " + std::to_string(total_size_view));
+            }
+        }
+
+    template <typename T>
+    DenseMatView<T, BatchType::Single>& DenseMatView<T, BatchType::Single>::operator=(const DenseMatView<T, BatchType::Single>& view) = default;
+
+    template <typename T>
+    DenseMatView<T, BatchType::Batched>& DenseMatView<T, BatchType::Batched>::operator=(const DenseMatView<T, BatchType::Batched>& view) = default;
+
+    template <typename T>
+    DenseMatView<T, BatchType::Batched>& DenseMatView<T, BatchType::Batched>::operator=(const DenseMatHandle<T, BatchType::Batched>& handle) {
+        data_ = handle.data_;
+        rows_ = handle.rows_;
+        cols_ = handle.cols_;
+        ld_ = handle.ld_;
+        stride_ = handle.stride_;
+        batch_size_ = handle.batch_size_;
+        layout_ = handle.layout_;
+        data_ptrs_ = handle.data_ptrs_;
+        return *this;
+    }
+
+    template <typename T>
+    DenseMatView<T, BatchType::Single>& DenseMatView<T, BatchType::Single>::operator=(const DenseMatHandle<T, BatchType::Single>& handle) {
+        data_ = handle.data_;
+        rows_ = handle.rows_;
+        cols_ = handle.cols_;
+        ld_ = handle.ld_;
+        layout_ = handle.layout_;
+        return *this;
+    }
+
 
     template <typename T>
     SparseMatHandle<T, Format::CSR, BatchType::Single>::~SparseMatHandle() = default;
@@ -590,7 +701,11 @@ namespace linalg{
     DenseMatHandle<T, BatchType::Single>::~DenseMatHandle() = default;
     template <typename T>
     DenseMatHandle<T, BatchType::Batched>::~DenseMatHandle() = default;
-}
+    template <typename T>
+    DenseMatView<T, BatchType::Single>::~DenseMatView() = default;
+    template <typename T>
+    DenseMatView<T, BatchType::Batched>::~DenseMatView() = default;
+
 
     template <typename T>
     BackendSparseMatrixHandle<T, Format::CSR>* SparseMatHandle<T, Format::CSR, BatchType::Single>::operator->() {
@@ -614,6 +729,18 @@ namespace linalg{
     }
 
     template <typename T>
+    BackendDenseMatrixHandle<T>* DenseMatView<T, BatchType::Single>::operator->() {
+        init_backend();
+        return *backend_handle_;
+    }
+
+    template <typename T>
+    BackendDenseMatrixHandle<T>* DenseMatView<T, BatchType::Batched>::operator->() {
+        init_backend();
+        return *backend_handle_;
+    }
+
+    template <typename T>
     BackendSparseMatrixHandle<T, Format::CSR>& SparseMatHandle<T, Format::CSR, BatchType::Single>::operator*() {
         init_backend();
         return *backend_handle_;
@@ -633,3 +760,24 @@ namespace linalg{
         init_backend();
         return *backend_handle_;
     }
+
+    template <typename T>
+    BackendDenseMatrixHandle<T>& DenseMatView<T, BatchType::Single>::operator*() {
+        init_backend();
+        return *backend_handle_;
+    }
+
+    template <typename T>
+    BackendDenseMatrixHandle<T>& DenseMatView<T, BatchType::Batched>::operator*() {
+        init_backend();
+        return *backend_handle_;
+    }
+
+    template <typename T>
+    DenseMatView<T, BatchType::Single>::DenseMatView(const DenseMatHandle<T, BatchType::Single>& handle) 
+        : data_(handle.data_), rows_(handle.rows_), cols_(handle.cols_), ld_(handle.ld_), layout_(handle.layout_) {}
+
+    template <typename T>
+    DenseMatView<T, BatchType::Batched>::DenseMatView(const DenseMatHandle<T, BatchType::Batched>& handle) 
+        : data_(handle.data_), rows_(handle.rows_), cols_(handle.cols_), ld_(handle.ld_), stride_(handle.stride_), batch_size_(handle.batch_size_), layout_(handle.layout_), data_ptrs_(handle.data_ptrs_) {}
+}
