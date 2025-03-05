@@ -648,8 +648,8 @@ namespace linalg{
         : data_(handle.data_), rows_(rows), cols_(cols), ld_(ld), layout_(handle.layout_) {
             auto total_size_handle = handle.layout_ == Layout::RowMajor ? handle.rows_ * handle.ld_ : handle.cols_ * handle.ld_;
             auto total_size_view = layout_ == Layout::RowMajor ? rows * ld : cols * ld;
-            if (total_size_handle != total_size_view) {
-                throw std::runtime_error("Size mismatch " + std::to_string(total_size_handle) + " != " + std::to_string(total_size_view));
+            if (total_size_handle < total_size_view) {
+                throw std::runtime_error("View larger than handle: " + std::to_string(total_size_handle) + " < " + std::to_string(total_size_view));
             }
         }
 
@@ -658,8 +658,8 @@ namespace linalg{
         : data_(handle.data_), rows_(rows), cols_(cols), ld_(ld), stride_(stride), batch_size_(batch_size), layout_(handle.layout_), data_ptrs_(handle.data_ptrs_) {
             auto total_size_handle = handle.stride_ * handle.batch_size_;
             auto total_size_view = stride * batch_size;
-            if (total_size_handle != total_size_view) {
-                throw std::runtime_error("Size mismatch " + std::to_string(total_size_handle) + " != " + std::to_string(total_size_view));
+            if (total_size_handle < total_size_view) {
+                throw std::runtime_error("View larger than handle: " + std::to_string(total_size_handle) + " < " + std::to_string(total_size_view));
             }
         }
 

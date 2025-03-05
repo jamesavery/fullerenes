@@ -243,6 +243,10 @@ namespace linalg{
             return DenseMatView<T, BatchType::Single>(*this);
         }
 
+        DenseMatView<T, BatchType::Single> operator()(int rows, int cols, int ld) const {
+            return DenseMatView<T, BatchType::Single>(*this, rows, cols, ld);
+        }
+
         private:
             std::unique_ptr<BackendDenseMatrixHandle<T>> backend_handle_;
     };
@@ -265,6 +269,10 @@ namespace linalg{
 
         DenseMatView<T, BatchType::Batched> operator()() const {
             return DenseMatView<T, BatchType::Batched>(*this);
+        }
+
+        DenseMatView<T, BatchType::Batched> operator()(int rows, int cols = -1, int ld = -1, int stride = -1) const {
+            return DenseMatView<T, BatchType::Batched>(*this, rows, cols > 0 ? cols : cols_, ld > 0 ? ld : ld_, stride > 0 ? stride : stride_, batch_size_);
         }
 
         private:

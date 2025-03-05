@@ -417,13 +417,9 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
     linalg::DenseMatHandle<T, BatchType::Batched> handleAP(AS.data() + BlockVectors*m, m, BlockVectors, m, m*3*BlockVectors, batch_size);
     linalg::DenseMatHandle<T, BatchType::Batched> handleXtAX(StAS.data(), BlockVectors, BlockVectors, BlockVectors, BlockVectors*BlockVectors, batch_size);
     linalg::DenseMatHandle<T, BatchType::Batched> handleStAS(StAS.data(), BlockVectors*3, BlockVectors*3, BlockVectors*3, BlockVectors*3*3*BlockVectors, batch_size);
-    linalg::DenseMatHandle<T, BatchType::Batched> handleS_restart(S.data(), m, BlockVectors*2, m, m*3*BlockVectors, batch_size);
-    linalg::DenseMatHandle<T, BatchType::Batched> handleAS_restart(AS.data(), m, BlockVectors*2, m, m*3*BlockVectors, batch_size);
-    linalg::DenseMatHandle<T, BatchType::Batched> handleStAS_restart(StAS.data(), BlockVectors*2, BlockVectors*2, BlockVectors*2, BlockVectors*2*2*BlockVectors, batch_size);
     linalg::DenseMatHandle<T, BatchType::Batched> handleU(U.data(), m, BlockVectors*3, m, m*3*BlockVectors, batch_size);
     linalg::DenseMatHandle<T, BatchType::Batched> handleStemp(S_temp.data(), m, BlockVectors*3, m, m*3*BlockVectors, batch_size);
     linalg::DenseMatHandle<T, BatchType::Batched> handleC_p(C_p.data(), BlockVectors*3, BlockVectors, BlockVectors*3, BlockVectors*3*BlockVectors, batch_size);
-    linalg::DenseMatHandle<T, BatchType::Batched> handleC_p_restart(C_p.data(), BlockVectors*2, BlockVectors, BlockVectors*2, BlockVectors*3*BlockVectors, batch_size);
     linalg::DenseMatHandle<T, BatchType::Batched> handleP_new(U.data() + m*BlockVectors, m, BlockVectors, m, m*3*BlockVectors, batch_size);
     linalg::DenseMatHandle<T, BatchType::Batched> handleAP_new(S_temp.data() + m*BlockVectors, m, BlockVectors, m, m*3*BlockVectors, batch_size);
     SyclVector<std::byte> spmm_workspace(linalg::spmm_buffer_size<Backend::CUDA>(ctx, (handleA), handleS(), handleAS(), alpha, beta, Transpose::NoTrans, Transpose::NoTrans));
@@ -496,7 +492,8 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
     auto Tmemcpy = std::chrono::duration<double>(0);
 
     auto iteration = [&](SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, size_t iter, bool restart){
-        
+        auto Nvecs = restart ? 2*BlockVectors : 3*BlockVectors;
+        auto eig_stride = Nvecs * Nvecs;
         auto start = std::chrono::steady_clock::now();
         //Setup
         ctx -> submit([&](sycl::handler& h){
@@ -560,12 +557,12 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
         ctx.wait(); Tspmm += std::chrono::steady_clock::now() - start;
         //Compute S^T A S
         start = std::chrono::steady_clock::now();
-        linalg::gemm<Backend::CUDA>(ctx, restart ? handleS_restart() : handleS(), restart ? handleAS_restart() : handleAS(), restart ? handleStAS_restart() : handleStAS(), alpha, beta, Transpose::Trans, Transpose::NoTrans);
+        linalg::gemm<Backend::CUDA>(ctx, handleS(m, Nvecs), handleAS(m, Nvecs), handleStAS(Nvecs, Nvecs, Nvecs, Nvecs * Nvecs), alpha, beta, Transpose::Trans, Transpose::NoTrans);
         ctx.wait(); Tgemm += std::chrono::steady_clock::now() - start;
 
         //Solve the eigenvalue problem
         start = std::chrono::steady_clock::now();
-        linalg::syev<Backend::CUDA>(ctx, restart ? handleStAS_restart() : handleStAS(), lambdas.to_span(), Uplo::Lower, syev_workspace.to_span());
+        linalg::syev<Backend::CUDA>(ctx, handleStAS(Nvecs, Nvecs, Nvecs, Nvecs*Nvecs), lambdas.to_span(), Uplo::Lower, syev_workspace.to_span());
         ctx.wait(); Teigen += std::chrono::steady_clock::now() - start;
         //cudaMemcpy(R_inv.data(), StAS.data(), StAS.size() * sizeof(T), cudaMemcpyDeviceToDevice);
         start = std::chrono::steady_clock::now();
@@ -626,18 +623,18 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
         Tmemcpy += std::chrono::steady_clock::now() - start;
         //Compute X = [X, R, P] * [Zx, Zr, Zp]^T
         start = std::chrono::steady_clock::now();
-        linalg::gemm<Backend::CUDA>(ctx, restart ? handleS_restart() : handleS(), restart ? handleStAS_restart() : handleStAS(), handleU(), alpha, beta, Transpose::NoTrans, Transpose::NoTrans); 
+        linalg::gemm<Backend::CUDA>(ctx, handleS(m, Nvecs), handleStAS(Nvecs, Nvecs, Nvecs, Nvecs * Nvecs), handleU(), alpha, beta, Transpose::NoTrans, Transpose::NoTrans); 
         //Make an implicit update of AX:
-        linalg::gemm<Backend::CUDA>(ctx, restart ? handleAS_restart() : handleAS(), restart ? handleStAS_restart() : handleStAS(), handleStemp(), alpha, beta, Transpose::NoTrans, Transpose::NoTrans);
+        linalg::gemm<Backend::CUDA>(ctx, handleAS(m, Nvecs), handleStAS(Nvecs, Nvecs, Nvecs, Nvecs * Nvecs), handleStemp(), alpha, beta, Transpose::NoTrans, Transpose::NoTrans);
         ctx.wait(); Tgemm += std::chrono::steady_clock::now() - start;
         start = std::chrono::steady_clock::now();
         Ortho<T, BlockVectors, BlockVectors>(ctx, C_p, StAS, QRworkspace, restart ? BlockVectors*2 : BlockVectors*3, BlockVectors*BlockVectors * (restart? (2*2) : (3*3)), BlockVectors*BlockVectors *  3, batch_size);
         ctx.wait(); Tortho += std::chrono::steady_clock::now() - start;
         //First compute P = [X, R, P] * C_p
         start = std::chrono::steady_clock::now();
-        linalg::gemm<Backend::CUDA>(ctx, restart ? handleS_restart() : handleS(), restart ? handleC_p_restart() : handleC_p(), handleP_new(), alpha, beta, Transpose::NoTrans, Transpose::NoTrans);
+        linalg::gemm<Backend::CUDA>(ctx, handleS(m, Nvecs), handleC_p(Nvecs, BlockVectors, Nvecs), handleP_new(), alpha, beta, Transpose::NoTrans, Transpose::NoTrans);
         //Make an implicit update of AP:
-        linalg::gemm<Backend::CUDA>(ctx, restart ? handleAS_restart() : handleAS(), restart ? handleC_p_restart() : handleC_p(), handleAP_new(), alpha, beta, Transpose::NoTrans, Transpose::NoTrans);
+        linalg::gemm<Backend::CUDA>(ctx, handleAS(m, Nvecs), handleC_p(Nvecs, BlockVectors, Nvecs), handleAP_new(), alpha, beta, Transpose::NoTrans, Transpose::NoTrans);
         ctx.wait();
         Tgemm += std::chrono::steady_clock::now() - start;
         //AS = S_temp;
