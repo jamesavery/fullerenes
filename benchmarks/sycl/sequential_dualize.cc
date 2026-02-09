@@ -99,9 +99,7 @@ int main(int argc, char** argv) {
     double not_used;
 
     for(int i = 0; i < Nruns; i++){
-        auto start = std::chrono::steady_clock::now();
         fill_and_dualize(batch, not_used, times_dual[i]);
-        auto T0 = std::chrono::steady_clock::now();
     }
 
     std::cout << "N, Nf, BatchSize, device_type \n";

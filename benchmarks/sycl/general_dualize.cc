@@ -18,18 +18,8 @@ int main(int argc, char** argv) {
     parseArguments(argc, argv, args);
     typedef float real_t;
     typedef uint16_t node_t;
-    size_t Nruns = args.nruns;
-    size_t N = args.natoms;
-    size_t BatchSize = args.nisomers;
     std::string device_type = args.device_type;
-    bool use_double_precision = args.use_double_precision;
-    size_t Nlanczos = args.nlanczos;
     std::string output_file = args.output_file;
-    size_t print_vector = args.print_vector;
-    size_t device_id = args.device_id;
-    bool print_out = false;
-
-    size_t Nf = N/2 + 2;
 
 
     

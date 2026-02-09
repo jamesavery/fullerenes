@@ -4,7 +4,6 @@ set(SYCL_EXECUTABLES
   full_pipeline_strong_scaling  
   sequential_dualize
   lockstep_dualize
-  matmul
   general_dualize
 )
 

@@ -33,9 +33,8 @@ int main(int argc, char** argv) {
 
     size_t N  = argc>1 ? strtol(argv[1],0,0) : 80;
     size_t Nf = N/2 + 2;
-    size_t NumNodes = argc>2 ? strtol(argv[2],0,0) : 2000000;
-    std::string device_type = argc>3 ? argv[3] : "gpu";
-    size_t Nruns = argc>4 ? strtol(argv[4],0,0) : 10;
+    std::string device_type = argc>2 ? argv[2] : "gpu";
+    size_t Nruns = argc>3 ? strtol(argv[3],0,0) : 10;
 
     size_t BatchSize = 1280; //std::ceil((real_t)NumNodes/(real_t)N);
 
@@ -86,7 +85,6 @@ int main(int argc, char** argv) {
 
 
     for(int i = 0; i < Nruns; i++){
-        auto start = std::chrono::steady_clock::now();
         FullereneBatch<real_t,node_t> batch(N, BatchSize);
         fill_and_dualize(batch, times_generate[i], times_dual[i]);
         auto T0 = std::chrono::steady_clock::now();
@@ -98,9 +96,6 @@ int main(int argc, char** argv) {
         auto T3 = std::chrono::steady_clock::now(); times_project[i] = std::chrono::duration<double, std::nano>(T3 - T2).count();
         forcefield_optimize(Q, batch, LaunchPolicy::SYNC, 5*N, 5*N);
         auto T4 = std::chrono::steady_clock::now(); times_opt[i] = std::chrono::duration<double, std::nano>(T4 - T3).count();
-        
-
-
     }
 
     std::cout << "N, Nf, BatchSize, device_type, generate, memcpy, dual, tutte, project, opt" << std::endl;
