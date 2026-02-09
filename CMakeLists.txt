@@ -200,14 +200,6 @@ set(SYCL_FULLERENE_LIBS
   sycl-util-impl_lib 
   primitives-instantiations_lib 
   geometry-properties_lib
-  lobpcg-v1_lib
-  lobpcg-v2_lib
-  lobpcg-v3_lib
-  lobpcg-v4_lib
-  lobpcg-v5_lib
-  lobpcg-v6_lib
-  lobpcg-v7_lib
-  lobpcg-v8_lib
   )
 
 set(SYCL_FULLERENE_LIBS ${SYCL_FULLERENE_LIBS} CACHE STRING "SYCL_FULLERENE_LIBS")
@@ -216,7 +208,6 @@ if(ENABLE_SYCL)
   set(PREVIOUS_CXX_COMPILER ${CMAKE_CXX_COMPILER})
   set(CMAKE_CXX_COMPILER ${DPCPP_COMPILER})
   add_subdirectory(src/sycl)
-  add_subdirectory(src/linalg/wrappers)
   add_subdirectory(tests/sycl-tests)
   add_subdirectory(benchmarks/sycl)
   set(CMAKE_CXX_COMPILER ${PREVIOUS_CXX_COMPILER})
