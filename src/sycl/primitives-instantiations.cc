@@ -4,8 +4,11 @@ namespace primitives{
     template <typename T1, typename T2, template <typename> class ContainerType, typename BinaryOp, typename UnaryOp, typename BinaryPredicate, typename Predicate>
     void myFunction() {
         SyclQueue Q;
-        ContainerType<T1> input;
-        ContainerType<T2> output;
+        ContainerType<T1> input_tmp;
+        ContainerType<T2> output_tmp;
+        // Create references to match actual usage patterns  
+        ContainerType<T1>& input = input_tmp;
+        ContainerType<T2>& output = output_tmp;
         T1 res;
         res = reduce(Q, input, T1{}, BinaryOp{});
         res = transform_reduce(Q, input, T1{}, BinaryOp{}, UnaryOp{});
@@ -22,20 +25,24 @@ namespace primitives{
         all_of(Q, input, Predicate{});
         none_of(Q, input, Predicate{});
         fill(Q, input, T1{});
+        
+        // Add iota and reduce_by_segment to ensure proper instantiation
+        iota(Q, input, T1{});
+        reduce_by_segment(Q, input, output, input, output, BinaryPredicate{}, BinaryOp{});
     }
 
-    /* 
+    
     using Types = std::tuple<uint16_t, float>;
     using UnaryOperators = std::tuple<Identity, Negate, Square, Cube>; 
     using BinaryOperators = std::tuple<Plus, Multiply, Min, Max>;
     using BinaryPredicates = std::tuple<Less, Greater, Equal, NotEqual, GreaterEqual, LessEqual>;
     using Predicates = std::tuple<IsTrue, IsFalse>;
-    */
-    using Types = std::tuple<float>;
+   
+    /* using Types = std::tuple<float>;
     using UnaryOperators = std::tuple<Identity>; 
     using BinaryOperators = std::tuple<Plus>;
     using BinaryPredicates = std::tuple<Equal>;
-    using Predicates = std::tuple<IsTrue>;
+    using Predicates = std::tuple<IsTrue>; */
 
 
     template <typename Tuple, std::size_t Index>
@@ -79,4 +86,14 @@ namespace primitives{
             InstantiateFunctions<0, 0, 0, 0, 0, 0>::instantiate();
         }
     }
+    
+    // Actually call the instantiation function to force template generation
+    static struct ForceInstantiations {
+        ForceInstantiations() { 
+            volatile bool dummy = false;
+            if (dummy) {  // Will never execute but forces instantiation
+                instantiateAllFunctions();
+            }
+        }
+    } instantiator;
 }
