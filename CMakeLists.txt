@@ -74,7 +74,7 @@ if(ENABLE_SYCL)
     "SHELL:-Xcuda-ptxas --warn-on-double-precision-use"
     "SHELL:-Xcuda-ptxas --warn-on-spills"
     )
-    set(DPCPP_TARGET_FLAGS "-Xcuda-ptxas --generate-line-info -fsycl-targets=nvptx64-nvidia-cuda -Xsycl-target-backend=nvptx64-nvidia-cuda --cuda-gpu-arch=sm_${CMAKE_CUDA_ARCHITECTURES} --cuda-path=$ENV{CUDA_PATH}")
+    set(DPCPP_TARGET_FLAGS "--cuda-path=$ENV{CUDA_PATH}")
     set(DPCPP_LINK_FLAGS   "-O3 -fsycl -fsycl-unnamed-lambda ${DPCPP_TARGET_FLAGS}")    
   elseif(SYCL_TARGETS STREQUAL "X86")
     set(DPCPP_TARGET_FLAGS "-fsycl-targets=x86_64 -march=native -mcpu=native")
@@ -82,7 +82,7 @@ if(ENABLE_SYCL)
 
   set(DPCPP_INCLUDE ${SYCL_DIR}include)
   message("Using SYCL include path: ${DPCPP_INCLUDE}")  
-  set(DPCPP_FLAGS "${DPCPP_FLAGS} -fsycl -fsycl-unnamed-lambda ${DPCPP_TARGET_FLAGS} -I${DPCPP_INCLUDE} -I${DPCPP_INCLUDE}/sycl -I$ENV{CUDA_INCLUDE}")
+  set(DPCPP_FLAGS "${DPCPP_FLAGS} ${DPCPP_TARGET_FLAGS} -I${DPCPP_INCLUDE} -I${DPCPP_INCLUDE}/sycl -I$ENV{CUDA_INCLUDE}")
 
 endif()
 
@@ -106,6 +106,14 @@ execute_process(
 # C++ configure file
 include_directories(AFTER SYSTEM include)
 include_directories(${CMAKE_BINARY_DIR}/include/)
+
+# oneDPL (DPC++ STL) headers are not installed in /opt/dpcpp-cuda by default.
+# If a oneAPI oneDPL install exists, add it explicitly.
+set(ONEDPL_ROOT "/opt/intel/oneapi/dpl/latest")
+if(EXISTS "${ONEDPL_ROOT}/include/oneapi/dpl")
+    message(STATUS "Adding oneDPL include dir: ${ONEDPL_ROOT}/include")
+    include_directories("${ONEDPL_ROOT}/include")
+endif()
 
 
 # Fortran compiler flags
