@@ -1,6 +1,6 @@
 #pragma once
 
-#if __INTEL_LLVM_COMPILER > 20240000
+#if defined(__INTEL_LLVM_COMPILER)
     #define ONEDPL_USE_PREDEFINED_POLICIES 0
     #include <oneapi/dpl/algorithm>
     #include <oneapi/dpl/execution>
@@ -19,7 +19,7 @@
 namespace primitives{
 
 
-#if __INTEL_LLVM_COMPILER > 20240000
+#if defined(__INTEL_LLVM_COMPILER)
     #define BEGIN(x) (static_cast< std::decay_t<decltype(x[0])>* >(x.begin()))
     #define END(x) (static_cast< std::decay_t<decltype(x[0])>* >(x.end()))
 
@@ -361,6 +361,45 @@ namespace primitives{
     void inline sort(SyclQueue& Q, InputContainer&& vec, BinaryPredicate binary_op) {
         Q.wait();
         std::sort(std::execution::par_unseq, BEGIN(vec), END(vec), binary_op);
+    }
+
+    //iota
+    template <typename InputContainer, typename T>
+    void inline iota(SyclQueue& Q, InputContainer&& vec, T value) {
+        Q.wait();
+        std::iota(BEGIN(vec), END(vec), value);
+    }
+
+    //reduce_by_segment 
+    template <typename InputKeys, typename InputValues, typename OutputKeys, typename OutputValues, typename BinaryPredicate, typename BinaryOp>
+    void inline reduce_by_segment(SyclQueue& Q, InputKeys&& keys, InputValues&& values, OutputKeys&& out_keys, OutputValues&& out_values, BinaryPredicate pred, BinaryOp op) {
+        Q.wait();
+        // Fallback CPU implementation
+        auto k_it = BEGIN(keys);
+        auto v_it = BEGIN(values);
+        auto k_end = END(keys);
+        auto ok_it = BEGIN(out_keys);
+        auto ov_it = BEGIN(out_values);
+        
+        if (k_it == k_end) return;
+        
+        auto current_key = *k_it;
+        auto accumulated = *v_it;
+        ++k_it; ++v_it;
+        
+        while (k_it != k_end) {
+            if (!pred(*k_it, current_key)) {
+                *ok_it++ = current_key;
+                *ov_it++ = accumulated;
+                current_key = *k_it;
+                accumulated = *v_it;
+            } else {
+                accumulated = op(accumulated, *v_it);
+            }
+            ++k_it; ++v_it;
+        }
+        *ok_it = current_key;
+        *ov_it = accumulated;
     }
 #endif
 
