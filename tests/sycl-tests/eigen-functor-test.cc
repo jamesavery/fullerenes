@@ -44,13 +44,6 @@ protected:
 
 
 TEST_P(MinimumProblem, AllTestsInOne) {
-    auto float_spans_equal = [](auto&& a, auto&& b) {
-        return std::equal(a.begin(), a.end(), b.begin(), [](auto a, auto b) {
-            auto max_val = std::max(std::abs(a), std::abs(b));
-            auto eps = std::numeric_limits<decltype(a)>::epsilon() * 1e3;
-            return (std::abs(a - b) / (max_val > eps ? max_val : 1) ) < eps;
-        });
-    };
     {
         auto batch1 = batch_1;
         auto batch2 = batch_2;

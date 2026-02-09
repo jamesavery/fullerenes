@@ -86,14 +86,4 @@ namespace primitives{
             InstantiateFunctions<0, 0, 0, 0, 0, 0>::instantiate();
         }
     }
-    
-    // Actually call the instantiation function to force template generation
-    static struct ForceInstantiations {
-        ForceInstantiations() { 
-            volatile bool dummy = false;
-            if (dummy) {  // Will never execute but forces instantiation
-                instantiateAllFunctions();
-            }
-        }
-    } instantiator;
 }

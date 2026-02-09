@@ -63,7 +63,6 @@ SyclEvent EccentricityFunctor<T,K>::compute(SyclQueue& Q, FullereneBatchView<T, 
         auto N = batch.N_;
         cgh.parallel_for<struct EccentricityFunctor<T,K>>(sycl::nd_range<1>(sycl::range<1>(batch.capacity()*N), sycl::range<1>(N)), [=](sycl::nd_item<1> nditem){
             auto cta = nditem.get_group();
-            auto tid = cta.get_local_linear_id();
             auto bid = cta.get_group_linear_id();
             if (batch[bid].m_.flags_.get().is_not_set(StatusEnum::FULLERENEGRAPH_PREPARED)) return;
             auto X = batch[bid].d_.X_cubic_;
@@ -80,7 +79,6 @@ SyclEvent EccentricityFunctor<T,K>::compute(SyclQueue& Q, FullereneBatchView<T, 
 template <typename T, typename K>
 SyclEvent EccentricityFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T, K> fullerene, Span<T> out_ellipticity){
     if (fullerene.m_.flags_.get().is_not_set(StatusEnum::FULLERENEGRAPH_PREPARED)) return SyclEvent();
-    auto N = fullerene.N_;
     auto X = fullerene.d_.X_cubic_;
     auto I = inertia_matrix(Q, X);
     SyclEventImpl ret_val = Q -> single_task ([=](){
@@ -113,7 +111,6 @@ SyclEvent InertiaFunctor<T,K>::compute(SyclQueue& Q, FullereneBatchView<T, K> ba
 template <typename T, typename K>
 SyclEvent InertiaFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T, K> fullerene, Span<std::array<T,3>> out_inertia){
     if (fullerene.m_.flags_.get().is_not_set(StatusEnum::FULLERENEGRAPH_PREPARED)) return SyclEvent();
-    auto N = fullerene.N_;
     auto X = fullerene.d_.X_cubic_;
     auto I = inertia_matrix(Q, X);
     SyclEventImpl ret_val = Q -> single_task ([=](){
@@ -145,7 +142,6 @@ SyclEvent TransformCoordinatesFunctor<T,K>::compute(SyclQueue& Q, FullereneBatch
 
 template <typename T, typename K>
 SyclEvent TransformCoordinatesFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T, K> fullerene){
-    auto N = fullerene.N_;
     auto X = fullerene.d_.X_cubic_;
     auto P = principal_axes(Q, X);
     primitives::transform(Q, X, X, [P](auto x){return dot(P,x);});
@@ -195,7 +191,6 @@ SyclEvent SurfaceAreaFunctor<T,K>::compute(SyclQueue& Q, FullereneBatchView<T, K
 template <typename T, typename K>
 SyclEvent SurfaceAreaFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T, K> fullerene, Span<T> out_surface_area, Span<K> indices){
     if (fullerene.m_.flags_.get().is_not_set(StatusEnum::FULLERENEGRAPH_PREPARED)) return SyclEvent();
-    auto N = fullerene.N_;
     auto Nf = fullerene.Nf_;
     if (indices.size() != Nf) throw std::runtime_error("Indices size must be equal to the number of faces");
 
@@ -267,11 +262,7 @@ SyclEvent VolumeFunctor<T,K>::compute(SyclQueue& Q, FullereneBatchView<T, K> bat
 template <typename T, typename K>
 SyclEvent VolumeFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T, K> fullerene, Span<T> out_volume, Span<K> indices){
     if (fullerene.m_.flags_.get().is_not_set(StatusEnum::FULLERENEGRAPH_PREPARED)) return SyclEvent();
-    auto N = fullerene.N_;
     auto Nf = fullerene.Nf_;
-    auto X = fullerene.d_.X_cubic_;
-
-    T V = 0;
     if (indices.size() != Nf) throw std::runtime_error("Indices size must be equal to the number of faces");
 
     primitives::iota(Q, indices, 0);

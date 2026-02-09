@@ -38,7 +38,6 @@ void T_QTQ(sycl::group<1>& cta, const int n, const sycl::local_accessor<T,1>& D,
     for (int i = tix; i < n; i += bdim){
         local_max = std::max(local_max, std::abs(D[i]) + 2*std::abs(L[i]));
     }
-    real_t max_norm = reduce_over_group(cta, local_max, sycl::maximum<real_t>());
     real_t numerical_zero = 10*std::numeric_limits<real_t>::epsilon();
     real_t d_n, l_n, l_nm1;
     d_n = D[n]; l_n = L[n]; l_nm1 = L[n-1];
@@ -265,7 +264,7 @@ SyclEvent eigensolve(SyclQueue& Q, FullereneBatchView<T,K> B,
     if (nLanczos  > B.N_*3) {
         throw std::runtime_error("Number of lanczos iterations ("+ std::to_string(nLanczos) +") exceeds the number of rank of the hessian matrix");
     }
-    size_t capacity = B.capacity(), Natoms = B.N_, batch_size = B.size();
+    size_t Natoms = B.N_, batch_size = B.size();
  
     //Buffers required: buffer<T>& D_, buffer<T>& L_, buffer<T>& U_, buffer<T>& Q_, 
 
@@ -307,15 +306,6 @@ SyclEvent eigensolve(SyclQueue& Q, FullereneBatchView<T,K> B,
             node_t C[M]; //Column indices of the threadIdx.x'th row 3-fold degenerate
             real_t* V = V_acc.data() + bid * nLanczos * N + tid;
             coord3d* X_ptr = X_acc.data()  + Natoms*bid; 
-
-            auto LCG = [&](const unsigned long seed){
-                //Parameters from Numerical Recipes, Knuth and H. W. Lewis
-                unsigned long a = 1664525;
-                unsigned long c = 1013904223;
-                unsigned long m = 4294967296;
-                unsigned long x = seed;
-                return (a*x + c) % m;
-            };
 
             auto mat_vect = [&](const real_t x){
                 real_t result = real_t(0);
@@ -467,8 +457,6 @@ SyclEvent eigensolve(SyclQueue& Q, FullereneBatchView<T,K> B,
                     if(GR <= std::numeric_limits<real_t>::epsilon()*real_t(10.)) not_done--; // Do one (or optionally more) steps after reaching tolerance, to get all off-diagonals below.
                                                     // GPU NB: Se GPU NB ovenfor.
                     if(i>10){
-                        //printf("%dth run: Cannot converge eigenvalue %d to tolerance " G " using machine precision %g (d=%g, shift=%g, G=%g)\n" "D[k] = %g, L[k-1] = %g, L[k] = %g\n", nth_time,k,tolerance, std::numeric_limits<real_t>::epsilon(),d,shift,GR, D[k], (k>0)?L[k-1]:0, (k+1<n)?L[k]:0);
-                        auto max_error = std::max(std::numeric_limits<real_t>::epsilon()*real_t(10.),GR);
                         break;
                     }
                 }
@@ -517,7 +505,6 @@ SyclEvent eigensolve(SyclQueue& Q, FullereneBatchView<T,K> B,
             auto tid = nditem.get_local_linear_id();
             auto bid = nditem.get_group_linear_id();
             auto cta = nditem.get_group();
-            auto bdim = cta.get_local_linear_range();
             int atom_idx = tid/3; //Atom index (Integer division so the result is rounded down)
             int n = Natoms*3;
             int m = nLanczos;

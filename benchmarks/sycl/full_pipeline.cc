@@ -47,7 +47,6 @@ int main(int argc, char** argv) {
     typedef uint16_t node_t;
 
     size_t N  = argc>1 ? strtol(argv[1],0,0) : 200;
-    size_t NumNodes = argc>2 ? strtol(argv[2],0,0) : 20000000;
     size_t NisomersInIsomerspace = IsomerDB::number_isomers(N);
     //auto IsomerPerNodeEstimate = NisomersInIsomerspace/std::stoi(getenv("N_TASKS"));
     auto BatchSize =  std::min((int)NisomersInIsomerspace, (int)1280*10);
@@ -65,14 +64,11 @@ int main(int argc, char** argv) {
     //BuckyGen::buckyherd_queue BuckyQ(N,N_chunks,3,
 	//			   false,false,my_chunks);
 
-    size_t isomers_in_queue = 0;
     //std::vector<node_t> dual_neighbours(IsomerPerNodeEstimate*1.5*Nf*6);
     //std::vector<node_t> face_degrees(IsomerPerNodeEstimate*1.5*Nf); //We do not know a priori how many isomers our buckygen queue will generate so we reserve space for 1.5 times the number of isomers we want to generate.
     
     
     Graph G(N);
-
-    bool more = true;
 
     double times_generate = 0.; //Times in nanoseconds.
     double times_memcpy = 0.; //Times in nanoseconds.

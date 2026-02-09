@@ -767,7 +767,6 @@ struct ForceField
             mat3 GradPmp = (identity3() - tensor_product(mph, mph)) * rmpn;
             coord3d GradPcotm = (sinm * GradPcosm - cosm * GradPsinm) * cscm * cscm;
             coord3d GradPcscm = -GradPsinm * cscm * cscm;
-            mat3 GradPnbam = -tensor_product(cross(abh, amh), GradAcosb) * csca * csca;
             mat3 GradPnamp = (cross(mah, GradPmp) * sinm - tensor_product(cross(mah, mph), GradPsinm)) * cscm * cscm;
             coord3d GradPcosb = (sinm * rmpn * (cross(nbam, mah) - dot(nbam, cross(mah, mph)) * mph) - dot(nbam, cross(mah, mph)) * GradPsinm) * cscm * cscm;
 
@@ -845,7 +844,6 @@ struct ForceField
 
             coord3d GradBcosm = (mph - mbh * cosm) * rbmn;
             coord3d GradBsinm = -cosm / sinm * GradBcosm;
-            coord3d GradBcscm = -GradBsinm * cscm * cscm;
 
             coord3d GradBcosb = -(cross(nmpa, mph) - dot(cross(nmpa, mph), mbh) * mbh) * rbmn * cscm - dot(nmpa, cross(mbh, mph)) * GradBsinm * cscm * cscm;
 
@@ -867,7 +865,6 @@ struct ForceField
 
             coord3d GradMcosm = (mbh * cosm - mph) * rbmn + (mph * cosm - mbh) * rmpn;
             coord3d GradMsinm = -cosm / sinm * GradMcosm;
-            coord3d GradMcscm = -GradMsinm * cscm * cscm;
             coord3d GradMcosp = (pah - pmh * cosp) * rmpn;
             coord3d GradMsinp = -cosp * cscp * GradMcosp;
             coord3d GradMcscp = -GradMsinp * cscp * cscp;
@@ -899,7 +896,6 @@ struct ForceField
 
             coord3d GradPcosm = (mbh - mph * cosm) * rmpn;
             coord3d GradPsinm = -cosm / sinm * GradPcosm;
-            coord3d GradPcscm = -GradPsinm * cscm * cscm;
             coord3d GradPcosp = (pmh * cosp - pah) * rmpn + (pah * cosp - pmh) * rapn;
             coord3d GradPsinp = -cosp * cscp * GradPcosp;
             coord3d GradPcscp = -GradPsinp * cscp * cscp;
@@ -1017,7 +1013,6 @@ struct ForceField
             coord3d GradBcotp = (sinp * GradBcosp - cosp * GradBsinp) * cscp * cscp;
 
             mat3 GradBpbh = (identity3() - tensor_product(pbh, pbh)) * rbpn;
-            coord3d GradBrpbn = -pbh * rbpn * rbpn;
             coord3d GradBcosb = ((dot(npam, cross(pah, pbh)) * pbh - cross(npam, pah)) * sinp * rbpn - dot(npam, cross(pbh, pah)) * GradBsinp) * cscp * cscp;
 
             coord3d GradBC1 = GradBcscp * rapn;
@@ -1087,7 +1082,6 @@ struct ForceField
             mat3 GradPaph = (identity3() - tensor_product(aph, aph)) * rapn;
             coord3d GradPrapn = -aph * rapn * rapn;
             mat3 GradPpbh = (tensor_product(pbh, pbh) - identity3()) * rbpn;
-            coord3d GradPrpbn = pbh * rbpn * rbpn;
             mat3 GradPpah = (tensor_product(pah, pah) - identity3()) * rapn;
             coord3d GradPrpan = pah * rapn * rapn;
             coord3d GradPcosbP1 = (((dot(cross(npam, pbh), pah) * pah - cross(npam, pbh)) * rapn - (dot(cross(npam, pah), pbh) * pbh - cross(npam, pah)) * rbpn) * sinp - dot(npam, cross(pbh, pah)) * GradPsinp) * cscp * cscp;
@@ -1855,7 +1849,6 @@ SyclEvent compute_hessians(SyclQueue& Q, FullereneBatchView<T,K> B, Span<T> hess
                 
                 if(i < j){
                     while (ix < n_cols && cols_span[j*n_cols + ix] != i) {ix++;}
-                    int jx = cols_span[j*n_cols + ix];
 
                     T val = 0.5*(hess_span[i*n_cols + jj] + hess_span[j*n_cols + ix]);
                     hess_span[i*n_cols + jj] = val;

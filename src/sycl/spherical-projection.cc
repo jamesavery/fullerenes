@@ -124,7 +124,6 @@ K multiple_source_shortest_paths(const sycl::group<1>& cta, const Span<std::arra
     INT_TYPEDEFS(K);
     auto N = cta.get_local_linear_range();
     auto tid = cta.get_local_linear_id();
-    auto isomer_idx = cta.get_group_linear_id();
     DeviceCubicGraph FG(cubic_neighbours);
     std::array<K,6> outer_face; memset(outer_face.data(), 0, 6*sizeof(node_t));
     uint8_t Nface = FG.get_face_oriented(0,FG[0][0], outer_face);
@@ -158,9 +157,7 @@ SyclEvent spherical_projection(SyclQueue& Q, FullereneBatchView<T,K>& batch){
     constexpr real_t scalerad = 4.0;
     SyclEventImpl projection_done = Q->submit([&](handler& h) {
         auto N = batch.N_;
-        auto Nf = batch.Nf_;
         auto capacity = batch.capacity();
-        auto max_iter = N * 10;
 
         local_accessor<node_t, 1>   work_queue_memory(N*2, h);
         local_accessor<int, 1>      smem(N, h); //Has to be int for atomic operations
@@ -203,7 +200,6 @@ SyclEvent spherical_projection(SyclQueue& Q, FullereneBatchView<T,K>& batch){
             real_t dtheta = real_t(M_PI)/real_t(d_max+1);
             real_t phi = dtheta*(distance+0.5);
             real_t theta = sycl::atan2(xy[0],xy[1]);
-            coord2d spherical_coords = {theta, phi};
             coord3d xyz = {sycl::cos(theta)*sycl::sin(phi), sycl::sin(theta)*sycl::sin(phi), sycl::cos(phi)};
             real_t xsum = sycl::reduce_over_group(cta, xyz[0], sycl::plus<real_t>{});
             real_t ysum = sycl::reduce_over_group(cta, xyz[1], sycl::plus<real_t>{});

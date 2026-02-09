@@ -1,4 +1,3 @@
-#pragma once
 #include <sycl/sycl.hpp>
 #include <fullerenes/kernel-headers/sycl-parallel-primitives.hh>
 #include <fullerenes/sycl-headers/reference-wrapper.hh>
