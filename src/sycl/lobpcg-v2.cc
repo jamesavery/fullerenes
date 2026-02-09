@@ -4,8 +4,6 @@
 #include "sycl/sycl.hpp"
 #include <oneapi/dpl/random>
 #include <oneapi/dpl/iterator>
-#include <oneapi/mkl/lapack.hpp>
-#include <oneapi/mkl/spblas.hpp>
 #include <fullerenes/graph.hh>
 #include <fullerenes/kernel-headers/all-kernels.hh>
 #include "queue-impl.cc"
