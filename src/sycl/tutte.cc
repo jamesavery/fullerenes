@@ -218,5 +218,5 @@ SyclEvent TutteFunctor<T,K>::compute(SyclQueue& Q, FullereneBatchView<T,K> batch
 
 template struct TutteFunctor<float,uint16_t>;
 template struct TutteFunctor<float,uint32_t>;
-//template struct TutteFunctor<double,uint16_t>;
-//template struct TutteFunctor<double,uint32_t>;
+template struct TutteFunctor<double,uint16_t>;
+template struct TutteFunctor<double,uint32_t>;

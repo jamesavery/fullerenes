@@ -112,13 +112,9 @@ int main(int argc, char** argv){
     //LOBPCG_V2<float, uint16_t, 21, 30>(queue, hessians, cols, BatchSize, (int)N*3, maxiter, true);
     //auto T3 = std::chrono::high_resolution_clock::now();
     //std::cout << "Starting LOBPCG-V3" << std::endl;
-     auto T4 = std::chrono::high_resolution_clock::now();
     //LOBPCG_V3<float, uint16_t, 21, 30>(queue, hessians, cols, BatchSize, (int)N*3, maxiter, true, eigenvects, eigenvalues);
-    auto T5 = std::chrono::high_resolution_clock::now();
-
-    std::cout << "Starting LOBPCG-V5" << std::endl;
-    //auto T6 = std::chrono::high_resolution_clock::now();
-    LOBPCG_V3<float, uint16_t, 21, 30>(  queue, 
+    auto T6 = std::chrono::high_resolution_clock::now();
+    LOBPCG_V4<float, uint16_t, 3, 30>(  queue, 
                                         hessians, 
                                         cols, 
                                         BatchSize, 
@@ -127,12 +123,11 @@ int main(int argc, char** argv){
                                         true, 
                                         eigenvects, 
                                         eigenvalues);
-    //auto T7 = std::chrono::high_resolution_clock::now();
+    auto T7 = std::chrono::high_resolution_clock::now();
     std::cout << "LOBPCG-V7 Eigenvalues: " << eigenvalues << std::endl;
 
-    std::cout << "Starting LOBPCG-V6" << std::endl;
-    //auto T8 = std::chrono::high_resolution_clock::now();
-    LOBPCG_V8<float, uint16_t, 21, 30>(  queue, 
+    auto T8 = std::chrono::high_resolution_clock::now();
+    LOBPCG_V8<float, uint16_t, 3, 30>(  queue, 
                                         hessians, 
                                         cols, 
                                         BatchSize, 
@@ -141,8 +136,12 @@ int main(int argc, char** argv){
                                         true, 
                                         eigenvects, 
                                         eigenvalues);
+    auto T9 = std::chrono::high_resolution_clock::now();
 
     std::cout << "LOBPCG-V8 Eigenvalues: " << eigenvalues << std::endl;
+
+    std::cout << "LOBPCG-V7 Duration: " << float(std::chrono::duration_cast<std::chrono::milliseconds>(T7 - T6).count())/float(BatchSize) << " ms/isomer" << std::endl;
+    std::cout << "LOBPCG-V8 Duration: " << float(std::chrono::duration_cast<std::chrono::milliseconds>(T9 - T8).count())/float(BatchSize) << " ms/isomer" << std::endl;
 
     //std::cout << "LOBPCG-V1: " << float(std::chrono::duration_cast<std::chrono::milliseconds>(T1 - T0).count())/float(BatchSize) << " ms/isomer" << std::endl;
     //std::cout << "LOBPCG-V2: " << float(std::chrono::duration_cast<std::chrono::milliseconds>(T3 - T2).count())/float(BatchSize) << " ms/isomer" << std::endl;
@@ -150,8 +149,8 @@ int main(int argc, char** argv){
     //std::cout << "LOBPCG: " << std::chrono::duration_cast<std::chrono::milliseconds>(T1 - T0).count()/10 << " ms" << std::endl;
     //LOBPCG<double, uint16_t, 21, 30>(queue, hessians_double, cols, BatchSize, N*3, maxiter);
 
-    std::vector <float> matrices(N*3*N*3*BatchSize);
-    std::vector <double> matrices_double(N*3*N*3*BatchSize);
+        std::vector <float> matrices(N*3*N*3*BatchSize);
+        std::vector <double> matrices_double(N*3*N*3*BatchSize);    
         std::vector <float> vect_eigenvalues(21*BatchSize);
         std::vector <double> vect_eigenvalues_double(21*BatchSize);
         std::vector <std::array<float,3>> vect_X(N*BatchSize);

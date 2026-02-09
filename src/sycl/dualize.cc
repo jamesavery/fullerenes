@@ -375,5 +375,5 @@ SyclEvent DualizeFunctor<T,K>::compute(SyclQueue& Q, FullereneBatchView<T,K> bat
 
 template struct DualizeFunctor<float,uint16_t>;
 template struct DualizeFunctor<float,uint32_t>;
-//template struct DualizeFunctor<double,uint16_t>;
-//template struct DualizeFunctor<double,uint32_t>;
+template struct DualizeFunctor<double,uint16_t>;
+template struct DualizeFunctor<double,uint32_t>;

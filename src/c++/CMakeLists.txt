@@ -11,6 +11,12 @@ if(NOT CMAKE_Fortran_IMPLICIT_LINK_LIBRARIES)
   message(FATAL_ERROR "CMAKE_Fortran_IMPLICIT_LINK_LIBRARIES is not defined")
 endif()
 
-target_link_libraries(fullerenes fortran_opt buckygen ${CMAKE_Fortran_IMPLICIT_LINK_LIBRARIES})
+find_library(GOMP_LIB gomp HINTS /usr/lib/gcc/x86_64-linux-gnu/11)
+if(GOMP_LIB)
+  target_link_libraries(fullerenes ${GOMP_LIB} fortran_opt buckygen)
+else()
+  target_link_libraries(fullerenes fortran_opt buckygen)
+endif()
+
 
 

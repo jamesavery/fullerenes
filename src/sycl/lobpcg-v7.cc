@@ -542,7 +542,7 @@ void Ortho(SyclQueue& ctx, Span<T*> S_ptrs /* Candidate Basis [k,CandDim] */,
                             size_t batch_size){
     for(int i = 0; i < 2; i++){
         ExternalOrthogonalization<T, ExtDim, CandDim>(ctx, Span<T>(S_ptrs.front(),CandStride*batch_size), Span<T>(E_ptrs.front(),ExtStride*batch_size), U, k, ExtStride, CandStride, batch_size);
-        Chol2QR<T, CandDim>(ctx, S_ptrs, StS_ptrs, k, batch_size);
+        CholQR<T, CandDim>(ctx, S_ptrs, StS_ptrs, k, batch_size);
     }
 }
                             
@@ -1072,11 +1072,13 @@ void LOBPCG_V7(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
 
         cudaStreamSynchronize(stream);
         end = std::chrono::high_resolution_clock::now();
-        Tupdate += end - start;
+        Tgemm += end - start;
 
         start = std::chrono::high_resolution_clock::now();
         ExternalOrthogonalization<T, BlockVectors, BlockVectors>(ctx, C_p, StAS, R_inv, restart ? BlockVectors*2 : BlockVectors*3, BlockVectors*BlockVectors * (restart? (2*2) : (3*3)), BlockVectors*BlockVectors *  3, batch_size);
-        Chol2QR<T, BlockVectors>(ctx, C_p_ptrs, STS_ptrs, BlockVectors * (restart ? 2 : 3), batch_size); //Since we're done using StAS (eigenvectors of previous iteration), we can use it as a scratchpad
+        CholQR<T, BlockVectors>(ctx, C_p_ptrs, STS_ptrs, BlockVectors * (restart ? 2 : 3), batch_size); //Since we're done using StAS (eigenvectors of previous iteration), we can use it as a scratchpad
+        //ExternalOrthogonalization<T, BlockVectors, BlockVectors>(ctx, C_p, StAS, R_inv, restart ? BlockVectors*2 : BlockVectors*3, BlockVectors*BlockVectors * (restart? (2*2) : (3*3)), BlockVectors*BlockVectors *  3, batch_size);
+        //CholQR<T, BlockVectors>(ctx, C_p_ptrs, STS_ptrs, BlockVectors * (restart ? 2 : 3), batch_size); //Since we're done using StAS (eigenvectors of previous iteration), we can use it as a scratchpad
         //Ortho<T, BlockVectors, BlockVectors>(ctx, C_p_ptrs, restart ? C_x_restart_ptrs : STS_ptrs, R_inv_ptrs, QRworkspace, BlockVectors * (restart ? 2 : 3), BlockVectors*BlockVectors * (restart? (2*2) : (3*3)), BlockVectors*BlockVectors *  3, batch_size);
 
 
@@ -1127,7 +1129,7 @@ void LOBPCG_V7(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
 
         cudaStreamSynchronize(stream);
         end = std::chrono::high_resolution_clock::now();
-        Tupdate += end - start;
+        Tgemm += end - start;
 
         start = std::chrono::high_resolution_clock::now();
         cudaMemcpy(AS.data(), S_temp.data(), S_temp.size() * sizeof(T), cudaMemcpyDeviceToDevice);

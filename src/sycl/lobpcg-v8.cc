@@ -264,80 +264,7 @@ void SVQB(SyclQueue &ctx,   Span<T> S /* Subspace */,
     
     cudaDeviceSynchronize();
 }
-
-template <typename T, int ExtDim /* Number of vectors in External Basis */, int CandDim /* Number of vectors in Candidate Basis */>
-void ExternalOrthogonalization(SyclQueue& ctx,  Span<T> S  /* Candidate Basis [k,CandDim] */, 
-                                                Span<T> E  /* External Basis [k,ExtDim]*/,
-                                                Span<T> U  /* Workspace [ExtDim * CandDim] */,
-                                                size_t k,
-                                                size_t ExtStride,
-                                                size_t CandStride,
-                                                size_t batch_size){
-    static cublasHandle_t handle;
-    static bool initialized = false;
-    if (!initialized){
-        cublasCreate(&handle);
-    }
-
-    constexpr T alpha0 = 1.0;
-    constexpr T beta0 = 0.0;
-    //Compute U = E^T * S
-    cublasSgemmStridedBatched(  handle, CUBLAS_OP_T, CUBLAS_OP_N,
-                                ExtDim, /* m */
-                                CandDim, /* n */
-                                k, /* k */
-                                &alpha0, /* alpha */
-                                E.data(), /* A */
-                                k, /* lda */
-                                ExtStride, /* strideA */
-                                S.data(), /* B */
-                                k, /* ldb */
-                                CandStride, /* strideB */
-                                &beta0, /* beta */
-                                U.data(), /* C */
-                                ExtDim, /* ldc */
-                                ExtDim*CandDim, /* strideC */
-                                batch_size);
-    cudaDeviceSynchronize();
-
-    //Compute S = S - E * (E^T * S)
-    constexpr T alpha1 = -1.0;
-    constexpr T beta1 = 1.0;
-
-    cublasSgemmStridedBatched(handle, CUBLAS_OP_N, CUBLAS_OP_N,
-                                k, /* m */
-                                CandDim, /* n */
-                                ExtDim, /* k */
-                                &alpha1, /* alpha */
-                                E.data(), /* A */
-                                k, /* lda */
-                                ExtStride, /* strideA */
-                                U.data(), /* B */
-                                ExtDim, /* ldb */
-                                ExtDim*CandDim, /* strideB */
-                                &beta1, /* beta */
-                                S.data(), /* C */
-                                k, /* ldc */
-                                CandStride, /* strideC */
-                                batch_size);
-    cudaDeviceSynchronize();
-}
-
-template <typename T, int ExtDim, int CandDim>
-void Ortho(SyclQueue& ctx, Span<T> S /* Candidate Basis [k,CandDim] */, 
-                            Span<T> E /* External Basis [k,ExtDim] */,
-                            Span<T> U /* Workspace [ExtDim * CandDim] */,
-                            size_t k,
-                            size_t ExtStride,
-                            size_t CandStride,
-                            size_t batch_size){
-    for(int i = 0; i < 2; i++){
-        ExternalOrthogonalization<T, ExtDim, CandDim>(ctx, S, E, U, k, ExtStride, CandStride, batch_size);
-        //Chol2QR<T, CandDim>(ctx, S_ptrs, StS_ptrs, k, batch_size);
-        chol_qr_batched(ctx, false, batch_size, CandStride, k, CandDim, S, U.template as_span<std::byte>());
-    }
-}
-                            
+  
 
 template <typename T, typename K, int BlockVectors, int NZ>
 void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, size_t maxiters, bool largest, Span<T> out_eigvects, Span<T> out_eigvals){
@@ -356,13 +283,10 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
     auto StAS_acc = StAS.to_span();
     constexpr T alpha = 1.0;
     constexpr T beta = 0.0;
-    auto SubspaceStride = m*BlockVectors*3;
 
     SyclVector<int> cols_32I(cols.size());
     primitives::transform(ctx, cols, cols_32I, [](K i){return static_cast<int>(i);});
     
-    size_t syevd_scratchpad_size = 0;
-    size_t syevd_scratchpad_host_size = 0;
     SyclVector<int> syevd_info(batch_size);
     SyclVector<T> lambdas(batch_size * BlockVectors*3);
     SyclVector<int> csr_row_offsets(m + 1);
@@ -372,7 +296,10 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
     primitives::transform(ctx, csr_row_offsets, csr_row_offsets, [&](int i){return i * NZ;}); 
 
     auto lambda_acc = lambdas.to_span();
-    
+    /* std::cout << "A matrix: " 
+                << A << std::endl
+                << "cols: "
+                << cols_32I << std::endl; */
     const T tol = sycl::sqrt(std::numeric_limits<T>::epsilon()) * 1e-2 * T(m);
     
     SyclVector<T> Diag(3*BlockVectors * batch_size, 0);
@@ -390,7 +317,7 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
             auto bid = item.get_group_linear_id();
             oneapi::dpl::uniform_real_distribution<T> distr(0.0, 1.0);            
             oneapi::dpl::minstd_rand engine(42, tid);
-            DECLARE_SUBSPACE;
+            auto blockX = S_acc.subspan(bid * BlockVectors*3 * m + 0*BlockVectors*m, BlockVectors*m);
 
             sycl::group_barrier(cta);
             for (int i = tid; i < m*BlockVectors; i+=cta.get_local_range(0)){
@@ -405,7 +332,8 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
     });
     ctx.wait();
     //CholQR<T, BlockVectors>(ctx, S_ptrs, STS_ptrs, m, batch_size);
-    chol2_qr_batched(ctx, false, batch_size, m*3*BlockVectors, m, BlockVectors, S.to_span(), QRworkspace.to_span().template as_span<std::byte>());
+    //chol2_qr_batched(ctx, false, batch_size, m*3*BlockVectors, m, BlockVectors, S.to_span(), QRworkspace.to_span().template as_span<std::byte>());
+    
     linalg::SparseMatHandle<T, Format::CSR, BatchType::Batched> handleA(A.data(), csr_row_offsets.data(), cols_32I.data(), m*NZ, m, m, m*NZ, batch_size);
     linalg::DenseMatHandle<T, BatchType::Batched> handleS(S.data(), m, BlockVectors*3, m, m*3*BlockVectors, batch_size);
     linalg::DenseMatHandle<T, BatchType::Batched> handleX(S.data(), m, BlockVectors, m, m*3*BlockVectors, batch_size);
@@ -424,9 +352,9 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
     linalg::DenseMatHandle<T, BatchType::Batched> handleAP_new(S_temp.data() + m*BlockVectors, m, BlockVectors, m, m*3*BlockVectors, batch_size);
     SyclVector<std::byte> spmm_workspace(linalg::spmm_buffer_size<Backend::CUDA>(ctx, (handleA), handleS(), handleAS(), alpha, beta, Transpose::NoTrans, Transpose::NoTrans));
     SyclVector<std::byte> syev_workspace(linalg::syev_buffer_size<Backend::CUDA>(ctx, handleStAS(), lambdas.to_span(), Uplo::Lower));
-    
-
+    linalg::ortho<Backend::CUDA>(ctx, handleX(), Transpose::NoTrans, QRworkspace.to_span().template as_span<std::byte>(), OrthoAlgorithm::Cholesky);
     //Compute AX
+
     linalg::spmm<Backend::CUDA>(ctx, handleA, handleX(), handleAX(), alpha, beta, Transpose::NoTrans, Transpose::NoTrans, spmm_workspace.to_span());
     
     //Compute X^T AX
@@ -463,10 +391,10 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
             //X^T @ X  = (X^T @ X)^T = X @ X^T
             //iff A^T = A then 
             //X^T @ A @ X = (X^T @ A @ X)^T
-
-            DECLARE_SUBSPACE;
-
-            matBlockVector<T, K, 1, BlockVectors>(cta, A_tid, cols_tid, blockX, blockAX, NZ, m);
+            auto blockX = S_acc.subspan(bid * BlockVectors*3 * m + 0*BlockVectors*m, BlockVectors*m);
+            auto blockAX = AS_acc.subspan(bid * BlockVectors*3 * m + 0*BlockVectors*m, BlockVectors*m);
+            
+            //matBlockVector<T, K, 1, BlockVectors>(cta, A_tid, cols_tid, blockX, blockAX, NZ, m);
             //cuSolver stores the eigenvectors in-place in the input matrix
             auto eigvects = StAS_acc.subspan(bid * BlockVectors * BlockVectors, BlockVectors * BlockVectors);
             inPlaceMatMatMul<T, BlockVectors>(cta, blockX, eigvects, m , largest);
@@ -491,9 +419,9 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
     auto Tupdate = std::chrono::duration<double>(0);
     auto Tmemcpy = std::chrono::duration<double>(0);
 
+    print_matrix(Span<T>(handleX.data_,m*BlockVectors), m, BlockVectors, false);
     auto iteration = [&](SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, size_t iter, bool restart){
         auto Nvecs = restart ? 2*BlockVectors : 3*BlockVectors;
-        auto eig_stride = Nvecs * Nvecs;
         auto start = std::chrono::steady_clock::now();
         //Setup
         ctx -> submit([&](sycl::handler& h){
@@ -525,11 +453,7 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
         Tresiduals += std::chrono::steady_clock::now() - start;
 
         start = std::chrono::steady_clock::now();
-        if (restart){
-            Ortho<T, BlockVectors, BlockVectors>(ctx, S.subspan(2*m*BlockVectors), S, U, m, SubspaceStride, SubspaceStride, batch_size);
-        } else {
-            Ortho<T, 2*BlockVectors, BlockVectors>(ctx, S.subspan(2*m*BlockVectors), S, U, m, SubspaceStride, SubspaceStride, batch_size);
-        }
+        linalg::ortho<Backend::CUDA>(ctx, handleR(), handleS(m, restart? BlockVectors : 2*BlockVectors), Transpose::NoTrans, Transpose::NoTrans, QRworkspace.to_span().template as_span<std::byte>());
         ctx.wait(); Tortho += std::chrono::steady_clock::now() - start;
         start = std::chrono::steady_clock::now();
         //Strided Copy Kernel:
@@ -628,7 +552,8 @@ void LOBPCG_V8(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
         linalg::gemm<Backend::CUDA>(ctx, handleAS(m, Nvecs), handleStAS(Nvecs, Nvecs, Nvecs, Nvecs * Nvecs), handleStemp(), alpha, beta, Transpose::NoTrans, Transpose::NoTrans);
         ctx.wait(); Tgemm += std::chrono::steady_clock::now() - start;
         start = std::chrono::steady_clock::now();
-        Ortho<T, BlockVectors, BlockVectors>(ctx, C_p, StAS, QRworkspace, restart ? BlockVectors*2 : BlockVectors*3, BlockVectors*BlockVectors * (restart? (2*2) : (3*3)), BlockVectors*BlockVectors *  3, batch_size);
+        //Ortho<T, BlockVectors, BlockVectors>(ctx, C_p, StAS, QRworkspace, restart ? BlockVectors*2 : BlockVectors*3, BlockVectors*BlockVectors * (restart? (2*2) : (3*3)), BlockVectors*BlockVectors *  3, batch_size);
+        linalg::ortho<Backend::CUDA>(ctx, handleC_p(Nvecs,BlockVectors,Nvecs), handleStAS(Nvecs, BlockVectors, Nvecs, Nvecs*Nvecs), Transpose::NoTrans, Transpose::NoTrans, QRworkspace.to_span().template as_span<std::byte>(), OrthoAlgorithm::Cholesky);
         ctx.wait(); Tortho += std::chrono::steady_clock::now() - start;
         //First compute P = [X, R, P] * C_p
         start = std::chrono::steady_clock::now();

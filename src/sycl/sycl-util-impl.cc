@@ -533,6 +533,10 @@ template void QueueUtil::push(SyclQueue& Q, FullereneQueue<float,uint16_t>& dst_
 template void QueueUtil::push(SyclQueue& Q, FullereneBatch<float,uint16_t>& dst_batch, FullereneQueue<float,uint16_t>& src_queue, ConditionFunctor transfer_cond, StatusEnum consumed_status);
 template void QueueUtil::push(SyclQueue& Q, FullereneQueue<float,uint32_t>& dst_queue, FullereneBatch<float,uint32_t>& src_batch, ConditionFunctor transfer_cond, StatusEnum consumed_status);
 template void QueueUtil::push(SyclQueue& Q, FullereneBatch<float,uint32_t>& dst_batch, FullereneQueue<float,uint32_t>& src_queue, ConditionFunctor transfer_cond, StatusEnum consumed_status);
+template void QueueUtil::push(SyclQueue& Q, FullereneQueue<double,uint16_t>& dst_queue, FullereneBatch<double,uint16_t>& src_batch, ConditionFunctor transfer_cond, StatusEnum consumed_status);
+template void QueueUtil::push(SyclQueue& Q, FullereneBatch<double,uint16_t>& dst_batch, FullereneQueue<double,uint16_t>& src_queue, ConditionFunctor transfer_cond, StatusEnum consumed_status);
+template void QueueUtil::push(SyclQueue& Q, FullereneQueue<double,uint32_t>& dst_queue, FullereneBatch<double,uint32_t>& src_batch, ConditionFunctor transfer_cond, StatusEnum consumed_status);
+template void QueueUtil::push(SyclQueue& Q, FullereneBatch<double,uint32_t>& dst_batch, FullereneQueue<double,uint32_t>& src_queue, ConditionFunctor transfer_cond, StatusEnum consumed_status);
 //template void push_impl (SyclQueue& Q, FullereneQueue<float,uint16_t>& dst_queue, FullereneBatch<float,uint16_t>& src_batch, ConditionFunctor condition);
 
 template void FullereneBatch<float, uint16_t>::push_back(const Fullerene<float, uint16_t>&, const int);

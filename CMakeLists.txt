@@ -58,7 +58,7 @@ if(ENABLE_SYCL)
   set(SYCL_TARGETS ${SYCL_DEFAULT_TARGET} CACHE STRING "AMD|NVIDIA|X86 (Currently only single target supported.") # TODO: Multi-target compiles.
   message("SYCL compile enabled with ${SYCL_TARGETS} target")
 
-  set(DPCPP_FLAGS "-Wno-pass-failed -Wno-unused-local-typedef -Wno-unused-command-line-argument -Wno-deprecated-declarations -Wno-recommended-option -Wno-unused-local-typedef -Wall -O3 -fsycl -fsycl-unnamed-lambda") # Use regardless of target.
+  set(DPCPP_FLAGS "-Wno-pass-failed -Wunused-variable -Wno-unused-command-line-argument -Wno-deprecated-declarations -Wno-recommended-option -O3 -fsycl -fsycl-unnamed-lambda") # Use regardless of target.
   
   if(SYCL_TARGETS STREQUAL "AMD") 
     add_definitions(-DSOLVER_BACKEND=ROCSOLVER_BACKEND)

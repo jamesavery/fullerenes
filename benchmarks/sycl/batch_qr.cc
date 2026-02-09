@@ -13,7 +13,7 @@ int main(int argc, char** argv){
     int batch_size = argc > 3 ? std::stoi(argv[3]) : ctx.device().get_property(DeviceProperty::MAX_COMPUTE_UNITS);
 
     auto A = SyclVector<float>(m*n*batch_size);
-    auto workspace = SyclVector<std::byte>(chol_qr_batched_buffer_size<float>(ctx, false, batch_size, m*n, m, n, A.to_span()));
+    auto workspace = SyclVector<std::byte>(shift_chol3_qr_batched_buffer_size<float>(ctx, false, batch_size, m*n, m, n, A.to_span()));
 
     std::cout << "Workspace made" << std::endl;
 
@@ -22,7 +22,7 @@ int main(int argc, char** argv){
     std::cout << "Matrix made" << std::endl;
 
     auto T0 = std::chrono::high_resolution_clock::now();
-    chol_qr_batched<float>( ctx, 
+    shift_chol3_qr_batched<float>( ctx, 
                             false, 
                             batch_size, 
                             m*n, 

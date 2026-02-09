@@ -611,7 +611,7 @@ namespace linalg{
         
     template <typename T>
     DenseMatHandle<T, BatchType::Batched>::DenseMatHandle(T* data, int rows, int cols, int ld, int stride, int batch_size) 
-        : data_(data), rows_(rows), cols_(cols), ld_(ld), stride_(stride), batch_size_(batch_size) {}
+        : data_(data), rows_(rows), cols_(cols), ld_(ld), stride_(stride), batch_size_(batch_size), data_ptrs_(batch_size) {}
 
     template <typename T>
     DenseMatView<T, BatchType::Single>::DenseMatView(T* data, int rows, int cols, int ld) 
@@ -655,7 +655,7 @@ namespace linalg{
 
     template <typename T>
     DenseMatView<T, BatchType::Batched>::DenseMatView(const DenseMatHandle<T, BatchType::Batched>& handle, int rows, int cols, int ld, int stride, int batch_size) 
-        : data_(handle.data_), rows_(rows), cols_(cols), ld_(ld), stride_(stride), batch_size_(batch_size), layout_(handle.layout_), data_ptrs_(handle.data_ptrs_) {
+        : data_(handle.data_), rows_(rows), cols_(cols), ld_(ld), stride_(stride), batch_size_(batch_size), layout_(handle.layout_), data_ptrs_(handle.data_ptrs_.to_span()) {
             auto total_size_handle = handle.stride_ * handle.batch_size_;
             auto total_size_view = stride * batch_size;
             if (total_size_handle < total_size_view) {

@@ -866,13 +866,13 @@ void LOBPCG_V4(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
         start = std::chrono::high_resolution_clock::now();
         if (restart){
             ExternalOrthogonalization<T, BlockVectors, BlockVectors>(ctx, S.subspan(BlockVectors*m), S, StAS, m, m*3*BlockVectors, m*3*BlockVectors, batch_size);
-            //SVQB<T, BlockVectors*2>(ctx, S, StAS, Diag, U, m, BlockVectors*3*m, batch_size);
-            CholQR<T, BlockVectors*1>(ctx, S.subspan(m*BlockVectors), StAS, R_inv, U, m, BlockVectors*3*m, batch_size);
+            SVQB<T, BlockVectors>(ctx, S.subspan(m*BlockVectors), StAS, Diag, U, m, BlockVectors*3*m, batch_size);
+            //CholQR<T, BlockVectors*1>(ctx, S.subspan(m*BlockVectors), StAS, R_inv, U, m, BlockVectors*3*m, batch_size);
         } else {
             ExternalOrthogonalization<T, BlockVectors, BlockVectors>(ctx, S.subspan(BlockVectors*m), S, StAS, m, m*3*BlockVectors, m*3*BlockVectors, batch_size);
             ExternalOrthogonalization<T, BlockVectors, BlockVectors>(ctx, S.subspan(BlockVectors*m), S.subspan(BlockVectors*m*2), StAS, m, m*3*BlockVectors, m*3*BlockVectors, batch_size);
-            //SVQB<T, BlockVectors*3>(ctx, S, StAS, Diag, U, m, BlockVectors*3*m, batch_size);
-            CholQR<T, BlockVectors>(ctx, S.subspan(m*BlockVectors), StAS, R_inv, U, m, BlockVectors*3*m, batch_size);
+            SVQB<T, BlockVectors>(ctx, S.subspan(BlockVectors*m), StAS, Diag, U, m, BlockVectors*3*m, batch_size);
+            //CholQR<T, BlockVectors>(ctx, S.subspan(m*BlockVectors), StAS, R_inv, U, m, BlockVectors*3*m, batch_size);
         }  
         end = std::chrono::high_resolution_clock::now();
         Tortho += end - start;

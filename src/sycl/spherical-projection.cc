@@ -343,5 +343,5 @@ SyclEvent SphericalProjectionFunctor<T,K>::compute(SyclQueue& Q, FullereneBatchV
 
 template struct SphericalProjectionFunctor<float,uint16_t>;
 template struct SphericalProjectionFunctor<float,uint32_t>;
-//template struct SphericalProjectionFunctor<double,uint16_t>;
-//template struct SphericalProjectionFunctor<double,uint32_t>;
+template struct SphericalProjectionFunctor<double,uint16_t>;
+template struct SphericalProjectionFunctor<double,uint32_t>;

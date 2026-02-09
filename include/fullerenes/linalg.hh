@@ -349,6 +349,15 @@ namespace linalg{
             std::shared_ptr<BackendDenseMatrixHandle<T>> backend_handle_;
     };
 
+    template <typename T, BatchType BT>
+    auto create_view(T* data, int rows, int cols, int ld, int stride, int batch_size, Span<T*> data_ptrs){
+        if constexpr (BT == BatchType::Single) {
+            return DenseMatView<T, BT>(data, rows, cols, ld);
+        } else {
+            return DenseMatView<T, BT>(data, rows, cols, ld, stride, batch_size, data_ptrs);
+        }
+    }
+
     // Deduction guides for DenseMatView
 
     template <typename T>
@@ -441,6 +450,15 @@ namespace linalg{
     template <template <typename, Format, BatchType> class Handle, typename T, Format F, BatchType BT>
     auto get_data(Handle<T,F,BT>& handle) {
         return handle.data_;
+    }
+
+    template <template <typename, BatchType> class Handle, typename T, BatchType BT>
+    auto get_batch_size(Handle<T,BT>& handle) {
+        if constexpr (BT == BatchType::Batched) {
+            return handle.batch_size_;
+        } else {
+            return 1;
+        }
     }
 
 
@@ -661,7 +679,8 @@ namespace linalg{
             Transpose transA,
             Transpose transM,
             Span<std::byte> workspace,
-            OrthoAlgorithm algo = OrthoAlgorithm::Chol2);
+            OrthoAlgorithm algo = OrthoAlgorithm::Chol2,
+            size_t iterations = 2);
     
     template <Backend B, typename T, BatchType BT>
     size_t ortho_buffer_size(SyclQueue& ctx,
@@ -675,5 +694,6 @@ namespace linalg{
             DenseMatView<T,BT> M,
             Transpose transA,
             Transpose transM,
-            OrthoAlgorithm algo = OrthoAlgorithm::Chol2);
+            OrthoAlgorithm algo = OrthoAlgorithm::Chol2,
+            size_t iterations = 2);
 }

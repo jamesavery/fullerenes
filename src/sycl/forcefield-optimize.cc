@@ -2113,3 +2113,7 @@ template struct ForcefieldOptimizeFunctor<PEDERSEN, float, uint16_t>;
 template struct ForcefieldOptimizeFunctor<PEDERSEN, double, uint16_t>;
 template struct ForcefieldOptimizeFunctor<PEDERSEN, float, uint32_t>;   
 template struct ForcefieldOptimizeFunctor<PEDERSEN, double, uint32_t>;
+template struct ForcefieldOptimizeFunctor<FLATNESS_ENABLED, float, uint16_t>;
+template struct ForcefieldOptimizeFunctor<FLATNESS_ENABLED, double, uint16_t>;
+template struct ForcefieldOptimizeFunctor<FLATNESS_ENABLED, float, uint32_t>;   
+template struct ForcefieldOptimizeFunctor<FLATNESS_ENABLED, double, uint32_t>;
