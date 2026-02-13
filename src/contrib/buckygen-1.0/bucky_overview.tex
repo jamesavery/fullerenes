@@ -1,0 +1,703 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,decorations.pathmorphing}
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{observation}[theorem]{Observation}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+
+\title{Buckygen: Algorithm Structure and Code Map\\[6pt]
+\large Notes toward a modern rewrite}
+\author{}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We present a detailed structural analysis of the \texttt{buckygen} fullerene
+generator (Brinkmann, Goedgebeur, McKay, 2012), mapping the mathematical
+algorithm described in their paper to the 15\,000-line C implementation.
+The purpose is to serve as a reference for rewriting the generator in
+modern C++ and Haskell, with an eye toward parallelisation and
+branch-and-bound extensions for scaling beyond 500 vertices.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+%======================================================================
+\section{Mathematical Setting}
+%======================================================================
+
+A \textbf{fullerene} is a cubic planar graph in which every face is a
+pentagon or a hexagon. By Euler's formula a fullerene on $n$ vertices
+has exactly 12 pentagons and $n/2 - 10$ hexagons.
+
+The \textbf{dual} of a fullerene is a triangulation in which every vertex
+has degree 5 or 6, with exactly 12 degree-5 vertices (hereafter
+\emph{5-vertices}).  Buckygen works entirely in this dual
+representation and converts to the primal on output.
+
+An \textbf{IPR} (Isolated Pentagon Rule) fullerene is one in which no
+two pentagons share an edge; equivalently, in the dual, no two
+5-vertices are adjacent.
+
+%======================================================================
+\section{The Construction Theorem}
+%======================================================================
+
+The algorithm rests on the following theorem of Hasheminezhad, Fleischner
+and McKay~\cite{hasheminezhad_08}:
+
+\begin{theorem}[Hasheminezhad et al.\ 2008]\label{thm:construction}
+Every fullerene isomer except $C_{28}(T_d)$ and the type-$(5,0)$
+nanotube fullerenes can be constructed by recursively applying
+expansions of type $L$ and $B$ to $C_{20}$.
+\end{theorem}
+
+The three \textbf{irreducible} fullerenes that serve as starting points are:
+\begin{itemize}[nosep]
+  \item $C_{20}$: the dodecahedron (12 dual vertices, all degree~5).
+  \item $C_{28}(T_d)$: 16 dual vertices.
+  \item $C_{30}(D_{5h})$: the smallest type-$(5,0)$ nanotube (17 dual
+    vertices).  All larger nanotubes of this type are obtained by the
+    $F$ expansion (adding a ring of hexagons).
+\end{itemize}
+
+%======================================================================
+\section{Expansion and Reduction Operations}\label{sec:operations}
+%======================================================================
+
+The two infinite families of patch-replacement operations act on the
+dual triangulation.  Each replaces a connected patch around a path
+between two 5-vertices with a larger patch, increasing the vertex count.
+The inverse operations are called \emph{reductions}.
+
+%----------------------------------------------------------------------
+\subsection{\texorpdfstring{$L_i$}{Li} expansions (straight)}
+%----------------------------------------------------------------------
+
+An $L_i$ expansion operates on a path of length $i+1$ between two
+5-vertices.  The path runs ``straight'' through the triangulation
+(no turn). The expansion replaces this path and its neighbourhood
+with a longer patch, adding $i+2$ new vertices:
+\begin{center}
+\begin{tabular}{lccc}
+Operation & Path length & New vertices & New 5-vertices \\
+\hline
+$L_0$ & 1 (adjacent 5-vertices) & 2 & 2 (replace old ones)\\
+$L_1$ & 2 & 3 & 2 \\
+$L_2$ & 3 & 4 & 2 \\
+$L_i$ & $i+1$ & $i+2$ & 2 \\
+\end{tabular}
+\end{center}
+The two new 5-vertices are the endpoints of the new, longer path.  The
+old 5-vertices become 6-vertices in the expanded graph.  Because the
+path has a notion of left/right side, each $L_i$ reduction also carries
+a \emph{direction} flag distinguishing it from its mirror image.
+
+%----------------------------------------------------------------------
+\subsection{\texorpdfstring{$B_{i,j}$}{B\_{i,j}} expansions (bent)}
+%----------------------------------------------------------------------
+
+A $B_{i,j}$ expansion ($i+j > 0$) operates on a path between two
+5-vertices that makes a \emph{turn} (``bend'') at some intermediate
+vertex.  The straight segments before and after the turn have lengths
+related to $i$ and $j$.  The expansion adds $i+j+3$ new vertices.
+
+Special cases:
+\begin{itemize}[nosep]
+  \item $B_{0,0}$: the shortest bent expansion, adds 3 vertices, operates
+    on a path of length 2 with a turn.
+  \item $B_{1,0}$: adds 4 vertices, path of length 3 with a turn.
+\end{itemize}
+
+The ``length'' of a $B_{i,j}$ reduction is defined as the distance
+between the two 5-vertices before the reduction is applied, which equals
+$i + j + 2$.
+
+%----------------------------------------------------------------------
+\subsection{\texorpdfstring{$F$}{F} expansion (nanotube ring)}
+%----------------------------------------------------------------------
+
+The $F$ expansion adds a ring of degree-6 vertices around the equator
+of a type-$(5,0)$ nanotube.  It is only used for the nanotube family
+starting from $C_{30}(D_{5h})$ and is handled separately from the main
+$L/B$ recursion.
+
+%----------------------------------------------------------------------
+\subsection{Relationship between operations}
+%----------------------------------------------------------------------
+
+Every expansion has a unique inverse reduction.  In the dual
+representation:
+\begin{itemize}[nosep]
+  \item $L_0$: the only expansion that increases vertex count by exactly 2.
+    Its result \emph{always} contains adjacent 5-vertices (non-IPR).
+  \item $L_1$ and $B_{0,0}$: increase vertex count by 3.
+  \item Longer operations: $L_i$ adds $i+2$, $B_{i,j}$ adds $i+j+3$.
+\end{itemize}
+
+%======================================================================
+\section{Isomorphism Rejection: The Canonical Construction Path}
+\label{sec:canonicity}
+%======================================================================
+
+Applying all possible expansions produces many isomorphic copies.
+Buckygen uses the \textbf{canonical construction path
+method}~\cite{mckay_98} to output exactly one representative of each
+isomorphism class.
+
+%----------------------------------------------------------------------
+\subsection{Canonical reduction}
+%----------------------------------------------------------------------
+
+For each reducible dual fullerene $G$, a unique \textbf{canonical
+reduction} is defined (unique up to automorphisms of $G$).  A reduction
+is represented by a triple $(e, x, d)$ where:
+\begin{itemize}[nosep]
+  \item $e$: a directed edge---the first edge on the central path
+    between the two 5-vertices.
+  \item $x$: the operation parameters (e.g.\ ``$L_2$'' or ``$B_{2,3}$'').
+  \item $d$: a direction flag---for $L$ reductions, distinguishes
+    the reduction from its mirror image; for $B$ reductions, indicates
+    whether the turn is left or right.
+\end{itemize}
+Since the edge can start from either end of the path, each reduction
+has exactly two representing triples.
+
+%----------------------------------------------------------------------
+\subsection{The 6-tuple ordering}
+%----------------------------------------------------------------------
+
+The canonical reduction is the one whose representing triple has the
+lexicographically smallest \textbf{6-tuple} $(x_0, \ldots, x_5)$:
+
+\begin{center}
+\begin{tabular}{clcc}
+Entry & Meaning & Cost & Discriminating power \\
+\hline
+$x_0$ & Length of reduction (distance between 5-vertices) & $O(1)$ & High \\
+$x_1$ & $-(\text{longest straight segment in path})$ & $O(1)$ & Medium \\
+$x_2$ & Degree string, small neighbourhood & $O(1)$ & Good \\
+$x_3$ & Degree string, medium neighbourhood & $O(1)$ & Good \\
+$x_4$ & Degree string, larger neighbourhood & $O(1)$ & Good \\
+$x_5$ & Full BFS canonical form & $O(n)$ & Perfect \\
+\end{tabular}
+\end{center}
+
+Each $x_i$ is computed only for triples that are still tied after
+$(x_0, \ldots, x_{i-1})$.  For dual fullerenes with 152 vertices,
+$(x_0, \ldots, x_4)$ resolves $> 99.9\%$ of cases; $x_5$ is rarely
+needed.
+
+%----------------------------------------------------------------------
+\subsection{The two rules}
+%----------------------------------------------------------------------
+
+\begin{enumerate}[nosep]
+  \item \textbf{Accept} a dual fullerene only if the last expansion was
+    \emph{canonical} (its inverse has the minimal 6-tuple among all
+    reductions).
+  \item \textbf{Apply} only one expansion from each equivalence class
+    (where equivalence is defined by the automorphism group of the
+    current graph).
+\end{enumerate}
+
+When $x_5$ is computed and the graph is accepted, the automorphism
+group is obtained as a byproduct.
+
+%======================================================================
+\section{Bounding the Search}\label{sec:bounds}
+%======================================================================
+
+The bounding lemmas are critical for performance.  They limit the
+maximum length of expansions that need to be considered at each
+recursion level.
+
+\begin{lemma}[Non-IPR bound]\label{lem:nonipr}
+Every reducible non-IPR dual fullerene has an $L_0$, $L_1$, or
+$B_{0,0}$ reduction (length $\le 2$).
+\end{lemma}
+
+\begin{lemma}[Child bound]\label{lem:child}
+If a dual fullerene $G$ has a reduction of length $d \le 2$, every
+child $G'$ of $G$ has a reduction of length at most $d + 2$.
+\end{lemma}
+
+\begin{lemma}[$L_0$ tightening]\label{lem:L0}
+If $G$ has an $L_0$ reduction, all \emph{canonical} children have a
+reduction of length at most~$2$.
+\end{lemma}
+
+\begin{lemma}[Three independent $L_1$s]\label{lem:3L1}
+If $G$ has at least three $L_1$ reductions with pairwise disjoint sets
+of 5-vertices, all canonical children have a reduction of length at
+most~$2$.
+\end{lemma}
+
+\begin{lemma}[Geometric bound]\label{lem:geometric}
+In a dual fullerene where the shortest distance between any two
+5-vertices is at least $d$, the number of vertices is at least
+\[
+  12 \cdot f\!\left(\left\lfloor \frac{d-1}{2} \right\rfloor\right),
+  \qquad
+  f(x) = 1 + \tfrac{5}{2}\, x(x+1).
+\]
+Therefore, expansions of length $d$ are not canonical if the expanded
+graph has fewer than $12 \cdot f(\lfloor(d-1)/2\rfloor)$ vertices.
+\end{lemma}
+
+The code computes these bounds in
+\texttt{determine\_max\_pathlength\_straight()} (line~4868), using the
+precomputed array \texttt{max\_straight\_lengths[]} initialised in
+\texttt{initialize\_fuller\_arrays()} (line~4722).
+
+%======================================================================
+\section{Code Structure: Map to the Algorithm}
+\label{sec:codemap}
+%======================================================================
+
+The implementation is a single 14\,936-line C file
+(\texttt{buckygen.c}) plus a splay tree (\texttt{splay.c}, included
+directly).  All state is global and mutable.
+
+%----------------------------------------------------------------------
+\subsection{Entry point and dispatch}
+%----------------------------------------------------------------------
+
+\begin{center}
+\begin{tabular}{lrl}
+Function & Line & Role \\
+\hline
+\texttt{MAIN()} & 14777 & Parse arguments, call \texttt{simple\_dispatch()} \\
+\texttt{simple\_dispatch()} & 14577 & Orchestrate the three generation streams \\
+\texttt{decode\_command\_line()} & 14292 & Parse CLI flags \\
+\end{tabular}
+\end{center}
+
+\texttt{simple\_dispatch()} branches on IPR mode:
+\begin{itemize}[nosep]
+  \item \textbf{General fullerenes}: Initialise from $C_{20}$, $C_{28}$,
+    $C_{30}$ and recurse via \texttt{scansimple\_fuller()}.
+  \item \textbf{IPR fullerenes}: Initialise from 10 irreducible IPR
+    fullerenes with valid boundaries and 36 without, then recurse via
+    \texttt{scansimple\_fuller\_ipr()}.
+\end{itemize}
+
+%----------------------------------------------------------------------
+\subsection{Main recursion}
+%----------------------------------------------------------------------
+
+\begin{center}
+\begin{tabular}{lrl}
+Function & Line & Role \\
+\hline
+\texttt{scansimple\_fuller()} & 12100 & Main DFS for general fullerenes \\
+\texttt{scansimple\_fuller\_ipr()} & 12725 & Main DFS for IPR fullerenes \\
+\texttt{scansimple\_and\_add\_ring()} & 14087 & DFS interleaved with $F$ expansion \\
+\texttt{got\_one()} & 8847 & Output/count an accepted fullerene \\
+\end{tabular}
+\end{center}
+
+The recursion in \texttt{scansimple\_fuller()} follows this pattern:
+\begin{enumerate}[nosep]
+  \item If $n_v = n_{\max}$: call \texttt{got\_one()}, return.
+  \item If $n_v = \texttt{splitlevel}$: handle work-splitting for parallelism.
+  \item Compute \texttt{max\_pathlength\_straight} (the upper bound from
+    Section~\ref{sec:bounds}).
+  \item Call \texttt{find\_extensions\_fuller()} to enumerate all
+    non-equivalent expansions (using automorphism information).
+  \item For each expansion type ($L_0$, $L_1$, $B_{0,0}$, longer
+    straight, bent):
+    \begin{enumerate}[nosep]
+      \item \textbf{Extend}: modify the global graph state.
+      \item \textbf{Test canonicity}: first via cheap invariants
+        (\texttt{is\_best\_*\_reduction}), then if needed via full
+        canonical form (\texttt{canon\_edge\_oriented}).
+      \item \textbf{Recurse}: call \texttt{scansimple\_fuller()}.
+      \item \textbf{Reduce}: restore the global graph state.
+    \end{enumerate}
+\end{enumerate}
+
+%----------------------------------------------------------------------
+\subsection{Expansion/reduction functions}
+%----------------------------------------------------------------------
+
+Each operation has an \texttt{extend\_*} and a \texttt{reduce\_*} function
+that modify and restore the global graph state respectively:
+
+\begin{center}
+\begin{tabular}{llrl}
+Operation & Extend function & Line & Vertices added \\
+\hline
+$L_0$      & \texttt{extend\_L0()} / \texttt{reduce\_L0()} & 1184 / 1342 & 2 \\
+$L_i$ ($i \ge 1$)  & \texttt{extend\_straight()} / \texttt{reduce\_straight()} & 1395 / 1548 & $i+2$ \\
+$B_{0,0}$  & \texttt{extend\_bent\_zero()} / \texttt{reduce\_bent\_zero()} & (nearby) / 1833 & 3 \\
+$B_{i,j}$  & \texttt{extend\_bent()} / \texttt{reduce\_bent()} & 1886 / 2168 & $i{+}j{+}3$ \\
+\end{tabular}
+\end{center}
+
+Each extend function:
+\begin{enumerate}[nosep]
+  \item Allocates new edges from the edge pool (\texttt{NEWEDGE} macro).
+  \item Creates new vertices with correct degree (5 at endpoints, 6 interior).
+  \item Splices the new edges into the circular edge lists of existing vertices
+    (\texttt{insert\_edge\_fuller}, \texttt{replace\_neighbour}).
+  \item Updates \texttt{degree\_5\_vertices[]}.
+  \item Increments \texttt{nv} and \texttt{ne}.
+\end{enumerate}
+
+Each reduce function undoes this exactly:
+\begin{enumerate}[nosep]
+  \item Decrements \texttt{nv} and \texttt{ne}.
+  \item Restores neighbour pointers (\texttt{restore\_neighbour}).
+  \item Restores old 5-vertex entries.
+  \item Frees edges (\texttt{FREEEDGES}).
+\end{enumerate}
+
+%----------------------------------------------------------------------
+\subsection{Canonicity testing}
+%----------------------------------------------------------------------
+
+\begin{center}
+\begin{tabular}{lrl}
+Function & Line & Role \\
+\hline
+\texttt{is\_best\_L0\_reduction()} & $\sim$9000 & Cheap test: is $L_0$ the canonical reduction? \\
+\texttt{is\_best\_straight\_reduction()} & $\sim$9100 & Cheap test for $L_i$ \\
+\texttt{is\_best\_bent\_zero\_reduction()} & $\sim$9300 & Cheap test for $B_{0,0}$ \\
+\texttt{canon\_edge\_oriented()} & $\sim$9500 & Full canonical form ($x_5$) \\
+\texttt{canon\_form()} & 3947 & Compute canonical form and automorphism group \\
+\texttt{canon\_edge()} & 3985 & Edge-based canonical form (from plantri) \\
+\texttt{compute\_group()} & -- & Compute automorphism group \\
+\end{tabular}
+\end{center}
+
+The \texttt{is\_best\_*} functions implement the cheap invariants $x_0$
+through $x_4$.  They return a list of ``good edges'' (those that survive
+the cheap filter).  If more than one edge survives, the expensive
+\texttt{canon\_edge\_oriented()} computes $x_5$.
+
+%----------------------------------------------------------------------
+\subsection{Extension enumeration}
+%----------------------------------------------------------------------
+
+\begin{center}
+\begin{tabular}{lrl}
+Function & Line & Role \\
+\hline
+\texttt{find\_extensions\_fuller()} & 6784 & List all non-equivalent expansions \\
+\texttt{find\_extensions\_fuller\_ipr()} & 7341 & Same, with IPR-specific optimisations \\
+\texttt{find\_L0\_extensions\_next/prev()} & -- & Enumerate $L_0$ expansions \\
+\texttt{find\_L1\_extensions\_next/prev()} & -- & Enumerate $L_1$ expansions \\
+\end{tabular}
+\end{center}
+
+These functions walk the 12 degree-5 vertices and their incident edges,
+using the mark arrays to avoid generating equivalent expansions.  When
+the automorphism group is trivial ($\texttt{nbtot} = 1$), all directed
+edges from 5-vertices are candidates; otherwise only one representative
+per orbit is used.
+
+%----------------------------------------------------------------------
+\subsection{Data structures}
+%----------------------------------------------------------------------
+
+\paragraph{Edge structure.}
+Each directed edge is a \texttt{struct EDGE} (line~178) with fields:
+\texttt{start}, \texttt{end}, \texttt{rightface}, and pointers
+\texttt{*prev}, \texttt{*next} (circular list around a vertex in
+clockwise order), \texttt{*invers} (the reverse edge), plus
+\texttt{mark}, \texttt{index}, \texttt{label} for temporary use.
+
+\paragraph{Edge pool.}
+Edges are allocated from a static array \texttt{edges[NUMEDGES]} via a
+stack pointer \texttt{edge\_top}.  \texttt{NEWEDGE(p)} pushes,
+\texttt{FREEEDGES(k)} pops $k$ edges.  This is essentially an arena
+allocator with $O(1)$ bulk deallocation---perfect for the
+extend/reduce pattern.
+
+\paragraph{Global graph state.}
+\begin{center}
+\begin{tabular}{ll}
+Variable & Purpose \\
+\hline
+\texttt{nv}, \texttt{ne} & Current vertex/edge count \\
+\texttt{degree[MAXN]} & Vertex degrees \\
+\texttt{firstedge[MAXN]} & One edge per vertex (entry to circular list) \\
+\texttt{edge\_list[MAXN][MAXN]} & Direct lookup: pointer to edge $i \to j$ \\
+\texttt{degree\_5\_vertices[12]} & The twelve 5-vertices \\
+\texttt{degree\_5\_vertices\_index[MAXN]} & Inverse map: vertex $\to$ index in above \\
+\end{tabular}
+\end{center}
+
+\paragraph{Mark arrays.}
+The code uses a generation-counter pattern: instead of clearing an
+entire array, a global \texttt{markvalue} is incremented, and an entry
+is ``marked'' by setting it to the current value.  There are
+\emph{eleven} independent mark systems (\texttt{marks\_\_v} through
+\texttt{marks\_\_v5}, \texttt{marks\_\_double\_next/prev},
+\texttt{marks\_L0\_next/prev}, \texttt{marks\_b00\_next/prev},
+\texttt{marks\_\_bent\_next/prev}, etc.) totalling several megabytes
+of static arrays.
+
+\paragraph{Canonical form workspace.}
+\texttt{numbering[2*MAXE][MAXE]}: an array of edge pointer arrays used
+by the canonical form computation.  This is $O(n^2)$ in size and
+represents the dominant memory cost.
+
+%======================================================================
+\section{Work Splitting for Parallelism}
+\label{sec:splitting}
+%======================================================================
+
+Buckygen supports coarse-grained parallelism via the \texttt{res/mod}
+command-line mechanism.  At a chosen \texttt{splitlevel} in the DFS
+tree, a counter cycles through $0, 1, \ldots, \texttt{mod}-1$; only
+the subtree where $\texttt{counter} \equiv \texttt{res} \pmod{\texttt{mod}}$
+is explored.
+
+The C++ wrapper (\texttt{buckygen-wrapper.cc}) uses System~V IPC
+message queues to run multiple buckygen instances as child processes
+(the \texttt{buckyherd\_queue} class).  This is necessary because the
+global state makes it impossible to run multiple instances in a single
+address space.
+
+%======================================================================
+\section{IPR-Specific Generation}
+\label{sec:ipr}
+%======================================================================
+
+For IPR fullerenes, additional structure is exploited:
+
+\begin{itemize}[nosep]
+  \item $L_0$ expansions always produce adjacent 5-vertices, so they
+    never yield IPR fullerenes.  This means:
+    \begin{itemize}[nosep]
+      \item Dual IPR fullerenes with $n{-}2$ vertices need not be
+        generated (no $L_0$ child can be IPR).
+      \item Only $L_2$ and $B_{1,0}$ expansions (adding 4 vertices)
+        from $n{-}4$ vertex graphs can produce $n$-vertex IPR results,
+        but if the parent has an $L_0$ reduction, these are not
+        canonical (Lemma~\ref{lem:L0}).
+    \end{itemize}
+
+  \item The irreducible IPR fullerenes (those with no $L$ or $B$
+    reduction) are hardcoded:
+    \begin{itemize}[nosep]
+      \item 10 with valid boundaries (\texttt{code\_irred\_ipr[]},
+        32--47 dual vertices).
+      \item 36 without valid boundaries
+        (\texttt{code\_irred\_ipr\_invalid\_boundary[]}, 37--58 dual vertices).
+    \end{itemize}
+    These serve as additional starting points for the IPR generation
+    tree.
+
+  \item A splay tree (\texttt{splay.c}) stores canonical forms of
+    irreducible IPR fullerenes to prevent duplicate generation when
+    multiple starting points produce the same reducible descendant.
+\end{itemize}
+
+%======================================================================
+\section{Implications for Rewriting}
+\label{sec:rewrite}
+%======================================================================
+
+%----------------------------------------------------------------------
+\subsection{C++ rewrite}
+%----------------------------------------------------------------------
+
+\begin{enumerate}[nosep]
+  \item \textbf{Encapsulate state.}  All global arrays become members
+    of a \texttt{DualFullerene} class.  This immediately enables
+    multiple instances in a single process, eliminating the need for
+    \texttt{fork()} in the wrapper.
+
+  \item \textbf{Edge pool as arena.}  Replace the macro-based
+    stack allocator with a \texttt{std::vector<Edge>} whose
+    \texttt{size()} is saved before an extension and restored after
+    the corresponding reduction.
+
+  \item \textbf{Mark arrays as generation-counted sets.}  The
+    pattern is clean and efficient; wrap it in a small template class
+    \texttt{MarkSet<N>} with \texttt{reset()}, \texttt{mark(i)},
+    \texttt{is\_marked(i)}.
+
+  \item \textbf{Separate concerns.}  The current code intermixes
+    graph manipulation, canonicity testing, extension enumeration,
+    output formatting, and work splitting.  These should be separate
+    modules.
+
+  \item \textbf{Compile-time limits.}  Replace \texttt{MAXN} with a
+    template parameter or runtime allocation.  The quadratic arrays
+    (\texttt{edge\_list}, \texttt{numbering}) should become sparse or
+    dynamically sized for large $n$.
+\end{enumerate}
+
+%----------------------------------------------------------------------
+\subsection{Haskell rewrite}
+%----------------------------------------------------------------------
+
+\begin{enumerate}[nosep]
+  \item \textbf{Tree of fullerenes.}  The recursion is a DFS over an
+    implicitly defined tree.  In Haskell, this is naturally represented
+    as a lazy tree:
+    \[
+      \texttt{data GenTree = Node DualFullerene [GenTree]}
+    \]
+    where the children are obtained by applying all canonical
+    expansions.
+
+  \item \textbf{Zipper-like context.}  The extend/reduce pairs
+    correspond to moving down/up in a zipper.  The ``context'' is the
+    set of edges that were modified, stored as a diff.
+
+  \item \textbf{Pure canonicity.}  The canonical form is a pure
+    function of the graph.  The 6-tuple computation and BFS numbering
+    are naturally pure.
+
+  \item \textbf{Parallel evaluation.}  Once the tree is explicit,
+    subtrees can be evaluated in parallel using
+    \texttt{Control.Parallel.Strategies} or similar.
+
+  \item \textbf{Bounding as pruning.}  The lemmas of
+    Section~\ref{sec:bounds} become predicates that prune subtrees:
+    \[
+      \texttt{children g = filter canonical (expansions g)}
+    \]
+    where \texttt{expansions} already respects the length bound.
+\end{enumerate}
+
+%----------------------------------------------------------------------
+\subsection{Scaling beyond 500 vertices}
+%----------------------------------------------------------------------
+
+\begin{enumerate}[nosep]
+  \item \textbf{\texttt{MAXN} limit.}  Currently 152 (dual vertices,
+    corresponding to 300 primal vertices).  The static arrays grow
+    as $O(n^2)$; at $n = 500$ dual vertices (1000 primal), the
+    \texttt{numbering} array alone would be
+    $2 \times 3000 \times 3000 \times 8 \approx 137\,\text{MB}$.
+    Dynamic allocation or sparse representations are needed.
+
+  \item \textbf{Geometric bound weakens.}  From the formula in
+    Lemma~\ref{lem:geometric}, at 250 dual vertices the maximum
+    reduction length is around 8--9, meaning longer expansions must be
+    considered.  The lookahead lemmas become less effective.
+
+  \item \textbf{Branch and bound.}  Additional pruning criteria
+    beyond the current bounding lemmas could exploit:
+    \begin{itemize}[nosep]
+      \item Chemical stability measures (HOMO-LUMO gap estimates).
+      \item Symmetry-based pruning (restrict to specific point groups).
+      \item Pentagon-distance constraints stronger than IPR.
+    \end{itemize}
+
+  \item \textbf{True parallelism.}  The current \texttt{res/mod}
+    splitting is coarse.  With encapsulated state, work-stealing over
+    the DFS tree becomes feasible.  The key insight is that subtrees
+    below the split level are independent once the graph state is
+    copied.
+\end{enumerate}
+
+%======================================================================
+\section{Summary of Code Landmarks}
+\label{sec:landmarks}
+%======================================================================
+
+For reference, the key line numbers in \texttt{buckygen.c} (version 1.0,
+14\,936 lines):
+
+\begin{center}
+\small
+\begin{tabular}{rll}
+\textbf{Line} & \textbf{Identifier} & \textbf{Role} \\
+\hline
+1--107 & Header & Version, comments, output format documentation \\
+178 & \texttt{EDGE} & Edge data structure \\
+277--599 & Global variables & All mutable state, mark arrays \\
+642--722 & Irreducible codes & Hardcoded planar codes for $C_{20}$, $C_{28}$, $C_{30}$, IPR bases \\
+1184 & \texttt{extend\_L0()} & Apply $L_0$ expansion \\
+1342 & \texttt{reduce\_L0()} & Undo $L_0$ expansion \\
+1395 & \texttt{extend\_straight()} & Apply $L_i$ ($i \ge 1$) expansion \\
+1548 & \texttt{reduce\_straight()} & Undo $L_i$ expansion \\
+1833 & \texttt{reduce\_bent\_zero()} & Undo $B_{0,0}$ expansion \\
+1886 & \texttt{extend\_bent()} & Apply $B_{i,j}$ expansion \\
+2168 & \texttt{reduce\_bent()} & Undo $B_{i,j}$ expansion \\
+3947 & \texttt{canon\_form()} & Canonical form computation \\
+3985 & \texttt{canon\_edge()} & Edge-based canonical form (from plantri) \\
+4618 & \texttt{initialize\_fuller\_code()} & Decode a planar code into global state \\
+4722 & \texttt{initialize\_fuller\_arrays()} & Precompute distance bounds \\
+4868 & \texttt{determine\_max\_pathlength\_straight()} & Bound on expansion length \\
+6784 & \texttt{find\_extensions\_fuller()} & Enumerate non-equivalent expansions \\
+7341 & \texttt{find\_extensions\_fuller\_ipr()} & Same, IPR-specific \\
+8847 & \texttt{got\_one()} & Accept and output a fullerene \\
+12100 & \texttt{scansimple\_fuller()} & Main DFS recursion \\
+12725 & \texttt{scansimple\_fuller\_ipr()} & Main DFS recursion, IPR \\
+14087 & \texttt{scansimple\_and\_add\_ring()} & DFS with nanotube ring addition \\
+14577 & \texttt{simple\_dispatch()} & Top-level dispatch \\
+14777 & \texttt{MAIN()} & Entry point \\
+\end{tabular}
+\end{center}
+
+\begin{thebibliography}{10}
+
+\bibitem{hasheminezhad_08}
+H.~Hasheminezhad, H.~Fleischner, and B.D.~McKay.
+\newblock A universal set of growth operations for fullerenes.
+\newblock {\em Chemical Physics Letters}, 464:118--121, 2008.
+
+\bibitem{mckay_98}
+B.D.~McKay.
+\newblock Isomorph-free exhaustive generation.
+\newblock {\em Journal of Algorithms}, 26:306--324, 1998.
+
+\bibitem{brinkmann_97}
+G.~Brinkmann and A.W.M.~Dress.
+\newblock A constructive enumeration of fullerenes.
+\newblock {\em Journal of Algorithms}, 23:345--358, 1997.
+
+\bibitem{brinkmann_06}
+G.~Brinkmann, J.~Goedgebeur, and B.D.~McKay.
+\newblock The smallest fullerene without a spiral.
+\newblock {\em Chemical Physics Letters}, 522:54--55, 2012.
+
+\bibitem{brinkmann_07}
+G.~Brinkmann and B.D.~McKay.
+\newblock Fast generation of planar graphs.
+\newblock {\em MATCH Communications in Mathematical and in Computer Chemistry},
+  58:323--357, 2007.
+
+\bibitem{BGJ06}
+G.~Brinkmann, O.~Delgado~Friedrichs, and U.~von~Nathusius.
+\newblock Numbers of faces and boundary encodings of patches.
+\newblock In {\em Graphs and Discovery}, DIMACS Series, vol.~69, pages 27--38,
+  2005.
+
+\bibitem{bornhoft_03}
+J.~Bornh\"oft, G.~Brinkmann, and J.~Greinus.
+\newblock Pentagon--hexagon-patches with short boundaries.
+\newblock {\em European Journal of Combinatorics}, 24:517--529, 2003.
+
+\bibitem{kardos_08}
+F.~Kardo\u{s} and R.~\u{S}krekovski.
+\newblock Cyclic edge-cuts in fullerene graphs.
+\newblock {\em Journal of Mathematical Chemistry}, 44:121--132, 2008.
+
+\bibitem{brinkmann_03}
+G.~Brinkmann, T.~Harmuth, and O.~Heidemeier.
+\newblock The construction of cubic and quartic planar maps with prescribed face degrees.
+\newblock {\em Discrete Applied Mathematics}, 128:541--554, 2003.
+
+\end{thebibliography}
+
+\end{document}
