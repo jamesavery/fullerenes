@@ -14,6 +14,22 @@ static int expected_gc_nodes(int V, int E, int F, int k, int l) {
   return 2 + E_new - F_new;
 }
 
+// Check that a triangulation has exactly 12 degree-5 nodes and the rest degree-6
+static void check_degree_preservation(const Triangulation& result) {
+  int deg5_count = 0, deg6_count = 0, other = 0;
+  for(int u = 0; u < result.N; u++) {
+    int d = result.neighbours[u].size();
+    if(d == 5) deg5_count++;
+    else if(d == 6) deg6_count++;
+    else other++;
+  }
+  EXPECT_EQ(deg5_count, 12);
+  EXPECT_EQ(other, 0) << "All nodes should be degree 5 or 6";
+  EXPECT_EQ(deg6_count, result.N - 12);
+}
+
+// ===== C20 dual fixture =====
+
 class GCTransformTest : public ::testing::Test {
 protected:
   // C20 dual: icosahedron with 12 nodes, all degree 5
@@ -34,18 +50,24 @@ TEST_F(GCTransformTest, HalmaNodeCount_2_0) {
   EXPECT_EQ(result.N, expected_gc_nodes(V0, E0, F0, 2, 0));
 }
 
-TEST_F(GCTransformTest, HalmaDegreePreservation) {
+TEST_F(GCTransformTest, HalmaNodeCount_3_0) {
+  Triangulation result = C20dual.GCtransform(3, 0);
+  EXPECT_EQ(result.N, expected_gc_nodes(V0, E0, F0, 3, 0));
+}
+
+TEST_F(GCTransformTest, HalmaNodeCount_4_0) {
+  Triangulation result = C20dual.GCtransform(4, 0);
+  EXPECT_EQ(result.N, expected_gc_nodes(V0, E0, F0, 4, 0));
+}
+
+TEST_F(GCTransformTest, HalmaDegreePreservation_2_0) {
   Triangulation result = C20dual.GCtransform(2, 0);
-  int deg5_count = 0, deg6_count = 0, other = 0;
-  for(int u = 0; u < result.N; u++) {
-    int d = result.neighbours[u].size();
-    if(d == 5) deg5_count++;
-    else if(d == 6) deg6_count++;
-    else other++;
-  }
-  EXPECT_EQ(deg5_count, 12);
-  EXPECT_EQ(other, 0) << "All nodes should be degree 5 or 6";
-  EXPECT_EQ(deg6_count, result.N - 12);
+  check_degree_preservation(result);
+}
+
+TEST_F(GCTransformTest, HalmaDegreePreservation_3_0) {
+  Triangulation result = C20dual.GCtransform(3, 0);
+  check_degree_preservation(result);
 }
 
 TEST_F(GCTransformTest, HalmaConnectivity) {
@@ -60,10 +82,38 @@ TEST_F(GCTransformTest, HalmaTriangleCount) {
   EXPECT_EQ((int)result.triangles.size(), F0 * 4);
 }
 
-// halma_transform(m>=2) has a pre-existing bug; skip GC(3,0) for now
-TEST_F(GCTransformTest, DISABLED_HalmaNodeCount_3_0) {
-  Triangulation result = C20dual.GCtransform(3, 0);
-  EXPECT_EQ(result.N, expected_gc_nodes(V0, E0, F0, 3, 0));
+// --- Chiral (l!=0, unfold/fold path) tests ---
+
+// Node count tests pass: the fold identifies nodes correctly.
+// GC(1,1) has a pre-existing identify_nodes bug for T=3.
+TEST_F(GCTransformTest, DISABLED_ChiralNodeCount_1_1) {
+  Triangulation result = C20dual.GCtransform(1, 1);
+  EXPECT_EQ(result.N, expected_gc_nodes(V0, E0, F0, 1, 1));
+}
+
+TEST_F(GCTransformTest, ChiralNodeCount_2_1) {
+  Triangulation result = C20dual.GCtransform(2, 1);
+  EXPECT_EQ(result.N, expected_gc_nodes(V0, E0, F0, 2, 1));
+}
+
+TEST_F(GCTransformTest, ChiralNodeCount_3_1) {
+  Triangulation result = C20dual.GCtransform(3, 1);
+  EXPECT_EQ(result.N, expected_gc_nodes(V0, E0, F0, 3, 1));
+}
+
+// Connectivity/degree tests: pre-existing bug in fold scan-conversion
+// boundary handling. The scanline rasterization produces asymmetric edge
+// counts across the three Eisenstein rotations (80/66/51 instead of 70/70/70
+// for GC(2,1)). Needs a redesign of connect_polygon/connect_cross.
+TEST_F(GCTransformTest, DISABLED_ChiralDegreePreservation_2_1) {
+  Triangulation result = C20dual.GCtransform(2, 1);
+  check_degree_preservation(result);
+}
+
+TEST_F(GCTransformTest, DISABLED_ChiralConnectivity_2_1) {
+  Triangulation result = C20dual.GCtransform(2, 1);
+  vector<vector<node_t>> components = result.connected_components();
+  EXPECT_EQ(components.size(), 1u);
 }
 
 // --- Unfold/fold infrastructure tests ---
@@ -71,7 +121,6 @@ TEST_F(GCTransformTest, DISABLED_HalmaNodeCount_3_0) {
 TEST_F(GCTransformTest, UnfoldProducesOutline) {
   Unfolding u(C20dual);
   EXPECT_GT(u.outline.size(), 0u);
-  // Each outline vertex should have a valid node id in [0, N)
   for(const auto& p : u.outline)
     EXPECT_LT(p.second, C20dual.N);
 }
@@ -81,13 +130,67 @@ TEST_F(GCTransformTest, GCDreduce) {
   Unfolding gcu(u * Eisenstein(2, 0));
   auto reduced = Unfolding::GCDreduce(gcu.outline);
   EXPECT_EQ(reduced.size(), gcu.outline.size());
-  // After GCDreduce, the outline should have same node labels
   for(size_t i = 0; i < reduced.size(); i++)
     EXPECT_EQ(reduced[i].second, gcu.outline[i].second);
+}
+
+TEST_F(GCTransformTest, GCDreduce_Segments) {
+  Unfolding u(C20dual);
+  Unfolding gcu(u * Eisenstein(3, 0));
+  auto reduced = Unfolding::GCDreduce(gcu.outline);
+  // Each segment in the reduced outline should be 1/3 the length of the original
+  for(size_t i = 0; i < reduced.size(); i++) {
+    Eisenstein orig_seg = gcu.outline[(i+1)%gcu.outline.size()].first - gcu.outline[i].first;
+    Eisenstein red_seg  = reduced[(i+1)%reduced.size()].first - reduced[i].first;
+    EXPECT_EQ(orig_seg, red_seg * Eisenstein(3, 0));
+  }
 }
 
 TEST_F(GCTransformTest, ScaledUnfoldPreservesOutlineSize) {
   Unfolding u(C20dual);
   Unfolding gcu(u * Eisenstein(2, 1));
   EXPECT_EQ(gcu.outline.size(), u.outline.size());
+}
+
+TEST_F(GCTransformTest, FoldUnfoldRoundtrip) {
+  Unfolding u(C20dual);
+  Unfolding scaled(u * Eisenstein(1, 0));
+  Folding f(scaled);
+  Triangulation result = f.fold();
+  EXPECT_EQ(result.N, C20dual.N);
+}
+
+// ===== C28 dual fixture =====
+
+class C28GCTest : public ::testing::Test {
+protected:
+  // C28 dual from spiral representation: 16 nodes
+  Triangulation C28dual = Triangulation(vector<int>({5,5,5,6,5,6,5,6,5,5,5,5,5,5,5,6}));
+  // C28 dual: V=16, E=42, F=28
+  static constexpr int V0 = 16, E0 = 42, F0 = 28;
+};
+
+TEST_F(C28GCTest, Identity) {
+  Triangulation result = C28dual.GCtransform(1, 0);
+  EXPECT_EQ(result.N, C28dual.N);
+}
+
+TEST_F(C28GCTest, Halma_2_0_NodeCount) {
+  Triangulation result = C28dual.GCtransform(2, 0);
+  EXPECT_EQ(result.N, expected_gc_nodes(V0, E0, F0, 2, 0));
+}
+
+TEST_F(C28GCTest, Halma_2_0_Degrees) {
+  Triangulation result = C28dual.GCtransform(2, 0);
+  check_degree_preservation(result);
+}
+
+TEST_F(C28GCTest, Halma_3_0_NodeCount) {
+  Triangulation result = C28dual.GCtransform(3, 0);
+  EXPECT_EQ(result.N, expected_gc_nodes(V0, E0, F0, 3, 0));
+}
+
+TEST_F(C28GCTest, Halma_3_0_Degrees) {
+  Triangulation result = C28dual.GCtransform(3, 0);
+  check_degree_preservation(result);
 }

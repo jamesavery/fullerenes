@@ -210,11 +210,11 @@ public:
     if(debug_flags & WRITE_FILE) cout << "final_grid_values = " << get_values(final_grid) << endl;
   }
 
-  void connect(neighbours_t &neighbours);    
+  void connect(set<edge_t> &edges);
 
-  void connect_polygon(int i_omega, neighbours_t& neighbours);  // Connect scanlines of polygon rotated by w.
-  void connect_cross(int i_omega, neighbours_t& neighbours);    // Connect horizontal lines across edges or polygon rotated by w.
-  void connect(int i_omega, neighbours_t& neighbours);	        // Both of the above operations.
+  void connect_polygon(int i_omega, set<edge_t>& edges);  // Connect scanlines of polygon rotated by w.
+  void connect_cross(int i_omega, set<edge_t>& edges);    // Connect horizontal lines across edges or polygon rotated by w.
+  void connect(int i_omega, set<edge_t>& edges);	        // Both of the above operations.
 
   // Collect nodes in unfolding that will correspond to the same nodes in the folded graph.
   vector<node_t> identify_nodes(const IDCounter<Eisenstein>& grid, const vector< pair<Eisenstein,node_t>>& outline) const;

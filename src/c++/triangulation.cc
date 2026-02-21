@@ -432,25 +432,27 @@ Triangulation Triangulation::GCtransform(const unsigned k, const unsigned l) con
 Triangulation Triangulation::halma_transform(int m) const {
   if(m<0) return Triangulation(*this);
 
-  map<edge_t,vector<node_t> > edge_nodes;
+  map<arc_t,vector<node_t> > arc_nodes;
 
   set<edge_t> edgeset_new;
   node_t v_new = N;
 
-  // Create n new vertices for each edge
+  // Create m new vertices for each edge, stored in both directions
   vector<edge_t> dual_edges = undirected_edges();
 
   for(const auto &e: dual_edges){
-    vector<node_t>& nodes(edge_nodes[e]);
+    vector<node_t> nodes;
     for(unsigned int i=0;i<m;i++) nodes.push_back(v_new++);
+    arc_nodes[{e.first, e.second}] = nodes;
+    arc_nodes[{e.second, e.first}] = vector<node_t>(nodes.rbegin(), nodes.rend());
   }
 
   // For every triangle in the dual, we create and connect a halma-type grid
   for(size_t i=0;i<triangles.size();i++){
     map<edge_t,node_t> grid;
     const face_t& T(triangles[i]);
-    edge_t e0(T[0],T[1]),e1(T[1],T[2]),e2(T[2],T[0]);
-    const vector<node_t>& ns0(edge_nodes[e0]), ns1(edge_nodes[e1]), ns2(edge_nodes[e2]);
+    arc_t a0(T[0],T[1]),a1(T[1],T[2]),a2(T[0],T[2]);
+    const vector<node_t>& ns0(arc_nodes[a0]), ns1(arc_nodes[a1]), ns2(arc_nodes[a2]);
     // Insert original vertices
     grid[edge_t(0,0)]     = T[0];
     grid[edge_t(m+1,0)]   = T[1];

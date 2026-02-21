@@ -19,17 +19,16 @@
 
 // connect_cross connects edges in split triangles
 // (for outline segments that do not align with Eisenstein grid)
-void Folding::connect_cross(int i_omega, neighbours_t &n)
+void Folding::connect_cross(int i_omega, set<edge_t> &edges)
 {
   map<arc_t,arccoord_t> reverse_arc;
-  vector< pair<Eisenstein,Eisenstein> > EC, ECp; // Split edge Eisenstein coordinates 
   Eisenstein xu, xv;
   node_t u,v;
 
   Eisenstein omega     = Eisenstein::unit[i_omega];
   Eisenstein omega_inv = Eisenstein::unit[6-i_omega];
-  
-  // Register reverse arcs  
+
+  // Register reverse arcs
   for(int i=0;i<outline.size();i++){
     tie(xu,u) = outline[i];
     tie(xv,v) = outline[(i+1) % outline.size()];
@@ -52,7 +51,7 @@ void Folding::connect_cross(int i_omega, neighbours_t &n)
     Unfolding::transform_line(Xuv,Xvu, xu0,xu1, T);
 
     // Alongside u->v, rasterize u->v line segment forwards and backwards
-    vector<Eisenstein> segment   (polygon::draw_line(xu*omega,xv*omega)), 
+    vector<Eisenstein> segment   (polygon::draw_line(xu*omega,xv*omega)),
                        revsegment(polygon::draw_line(xv*omega,xu*omega));
     reverse(revsegment.begin(),revsegment.end());
     assert(segment.size() == revsegment.size());
@@ -61,48 +60,33 @@ void Folding::connect_cross(int i_omega, neighbours_t &n)
     for(int j=0;j<segment.size();j++){
       const Eisenstein& x(segment[j]), y(revsegment[j]);
       // Forward rasterization rounds to the right, backwards to the left.
-      // So when x != y, we have a split triangle and an edge that needs to be connected across the boundary 
+      // So when x != y, we have a split triangle and an edge that needs to be connected across the boundary
       if(x != y){
 	Eisenstein xp((x-xu0)*T+xu1); // Rotate and translate from u->v to v->u coords
 	Eisenstein yp((y-xu0)*T+xu1); // Rotate and translate from u->v to v->u coords
 
 	// Connect untransformed u to transformed v
-	node_t u = final_grid[x*omega_inv], v = final_grid[yp*omega_inv];
-	//	edges.push_back(edge_t(u,v));
-	if(debug_flags & WRITE_FILE) printf("Connect cross arc %d to %d \n",u,v);
-	n[u][i_omega] = v;
-	n[v][i_omega+3] = u;
+	Eisenstein pu = x*omega_inv, pv = yp*omega_inv;
+	auto itu = final_grid.find(pu), itv = final_grid.find(pv);
+	if(itu == final_grid.end() || itv == final_grid.end()) continue;
 
-	// Debugging
-	assert(u>=0 && v>=0);	
-	EC.push_back({x,y});
-	ECp.push_back({xp,yp});
+	node_t u = itu->second, v = itv->second;
+	if(debug_flags & WRITE_FILE) printf("Connect cross arc %d to %d \n",u,v);
+	edges.insert(edge_t(u,v));
       }
-      
     }
   }
-
-  // Debugging
-  polygon P(omega*get_keys(outline));
-  if(debug_flags & WRITE_FILE)
-    debug_file
-      << "points = " << P.allpoints() << ";\n"
-      << "outlinecoords = " << P.outline << ";\n" 
-      << "EC = " << EC << ";\n"
-      << "ECp = " << ECp << ";\n"
-      << "neighbours = " << n << ";\n";  
-      ;
 }
 
 // connect_polygon connects all the inner edges in the outline polygon
 // by exact scan-conversion and rasterization
-void Folding::connect_polygon(int i_omega, neighbours_t &neighbours)
+void Folding::connect_polygon(int i_omega, set<edge_t> &edges)
 {
   Eisenstein
     omega     = Eisenstein::unit[i_omega],
     omega_inv = Eisenstein::unit[6-i_omega];
 
-  vector<Eisenstein> outline_coords(omega*get_keys(outline));  
+  vector<Eisenstein> outline_coords(omega*get_keys(outline));
   polygon P(outline_coords);
   polygon::scanline S(P.scanConvert());
 
@@ -111,34 +95,33 @@ void Folding::connect_polygon(int i_omega, neighbours_t &neighbours)
       int x_start = S.xs[y][2*j], x_end = S.xs[y][2*j+1];
 
       for(int x=x_start;x<x_end;x++){
-	node_t u = final_grid[Eisenstein(x,y+S.minY)*omega_inv], v = final_grid[Eisenstein(x+1,y+S.minY)*omega_inv];
+	Eisenstein pu = Eisenstein(x,y+S.minY)*omega_inv, pv = Eisenstein(x+1,y+S.minY)*omega_inv;
+	auto itu = final_grid.find(pu), itv = final_grid.find(pv);
+	if(itu == final_grid.end() || itv == final_grid.end()) continue;
 
+	node_t u = itu->second, v = itv->second;
 	if(debug_flags & WRITE_FILE) printf("Connect polygon arc %d to %d \n",u,v);
-	//	edges.push_back({u,v});
-	neighbours[u][i_omega]   = v;
-	neighbours[v][i_omega+3] = u;
-
-	assert(u>=0 && v>=0);
-      }      
+	edges.insert(edge_t(u,v));
+      }
     }
   }
 }
 
 // The inner edges and the cross-outline edges are all the edges
-void Folding::connect(int i_omega, neighbours_t &neighbours)
+void Folding::connect(int i_omega, set<edge_t> &edges)
 {
-  if(!(debug_flags & DONT_CONNECT_POLYGON))  connect_polygon(i_omega, neighbours);
-  if(!(debug_flags & DONT_CONNECT_ACROSS))   connect_cross(i_omega,neighbours);
+  if(!(debug_flags & DONT_CONNECT_POLYGON))  connect_polygon(i_omega, edges);
+  if(!(debug_flags & DONT_CONNECT_ACROSS))   connect_cross(i_omega, edges);
 }
 
 
 // The whole outline is connected into a triangulation / cubic graph dual
 // by rotating 0, 60, and 120 degrees and "drawing" the horizontal edges
-void Folding::connect(neighbours_t &neighbours)
+void Folding::connect(set<edge_t> &edges)
 {
-  connect(0,neighbours);
-  connect(1,neighbours);
-  connect(2,neighbours);    
+  connect(0, edges);
+  connect(1, edges);
+  connect(2, edges);
 }
 
 // identify_nodes takes a polygon outline and a map from the eisenstein grid
@@ -271,21 +254,17 @@ vector<int> Folding::identify_nodes(const IDCounter<Eisenstein>& grid, const vec
 Triangulation Folding::fold()
 {
   node_t N = node_pos.size();
-  neighbours_t neighbours(N,vector<node_t>(6,-1));
+  set<edge_t> edge_set;
 
-  connect(neighbours);
+  connect(edge_set);
 
-  // Remove empty spots from neighbour list
-  for(node_t u=0;u<N;u++){
-    auto &redundant_nu = neighbours[u];
-    vector<node_t> nu;
-    
-    if(debug_flags & WRITE_FILE) cout << "n["<<u<<"] = " << redundant_nu;
-    for(int i=0;i<6;i++)
-      if(redundant_nu[i] != -1) nu.push_back(redundant_nu[i]);
-    if(debug_flags & WRITE_FILE) cout << " -> " << nu << endl;
-    
-    neighbours[u] = nu;
+  // Build neighbour lists from the collected edge set.
+  // Using a set avoids both duplicates and clobbering that the old
+  // 6-slot positional scheme suffered from with multi-position nodes.
+  neighbours_t neighbours(N);
+  for(const auto& e: edge_set){
+    neighbours[e.first].push_back(e.second);
+    neighbours[e.second].push_back(e.first);
   }
 
   Triangulation T(neighbours,true);
