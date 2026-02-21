@@ -152,7 +152,7 @@ map<arc_t,Unfolding::arccoord_t> Unfolding::unfold(const Triangulation& G, const
     
   auto place_triangle = [&](const tri_t &T, const Eisenstein position[3]) {
 
-    cout << "Placing triangle " << T << " at " << vector<Eisenstein>{{position[0],position[1],position[2]}} << endl;
+    if(debug_flags & VERBOSE) cout << "Placing triangle " << T << " at " << vector<Eisenstein>{{position[0],position[1],position[2]}} << endl;
     for(int i=0;i<3;i++) seen[{T[i],T[(i+1)%3]}] = true;
     
     for(int i=0;i<3;i++){
@@ -236,6 +236,23 @@ void Unfolding::transform_line(const Unfolding::arccoord_t& l1, const Unfolding:
   w   = Tuvvu;
 }
 
+vector<pair<Eisenstein,node_t>> Unfolding::GCDreduce(const vector<pair<Eisenstein,node_t>>& outline)
+{
+  vector<Eisenstein> segments(outline.size());
+  for(size_t i=0;i<outline.size();i++)
+    segments[i] = outline[(i+1)%outline.size()].first - outline[i].first;
+
+  Eisenstein d(Eisenstein::gcd(segments));
+  for(size_t i=0;i<segments.size();i++) segments[i] = segments[i].div(d);
+
+  vector<pair<Eisenstein,node_t>> new_outline(outline.size());
+  new_outline[0] = outline[0];
+  for(size_t i=0;i+1<outline.size();i++)
+    new_outline[i+1] = make_pair(new_outline[i].first+segments[i], outline[i+1].second);
+
+  return new_outline;
+}
+
 // TODO: Preserve the graph!
 #include <unistd.h>
 Unfolding Unfolding::straighten_lines() const 
@@ -282,14 +299,14 @@ Unfolding Unfolding::straighten_lines() const
   // Now repeatedly eliminate arcs by the following rules:
   while(!workset.empty()){
     
-    fprintf(stderr,"Step 1\n");
-    cerr << "workset = " << workset << ";\n";
+    if(debug_flags & VERBOSE) fprintf(stderr,"Step 1\n");
+    if(debug_flags & VERBOSE) cerr << "workset = " << workset << ";\n";
     //  1. If u->v and v->u are both in the digraph, u->v matches up with v->u as
     //     desired, and we can remove the cycle u<->v from the digraph.
     for(node_t U=0;U<12;U++)
       for(node_t V=U+1;V<12;V++)
 	if(A[U*12+V] && A[V*12+U]){
-	  fprintf(stderr,"Found %d->%d and %d->%d, removing both\n",U,V,V,U);
+	  if(debug_flags & VERBOSE) fprintf(stderr,"Found %d->%d and %d->%d, removing both\n",U,V,V,U);
 	  A[U*12+V] = false;
 	  A[V*12+U] = false;
 
@@ -297,8 +314,8 @@ Unfolding Unfolding::straighten_lines() const
 	  workset.erase(arc_t(V,U));
 	}
     
-    fprintf(stderr,"\nStep 2\n");
-    cerr << "workset = " << workset << ";\n";
+    if(debug_flags & VERBOSE) fprintf(stderr,"\nStep 2\n");
+    if(debug_flags & VERBOSE) cerr << "workset = " << workset << ";\n";
 
     // 2. When this step is reached, edges in workset are part of cycles of length >=3 and must be reduced. 
     // 2.1 Find first length-3 segment U->V->W
@@ -307,7 +324,7 @@ Unfolding Unfolding::straighten_lines() const
     for(W=0;W<12;W++) if(A[V*12+W]) break; 
     if(W==12){
       if(!workset.empty())
-	fprintf(stderr,"straighten_lines: workset not empty, but no arcs to process.\n");
+	if(debug_flags & VERBOSE) fprintf(stderr,"straighten_lines: workset not empty, but no arcs to process.\n");
 	
       break;
     }
@@ -315,13 +332,13 @@ Unfolding Unfolding::straighten_lines() const
     // 2.2 Transform W
     if(U != W){    
       arc_t VW(V,W);
-      fprintf(stderr,"%d->%d->%d at ",U,V,W); cerr << UVindex[UV] << " and " << UVindex[VW] << endl;
+      if(debug_flags & VERBOSE){ fprintf(stderr,"%d->%d->%d at ",U,V,W); cerr << UVindex[UV] << " and " << UVindex[VW] << endl; }
       Eisenstein x0, x0p, omega;
       
       transform_line(XUv[VW], reverse(XVu[UV]), x0, x0p, omega);
-      cerr << "XUV = " << XUV[UV] << "; XWv = " << XUv[VW] << "; XUv = " << XVu[UV] << ";\n";
+      if(debug_flags & VERBOSE) cerr << "XUV = " << XUV[UV] << "; XWv = " << XUv[VW] << "; XUv = " << XVu[UV] << ";\n";
       Eisenstein Wxp = XUV[VW].second,  Wx((Wxp-x0)*omega+x0p);
-      cerr << "Wxp = " << Wxp << "; Wx = " << Wx << endl;
+      if(debug_flags & VERBOSE) cerr << "Wxp = " << Wxp << "; Wx = " << Wx << endl;
 
 
       // 2.3 Create annotation for new U->W arc
@@ -336,7 +353,7 @@ Unfolding Unfolding::straighten_lines() const
       O.insert(O.begin()+Uindex+1, make_pair(Wx,W));
 
       // 2.5 Remove U->V and V->W from workset
-      fprintf(stderr,"Removing %d->%d and %d->%d\n",U,V,V,W);
+      if(debug_flags & VERBOSE) fprintf(stderr,"Removing %d->%d and %d->%d\n",U,V,V,W);
       A[U*12+V] = false;
       A[V*12+W] = false;
       workset.erase(UV);
@@ -344,11 +361,11 @@ Unfolding Unfolding::straighten_lines() const
 
       // 2.6 Add U->W to workset
 
-      fprintf(stderr,"Adding %d->%d\n",U,W);
+      if(debug_flags & VERBOSE) fprintf(stderr,"Adding %d->%d\n",U,W);
       A[U*12+W] = true;
       workset.insert(UW);
     } else {
-      fprintf(stderr,"Not implemented yet: %d->%d->%d\n",U,V,W);
+      if(debug_flags & VERBOSE) fprintf(stderr,"Not implemented yet: %d->%d->%d\n",U,V,W);
       A[U*12+V] = false;
       A[V*12+W] = false;
       workset.erase({U,V});

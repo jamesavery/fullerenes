@@ -7,8 +7,11 @@
 class Unfolding {
 public:
   typedef pair<Eisenstein,Eisenstein> arccoord_t;
-  
-  typedef arccoord_t arc_coord_t;  
+
+  typedef arccoord_t arc_coord_t;
+
+  enum { VERBOSE = 1 };
+  int debug_flags = 0;
 
   Triangulation graph;
 
@@ -115,6 +118,10 @@ public:
 
   static void transform_line(const arccoord_t& l1, const arccoord_t& l2, Eisenstein& x0, Eisenstein& x0p, Eisenstein& w);
 
+  // Divide each outline segment by the Eisenstein GCD of all segments,
+  // producing a reduced outline suitable for folding back to the original graph.
+  static vector<pair<Eisenstein,node_t>> GCDreduce(const vector<pair<Eisenstein,node_t>>& outline);
+
 
 
   // Output
@@ -173,8 +180,10 @@ public:
     const vector<Eisenstein> allpoints(P.allpoints());
     for(auto &x: allpoints) grid.insert(x);
 
-    cout << "grid_keys = "   << get_keys(grid) << endl;
-    cout << "grid_values = " << get_values(grid) << endl;    
+    if(debug_flags & WRITE_FILE){
+      cout << "grid_keys = "   << get_keys(grid) << endl;
+      cout << "grid_values = " << get_values(grid) << endl;
+    }
 
     // Now reduce redundant grid to the real node names
     // if(!(debug_flags & DONT_IDENTIFY_NODES)){
@@ -193,10 +202,12 @@ public:
     // for(auto k: get_keys(grid))
     //   cout << "\t" << k << ": " << final_grid[k] << endl;      
 
-    node_pos = vector<vector<Eisenstein>>(N); // All coordinates of each node    
-    node_pos[same_as[u]].push_back(xu);    
+    node_pos = vector<vector<Eisenstein>>(N); // All coordinates of each node
+    for(const auto &kv: grid){
+      node_pos[same_as[kv.second]].push_back(kv.first);
+    }
 
-    cout << "final_grid_values = " << get_values(final_grid) << endl;    
+    if(debug_flags & WRITE_FILE) cout << "final_grid_values = " << get_values(final_grid) << endl;
   }
 
   void connect(neighbours_t &neighbours);    

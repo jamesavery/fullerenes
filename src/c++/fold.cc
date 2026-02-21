@@ -69,7 +69,7 @@ void Folding::connect_cross(int i_omega, neighbours_t &n)
 	// Connect untransformed u to transformed v
 	node_t u = final_grid[x*omega_inv], v = final_grid[yp*omega_inv];
 	//	edges.push_back(edge_t(u,v));
-	printf("Connect cross arc %d to %d \n",u,v);	
+	if(debug_flags & WRITE_FILE) printf("Connect cross arc %d to %d \n",u,v);
 	n[u][i_omega] = v;
 	n[v][i_omega+3] = u;
 
@@ -113,7 +113,7 @@ void Folding::connect_polygon(int i_omega, neighbours_t &neighbours)
       for(int x=x_start;x<x_end;x++){
 	node_t u = final_grid[Eisenstein(x,y+S.minY)*omega_inv], v = final_grid[Eisenstein(x+1,y+S.minY)*omega_inv];
 
-	printf("Connect polygon arc %d to %d \n",u,v);
+	if(debug_flags & WRITE_FILE) printf("Connect polygon arc %d to %d \n",u,v);
 	//	edges.push_back({u,v});
 	neighbours[u][i_omega]   = v;
 	neighbours[v][i_omega+3] = u;
@@ -175,7 +175,7 @@ vector<int> Folding::identify_nodes(const IDCounter<Eisenstein>& grid, const vec
                omega_inv = Eisenstein::unit[6-i_omega];
 
     assert((omega * omega_inv == Eisenstein{1,0}));
-    cout << "omega: " << i_omega << ": " << omega << "; " << omega_inv << endl;
+    if(debug_flags & WRITE_FILE) cout << "omega: " << i_omega << ": " << omega << "; " << omega_inv << endl;
     // Register reverse arcs
     for(int i=0;i<outline.size();i++){
       tie(XU,U) = outline[i];
@@ -195,11 +195,13 @@ vector<int> Folding::identify_nodes(const IDCounter<Eisenstein>& grid, const vec
 
       arccoord_t XUV(XU*omega,XV*omega), XVU(reverse_arc[{U,V}]);
 
-      cout << "\noutline["<<i<<"]\n";
-      cout << "{U,V} = " << make_pair(U,V) << endl;
-      cout << "{XU,XV}   = " << make_pair(XU,XV) << endl;
-      cout << "XUV = " << XUV << endl;      
-      cout << "XVU = " << XVU << endl;            
+      if(debug_flags & WRITE_FILE){
+        cout << "\noutline["<<i<<"]\n";
+        cout << "{U,V} = " << make_pair(U,V) << endl;
+        cout << "{XU,XV}   = " << make_pair(XU,XV) << endl;
+        cout << "XUV = " << XUV << endl;
+        cout << "XVU = " << XVU << endl;
+      }
       
       Eisenstein x0,x0p,T;
       Unfolding::transform_line(XUV,XVU, x0,x0p, T);
@@ -210,8 +212,9 @@ vector<int> Folding::identify_nodes(const IDCounter<Eisenstein>& grid, const vec
 	segment   (polygon::draw_line(XU*omega, XV*omega)), 
 	revsegment(polygon::draw_line(XV*omega, XU*omega));
 
-      cout << "segment = " << segment    << endl
-	   << "regveg  = " << revsegment << endl;
+      if(debug_flags & WRITE_FILE)
+        cout << "segment = " << segment    << endl
+	     << "regveg  = " << revsegment << endl;
       reverse(revsegment.begin(),revsegment.end());
       assert(segment.size() == revsegment.size());
 
@@ -219,7 +222,7 @@ vector<int> Folding::identify_nodes(const IDCounter<Eisenstein>& grid, const vec
       for(int j=0;j<segment.size();j++){
 	const Eisenstein& x(segment[j]), y(revsegment[j]);
 	if(x == y){
-	  cout << "x = " << x << ", u = " << grid(x*omega_inv) << endl;
+	  if(debug_flags & WRITE_FILE) cout << "x = " << x << ", u = " << grid(x*omega_inv) << endl;
 	  //	  cout << "{x,y} = " << make_pair(x,y) << endl;
 	  //	  cout << "{xw,yw} = " << make_pair(x*omega_inv,y*omega_inv) << endl;	  
 	  Eisenstein xp = (x-x0)*T+x0p;
@@ -227,17 +230,17 @@ vector<int> Folding::identify_nodes(const IDCounter<Eisenstein>& grid, const vec
 
 	  node_t u = grid(x*omega_inv), v = grid(xp*omega_inv);
 	  if((u>=0 && v>= 0)  && (u != v)){
-	    cout << "same_as {u,v} = " << edge_t{u,v} << endl;
+	    if(debug_flags & WRITE_FILE) cout << "same_as {u,v} = " << edge_t{u,v} << endl;
 	    same_as.insert(edge_t{u,v});
 	  } else {
-	    cout << "u==v at "<<(x*omega_inv)<<"/"<<(xp*omega_inv)<<": " << edge_t{u,v} << endl;	    
+	    if(debug_flags & WRITE_FILE) cout << "u==v at "<<(x*omega_inv)<<"/"<<(xp*omega_inv)<<": " << edge_t{u,v} << endl;
 	  }
 	    //	  assert(u>=0 && v>=0);	
 	}
       }
     }
   }
-  cout << "same_as = " << same_as << "\n\n";
+  if(debug_flags & WRITE_FILE) cout << "same_as = " << same_as << "\n\n";
   
   // Find connected components
   vector<int> same(grid.size());
@@ -245,12 +248,12 @@ vector<int> Folding::identify_nodes(const IDCounter<Eisenstein>& grid, const vec
 
   Graph S(same_as);
   vector<vector<node_t> > components(S.connected_components());
-  cout << "S = " << S << endl;
-  
+  if(debug_flags & WRITE_FILE) cout << "S = " << S << endl;
+
   for(auto& c: components){
     node_t canonical = *min_element(c.begin(),c.end());
     sort(c.begin(), c.end());
-    cout << "Component " << c << " has canonical element " << canonical << endl;
+    if(debug_flags & WRITE_FILE) cout << "Component " << c << " has canonical element " << canonical << endl;
       
     for(auto t: c) same[t] = canonical;
   }
@@ -259,8 +262,9 @@ vector<int> Folding::identify_nodes(const IDCounter<Eisenstein>& grid, const vec
   if(debug_flags&WRITE_FILE) 
     debug_file << "samecomponents = " << components << ";\n";
 
-  cout << "same_components = " << components.size()<<", " << components << "\n\n"
-       << "same    = " << same << "\n\n";
+  if(debug_flags & WRITE_FILE)
+    cout << "same_components = " << components.size()<<", " << components << "\n\n"
+         << "same    = " << same << "\n\n";
   return same;
 }
 
@@ -276,10 +280,10 @@ Triangulation Folding::fold()
     auto &redundant_nu = neighbours[u];
     vector<node_t> nu;
     
-    cout << "n["<<u<<"] = " << redundant_nu;
+    if(debug_flags & WRITE_FILE) cout << "n["<<u<<"] = " << redundant_nu;
     for(int i=0;i<6;i++)
       if(redundant_nu[i] != -1) nu.push_back(redundant_nu[i]);
-    cout << " -> " << nu << endl;
+    if(debug_flags & WRITE_FILE) cout << " -> " << nu << endl;
     
     neighbours[u] = nu;
   }
@@ -309,8 +313,6 @@ vector<node_t> Folding::outline_nodes() const
   
   vector<node_t> new_nodenames(outline_N,-1);
   for(int i=0;i<outline.size();i++){
-    cerr << new_nodenames << endl;
-
     int u = outline[i].second;
     int stored_up = new_nodenames[u];
 
