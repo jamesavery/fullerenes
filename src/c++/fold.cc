@@ -136,28 +136,25 @@ void Folding::connect(set<edge_t> &edges)
 vector<int> Folding::identify_nodes(const IDCounter<Eisenstein>& grid, const vector< pair<Eisenstein,node_t>>& outline) const
 {
   node_t u, v, U, V;
-  Eisenstein xu, xv, XU, XV;  
+  Eisenstein xu, xv, XU, XV;
   set<edge_t> same_as;
 
   for(int i_omega=0;i_omega<3;i_omega++){
     map<arc_t,arccoord_t> reverse_arc;
-    
+
     Eisenstein omega     = Eisenstein::unit[i_omega],
                omega_inv = Eisenstein::unit[6-i_omega];
 
     assert((omega * omega_inv == Eisenstein{1,0}));
-    if(debug_flags & WRITE_FILE) cout << "omega: " << i_omega << ": " << omega << "; " << omega_inv << endl;
+
     // Register reverse arcs
     for(int i=0;i<outline.size();i++){
       tie(XU,U) = outline[i];
       tie(XV,V) = outline[(i+1) % outline.size()];
 
-      reverse_arc[{V,U}] = {XU*omega,XV*omega}; 
+      reverse_arc[{V,U}] = {XU*omega,XV*omega};
     }
 
-    // cout << "reverse_keys   = " << get_keys(reverse_arc) << endl;
-    // cout << "reverse_values = " << get_values(reverse_arc) << endl;    
-    
     // For each segment U->V of the outline, find the reverse one, and identify
     // the nodes on the path that are *not* on split triangles
     for(int i=0;i<outline.size();i++){
@@ -166,53 +163,30 @@ vector<int> Folding::identify_nodes(const IDCounter<Eisenstein>& grid, const vec
 
       arccoord_t XUV(XU*omega,XV*omega), XVU(reverse_arc[{U,V}]);
 
-      if(debug_flags & WRITE_FILE){
-        cout << "\noutline["<<i<<"]\n";
-        cout << "{U,V} = " << make_pair(U,V) << endl;
-        cout << "{XU,XV}   = " << make_pair(XU,XV) << endl;
-        cout << "XUV = " << XUV << endl;
-        cout << "XVU = " << XVU << endl;
-      }
-      
       Eisenstein x0,x0p,T;
       Unfolding::transform_line(XUV,XVU, x0,x0p, T);
 
-      //      cout << "{x0,x0p} = " << make_pair(x0,x0p) << endl;
-      //TODO: Handle horizontal lines. 
       vector<Eisenstein>
-	segment   (polygon::draw_line(XU*omega, XV*omega)), 
+	segment   (polygon::draw_line(XU*omega, XV*omega)),
 	revsegment(polygon::draw_line(XV*omega, XU*omega));
 
-      if(debug_flags & WRITE_FILE)
-        cout << "segment = " << segment    << endl
-	     << "regveg  = " << revsegment << endl;
       reverse(revsegment.begin(),revsegment.end());
-      assert(segment.size() == revsegment.size());
 
-      // 
+      if(segment.size() != revsegment.size()) continue;
+
       for(int j=0;j<segment.size();j++){
 	const Eisenstein& x(segment[j]), y(revsegment[j]);
 	if(x == y){
-	  if(debug_flags & WRITE_FILE) cout << "x = " << x << ", u = " << grid(x*omega_inv) << endl;
-	  //	  cout << "{x,y} = " << make_pair(x,y) << endl;
-	  //	  cout << "{xw,yw} = " << make_pair(x*omega_inv,y*omega_inv) << endl;	  
 	  Eisenstein xp = (x-x0)*T+x0p;
-	  //	  cout << "xp = " << xp << endl;
 
 	  node_t u = grid(x*omega_inv), v = grid(xp*omega_inv);
-	  if((u>=0 && v>= 0)  && (u != v)){
-	    if(debug_flags & WRITE_FILE) cout << "same_as {u,v} = " << edge_t{u,v} << endl;
+	  if((u>=0 && v>= 0)  && (u != v))
 	    same_as.insert(edge_t{u,v});
-	  } else {
-	    if(debug_flags & WRITE_FILE) cout << "u==v at "<<(x*omega_inv)<<"/"<<(xp*omega_inv)<<": " << edge_t{u,v} << endl;
-	  }
-	    //	  assert(u>=0 && v>=0);	
 	}
       }
     }
   }
-  if(debug_flags & WRITE_FILE) cout << "same_as = " << same_as << "\n\n";
-  
+
   // Find connected components
   // Use grid.nextid (number of unique IDs) not grid.size() (number of map entries,
   // which includes multiple Eisenstein positions mapping to the same node ID).
@@ -221,23 +195,12 @@ vector<int> Folding::identify_nodes(const IDCounter<Eisenstein>& grid, const vec
 
   Graph S(same_as);
   vector<vector<node_t> > components(S.connected_components());
-  if(debug_flags & WRITE_FILE) cout << "S = " << S << endl;
 
   for(auto& c: components){
     node_t canonical = *min_element(c.begin(),c.end());
-    sort(c.begin(), c.end());
-    if(debug_flags & WRITE_FILE) cout << "Component " << c << " has canonical element " << canonical << endl;
-      
     for(auto t: c) same[t] = canonical;
   }
 
-
-  if(debug_flags&WRITE_FILE) 
-    debug_file << "samecomponents = " << components << ";\n";
-
-  if(debug_flags & WRITE_FILE)
-    cout << "same_components = " << components.size()<<", " << components << "\n\n"
-         << "same    = " << same << "\n\n";
   return same;
 }
 

@@ -48,9 +48,7 @@ vector<Eisenstein> polygon::draw_line(const Eisenstein& xy0, const Eisenstein& x
     return result;
   }
   if(sy == 0){
-    //      while(xy.first-sx != xy1.first){ result.push_back(xy); xy.first += sx; }
-    result.push_back(xy0);
-    result.push_back(xy1);
+    while(xy.first-sx != xy1.first){ result.push_back(xy); xy.first += sx; }
     return result;
   }
 

@@ -113,14 +113,14 @@ public:
     for(auto& kv : arc_coords) { kv.second.first *= y; kv.second.second *= y; }
     return *this;
   }
-  Unfolding operator*(const Eisenstein& y) const { Unfolding U(outline); return (U *= y); }
+  Unfolding operator*(const Eisenstein& y) const { Unfolding U(*this); return (U *= y); }
 
   Unfolding& operator += (const Eisenstein& y){
     for(int i=0;i<outline.size();i++) outline[i].first += y;
     for(auto& kv : arc_coords) { kv.second.first += y; kv.second.second += y; }
     return *this;
   }
-  Unfolding operator+(const Eisenstein& y) const { Unfolding U(outline); return (U += y); }
+  Unfolding operator+(const Eisenstein& y) const { Unfolding U(*this); return (U += y); }
 
   // Unfolding& operator /= (const Eisenstein& y){ for(int i=0;i<outline.size();i++) outline[i].first /= y; return *this;  }
   // Unfolding operator/(const Eisenstein& y) const { Unfolding U(outline); return (U /= y); }
@@ -179,11 +179,7 @@ public:
       tie(xu,u) = kv;
       grid.reverse[u] = xu;
     }
-  
-    
-    
-    //    cout << "grid.reverse = " << grid.reverse << endl;
-    
+
     // Next, fill in uninitialized grid points
     // (in case only outline arcs are filled in)
     const vector<Eisenstein> allpoints(P.allpoints());
@@ -195,27 +191,27 @@ public:
     }
 
     // Now reduce redundant grid to the real node names
-    // if(!(debug_flags & DONT_IDENTIFY_NODES)){
-    node_t N = 0;
     same_as = identify_nodes(grid, outline);
+
+    // Compact canonical IDs to be contiguous (0..N-1).
+    // Merges and unused IDs can leave gaps in the canonical numbering.
+    map<node_t, node_t> compact;
+    node_t N = 0;
+    for(auto &kv: grid){
+      node_t canonical = same_as[kv.second];
+      if(compact.find(canonical) == compact.end())
+        compact[canonical] = N++;
+    }
+
     for(auto &kv: grid){
       tie(xu,u) = kv;
-      final_grid[xu] = same_as[u];
-      N = max(N,same_as[u]+1);
+      final_grid[xu] = compact[same_as[u]];
     }
-    // cout << "grid:\n";
-    // for(auto k: get_keys(grid))
-    //   cout << "\t" << k << ": " << grid[k] << endl;
-
-    // cout << "\nfinal_grid:\n";
-    // for(auto k: get_keys(grid))
-    //   cout << "\t" << k << ": " << final_grid[k] << endl;      
 
     node_pos = vector<vector<Eisenstein>>(N); // All coordinates of each node
     for(const auto &kv: grid){
-      node_t canonical = same_as[kv.second];
-      if(canonical >= 0 && canonical < N)
-        node_pos[canonical].push_back(kv.first);
+      node_t cid = compact[same_as[kv.second]];
+      node_pos[cid].push_back(kv.first);
     }
 
     if(debug_flags & WRITE_FILE) cout << "final_grid_values = " << get_values(final_grid) << endl;

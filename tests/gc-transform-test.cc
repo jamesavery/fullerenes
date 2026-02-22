@@ -120,6 +120,46 @@ TEST_F(GCTransformTest, ChiralDegreePreservation_3_1) {
   check_degree_preservation(result);
 }
 
+TEST_F(GCTransformTest, ChiralNodeCount_3_2) {
+  Triangulation result = C20dual.GCtransform(3, 2);
+  EXPECT_EQ(result.N, expected_gc_nodes(V0, E0, F0, 3, 2));
+}
+
+TEST_F(GCTransformTest, ChiralDegreePreservation_3_2) {
+  Triangulation result = C20dual.GCtransform(3, 2);
+  check_degree_preservation(result);
+}
+
+TEST_F(GCTransformTest, ChiralNodeCount_4_1) {
+  Triangulation result = C20dual.GCtransform(4, 1);
+  EXPECT_EQ(result.N, expected_gc_nodes(V0, E0, F0, 4, 1));
+}
+
+TEST_F(GCTransformTest, ChiralDegreePreservation_4_1) {
+  Triangulation result = C20dual.GCtransform(4, 1);
+  check_degree_preservation(result);
+}
+
+TEST_F(GCTransformTest, ChiralNodeCount_4_2) {
+  Triangulation result = C20dual.GCtransform(4, 2);
+  EXPECT_EQ(result.N, expected_gc_nodes(V0, E0, F0, 4, 2));
+}
+
+TEST_F(GCTransformTest, ChiralDegreePreservation_4_2) {
+  Triangulation result = C20dual.GCtransform(4, 2);
+  check_degree_preservation(result);
+}
+
+TEST_F(GCTransformTest, ChiralNodeCount_4_3) {
+  Triangulation result = C20dual.GCtransform(4, 3);
+  EXPECT_EQ(result.N, expected_gc_nodes(V0, E0, F0, 4, 3));
+}
+
+TEST_F(GCTransformTest, ChiralDegreePreservation_4_3) {
+  Triangulation result = C20dual.GCtransform(4, 3);
+  check_degree_preservation(result);
+}
+
 // --- Unfold/fold infrastructure tests ---
 
 TEST_F(GCTransformTest, UnfoldProducesOutline) {
@@ -197,4 +237,15 @@ TEST_F(C28GCTest, Halma_3_0_NodeCount) {
 TEST_F(C28GCTest, Halma_3_0_Degrees) {
   Triangulation result = C28dual.GCtransform(3, 0);
   check_degree_preservation(result);
+}
+
+// --- C28 chiral tests ---
+TEST_F(C28GCTest, Chiral_1_1_NodeCount) {
+  Triangulation result = C28dual.GCtransform(1, 1);
+  EXPECT_EQ(result.N, expected_gc_nodes(V0, E0, F0, 1, 1));
+}
+
+TEST_F(C28GCTest, Chiral_2_1_NodeCount) {
+  Triangulation result = C28dual.GCtransform(2, 1);
+  EXPECT_EQ(result.N, expected_gc_nodes(V0, E0, F0, 2, 1));
 }
