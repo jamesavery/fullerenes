@@ -217,10 +217,15 @@ public:
     if(debug_flags & WRITE_FILE) cout << "final_grid_values = " << get_values(final_grid) << endl;
   }
 
-  void connect(set<edge_t> &edges);
+  // cross_info: edge_t -> (dir_first_to_second, dir_second_to_first, pos_first, pos_second)
+  // dir_first_to_second:  Eisenstein direction index at pos_first toward the second node
+  // dir_second_to_first:  Eisenstein direction index at pos_second toward the first node
+  // pos_first/pos_second: grid positions used to compute these directions
+  typedef map<edge_t, tuple<int,int,Eisenstein,Eisenstein>> cross_info_t;
 
+  void connect(set<edge_t> &edges, cross_info_t& cross_info);
   void connect_interior(set<edge_t>& edges);              // Connect all interior edges via direct neighbor lookup.
-  void connect_cross(int i_omega, set<edge_t>& edges);    // Connect edges across polygon boundary.
+  void connect_cross(int i_omega, set<edge_t>& edges, cross_info_t& cross_info);  // Connect edges across polygon boundary.
 
   // Collect nodes in unfolding that will correspond to the same nodes in the folded graph.
   vector<node_t> identify_nodes(const IDCounter<Eisenstein>& grid, const vector< pair<Eisenstein,node_t>>& outline) const;
