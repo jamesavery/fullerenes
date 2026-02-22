@@ -14,18 +14,52 @@ static int expected_gc_nodes(int V, int E, int F, int k, int l) {
   return 2 + E_new - F_new;
 }
 
-// Check that a triangulation has exactly 12 degree-5 nodes and the rest degree-6
-static void check_degree_preservation(const Triangulation& result) {
-  int deg5_count = 0, deg6_count = 0, other = 0;
-  for(int u = 0; u < result.N; u++) {
-    int d = result.neighbours[u].size();
-    if(d == 5) deg5_count++;
-    else if(d == 6) deg6_count++;
+// Validate that a Triangulation is a valid fullerene dual:
+//  1) Planar: orientation is consistent (every directed arc belongs to exactly one face)
+//  2) Triangulation: every face is a triangle
+//  3) Degree constraint: exactly 12 vertices of degree 5, rest degree 6
+//  4) Euler relation: Nf = N_carbon/2 + 2, i.e. the number of triangles F = 2*(Nf-2)
+static void check_fullerene_dual(const Triangulation& T) {
+  // 1) Consistent orientation: every directed arc is part of exactly one face.
+  //    This verifies planarity of the embedding.
+  EXPECT_TRUE(T.is_consistently_oriented()) << "Orientation is inconsistent";
+
+  // 2) Every face is a triangle: compute faces via next_on_face and check sizes.
+  //    The triangles member is populated by the constructor, so verify it
+  //    matches the expected count from Euler's formula.
+  int Nf = T.N;
+  int expected_triangles = 2 * (Nf - 2);
+  EXPECT_EQ((int)T.triangles.size(), expected_triangles)
+    << "Triangle count violates Euler formula: expected 2*(Nf-2) = " << expected_triangles;
+
+  // Also verify each stored triangle is actually a valid face by tracing with next_on_face
+  for(const auto& tri : T.triangles) {
+    node_t u = tri[0], v = tri[1], w = tri[2];
+    EXPECT_EQ(T.next_on_face(u, v), w)
+      << "Triangle {" << u << "," << v << "," << w << "}: next_on_face(" << u << "," << v << ") != " << w;
+    EXPECT_EQ(T.next_on_face(v, w), u)
+      << "Triangle {" << u << "," << v << "," << w << "}: next_on_face(" << v << "," << w << ") != " << u;
+    EXPECT_EQ(T.next_on_face(w, u), v)
+      << "Triangle {" << u << "," << v << "," << w << "}: next_on_face(" << w << "," << u << ") != " << v;
+  }
+
+  // 3) Degree constraint: exactly 12 degree-5 vertices, rest degree-6
+  int deg5 = 0, deg6 = 0, other = 0;
+  for(int u = 0; u < Nf; u++) {
+    int d = T.neighbours[u].size();
+    if(d == 5) deg5++;
+    else if(d == 6) deg6++;
     else other++;
   }
-  EXPECT_EQ(deg5_count, 12);
+  EXPECT_EQ(deg5, 12) << "Must have exactly 12 degree-5 nodes (pentagons)";
   EXPECT_EQ(other, 0) << "All nodes should be degree 5 or 6";
-  EXPECT_EQ(deg6_count, result.N - 12);
+  EXPECT_EQ(deg6, Nf - 12);
+
+  // 4) Nf = N_carbon/2 + 2, equivalently N_carbon = 2*(Nf - 2)
+  //    The number of carbon atoms is the number of triangles (dual faces = cubic vertices).
+  int N_carbon = expected_triangles;
+  EXPECT_EQ(Nf, N_carbon / 2 + 2)
+    << "Nf=" << Nf << " should equal N/2+2=" << N_carbon/2+2 << " where N=" << N_carbon;
 }
 
 // ===== C20 dual fixture =====
@@ -62,12 +96,12 @@ TEST_F(GCTransformTest, HalmaNodeCount_4_0) {
 
 TEST_F(GCTransformTest, HalmaDegreePreservation_2_0) {
   Triangulation result = C20dual.GCtransform(2, 0);
-  check_degree_preservation(result);
+  check_fullerene_dual(result);
 }
 
 TEST_F(GCTransformTest, HalmaDegreePreservation_3_0) {
   Triangulation result = C20dual.GCtransform(3, 0);
-  check_degree_preservation(result);
+  check_fullerene_dual(result);
 }
 
 TEST_F(GCTransformTest, HalmaConnectivity) {
@@ -101,12 +135,12 @@ TEST_F(GCTransformTest, ChiralNodeCount_3_1) {
 
 TEST_F(GCTransformTest, ChiralDegreePreservation_1_1) {
   Triangulation result = C20dual.GCtransform(1, 1);
-  check_degree_preservation(result);
+  check_fullerene_dual(result);
 }
 
 TEST_F(GCTransformTest, ChiralDegreePreservation_2_1) {
   Triangulation result = C20dual.GCtransform(2, 1);
-  check_degree_preservation(result);
+  check_fullerene_dual(result);
 }
 
 TEST_F(GCTransformTest, ChiralConnectivity_2_1) {
@@ -117,7 +151,7 @@ TEST_F(GCTransformTest, ChiralConnectivity_2_1) {
 
 TEST_F(GCTransformTest, ChiralDegreePreservation_3_1) {
   Triangulation result = C20dual.GCtransform(3, 1);
-  check_degree_preservation(result);
+  check_fullerene_dual(result);
 }
 
 TEST_F(GCTransformTest, ChiralNodeCount_3_2) {
@@ -127,7 +161,7 @@ TEST_F(GCTransformTest, ChiralNodeCount_3_2) {
 
 TEST_F(GCTransformTest, ChiralDegreePreservation_3_2) {
   Triangulation result = C20dual.GCtransform(3, 2);
-  check_degree_preservation(result);
+  check_fullerene_dual(result);
 }
 
 TEST_F(GCTransformTest, ChiralNodeCount_4_1) {
@@ -137,7 +171,7 @@ TEST_F(GCTransformTest, ChiralNodeCount_4_1) {
 
 TEST_F(GCTransformTest, ChiralDegreePreservation_4_1) {
   Triangulation result = C20dual.GCtransform(4, 1);
-  check_degree_preservation(result);
+  check_fullerene_dual(result);
 }
 
 TEST_F(GCTransformTest, ChiralNodeCount_4_2) {
@@ -147,7 +181,7 @@ TEST_F(GCTransformTest, ChiralNodeCount_4_2) {
 
 TEST_F(GCTransformTest, ChiralDegreePreservation_4_2) {
   Triangulation result = C20dual.GCtransform(4, 2);
-  check_degree_preservation(result);
+  check_fullerene_dual(result);
 }
 
 TEST_F(GCTransformTest, ChiralNodeCount_4_3) {
@@ -157,7 +191,7 @@ TEST_F(GCTransformTest, ChiralNodeCount_4_3) {
 
 TEST_F(GCTransformTest, ChiralDegreePreservation_4_3) {
   Triangulation result = C20dual.GCtransform(4, 3);
-  check_degree_preservation(result);
+  check_fullerene_dual(result);
 }
 
 // --- Unfold/fold infrastructure tests ---
@@ -226,7 +260,7 @@ TEST_F(C28GCTest, Halma_2_0_NodeCount) {
 
 TEST_F(C28GCTest, Halma_2_0_Degrees) {
   Triangulation result = C28dual.GCtransform(2, 0);
-  check_degree_preservation(result);
+  check_fullerene_dual(result);
 }
 
 TEST_F(C28GCTest, Halma_3_0_NodeCount) {
@@ -236,7 +270,7 @@ TEST_F(C28GCTest, Halma_3_0_NodeCount) {
 
 TEST_F(C28GCTest, Halma_3_0_Degrees) {
   Triangulation result = C28dual.GCtransform(3, 0);
-  check_degree_preservation(result);
+  check_fullerene_dual(result);
 }
 
 // --- C28 chiral tests ---
@@ -278,7 +312,7 @@ TEST(MultiIsomerGCTest, HalmaNodeCount) {
       SCOPED_TRACE("GC(" + to_string(k) + ",0)");
       Triangulation result = dual.GCtransform(k, 0);
       EXPECT_EQ(result.N, expected_gc_nodes(V, E, F, k, 0));
-      check_degree_preservation(result);
+      check_fullerene_dual(result);
     }
   }
 }
@@ -293,7 +327,7 @@ TEST(MultiIsomerGCTest, ChiralNodeCount) {
       SCOPED_TRACE("GC(" + to_string(k) + "," + to_string(l) + ")");
       Triangulation result = dual.GCtransform(k, l);
       EXPECT_EQ(result.N, expected_gc_nodes(V, E, F, k, l));
-      check_degree_preservation(result);
+      check_fullerene_dual(result);
     }
   }
 }

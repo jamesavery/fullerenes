@@ -219,7 +219,7 @@ Triangulation Folding::fold()
     neighbours[e.second].push_back(e.first);
   }
 
-  Triangulation T(neighbours,true);
+  Triangulation T(neighbours,false);
   // TODO:
   // 1. CubicPair -> also dual
   // 2. uv-map for both
