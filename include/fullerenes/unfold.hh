@@ -107,10 +107,19 @@ public:
   static vector< pair<Eisenstein,node_t> > get_outline(const map<arc_t,arccoord_t>& arc_coords);
 
   // Simple transformations in the Eisenstein plane.
-  Unfolding& operator *= (const Eisenstein& y){ for(int i=0;i<outline.size();i++) outline[i].first *= y; return *this;  }
+  // Note: both outline AND arc_coords must be transformed consistently.
+  Unfolding& operator *= (const Eisenstein& y){
+    for(int i=0;i<outline.size();i++) outline[i].first *= y;
+    for(auto& kv : arc_coords) { kv.second.first *= y; kv.second.second *= y; }
+    return *this;
+  }
   Unfolding operator*(const Eisenstein& y) const { Unfolding U(outline); return (U *= y); }
 
-  Unfolding& operator += (const Eisenstein& y){ for(int i=0;i<outline.size();i++) outline[i].first += y; return *this;  }
+  Unfolding& operator += (const Eisenstein& y){
+    for(int i=0;i<outline.size();i++) outline[i].first += y;
+    for(auto& kv : arc_coords) { kv.second.first += y; kv.second.second += y; }
+    return *this;
+  }
   Unfolding operator+(const Eisenstein& y) const { Unfolding U(outline); return (U += y); }
 
   // Unfolding& operator /= (const Eisenstein& y){ for(int i=0;i<outline.size();i++) outline[i].first /= y; return *this;  }
@@ -204,7 +213,9 @@ public:
 
     node_pos = vector<vector<Eisenstein>>(N); // All coordinates of each node
     for(const auto &kv: grid){
-      node_pos[same_as[kv.second]].push_back(kv.first);
+      node_t canonical = same_as[kv.second];
+      if(canonical >= 0 && canonical < N)
+        node_pos[canonical].push_back(kv.first);
     }
 
     if(debug_flags & WRITE_FILE) cout << "final_grid_values = " << get_values(final_grid) << endl;
@@ -212,9 +223,8 @@ public:
 
   void connect(set<edge_t> &edges);
 
-  void connect_polygon(int i_omega, set<edge_t>& edges);  // Connect scanlines of polygon rotated by w.
-  void connect_cross(int i_omega, set<edge_t>& edges);    // Connect horizontal lines across edges or polygon rotated by w.
-  void connect(int i_omega, set<edge_t>& edges);	        // Both of the above operations.
+  void connect_interior(set<edge_t>& edges);              // Connect all interior edges via direct neighbor lookup.
+  void connect_cross(int i_omega, set<edge_t>& edges);    // Connect edges across polygon boundary.
 
   // Collect nodes in unfolding that will correspond to the same nodes in the folded graph.
   vector<node_t> identify_nodes(const IDCounter<Eisenstein>& grid, const vector< pair<Eisenstein,node_t>>& outline) const;

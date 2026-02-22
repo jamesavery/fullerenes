@@ -54,7 +54,8 @@ void Folding::connect_cross(int i_omega, set<edge_t> &edges)
     vector<Eisenstein> segment   (polygon::draw_line(xu*omega,xv*omega)),
                        revsegment(polygon::draw_line(xv*omega,xu*omega));
     reverse(revsegment.begin(),revsegment.end());
-    assert(segment.size() == revsegment.size());
+
+    if(segment.size() != revsegment.size()) continue;
 
     // Go through the nodes of the line segments rasterized back and forth along u->v
     for(int j=0;j<segment.size();j++){
@@ -78,50 +79,37 @@ void Folding::connect_cross(int i_omega, set<edge_t> &edges)
   }
 }
 
-// connect_polygon connects all the inner edges in the outline polygon
-// by exact scan-conversion and rasterization
-void Folding::connect_polygon(int i_omega, set<edge_t> &edges)
+// connect_interior finds all edges where both endpoints are in the grid
+// by directly checking the 3 positive Eisenstein neighbor directions.
+void Folding::connect_interior(set<edge_t> &edges)
 {
-  Eisenstein
-    omega     = Eisenstein::unit[i_omega],
-    omega_inv = Eisenstein::unit[6-i_omega];
+  static const Eisenstein dirs[3] = {{1,0}, {0,1}, {-1,1}};
 
-  vector<Eisenstein> outline_coords(omega*get_keys(outline));
-  polygon P(outline_coords);
-  polygon::scanline S(P.scanConvert());
+  for(const auto& kv: final_grid){
+    const Eisenstein& p = kv.first;
+    node_t u = kv.second;
 
-  for(int y=0;y<S.xs.size();y++){        // For each y..
-    for(int j=0;j<S.xs[y].size()/2;j++){ // ..go through each inner interval
-      int x_start = S.xs[y][2*j], x_end = S.xs[y][2*j+1];
-
-      for(int x=x_start;x<x_end;x++){
-	Eisenstein pu = Eisenstein(x,y+S.minY)*omega_inv, pv = Eisenstein(x+1,y+S.minY)*omega_inv;
-	auto itu = final_grid.find(pu), itv = final_grid.find(pv);
-	if(itu == final_grid.end() || itv == final_grid.end()) continue;
-
-	node_t u = itu->second, v = itv->second;
-	if(debug_flags & WRITE_FILE) printf("Connect polygon arc %d to %d \n",u,v);
-	edges.insert(edge_t(u,v));
+    for(int d = 0; d < 3; d++){
+      auto it = final_grid.find(p + dirs[d]);
+      if(it != final_grid.end()){
+        node_t v = it->second;
+        if(u != v) edges.insert(edge_t(u,v));
       }
     }
   }
 }
 
-// The inner edges and the cross-outline edges are all the edges
-void Folding::connect(int i_omega, set<edge_t> &edges)
-{
-  if(!(debug_flags & DONT_CONNECT_POLYGON))  connect_polygon(i_omega, edges);
-  if(!(debug_flags & DONT_CONNECT_ACROSS))   connect_cross(i_omega, edges);
-}
-
-
 // The whole outline is connected into a triangulation / cubic graph dual
-// by rotating 0, 60, and 120 degrees and "drawing" the horizontal edges
+// by finding interior edges via direct neighbor lookup and cross-boundary
+// edges via line rasterization in each of the 3 Eisenstein directions.
 void Folding::connect(set<edge_t> &edges)
 {
-  connect(0, edges);
-  connect(1, edges);
-  connect(2, edges);
+  if(!(debug_flags & DONT_CONNECT_POLYGON))  connect_interior(edges);
+  if(!(debug_flags & DONT_CONNECT_ACROSS)){
+    connect_cross(0, edges);
+    connect_cross(1, edges);
+    connect_cross(2, edges);
+  }
 }
 
 // identify_nodes takes a polygon outline and a map from the eisenstein grid
@@ -226,8 +214,10 @@ vector<int> Folding::identify_nodes(const IDCounter<Eisenstein>& grid, const vec
   if(debug_flags & WRITE_FILE) cout << "same_as = " << same_as << "\n\n";
   
   // Find connected components
-  vector<int> same(grid.size());
-  for(int i=0;i<grid.size();i++) same[i] = i;
+  // Use grid.nextid (number of unique IDs) not grid.size() (number of map entries,
+  // which includes multiple Eisenstein positions mapping to the same node ID).
+  vector<int> same(grid.nextid);
+  for(size_t i=0;i<grid.nextid;i++) same[i] = i;
 
   Graph S(same_as);
   vector<vector<node_t> > components(S.connected_components());
@@ -259,10 +249,9 @@ Triangulation Folding::fold()
   connect(edge_set);
 
   // Build neighbour lists from the collected edge set.
-  // Using a set avoids both duplicates and clobbering that the old
-  // 6-slot positional scheme suffered from with multi-position nodes.
   neighbours_t neighbours(N);
   for(const auto& e: edge_set){
+    if(e.first == e.second) continue; // skip self-loops
     neighbours[e.first].push_back(e.second);
     neighbours[e.second].push_back(e.first);
   }

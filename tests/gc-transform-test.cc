@@ -84,9 +84,7 @@ TEST_F(GCTransformTest, HalmaTriangleCount) {
 
 // --- Chiral (l!=0, unfold/fold path) tests ---
 
-// Node count tests pass: the fold identifies nodes correctly.
-// GC(1,1) has a pre-existing identify_nodes bug for T=3.
-TEST_F(GCTransformTest, DISABLED_ChiralNodeCount_1_1) {
+TEST_F(GCTransformTest, ChiralNodeCount_1_1) {
   Triangulation result = C20dual.GCtransform(1, 1);
   EXPECT_EQ(result.N, expected_gc_nodes(V0, E0, F0, 1, 1));
 }
@@ -101,19 +99,25 @@ TEST_F(GCTransformTest, ChiralNodeCount_3_1) {
   EXPECT_EQ(result.N, expected_gc_nodes(V0, E0, F0, 3, 1));
 }
 
-// Connectivity/degree tests: pre-existing bug in fold scan-conversion
-// boundary handling. The scanline rasterization produces asymmetric edge
-// counts across the three Eisenstein rotations (80/66/51 instead of 70/70/70
-// for GC(2,1)). Needs a redesign of connect_polygon/connect_cross.
-TEST_F(GCTransformTest, DISABLED_ChiralDegreePreservation_2_1) {
+TEST_F(GCTransformTest, ChiralDegreePreservation_1_1) {
+  Triangulation result = C20dual.GCtransform(1, 1);
+  check_degree_preservation(result);
+}
+
+TEST_F(GCTransformTest, ChiralDegreePreservation_2_1) {
   Triangulation result = C20dual.GCtransform(2, 1);
   check_degree_preservation(result);
 }
 
-TEST_F(GCTransformTest, DISABLED_ChiralConnectivity_2_1) {
+TEST_F(GCTransformTest, ChiralConnectivity_2_1) {
   Triangulation result = C20dual.GCtransform(2, 1);
   vector<vector<node_t>> components = result.connected_components();
   EXPECT_EQ(components.size(), 1u);
+}
+
+TEST_F(GCTransformTest, ChiralDegreePreservation_3_1) {
+  Triangulation result = C20dual.GCtransform(3, 1);
+  check_degree_preservation(result);
 }
 
 // --- Unfold/fold infrastructure tests ---
