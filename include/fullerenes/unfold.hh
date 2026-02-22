@@ -170,7 +170,7 @@ public:
       tie(xu,xv) = kv.second;
 
       grid[xu]         = u;
-      grid.nextid = grid.nextid>=u? grid.nextid : (u+1);
+      if((size_t)(u+1) > grid.nextid) grid.nextid = u+1;
     }
 
     // Build node id -> Eisenstein coordinate lookup table

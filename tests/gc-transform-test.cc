@@ -249,3 +249,51 @@ TEST_F(C28GCTest, Chiral_2_1_NodeCount) {
   Triangulation result = C28dual.GCtransform(2, 1);
   EXPECT_EQ(result.N, expected_gc_nodes(V0, E0, F0, 2, 1));
 }
+
+// ===== Multi-isomer GC tests =====
+
+struct IsomerSpec {
+  const char* name;
+  vector<int> spiral;
+  // Derived: V = spiral.size(), E = 3V-6, F = 2V-4
+};
+
+static const IsomerSpec test_isomers[] = {
+  {"C42-1", {5,5,5,5,6,6,5,6,6,6,6,5,6,6,5,6,5,5,6,5,6,5,5}},
+  {"C42-2", {5,5,5,6,5,6,5,6,6,5,6,6,6,6,5,6,5,6,5,5,6,5,5}},
+  {"C44-1", {5,5,5,6,5,6,6,6,6,5,6,6,6,5,5,6,5,6,5,5,6,5,6,5}},
+  {"C44-2", {5,5,5,6,5,6,6,6,6,6,5,6,6,5,5,6,5,5,6,5,5,6,5,6}},
+  {"C52",   {5,5,5,6,6,6,6,6,6,5,6,6,5,6,6,6,5,5,6,6,5,5,6,5,5,6,6,5}},
+};
+
+TEST(MultiIsomerGCTest, HalmaNodeCount) {
+  for(const auto& iso : test_isomers) {
+    SCOPED_TRACE(iso.name);
+    int V = iso.spiral.size(), E = 3*V - 6, F = 2*V - 4;
+    Triangulation dual(vector<int>(iso.spiral));
+
+    EXPECT_EQ(dual.N, V);
+
+    for(int k : {2, 3}) {
+      SCOPED_TRACE("GC(" + to_string(k) + ",0)");
+      Triangulation result = dual.GCtransform(k, 0);
+      EXPECT_EQ(result.N, expected_gc_nodes(V, E, F, k, 0));
+      check_degree_preservation(result);
+    }
+  }
+}
+
+TEST(MultiIsomerGCTest, ChiralNodeCount) {
+  for(const auto& iso : test_isomers) {
+    SCOPED_TRACE(iso.name);
+    int V = iso.spiral.size(), E = 3*V - 6, F = 2*V - 4;
+    Triangulation dual(vector<int>(iso.spiral));
+
+    for(auto [k, l] : vector<pair<int,int>>{{1,1}, {2,1}, {3,1}}) {
+      SCOPED_TRACE("GC(" + to_string(k) + "," + to_string(l) + ")");
+      Triangulation result = dual.GCtransform(k, l);
+      EXPECT_EQ(result.N, expected_gc_nodes(V, E, F, k, l));
+      check_degree_preservation(result);
+    }
+  }
+}
