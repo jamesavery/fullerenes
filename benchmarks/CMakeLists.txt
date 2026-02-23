@@ -1,3 +1,8 @@
+add_executable(gc-benchmark gc-benchmark.cc)
+target_link_libraries(gc-benchmark fullerenes)
+
+add_executable(gc-spirals gc-spirals.cc)
+target_link_libraries(gc-spirals fullerenes)
 
 link_libraries(fortran_opt fullerenes ${SYCL_FULLERENE_LIBS})
 add_executable(fullerene-optimize-seq fullerene-optimize-seq.cc)
