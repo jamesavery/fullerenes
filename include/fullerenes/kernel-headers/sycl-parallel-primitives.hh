@@ -403,126 +403,47 @@ struct FloatEqual{
     FloatEqual(float eps) : eps(eps) {}
 
     template <typename T>
-    constexpr inline bool operator()(const T& x, const T& y) const 
-    {
+    constexpr inline bool operator()(const T& x, const T& y) const {
         T diff = std::abs(x - y);
         T max_v = std::max(std::abs(x), std::abs(y));
-        return (std::abs(x - y) / (max_v > eps ? max_v : 1)) < eps;
+        return (diff / (max_v > eps ? max_v : 1)) < eps;
     }
 };
 
-namespace primitives{
-    //exclusive_scan
-    template <typename InputContainer, typename OutputContainer, typename Init, typename BinaryOp = Plus>
-    __attribute__((noinline)) inline void exclusive_scan(SyclQueue& Q, InputContainer&& in_vec, OutputContainer&& out_vec, Init init = Init{}, BinaryOp op = BinaryOp{});
-
-    //transform_exclusive_scan
-    template <typename InputContainer, typename OutputContainer, typename Init, typename BinaryOp = Plus, typename UnaryOp = Identity>
-    __attribute__((noinline)) inline void transform_exclusive_scan(SyclQueue& Q, InputContainer&& in_vec, OutputContainer&& out_vec, Init init = Init{}, BinaryOp op = BinaryOp{}, UnaryOp f = UnaryOp{});
-
-    //transform_exclusive_scan
-    template <typename InputContainer1, typename InputContainer2, typename OutputContainer, typename Init, typename ReduceOp, typename TransformOp>
-    __attribute__((noinline)) inline void transform_exclusive_scan(SyclQueue& Q, InputContainer1&& in_vec1, InputContainer2&& in_vec2, OutputContainer&& out_vec, Init init = Init{}, ReduceOp reduce_op = ReduceOp{}, TransformOp transform_op = TransformOp{});
-
-    //inclusive_scan
-    template <typename InputContainer, typename OutputContainer, typename Init, typename BinaryOp = Plus>
-    __attribute__((noinline)) inline void inclusive_scan(SyclQueue& Q, InputContainer&& in_vec, OutputContainer&& out_vec, Init init = Init{}, BinaryOp op = BinaryOp{});
-
-    //transform_inclusive_scan
-    template <typename InputContainer, typename OutputContainer, typename Init, typename BinaryOp = Plus, typename UnaryOp = Identity>
-    __attribute__((noinline)) inline void transform_inclusive_scan(SyclQueue& Q, InputContainer&& in_vec, OutputContainer&& out_vec, Init init = Init{}, BinaryOp op = BinaryOp{}, UnaryOp f = UnaryOp{});
-
-    //transform_inclusive_scan
-    template <typename InputContainer1, typename InputContainer2, typename OutputContainer, typename Init, typename ReduceOp, typename TransformOp>
-    __attribute__((noinline)) inline void transform_inclusive_scan(SyclQueue& Q, InputContainer1&& in_vec1, InputContainer2&& in_vec2, OutputContainer&& out_vec, Init init = Init{}, ReduceOp reduce_op = ReduceOp{}, TransformOp transform_op = TransformOp{});
-
-    //transform
-    template <typename InputContainer, typename OutputContainer, typename UnaryOp = Identity>
-    __attribute__((noinline)) inline void transform(SyclQueue& Q, InputContainer&& in_vec, OutputContainer&& out_vec, UnaryOp f = UnaryOp{});
-
-    //transform
-    template <typename InputContainer1, typename InputContainer2, typename OutputContainer, typename BinaryOp>
-    __attribute__((noinline)) inline void transform(SyclQueue& Q, InputContainer1&& in_vec1, InputContainer2&& in_vec2, OutputContainer&& out_vec, BinaryOp op = BinaryOp{});
-
-    //reduce
-    template <typename InputContainer, typename Init, typename BinaryOp = Plus>
-    __attribute__((noinline)) inline auto reduce(SyclQueue& Q, InputContainer&& in_vec, Init init = Init{}, BinaryOp op = BinaryOp{}) -> decltype(init);
-
-    //transform_reduce
-    template <typename InputContainer, typename Init, typename BinaryOp = Plus, typename UnaryOp = Identity>
-    __attribute__((noinline)) inline auto transform_reduce(SyclQueue& Q, InputContainer&& in_vec, Init init = Init{}, BinaryOp op = BinaryOp{}, UnaryOp f = UnaryOp{}) -> decltype(init);
-    
-    //transform_reduce
-    template <typename InputContainer1, typename InputContainer2, typename Init, typename ReduceOp, typename TransformOp>
-    __attribute__((noinline)) inline auto transform_reduce(SyclQueue& Q, InputContainer1&& in_vec1, InputContainer2&& in_vec2, Init init = Init{}, ReduceOp reduce_op = ReduceOp{}, TransformOp transform_op = TransformOp{}) -> decltype(init);
-    
-    //any_of
-    template <typename InputContainer, typename Predicate = IsTrue>
-    __attribute__((noinline)) inline bool any_of(SyclQueue& Q, InputContainer&& in_vec, Predicate f = Predicate{});
-
-    //all_of
-    template <typename InputContainer, typename Predicate = IsTrue>
-    __attribute__((noinline)) inline bool all_of(SyclQueue& Q, InputContainer&& in_vec, Predicate f = Predicate{});
-
-    //none_of
-    template <typename InputContainer, typename Predicate = IsTrue>
-    __attribute__((noinline)) inline bool none_of(SyclQueue& Q, InputContainer&& in_vec, Predicate f = Predicate{});
-    
-    //for_each
-    template <typename InputContainer, typename Function>
-    __attribute__((noinline)) inline void for_each(SyclQueue& Q, InputContainer&& in_vec, Function f);
-
-    //for_each_n
-    template <typename InputContainer, typename Function>
-    __attribute__((noinline)) inline void for_each_n(SyclQueue& Q, InputContainer&& in_vec, size_t n, Function f);
-
-    //count
-    template <typename InputContainer, typename T>
-    __attribute__((noinline)) inline size_t count(SyclQueue& Q, InputContainer&& in_vec, T value);
-
-    //count_if
-    template <typename InputContainer, typename Predicate = AlwaysTrue>
-    __attribute__((noinline)) inline size_t count_if(SyclQueue& Q, InputContainer&& in_vec, Predicate f = Predicate{});
-    
-    //copy_if
-    template <typename InputContainer, typename OutputContainer, typename Predicate = AlwaysTrue>
-    __attribute__((noinline)) inline void copy_if(SyclQueue& Q, InputContainer&& in_vec, OutputContainer&& out_vec, Predicate f = Predicate{});
-
-    //copy
-    template <typename InputContainer, typename OutputContainer>
-    __attribute__((noinline)) inline void copy(SyclQueue& Q, InputContainer&& in_vec, OutputContainer&& out_vec);
-
-    //copy_n
-    template <typename InputContainer, typename OutputContainer>
-    __attribute__((noinline)) inline void copy_n(SyclQueue& Q, InputContainer&& in_vec, size_t n, OutputContainer&& out_vec);
-
-    //fill
-    template <typename InputContainer, typename T>
-    __attribute__((noinline)) inline void fill(SyclQueue& Q, InputContainer&& in_vec, T value);
-
-    //sort
-    template <typename InputContainer, typename BinaryPredicate = LessEqual>
-    __attribute__((noinline)) inline void sort(SyclQueue& Q, InputContainer&& in_vec, BinaryPredicate f = BinaryPredicate{});
-
-    //iota
-    template <typename InputContainer, typename T>
-    __attribute__((noinline)) inline void iota(SyclQueue& Q, InputContainer&& in_vec, T value);
-
-    //OneAPI Algorithms:
-
-
-    //inclusive_scan_by_segment
-    template <typename InputKeys, typename InputValues, typename OutputValues, typename BinaryPredicate = Equal, typename BinaryOp = Plus>
-    __attribute__((noinline)) inline void inclusive_scan_by_segment(SyclQueue& Q, InputKeys&& keys, InputValues&& values, OutputValues&& out_values, BinaryPredicate pred = BinaryPredicate{}, BinaryOp op = BinaryOp{});
-
-    //exclusive_scan_by_segment
-    template <typename InputKeys, typename InputValues, typename OutputValues, typename BinaryPredicate = Equal, typename BinaryOp = Plus>
-    __attribute__((noinline)) inline void exclusive_scan_by_segment(SyclQueue& Q, InputKeys&& keys, InputValues&& values, OutputValues&& out_values, BinaryPredicate pred = BinaryPredicate{}, BinaryOp op = BinaryOp{});
-
-    //reduce_by_segment
+namespace primitives {
+    // Segmented algorithms retained during std::algorithm migration.
     template <typename InputKeys, typename InputValues, typename OutputKeys, typename OutputValues, typename BinaryPredicate = Equal, typename BinaryOp = Plus>
-    __attribute__((noinline)) inline void reduce_by_segment(SyclQueue& Q, InputKeys&& keys, InputValues&& values, OutputKeys&& out_keys, OutputValues&& out_values, BinaryPredicate pred = BinaryPredicate{}, BinaryOp op = BinaryOp{});
+    inline void reduce_by_segment(SyclQueue& Q, InputKeys&& keys, InputValues&& values, OutputKeys&& out_keys, OutputValues&& out_values, BinaryPredicate pred = BinaryPredicate{}, BinaryOp op = BinaryOp{}) {
+        (void)Q;
+        auto k_it = keys.begin();
+        auto v_it = values.begin();
+        auto k_end = keys.end();
+        auto ok_it = out_keys.begin();
+        auto ov_it = out_values.begin();
 
+        if (k_it == k_end) {
+            return;
+        }
 
+        auto current_key = *k_it;
+        auto accumulated = *v_it;
+        ++k_it;
+        ++v_it;
 
+        while (k_it != k_end) {
+            if (!pred(*k_it, current_key)) {
+                *ok_it++ = current_key;
+                *ov_it++ = accumulated;
+                current_key = *k_it;
+                accumulated = *v_it;
+            } else {
+                accumulated = op(accumulated, *v_it);
+            }
+            ++k_it;
+            ++v_it;
+        }
+
+        *ok_it = current_key;
+        *ov_it = accumulated;
+    }
 }
