@@ -8,11 +8,8 @@ set(SYCL_EXECUTABLES
 )
 
 foreach(EXECUTABLE ${SYCL_EXECUTABLES})
-  set_source_files_properties(${EXECUTABLE}.cc PROPERTIES COMPILE_FLAGS "${DPCPP_FLAGS}")    
-endforeach()
-  
-foreach(EXECUTABLE ${SYCL_EXECUTABLES})
   add_executable(${EXECUTABLE} ${EXECUTABLE}.cc)  
-  target_include_directories(${EXECUTABLE} PRIVATE ${DPCPP_INCLUDE} ${DPCPP_INCLUDE}/sycl)
-  target_link_libraries(${EXECUTABLE} PRIVATE ${SYCL_FULLERENE_LIBS} sycl fullerenes)
+  target_compile_options(${EXECUTABLE} PRIVATE ${SYCL_FLAGS})
+  target_link_options(${EXECUTABLE} PRIVATE ${SYCL_FLAGS})
+  target_link_libraries(${EXECUTABLE} PRIVATE ${SYCL_FULLERENE_LIBS} ${SYCL_RUNTIME_LIBS} fullerenes)
 endforeach()
