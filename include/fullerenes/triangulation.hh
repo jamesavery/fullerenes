@@ -72,11 +72,12 @@ public:
   bool get_spiral(const node_t f1, const node_t f2, const node_t f3, vector<int>& v, jumplist_t& j, vector<node_t>& permutation, const bool general=true) const;
 
 
-  // Get canonical general spiral and permutation of nodes compared to current triangulation
-  bool get_spiral(vector<int>& v, jumplist_t& j, vector<vector<node_t>> &permutations, const bool only_rarest_special=true, const bool general=true) const;  
+  // Get canonical general spiral and permutation of nodes compared to current triangulation.
+  // CW_only=true restricts to CW starting triples so orientation is preserved through windup round-trip.
+  bool get_spiral(vector<int>& v, jumplist_t& j, vector<vector<node_t>> &permutations, const bool only_rarest_special=true, const bool general=true, const bool CW_only=false) const;
   // Get canonical general spiral
-  bool get_spiral(vector<int>& v, jumplist_t& j, const bool rarest_start=true, const bool general=true) const;
-  general_spiral get_general_spiral(const bool rarest_start=true) const;
+  bool get_spiral(vector<int>& v, jumplist_t& j, const bool rarest_start=true, const bool general=true, const bool CW_only=false) const;
+  general_spiral get_general_spiral(const bool rarest_start=true, const bool CW_only=false) const;
 
   void get_all_spirals(vector< vector<int> >& spirals, vector<jumplist_t>& jumps,
 		       vector<vector<node_t>>& permutations,

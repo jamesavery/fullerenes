@@ -756,24 +756,24 @@ void Triangulation::get_all_spirals(vector<vector<int>>& spirals, vector<jumplis
 }
 
 
-bool Triangulation::get_spiral(vector<int>& spiral, jumplist_t& jumps, const bool only_rarest_special, const bool general) const
+bool Triangulation::get_spiral(vector<int>& spiral, jumplist_t& jumps, const bool only_rarest_special, const bool general, const bool CW_only) const
 {
   vector<vector<node_t>> permutations;
-  bool success = get_spiral(spiral,jumps,permutations,only_rarest_special,general);
+  bool success = get_spiral(spiral,jumps,permutations,only_rarest_special,general,CW_only);
   return success;
 }
 
-general_spiral Triangulation::get_general_spiral(const bool only_rarest_special) const
+general_spiral Triangulation::get_general_spiral(const bool only_rarest_special, const bool CW_only) const
 {
   general_spiral gs;
-  bool success = get_spiral(gs.spiral_code,gs.jumps,only_rarest_special,true);
+  bool success = get_spiral(gs.spiral_code,gs.jumps,only_rarest_special,true,CW_only);
   assert(success); 		// General spirals should *always* succeed
   return gs;
 }
 
 // perform the canonical general spiral search and the spiral and the jump positions + their length
 // special_only is a switch to search for spirals starting at non-hexagons only
-bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, vector<vector<node_t>>& permutations, const bool only_rarest_special, const bool general) const
+bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, vector<vector<node_t>>& permutations, const bool only_rarest_special, const bool general, const bool CW_only) const
 {
   permutations.clear();
   vector<node_t> node_starts;
@@ -819,11 +819,18 @@ bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, vector<ve
 
     // Get regular spiral if it exists
     for(node_t v: neighbours[u]){
+      int n_tries;
       node_t w[2];
-      w[0] = prev(v,u);
-      w[1] = next(v,u);
+      if(CW_only){
+        w[0] = prev(u,v);  // CW: prev(f1,f2)==f3
+        n_tries = 1;
+      } else {
+        w[0] = prev(v,u);
+        w[1] = next(v,u);
+        n_tries = 2;
+      }
 
-      for(int k=0;k<2;k++){        // Looks like O(N^3), is O(N) (or O(1) if only_rarest_special is set)
+      for(int k=0;k<n_tries;k++){        // Looks like O(N^3), is O(N) (or O(1) if only_rarest_special is set)
         // NB: general -> false to only do general if all originals fail
         //     That's much faster on average, but gives bigger variation in times.
         if(!get_spiral(u,v,w[k],spiral_tmp,jumps_tmp,permutation_tmp,false))
@@ -836,7 +843,7 @@ bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, vector<ve
           jumps       = jumps_tmp;
           spiral      = spiral_tmp;
           permutations.clear();
-        } 
+        }
         permutations.push_back(permutation_tmp);
       }
     }
@@ -847,13 +854,20 @@ bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, vector<ve
     for(int i=0; i<node_starts.size(); i++){
       const node_t u=node_starts[i];
 
-      // Get regular spiral if it exists
+      // Get general spiral
       for(node_t v: neighbours[u]){
+          int n_tries;
           node_t w[2];
-          w[0] = prev(v,u);
-          w[1] = next(v,u);
+          if(CW_only){
+            w[0] = prev(u,v);  // CW: prev(f1,f2)==f3
+            n_tries = 1;
+          } else {
+            w[0] = prev(v,u);
+            w[1] = next(v,u);
+            n_tries = 2;
+          }
 
-        for(int k=0;k<2;k++){        // Looks like O(N^3), is O(N) (or O(1) if only_rarest_special is set)
+        for(int k=0;k<n_tries;k++){        // Looks like O(N^3), is O(N) (or O(1) if only_rarest_special is set)
           if(!get_spiral(u,v,w[k],spiral_tmp,jumps_tmp,permutation_tmp,true)){
             cerr << "General spiral failed -- this should never happen!\n";
             abort();
@@ -867,7 +881,7 @@ bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, vector<ve
             spiral      = spiral_tmp;
             permutations.clear();
           } else {
-           //    cerr << general_spiral{jumps_tmp,spiral_tmp} << " >= " << general_spiral{jumps,spiral} << "\n";    
+           //    cerr << general_spiral{jumps_tmp,spiral_tmp} << " >= " << general_spiral{jumps,spiral} << "\n";
           }
           permutations.push_back(permutation_tmp);
         }
