@@ -427,19 +427,14 @@ Triangulation Triangulation::GCtransform(const unsigned k, const unsigned l) con
    return t;
 }
 
-// TODO: Get rid of maps, edge-sets, etc. Simplify and make faster.
-//       Keep orientation.
 Triangulation Triangulation::halma_transform(int m) const {
   if(m<0) return Triangulation(*this);
 
-  map<arc_t,vector<node_t> > arc_nodes;
-
-  set<edge_t> edgeset_new;
+  map<arc_t,vector<node_t>> arc_nodes;
   node_t v_new = N;
 
   // Create m new vertices for each edge, stored in both directions
   vector<edge_t> dual_edges = undirected_edges();
-
   for(const auto &e: dual_edges){
     vector<node_t> nodes;
     for(unsigned int i=0;i<m;i++) nodes.push_back(v_new++);
@@ -447,40 +442,84 @@ Triangulation Triangulation::halma_transform(int m) const {
     arc_nodes[{e.second, e.first}] = vector<node_t>(nodes.rbegin(), nodes.rend());
   }
 
-  // For every triangle in the dual, we create and connect a halma-type grid
-  for(size_t i=0;i<triangles.size();i++){
-    map<edge_t,node_t> grid;
-    const face_t& T(triangles[i]);
-    arc_t a0(T[0],T[1]),a1(T[1],T[2]),a2(T[0],T[2]);
-    const vector<node_t>& ns0(arc_nodes[a0]), ns1(arc_nodes[a1]), ns2(arc_nodes[a2]);
-    // Insert original vertices
+  // Build per-face halma grids and create interior nodes.
+  int n_faces = triangles.size();
+  vector<map<edge_t,node_t>> face_grid(n_faces);
+
+  for(int i = 0; i < n_faces; i++){
+    auto& grid = face_grid[i];
+    const face_t& T = triangles[i];
+    const vector<node_t>& ns0(arc_nodes[{T[0],T[1]}]);
+    const vector<node_t>& ns1(arc_nodes[{T[1],T[2]}]);
+    const vector<node_t>& ns2(arc_nodes[{T[0],T[2]}]);
+
     grid[edge_t(0,0)]     = T[0];
     grid[edge_t(m+1,0)]   = T[1];
     grid[edge_t(m+1,m+1)] = T[2];
-    // Insert new edge vertices
-    for(size_t j=0;j<m;j++){
+    for(int j=0;j<m;j++){
       grid[edge_t(0,j+1)]   = ns0[j];
       grid[edge_t(j+1,m+1)] = ns1[j];
       grid[edge_t(j+1,j+1)] = ns2[j];
     }
-    // Create and insert inner vertices
     for(int j=1;j<m;j++)
       for(int k=j+1;k<=m;k++)
         grid[edge_t(j,k)] = v_new++;
+  }
 
-    // Connect the vertices in the grid
+  node_t N_new = v_new;
+
+  // Build next_on_face map from micro-triangles.
+  // Each original face is subdivided into up-triangles and down-triangles.
+  // Both types inherit the original face's consistent winding.
+  // nof[{u,v}] = w means: in the face (u,v,w), w is the CW successor
+  // of v in u's neighbour list.
+  map<arc_t, node_t> nof;
+  vector<node_t> first_nb(N_new, -1);
+
+  for(int i = 0; i < n_faces; i++){
+    const auto& grid = face_grid[i];
+
+    // Up-triangles: face (v, left, dn)
     for(int j=0;j<=m;j++)
       for(int k=j+1;k<=m+1;k++){
-        node_t v(grid[edge_t(j,k)]), down(grid[edge_t(j+1,k)]),
-          left(grid[edge_t(j,k-1)]);
+        node_t v    = grid.at(edge_t(j,k));
+        node_t left = grid.at(edge_t(j,k-1));
+        node_t dn   = grid.at(edge_t(j+1,k));
 
-        edgeset_new.insert(edge_t(v,down));
-        edgeset_new.insert(edge_t(v,left));
-        edgeset_new.insert(edge_t(left,down));
+        nof[{v,left}]  = dn;
+        nof[{left,dn}] = v;
+        nof[{dn,v}]    = left;
+
+        if(first_nb[v]    < 0) first_nb[v]    = left;
+        if(first_nb[left] < 0) first_nb[left] = dn;
+        if(first_nb[dn]   < 0) first_nb[dn]   = v;
+      }
+
+    // Down-triangles: face (v, dn, dnr)
+    for(int j=0;j<m;j++)
+      for(int k=j+1;k<=m;k++){
+        node_t v   = grid.at(edge_t(j,k));
+        node_t dn  = grid.at(edge_t(j+1,k));
+        node_t dnr = grid.at(edge_t(j+1,k+1));
+
+        nof[{v,dn}]   = dnr;
+        nof[{dn,dnr}] = v;
+        nof[{dnr,v}]  = dn;
       }
   }
 
-  return Triangulation(Graph(edgeset_new),false);
+  // Build CW neighbour lists by chaining next_on_face.
+  neighbours_t neighbours(N_new);
+  for(node_t u = 0; u < N_new; u++){
+    node_t v = first_nb[u];
+    node_t w = v;
+    do {
+      neighbours[u].push_back(w);
+      w = nof.at({u,w});
+    } while(w != v);
+  }
+
+  return Triangulation(neighbours, true);
 }
 
 
