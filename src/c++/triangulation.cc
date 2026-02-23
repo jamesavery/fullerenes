@@ -281,10 +281,12 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
   // cerr << "J: " << j << endl;
   // cerr << "N: " << N << endl;
 
-  // open_valencies is a list with one entry per node that has been added to
+  // open_valencies is a deque with one entry per node that has been added to
   // the spiral but is not fully saturated yet.  The entry contains the number
   // of the node and the number of open valencies
-  list<pair<node_t,int> > open_valencies;
+  int max_boundary = static_cast<int>(12 * sqrt(N)) + 20;
+  vector<pair<node_t,int>> boundary_buf(max_boundary);
+  Deque<pair<node_t,int>> open_valencies(boundary_buf);
 
   // set up first two nodes
   open_valencies.push_back(make_pair(0,spiral_string[0]-1));
@@ -326,7 +328,7 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
 
     // connect k and <last>
     auto connect_backward = [&](const node_t suc_uv){
-      const node_t suc_vu = std::prev(open_valencies.end(), 2)->first; // second to last node in open_valencies
+      const node_t suc_vu = open_valencies.back(1).first; // second to last node in open_valencies
       insert_edge({k,open_valencies.back().first}, suc_uv, suc_vu);
       --open_valencies.back().second;
       ++pre_used_valencies;
@@ -369,9 +371,9 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
           cerr << "something's b0rked" << endl;
           abort();
         }
-        for(auto ov: open_valencies){
-          if(ov.second != 0){
-            cerr << ov << endl;
+        for(int i = 0; i < open_valencies.size(); i++){
+          if(open_valencies.front(i).second != 0){
+            cerr << open_valencies.front(i) << endl;
             cerr << "something's b0rked" << endl;
             abort();
           }
@@ -391,8 +393,8 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
       cerr << "Incomplete triangulation = " << *this << "\n";
       abort();
     }
-    for(list<pair<node_t,int> >::iterator it = open_valencies.begin(); it!=open_valencies.end(); ++it){
-      if(it->second!=1){
+    for(int i = 0; i < open_valencies.size(); i++){
+      if(open_valencies.front(i).second!=1){
         cerr << "Cage not closed but no faces left (or otherwise invalid spiral), more than one valency left for at least one face" << endl;
       abort();
       }
@@ -401,7 +403,7 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
     // add remaining edges, we don't care about the valency list at this stage
     // get a vector of nodes of the final hole, for easier orientation
     vector<node_t> last_nodes;
-    for(auto n: open_valencies) last_nodes.push_back(n.first);
+    for(int i = 0; i < open_valencies.size(); i++) last_nodes.push_back(open_valencies.front(i).first);
     for(int i=0; i<spiral_string.back(); ++i){
       const node_t suc_uv=last_nodes[(i+1)%last_nodes.size()];
       const node_t suc_vu=last_nodes[(i-1+last_nodes.size())%last_nodes.size()];
@@ -562,7 +564,8 @@ void remove_node(const node_t u, Graph &remaining_graph){
 // TODO: return GSpiral
 bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, const node_t f3, vector<int> &spiral,
                                               jumplist_t& jumps, vector<node_t> &permutation,
-                                              const bool general, const vector<int>& S0, const jumplist_t &J0) const {
+                                              const bool general, const vector<int>& S0, const jumplist_t &J0,
+                                              std::span<pair<node_t,int>> boundary_buf) const {
   // TODO: If S0 and J0 are specified, we are finding symmetry group permutations and should follow (S0,J0).
   //       Currently J0 is ignored, but J0 should control jumps in this case.
 
@@ -579,10 +582,16 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
   vector<int> valencies(N, 0); // valencies is the N-tuple consisting of the valencies for each node
   int last_vertex=-1; // we'd like to know the number of the last vertex
 
-  // open_valencies is a list with one entry per node that has been added to
+  // open_valencies is a deque with one entry per node that has been added to
   // the spiral but is not fully saturated yet.  The entry contains the number
   // of the node and the number of open valencies
-  list<pair<node_t,int> > open_valencies;
+  vector<pair<node_t,int>> local_buf;
+  if(boundary_buf.empty()){
+    int max_boundary = static_cast<int>(12 * sqrt(N)) + 20;
+    local_buf.resize(max_boundary);
+    boundary_buf = local_buf;
+  }
+  Deque<pair<node_t,int>> open_valencies(boundary_buf);
 
   int pre_used_valencies=0; // number of valencies removed from the last vertex *before* it is added to the spiral
   int jump_state=0; // the number of cyclic shifts of length 1 in the current series.
@@ -708,8 +717,8 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
     // cerr << "wrong number of nodes with open valencies: " << open_valencies.size() << " ... exiting." << endl;
     return false;
   }
-  for(list<pair<node_t,int> >::const_iterator it=open_valencies.begin(); it!=open_valencies.end(); ++it){
-    if(it->second != 1){
+  for(int i = 0; i < open_valencies.size(); i++){
+    if(open_valencies.front(i).second != 1){
       // cerr << "number of open valencies is not 1 (but it should be) ... exiting." << endl;
       return false;
     }
@@ -810,8 +819,12 @@ bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, vector<ve
   spiral = vector<int>(1,INT_MAX); // so it gets overwritten
   jumps = jumplist_t(100,make_pair(0,0)); // so it gets overwritten
 
+  // Pre-allocate boundary buffer for get_spiral_implementation (reused across all attempts)
+  int max_boundary = static_cast<int>(12 * sqrt(N)) + 20;
+  vector<pair<node_t,int>> boundary_buf(max_boundary);
+
   //cerr << "spiralstarts = " << node_starts << ";\n";
-  
+
   // TODO: Write this way neater.
   bool found_one = false;
   for(int i=0; i<node_starts.size(); i++){
@@ -833,7 +846,7 @@ bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, vector<ve
       for(int k=0;k<n_tries;k++){        // Looks like O(N^3), is O(N) (or O(1) if only_rarest_special is set)
         // NB: general -> false to only do general if all originals fail
         //     That's much faster on average, but gives bigger variation in times.
-        if(!get_spiral(u,v,w[k],spiral_tmp,jumps_tmp,permutation_tmp,false))
+        if(!get_spiral_implementation(u,v,w[k],spiral_tmp,jumps_tmp,permutation_tmp,false,{},{},boundary_buf))
           continue;
 
         found_one = true;
@@ -868,7 +881,7 @@ bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, vector<ve
           }
 
         for(int k=0;k<n_tries;k++){        // Looks like O(N^3), is O(N) (or O(1) if only_rarest_special is set)
-          if(!get_spiral(u,v,w[k],spiral_tmp,jumps_tmp,permutation_tmp,true)){
+          if(!get_spiral_implementation(u,v,w[k],spiral_tmp,jumps_tmp,permutation_tmp,true,{},{},boundary_buf)){
             cerr << "General spiral failed -- this should never happen!\n";
             abort();
           }

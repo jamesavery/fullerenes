@@ -18,7 +18,8 @@ void Unfolding::unfold(const Triangulation& T, arc_t first_arc)
 {
   size_t Nf = T.N, N = 2*(Nf-2);
 
-  Deque<arc_t> arc_queue(6*N);  
+  vector<arc_t> arc_queue_buf(6*N);
+  Deque<arc_t> arc_queue(arc_queue_buf);
   // auto stay_close_to_center =
   //   [&](arc_t uv, arc_t st) {
   //     Eisenstein ux, vx, sx, tx;

@@ -225,7 +225,8 @@ SyclEvent spherical_projection(SyclQueue& Q, FullereneBatchView<T,K>& batch){
 template <typename K>
 void multiple_source_shortest_paths(const Span<std::array<K,3>> neighbours, const std::vector<K>& sources, Span<K> distances, const unsigned int max_depth = INT_MAX)
 {
-    Deque<K> queue(neighbours.size());
+    std::vector<K> queue_buf(neighbours.size());
+    Deque<K> queue(queue_buf);
         
     for(K s: sources){
         distances[s] = 0;

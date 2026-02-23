@@ -248,7 +248,8 @@ vector<vector<node_t>> Graph::connected_components() const
 
 void Graph::single_source_shortest_paths(node_t source, int *distances, size_t max_depth) const
 {
-  Deque<node_t> queue(N);
+  vector<node_t> queue_buf(N);
+  Deque<node_t> queue(queue_buf);
   for(int u=0;u<N;u++) distances[u] = INT_MAX;
   
   distances[source] = 0;
@@ -272,7 +273,8 @@ void Graph::single_source_shortest_paths(node_t source, int *distances, size_t m
 matrix<int> Graph::all_pairs_shortest_paths(const unsigned int max_depth) const
 {
   matrix<int>   d(N,N,INT_MAX);
-  Deque<node_t> queue(N);
+  vector<node_t> queue_buf(N);
+  Deque<node_t> queue(queue_buf);
 
   for(node_t u=0;u<N;u++){
     queue.push_back(u);    	// Enqueue source u
@@ -305,7 +307,8 @@ matrix<int> Graph::all_pairs_shortest_paths(const vector<node_t> &V,
   matrix<int> D(M,M,INT_MAX);
   vector<int> d(N);
 
-  Deque<node_t> queue(N);
+  vector<node_t> queue_buf(N);
+  Deque<node_t> queue(queue_buf);
 
   for(int i=0;i<M;i++){
     for(int j=0;j<N;j++) d[j] = INT_MAX; // Mark all nodes as unvisited    
@@ -404,7 +407,8 @@ vector<node_t> Graph::shortest_cycle(const vector<node_t>& prefix, const int max
 vector<int> Graph::multiple_source_shortest_paths(const vector<node_t>& sources, const unsigned int max_depth) const
 {
   vector<int>   distances(N,INT_MAX);
-  Deque<node_t> queue(N);
+  vector<node_t> queue_buf(N);
+  Deque<node_t> queue(queue_buf);
     
   for(node_t s: sources){
     distances[s] = 0;

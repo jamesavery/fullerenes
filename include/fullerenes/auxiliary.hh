@@ -10,6 +10,7 @@
 #include <assert.h>
 #include <unordered_map>
 #include <unordered_set>
+#include <span>
 
 extern char LIST_OPEN;
 extern char LIST_CLOSE;
@@ -311,52 +312,38 @@ template <typename T> vector<T> split(const string& parse_str, const string& del
 // Version of split that handles empty strings ("a;;b;c;" -> {"a","","b","c",""} in stead of {"a","b","c"}.
 template <> vector<string> split(const string& parse_str, const string& delimiters, const string wschars);
 
-// Fast double-ended queue implemented with cyclic buffer and possibility of look-ahead and look-back
-template<typename T> class Deque: public std::vector<T> {
+// Fast double-ended queue implemented as a cyclic buffer over caller-provided storage.
+// Supports look-ahead via front(offset) and look-back via back(offset).
+// Uses ever-increasing signed indices so size() = tail_ - head_ is always correct.
+template<typename T>
+class Deque {
+  std::span<T> buf_;
+  int head_ = 0, tail_ = 0;
+
+  int wrap(int i) const { int n = buf_.size(); return ((i % n) + n) % n; }
+
 public:
-  const size_t N;
-  size_t front_index, back_index;
-  bool   empty() const { return front_index==back_index; }
-  size_t size()  const { return back_index-front_index;  }
-  void   clear()       { front_index=back_index; }
-  
-  const T& front(size_t offset=0) const {
-    assert(!empty() && (offset<size()));
-    return (*this)[front_index+offset];
-  }
-  const T& back (size_t offset=0) const {
-    assert(!empty() && (offset<size()));
-    return (*this)[(back_index-1-offset+N)%N];
-  }
-  
-  T pop_front() {
-    assert(!empty());
-    T x((*this)[front_index]);
-    front_index = (front_index+1) % N;
-    return x;
-  }
-  T pop_back()  {
-    assert(!empty());
-    T x((*this)[(back_index-1+N)%N]);
-    back_index  = (back_index-1+N)% N;
-    return x;
-  }
+  Deque(std::span<T> buf) : buf_(buf) {}
 
-  void push_front(const T& x) {
-    (*this)[front_index] = x; front_index = (front_index-1+N) % N;
-    assert(!empty());		// Overflow-check
-  }
-  void push_back (const T& x) {
-    (*this)[back_index]  = x; back_index  = (back_index+1)    % N;
-    assert(!empty());		// Overflow-check
-  }
+  int  size()  const { return tail_ - head_; }
+  bool empty() const { return head_ == tail_; }
+  void clear()       { head_ = tail_; }
 
-  Deque(size_t max_length) : std::vector<T>(max_length), N(max_length), front_index(0), back_index(0) {}
+  T&       front(int offset = 0)       { assert(offset >= 0 && offset < size()); return buf_[wrap(head_ + offset)]; }
+  const T& front(int offset = 0) const { assert(offset >= 0 && offset < size()); return buf_[wrap(head_ + offset)]; }
+  T&       back(int offset = 0)        { assert(offset >= 0 && offset < size()); return buf_[wrap(tail_ - 1 - offset)]; }
+  const T& back(int offset = 0) const  { assert(offset >= 0 && offset < size()); return buf_[wrap(tail_ - 1 - offset)]; }
 
-  friend ostream& operator<<(ostream &s, const Deque q)
-  {
-    vector<T> contents(&q[q.front_index],&q[q.back_index]);
-    return (s << contents);
+  void push_back(const T& x)  { assert(size() < (int)buf_.size()); buf_[wrap(tail_++)] = x; }
+  void push_front(const T& x) { assert(size() < (int)buf_.size()); buf_[wrap(--head_)] = x; }
+  T pop_front() { assert(!empty()); return buf_[wrap(head_++)]; }
+  T pop_back()  { assert(!empty()); return buf_[wrap(--tail_)]; }
+
+  friend ostream& operator<<(ostream& s, const Deque& q) {
+    s << LIST_OPEN;
+    for(int i = 0; i < q.size(); i++) { if(i) s << ','; s << q.front(i); }
+    s << LIST_CLOSE;
+    return s;
   }
 };
 
