@@ -7,10 +7,16 @@
     #define DEVICE_CAST(x,ix) (reinterpret_cast<const sycl::device*>(x)[ix])
 #endif
 
-struct SyclEventImpl : public sycl::event{
-    using sycl::event::event;
+struct SyclEventImpl {
+    sycl::event event;
 
-    SyclEventImpl(sycl::event&& event) : sycl::event(event) {}
+    SyclEventImpl() = default;
+    SyclEventImpl(sycl::event event_) : event(std::move(event_)) {}
+
+    void wait() const { const_cast<sycl::event&>(event).wait(); }
+
+    operator sycl::event&() { return event; }
+    operator const sycl::event&() const { return event; }
 };
 
 SyclEvent::SyclEvent() : impl_(std::make_unique<SyclEventImpl>(sycl::event())) {}
@@ -79,7 +85,7 @@ SyclQueueImpl& SyclQueue::operator*() const {
 void SyclQueue::enqueue(SyclEvent& event) {
     if(event.impl_.get() == nullptr) return;
     impl_->submit([&](sycl::handler& h) { 
-        h.depends_on(static_cast<sycl::event>(*event));
+        h.depends_on(event.impl_->event);
     });
 }
 

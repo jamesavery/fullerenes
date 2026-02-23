@@ -1,5 +1,17 @@
 #include <sycl/sycl.hpp>
 #include <fullerenes/sycl-headers/sycl-span.hh>
+#include <cstdint>
+
+template <typename T>
+inline T deterministic_unit_random(uint32_t seed, uint32_t lane) {
+    uint32_t x = seed ^ (lane + 0x9e3779b9u + (seed << 6) + (seed >> 2));
+    x ^= x >> 16;
+    x *= 0x7feb352du;
+    x ^= x >> 15;
+    x *= 0x846ca68bu;
+    x ^= x >> 16;
+    return T(x) * (T(1.0) / T(4294967295.0));
+}
 
 template <typename T>
 void apply_all_reflections(const sycl::group<1> &cta, T* V, const int n, const int m, T* Q)
@@ -147,8 +159,6 @@ template <typename T, int N>
 void lanczos(sycl::group<1>& cta, Span<T> A, Span<T> X, Span<T> alphas, Span<T> betas, Span<T> Vspan){
     auto tid = cta.get_local_linear_id();
     T* V = Vspan.data() + tid;
-    oneapi::dpl::uniform_real_distribution<T> distr(0.0, 1.0);            
-    oneapi::dpl::minstd_rand engine(42, tid);
 
     //Assumes A is column major, gives the best access pattern
     auto mat_vect = [&](const T x){
@@ -180,7 +190,7 @@ void lanczos(sycl::group<1>& cta, Span<T> A, Span<T> X, Span<T> alphas, Span<T> 
         return result;
     };
 
-    auto v0 = (tid < N) ? distr(engine) : T(0);
+    auto v0 = (tid < N) ? deterministic_unit_random<T>(42u, static_cast<uint32_t>(tid)) : T(0);
     auto norm = sycl::sqrt(reduce_over_group(cta, v0 * v0, sycl::plus<T>{}));
     if (tid < N)  V[0*N] = v0 / norm;
     v0 = MGS(0);

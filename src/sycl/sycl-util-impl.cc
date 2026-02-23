@@ -3,12 +3,12 @@
 #include <fullerenes/sycl-headers/reference-wrapper.hh>
 #include <fullerenes/sycl-headers/sycl-fullerene.hh>
 #include <fullerenes/sycl-headers/sycl-fullerene-structs.hh>
-#include "primitives.cc"
 #include <unordered_map>
 #include <exception>
 #include <limits>
 #include <cstdint>
 #include <complex>
+#include <execution>
 #include "coord3d.cc"
 
 #ifndef DEVICE_CAST
@@ -316,14 +316,16 @@ if(dst_batch.N_ != src_batch.N_ || src_batch.Nf_ != dst_batch.Nf_) throw std::ru
     using float_t = std::decay_t<decltype(src_batch.d_.X_cubic_[0][0])>;
     bool replace_status = consumed_status != StatusEnum(0); //If consumed_status is not 0, we take that as instruction to replace the status of the copied fullerenes
     int_t init = 0;
-    primitives::transform_exclusive_scan(Q,
-        flags,
-        indices,
-        init,
-        Plus{},
-        [condition](auto f){return static_cast<int_t>(condition(f));}
-    );
     Q.wait();
+    std::transform_exclusive_scan(
+        std::execution::par_unseq,
+        flags.begin(),
+        flags.end(),
+        indices.begin(),
+        init,
+        std::plus<int_t>{},
+        [condition](auto f){ return static_cast<int_t>(condition(f)); }
+    );
     
 
     auto num_valid = condition(flags.back()) + indices.back(); // Number of valid fullerenes in the source batch
@@ -361,16 +363,6 @@ if(dst_batch.N_ != src_batch.N_ || src_batch.Nf_ != dst_batch.Nf_) throw std::ru
             if(replace_status) src.m_.flags_[index_in_src] = consumed_status;
         }
     });
-
-    /* primitives::for_each(Q, indices, [=](auto& it){
-        auto index_in_indices = &it - &(*indices.begin());
-        if (condition(flags[index_in_indices]) && (dst_is_queue || index_in_indices < num_transfer)){ 
-            auto index_in_dst = (dst_is_queue ? (queue_back + it + 1) : index_in_indices) % dst_batch.capacity();
-            auto index_in_src = (dst_is_queue ? index_in_indices : queue_front + it) % src_batch.capacity();
-            decltype(dst[0])::copy(dst[index_in_dst], src[index_in_src]);
-        }
-    }); */
-    
 
     queue_size += dst_is_queue ? (num_transfer) : (-num_transfer);
     if constexpr(dst_is_queue) { queue_back = (queue_back + num_transfer) % queue_capacity;} else { queue_front = (queue_front + num_transfer) % queue_capacity;}

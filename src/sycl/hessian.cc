@@ -7,6 +7,17 @@
 #include "fstream"
 #define USE_MAX_NORM 0
 #define SQRT sycl::sqrt
+
+#ifndef __has_builtin
+#define __has_builtin(x) 0
+#endif
+
+#if !__has_builtin(__builtin_assume)
+#ifndef __builtin_assume
+#define __builtin_assume(x) ((void)0)
+#endif
+#endif
+
 #include <fullerenes/kernel-headers/hessian-functor.hh>
 #include "queue-impl.cc"
 #include "forcefield-includes.cc"

@@ -4,11 +4,24 @@
 #include <tuple>
 #include <iterator>
 #include <type_traits>
+#include <algorithm>
+#include <execution>
+#include <numeric>
 #include "fstream"
 #define USE_MAX_NORM 0
 #define SQRT sycl::sqrt
+
+#ifndef __has_builtin
+#define __has_builtin(x) 0
+#endif
+
+#if !__has_builtin(__builtin_assume)
+#ifndef __builtin_assume
+#define __builtin_assume(x) ((void)0)
+#endif
+#endif
+
 #include <fullerenes/kernel-headers/forcefield-optimize-functor.hh>
-#include "primitives.cc"
 #include "forcefield-includes.cc"
 #include "kernel.cc"
 
@@ -1759,6 +1772,7 @@ struct ForceField
         // Normalize To match reference python implementation by Buster.
         s_norm = SQRT(sycl::reduce_over_group(cta, dot(s, s), sycl::plus<real_t>{}));
         // s_norm = SQRT(reduction(sdata, dot(s,s)));
+        if (node_id == 0) printf("CG_INIT: s_norm=%f g0=(%f,%f,%f)\n", s_norm, g0[0], g0[1], g0[2]);
         s /= s_norm;
 
         sycl::group_barrier(cta);
@@ -1770,6 +1784,24 @@ struct ForceField
             {
                 X1[node_id] = X[node_id] + alpha * s;
             }
+            // DEBUG: check X1 before gradient call (barrier outside conditional)
+            sycl::group_barrier(cta);
+            if (i == 0 && node_id == 0) {
+                int first_nan = -1;
+                for (size_t k = 0; k < N; k++) {
+                    if (!std::isfinite(X1[k][0]) || !std::isfinite(X1[k][1]) || !std::isfinite(X1[k][2])) { first_nan = k; break; }
+                }
+                printf("CG_PRE_GRAD: first_nan_idx=%d X1[0]=(%f,%f,%f) alpha=%f\n", 
+                       first_nan, X1[0][0], X1[0][1], X1[0][2], alpha);
+                if (first_nan >= 0)
+                    printf("CG_PRE_GRAD: X1[%d]=(%f,%f,%f)\n", first_nan, X1[first_nan][0], X1[first_nan][1], X1[first_nan][2]);
+                // Print all X1 NaN locations
+                for (size_t k = 0; k < N; k++) {
+                    if (!std::isfinite(X1[k][0]) || !std::isfinite(X1[k][1]) || !std::isfinite(X1[k][2]))
+                        printf("  NAN_AT[%d]=(%f,%f,%f)\n", (int)k, X1[k][0], X1[k][1], X1[k][2]);
+                }
+            }
+            sycl::group_barrier(cta);
             g1 = gradient(X1);
 
             // Polak Ribiere method
@@ -1792,8 +1824,22 @@ struct ForceField
 #if USE_MAX_NORM == 1
             s_norm = sycl::reduce_over_group(cta, sycl::max(sycl::max(s.x, s.y), s.z), sycl::greater<real_t>{});
 #else
-            s_norm = SQRT(sycl::reduce_over_group(cta, dot(s, s), sycl::plus<real_t>{}));
+            // DEBUG: check for NaN in dot(s,s) before reduce
+            {
+                real_t local_dot = dot(s, s);
+                real_t sum_dots = sycl::reduce_over_group(cta, local_dot, sycl::plus<real_t>{});
+                if (node_id == 0 && i == 0) {
+                    printf("CG_ITER0: local_dot[0]=%f sum_dots=%f sqrt=%f g1[0]=(%f,%f,%f) s[0]=(%f,%f,%f)\n", 
+                           local_dot, sum_dots, SQRT(sum_dots), g1[0], g1[1], g1[2], s[0], s[1], s[2]);
+                }
+                s_norm = SQRT(sum_dots);
+            }
 #endif
+            // DEBUG: detect first NaN
+            if (node_id == 0 && (!std::isfinite(s_norm) || !std::isfinite(alpha) || !std::isfinite(beta))) {
+                printf("CG_NAN: iter=%d alpha=%f beta=%f s_norm=%f g0_norm2=%f X[0]=(%f,%f,%f)\n", 
+                       (int)i, alpha, beta, s_norm, g0_norm2, X[0][0], X[0][1], X[0][2]);
+            }
             s /= s_norm;
 
             // if (node_id == 0) printf("s_norm = %f\n", s_norm);
@@ -1839,6 +1885,15 @@ SyclEvent forcefield_optimize_impl(SyclQueue &Q, FullereneBatchView<T, K> B, siz
             
             X[tid] = X_acc[tid];
             sycl::group_barrier(cta);
+            // DEBUG: check X before CG
+            if (tid == 0 && bid == 0) {
+                bool any_nan = false;
+                for (size_t i = 0; i < N; i++) {
+                    if (!std::isfinite(X[i][0]) || !std::isfinite(X[i][1]) || !std::isfinite(X[i][2])) { any_nan = true; break; }
+                }
+                printf("FF_BATCH: bid=%d N=%d X_nan_before_CG=%d X[0]=(%f,%f,%f)\n", (int)bid, (int)N, any_nan, X[0][0], X[0][1], X[0][2]);
+            }
+            sycl::group_barrier(cta);
             ForceField FF = ForceField<FFT,T,K>(nodeG, constants, cta, sdata.get_pointer());
             auto convergence_check = [&]() {
                 coord3d rel_bond_err, rel_angle_err, rel_dihedral_err;
@@ -1859,6 +1914,15 @@ SyclEvent forcefield_optimize_impl(SyclQueue &Q, FullereneBatchView<T, K> B, siz
                 }
             };
             FF.CG(Span<coord3d>(X.get_pointer(), N), Span<coord3d>(X1.get_pointer(),N), Span<coord3d>(X2.get_pointer(),N), std::max(iterations - 1,size_t(0)));
+            // DEBUG: check X after first CG
+            if (tid == 0 && bid == 0) {
+                bool any_nan = false;
+                for (size_t i = 0; i < N; i++) {
+                    if (!std::isfinite(X[i][0]) || !std::isfinite(X[i][1]) || !std::isfinite(X[i][2])) { any_nan = true; break; }
+                }
+                printf("FF_BATCH: bid=%d X_nan_after_CG1=%d X[0]=(%f,%f,%f) iters=%d\n", (int)bid, any_nan, X[0][0], X[0][1], X[0][2], (int)(iterations-1));
+            }
+            sycl::group_barrier(cta);
             auto E1 = FF.energy(Span<coord3d>(X.get_pointer(), N));
             FF.CG(Span<coord3d>(X.get_pointer(), N), Span<coord3d>(X1.get_pointer(),N), Span<coord3d>(X2.get_pointer(),N), std::min(size_t(1),iterations));
             auto E2 = FF.energy(Span<coord3d>(X.get_pointer(), N));
@@ -1887,7 +1951,7 @@ SyclEvent forcefield_optimize_impl(SyclQueue& Q, Fullerene<T,K> fullerene,
                                             const Span<std::array<T, 3>> s,
                                             size_t iterations, size_t max_iterations){
     TEMPLATE_TYPEDEFS(T, K);
-    if (fullerene.m_.flags_.get().is_set(StatusEnum::NOT_CONVERGED)) return SyclEvent();
+    if (fullerene.m_.flags_.get().is_not_set(StatusEnum::NOT_CONVERGED)) return SyclEvent();
     if (fullerene.m_.flags_.get().is_set(StatusEnum::FAILED_3D) || fullerene.m_.flags_.get().is_set(StatusEnum::CONVERGED_3D)) return SyclEvent();
 
     auto N = fullerene.N_;
@@ -1901,13 +1965,12 @@ SyclEvent forcefield_optimize_impl(SyclQueue& Q, Fullerene<T,K> fullerene,
     //Span<NodeNeighbours<K>>         node_graphs = node_graphs_;
     //Span<Constants<T,K>>            constants = constants_;  
 
-    //primitives::transform(Q, indices, node_graphs, [=](K i){return NodeNeighbours<K>(A.data(), i);});
-    //primitives::transform(Q, indices, constants, [=](K i){return Constants<T,K>(A.data(), i);});
-
-    primitives::iota(Q, indices, K{0});
+    Q.wait();
+    std::iota(indices.begin(), indices.end(), K{0});
 
     auto energy = [&] (Span<coord3d> X){
-        T result = primitives::transform_reduce(Q, indices, T{0}, Plus{}, [=](K i) {
+        Q.wait();
+        T result = std::transform_reduce(std::execution::par_unseq, indices.begin(), indices.end(), T{0}, std::plus<T>{}, [=](K i) {
             NodeNeighbours<K> node_graph(A, i);
             Constants<T,K> constants(A, i);
             T result = 0;
@@ -1945,8 +2008,9 @@ SyclEvent forcefield_optimize_impl(SyclQueue& Q, Fullerene<T,K> fullerene,
         T x1, x2;
         x1 = (a + ((T)1. - tau) * (b - a));
         x2 = (a + tau * (b - a));
-        primitives::transform(Q, indices, X1, [=](K i){return X[i] + x1 * r0[i];});
-        primitives::transform(Q, indices, X2, [=](K i){return X[i] + x2 * r0[i];});
+        Q.wait();
+        std::transform(std::execution::par_unseq, indices.begin(), indices.end(), X1.begin(), [=](K i){return X[i] + x1 * r0[i];});
+        std::transform(std::execution::par_unseq, indices.begin(), indices.end(), X2.begin(), [=](K i){return X[i] + x2 * r0[i];});
         T f1 = energy(X1);
         T f2 = energy(X2);
         for (int i = 0; i < 20; i++)
@@ -1957,7 +2021,8 @@ SyclEvent forcefield_optimize_impl(SyclQueue& Q, Fullerene<T,K> fullerene,
                 x1 = x2;
                 f1 = f2;
                 x2 = a + tau * (b - a);
-                primitives::transform(Q, indices, X2, [=](K i){return X[i] + x2 * r0[i];});
+                Q.wait();
+                std::transform(std::execution::par_unseq, indices.begin(), indices.end(), X2.begin(), [=](K i){return X[i] + x2 * r0[i];});
                 f2 = energy(X2);
             }
             else
@@ -1966,7 +2031,8 @@ SyclEvent forcefield_optimize_impl(SyclQueue& Q, Fullerene<T,K> fullerene,
                 x2 = x1;
                 f2 = f1;
                 x1 = a + ((T)1.0 - tau) * (b - a);
-                primitives::transform(Q, indices, X1, [=](K i){return X[i] + x1 * r0[i];});
+                Q.wait();
+                std::transform(std::execution::par_unseq, indices.begin(), indices.end(), X1.begin(), [=](K i){return X[i] + x1 * r0[i];});
                 f1 = energy(X1);
             }
         }
@@ -1981,39 +2047,46 @@ SyclEvent forcefield_optimize_impl(SyclQueue& Q, Fullerene<T,K> fullerene,
     auto CG = [&] (const Span<coord3d> X, const Span<coord3d> X1, const Span<coord3d> X2, const size_t MaxIter){
         T alpha, beta, g0_norm2, s_norm;
         gradient(X, g0);
-        primitives::transform(Q, indices, s, [=](K i){return -g0[i];}); 
-        s_norm = sycl::sqrt(primitives::transform_reduce(Q, indices, T{0}, Plus{}, [=](K i){return dot(s[i], s[i]);}));
-        primitives::transform(Q, indices, s, [=](K i){return s[i] / s_norm;}); 
+        Q.wait();
+        std::transform(std::execution::par_unseq, indices.begin(), indices.end(), s.begin(), [=](K i){return -g0[i];});
+        s_norm = sycl::sqrt(std::transform_reduce(std::execution::par_unseq, indices.begin(), indices.end(), T{0}, std::plus<T>{}, [=](K i){return dot(s[i], s[i]);}));
+        std::transform(std::execution::par_unseq, indices.begin(), indices.end(), s.begin(), [=](K i){return s[i] / s_norm;});
 
         for (size_t i = 0; i < MaxIter; i++)
         {
             alpha = GSS(X, s, X1, X2);
             if (alpha > (T)0.0)
             {
-                primitives::transform(Q, indices, X1, [=](K i){return X[i] + alpha * s[i];}); 
+                Q.wait();
+                std::transform(std::execution::par_unseq, indices.begin(), indices.end(), X1.begin(), [=](K i){return X[i] + alpha * s[i];});
             }
             gradient(X1, g1);
-            g0_norm2 = primitives::transform_reduce(Q, indices, T{0}, Plus{}, [=](K i){return dot(g0[i], g0[i]);}); 
-            beta = sycl::max(primitives::transform_reduce(Q, indices, T{0}, Plus{}, [=](K i){return dot(g1[i], (g1[i] - g0[i]));}) / g0_norm2, (T)0.0); 
+            Q.wait();
+            g0_norm2 = std::transform_reduce(std::execution::par_unseq, indices.begin(), indices.end(), T{0}, std::plus<T>{}, [=](K i){return dot(g0[i], g0[i]);});
+            beta = sycl::max(std::transform_reduce(std::execution::par_unseq, indices.begin(), indices.end(), T{0}, std::plus<T>{}, [=](K i){return dot(g1[i], (g1[i] - g0[i]));}) / g0_norm2, (T)0.0);
             if (alpha > (T)0.0)
             {
-                primitives::transform(Q, indices, X, [=](K i){return X1[i];}); 
+                Q.wait();
+                std::transform(std::execution::par_unseq, indices.begin(), indices.end(), X.begin(), [=](K i){return X1[i];});
             }
             else
             {
-                primitives::copy(Q, g1, g0); 
+                Q.wait();
+                std::copy(std::execution::par_unseq, g1.begin(), g1.end(), g0.begin());
                 beta = (T)0.0;
             }
-            primitives::transform(Q, indices, s, [=](K i){return -g1[i] + beta * s[i];}); 
-            primitives::copy(Q, g1, g0); 
-            s_norm = sycl::sqrt(primitives::transform_reduce(Q, indices, T{0}, Plus{}, [=](K i){return dot(s[i], s[i]);})); 
-            primitives::transform(Q, indices, s, [=](K i){return s[i] / s_norm;}); 
+            Q.wait();
+            std::transform(std::execution::par_unseq, indices.begin(), indices.end(), s.begin(), [=](K i){return -g1[i] + beta * s[i];});
+            std::copy(std::execution::par_unseq, g1.begin(), g1.end(), g0.begin());
+            s_norm = sycl::sqrt(std::transform_reduce(std::execution::par_unseq, indices.begin(), indices.end(), T{0}, std::plus<T>{}, [=](K i){return dot(s[i], s[i]);}));
+            std::transform(std::execution::par_unseq, indices.begin(), indices.end(), s.begin(), [=](K i){return s[i] / s_norm;});
         }
     };
     bool check_convergence = false;
 
     auto convergence_check = [&] () {
-        T max_rel_bond_err = primitives::transform_reduce(Q, indices, T{0}, Max{}, [=](K i){
+        Q.wait();
+        T max_rel_bond_err = std::transform_reduce(std::execution::par_unseq, indices.begin(), indices.end(), T{0}, [](T a, T b){ return std::max(a, b); }, [=](K i){
             Constants<T,K> constants(A, i);
             NodeNeighbours<K> nodeG(A, i);
             T rel_bond_err = 0;
@@ -2023,7 +2096,7 @@ SyclEvent forcefield_optimize_impl(SyclQueue& Q, Fullerene<T,K> fullerene,
             }
             return rel_bond_err;
         });
-        T max_rel_angle_err = primitives::transform_reduce(Q, indices, T{0}, Max{}, [=](K i){
+        T max_rel_angle_err = std::transform_reduce(std::execution::par_unseq, indices.begin(), indices.end(), T{0}, [](T a, T b){ return std::max(a, b); }, [=](K i){
             Constants<T,K> constants(A, i);
             NodeNeighbours<K> nodeG(A, i);
             T rel_angle_err = 0;
@@ -2033,7 +2106,7 @@ SyclEvent forcefield_optimize_impl(SyclQueue& Q, Fullerene<T,K> fullerene,
             }
             return rel_angle_err;
         });
-        T max_rel_dihedral_err = primitives::transform_reduce(Q, indices, T{0}, Max{}, [=](K i){
+        T max_rel_dihedral_err = std::transform_reduce(std::execution::par_unseq, indices.begin(), indices.end(), T{0}, [](T a, T b){ return std::max(a, b); }, [=](K i){
             Constants<T,K> constants(A, i);
             NodeNeighbours<K> nodeG(A, i);
             T rel_dihedral_err = 0;

@@ -1,5 +1,7 @@
 #include "queue-impl.cc"
-#include "primitives.cc"
+#include <execution>
+#include <algorithm>
+#include <numeric>
 #include <fullerenes/kernel-headers/geometry-functors.hh>
 #include "forcefield-includes.cc"
 
@@ -23,16 +25,17 @@ symMat3<T> inertia_matrix(sycl::group<1>& cta, const Span<std::array<T,3>> X){
 template <typename T>
 auto inertia_matrix(SyclQueue& Q, const Span<std::array<T,3>> X){
     symMat3<T> I;
-    T diag = primitives::transform_reduce(Q, X, T(0), sycl::plus<T>(), [](const auto& x) -> T {return dot(x,x);});
+    Q.wait();
+    T diag = std::transform_reduce(std::execution::par_unseq, X.begin(), X.end(), T(0), std::plus<T>{}, [](const auto& x) -> T {return dot(x,x);});
     I.a = diag;
     I.d = diag;
     I.f = diag;
-    I.a -= primitives::transform_reduce(Q, X, T(0), sycl::plus<T>(), [](const auto& x){return x[0]*x[0];});
-    I.b -= primitives::transform_reduce(Q, X, T(0), sycl::plus<T>(), [](const auto& x){return x[0]*x[1];});
-    I.c -= primitives::transform_reduce(Q, X, T(0), sycl::plus<T>(), [](const auto& x){return x[0]*x[2];});
-    I.d -= primitives::transform_reduce(Q, X, T(0), sycl::plus<T>(), [](const auto& x){return x[1]*x[1];});
-    I.e -= primitives::transform_reduce(Q, X, T(0), sycl::plus<T>(), [](const auto& x){return x[1]*x[2];});
-    I.f -= primitives::transform_reduce(Q, X, T(0), sycl::plus<T>(), [](const auto& x){return x[2]*x[2];});
+    I.a -= std::transform_reduce(std::execution::par_unseq, X.begin(), X.end(), T(0), std::plus<T>{}, [](const auto& x){return x[0]*x[0];});
+    I.b -= std::transform_reduce(std::execution::par_unseq, X.begin(), X.end(), T(0), std::plus<T>{}, [](const auto& x){return x[0]*x[1];});
+    I.c -= std::transform_reduce(std::execution::par_unseq, X.begin(), X.end(), T(0), std::plus<T>{}, [](const auto& x){return x[0]*x[2];});
+    I.d -= std::transform_reduce(std::execution::par_unseq, X.begin(), X.end(), T(0), std::plus<T>{}, [](const auto& x){return x[1]*x[1];});
+    I.e -= std::transform_reduce(std::execution::par_unseq, X.begin(), X.end(), T(0), std::plus<T>{}, [](const auto& x){return x[1]*x[2];});
+    I.f -= std::transform_reduce(std::execution::par_unseq, X.begin(), X.end(), T(0), std::plus<T>{}, [](const auto& x){return x[2]*x[2];});
     return I;
 }
 
@@ -144,7 +147,8 @@ template <typename T, typename K>
 SyclEvent TransformCoordinatesFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T, K> fullerene){
     auto X = fullerene.d_.X_cubic_;
     auto P = principal_axes(Q, X);
-    primitives::transform(Q, X, X, [P](auto x){return dot(P,x);});
+    Q.wait();
+    std::transform(std::execution::par_unseq, X.begin(), X.end(), X.begin(), [P](auto x){return dot(P,x);});
     return Q.get_event();
 }
 
@@ -194,8 +198,9 @@ SyclEvent SurfaceAreaFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T, K> fullere
     auto Nf = fullerene.Nf_;
     if (indices.size() != Nf) throw std::runtime_error("Indices size must be equal to the number of faces");
 
-    primitives::iota(Q, indices, 0);
-    auto result = primitives::transform_reduce(Q, indices, T(0), Plus{}, [Nf, fullerene](auto tid){
+    Q.wait();
+    std::iota(indices.begin(), indices.end(), 0);
+    auto result = std::transform_reduce(std::execution::par_unseq, indices.begin(), indices.end(), T(0), std::plus<T>{}, [Nf, fullerene](auto tid){
         T A = 0;
         std::array<T,3> face_center = {0,0,0};
         auto face = fullerene.d_.faces_cubic_[tid];
@@ -265,8 +270,9 @@ SyclEvent VolumeFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T, K> fullerene, S
     auto Nf = fullerene.Nf_;
     if (indices.size() != Nf) throw std::runtime_error("Indices size must be equal to the number of faces");
 
-    primitives::iota(Q, indices, 0);
-    auto result = primitives::transform_reduce(Q, indices, T(0), Plus{}, [Nf, fullerene](auto tid){
+    Q.wait();
+    std::iota(indices.begin(), indices.end(), 0);
+    auto result = std::transform_reduce(std::execution::par_unseq, indices.begin(), indices.end(), T(0), std::plus<T>{}, [Nf, fullerene](auto tid){
         T V = 0;
         std::array<T,3> face_center = {0,0,0};
         auto face = fullerene.d_.faces_cubic_[tid];
