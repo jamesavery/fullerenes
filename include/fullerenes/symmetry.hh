@@ -29,7 +29,7 @@ public:
     return S;
   }
 
-  bool operator==(const PointGroup& G){
+  bool operator==(const PointGroup& G) const {
     return sym_type == G.sym_type && n == G.n && sym_reflection == G.sym_reflection;
   }
 };

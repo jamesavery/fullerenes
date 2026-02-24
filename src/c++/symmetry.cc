@@ -224,10 +224,10 @@ vector<int> Symmetry::site_symmetry_counts(const vector<Permutation>& pi) const
     seen[i] = true;
       
     int orbit_length = 1;
-    for(int j=1;j<order;j++){ 
+    for(int j=0;j<order;j++){
       int I = pi[j][i];
       assert(I<M);
-      assert(I>0);
+      assert(I>=0);
       if(seen[I]) continue;
       seen[I] = true;
       orbit_length++;
