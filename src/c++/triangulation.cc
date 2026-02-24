@@ -267,149 +267,119 @@ vector<face_t> Triangulation::cubic_faces() const
 }
 
 
-// Takes full spiral string, e.g. 566764366348665
-// where the degrees are 3 or larger
-// each neighbour list is oriented CCW (and the boundary is CW)
-// the indices of the jumps start counting at 0
-// best-effort means, additional trailing vertices in the spiral string are caught/discarded, implying that wrong spirals may not be caught
+// Windup: construct an oriented triangulation from a face-degree sequence.
+// Mirrors Haskell reference: windupGeneralSpiral spiral jumps = init2 >> foldl' stepK >> closeLast
 Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t& j, const bool best_effort):
   PlanarGraph(spiral_string.size())
 {
-  jumplist_t jumps = j; // we need a local copy to remove elements
-  // cerr << "best-effort: " << best_effort << endl;
-  // cerr << "S: " << spiral_string << endl;
-  // cerr << "J: " << j << endl;
-  // cerr << "N: " << N << endl;
+  jumplist_t jumps = j;
 
-  // open_valencies is a deque with one entry per node that has been added to
-  // the spiral but is not fully saturated yet.  The entry contains the number
-  // of the node and the number of open valencies
   int max_boundary = 3 * static_cast<int>(ceil(sqrt(N))) + 12;
   vector<pair<node_t,int>> boundary_buf(max_boundary);
-  Deque<pair<node_t,int>> open_valencies(boundary_buf);
+  Deque<pair<node_t,int>> B(boundary_buf);
 
-  // set up first two nodes
-  open_valencies.push_back(make_pair(0,spiral_string[0]-1));
-  open_valencies.push_back(make_pair(1,spiral_string[1]-1));
-  insert_edge({0,1});
+  // ── Edge insertion helpers ─────────────────────────
+  //   insert_edge({k,v}, suc_uv, suc_vu): put v before suc_uv in k's list,
+  //   put k before suc_vu in v's list. If successor not found, appends.
 
-  // iterate over atoms
-  // k=0, k=1 have been done already
-  int N_final;
-  if(best_effort) N_final = N;
-  else N_final = N-1; // omit the last one because it requires special treatment
-  for (int k=2; k<N_final; ++k){
-    int pre_used_valencies=0;
-    // cerr << "step " << k << "/" << N-1 << endl;
+  auto connectFwd = [&](int k, node_t suc_vu){
+    insert_edge({k, B.front().first}, B.back().first, suc_vu);
+    --B.front().second;
+  };
 
-    // should a cyclic shift be applied before adding the next atom?
-    if(jumps.size() != 0 && k == jumps.front().first){
-      // perform cyclic shift on open_valencies
-      for(int i = jumps.front().second; i>0; --i){ // 0 is no jump
-        open_valencies.push_back(open_valencies.front());
-        open_valencies.pop_front();
+  auto connectBwd = [&](int k, node_t suc_uv){
+    insert_edge({k, B.back().first}, suc_uv, B.back(1).first);
+    --B.back().second;
+  };
+
+  // ── Cascade drains (Haskell reference: cascFwd / cascBwd) ──────────────────────
+  auto cascFwd = [&](int k, int pu) -> int {
+    while(B.front().second == 0){
+      if(best_effort && B.size() == 2 && B.back().second == 0) break;
+      node_t old = B.front().first;
+      B.pop_front();
+      connectFwd(k, old);
+      pu++;
+    }
+    return pu;
+  };
+
+  auto cascBwd = [&](int k, int pu) -> int {
+    while(B.back().second == 0){
+      if(best_effort && B.size() == 2 && B.front().second == 0) break;
+      node_t old = B.back().first;
+      B.pop_back();
+      connectBwd(k, old);
+      pu++;
+    }
+    return pu;
+  };
+
+  // ── Jump application  ────────────────────────────
+  auto applyJump = [&](int k){
+    if(!jumps.empty() && k == jumps.front().first){
+      for(int i = jumps.front().second; i > 0; --i){
+        B.push_back(B.front());
+        B.pop_front();
       }
-      // jumps.pop_front();
       jumps.erase(jumps.begin());
     }
+  };
 
-    //       How-to: insert_edge({u,v}, succ_uv,succ_vu)
-    //               inserts v in u's neighbour list right *before* succ_uv, and
-    //               inserts u in v's neighbour list right *before* succ_vu (-1 means at end).
-    // connect k and <first>
-    auto connect_forward = [&](const node_t suc_vu){
-      const node_t suc_uv = open_valencies.back().first; // last node in open_valencies
-      insert_edge({k, open_valencies.front().first}, suc_uv, suc_vu);
-      --open_valencies.front().second;
-      ++pre_used_valencies;
-      // cerr << "cf" << endl;
-      // cerr << open_valencies << endl;
-    };
+  // ── Close last face  ─────────────────────────────
+  auto closeLast = [&](){
+    vector<node_t> nodes;
+    for(int i = 0; i < B.size(); i++) nodes.push_back(B.front(i).first);
+    int n = nodes.size();
+    for(int i = 0; i < n; i++)
+      insert_edge({N-1, nodes[i]}, nodes[(i+1)%n], nodes[(i-1+n)%n]);
+  };
 
-    // connect k and <last>
-    auto connect_backward = [&](const node_t suc_uv){
-      const node_t suc_vu = open_valencies.back(1).first; // second to last node in open_valencies
-      insert_edge({k,open_valencies.back().first}, suc_uv, suc_vu);
-      --open_valencies.back().second;
-      ++pre_used_valencies;
-      // cerr << "cb" << endl;
-      // cerr << open_valencies << endl;
-    };
+  // ── Initialize: place first two nodes ────────────────────────────────
+  B.push_back({0, spiral_string[0] - 1});
+  B.push_back({1, spiral_string[1] - 1});
+  insert_edge({0, 1});
 
-    connect_forward(open_valencies.back().first); // suc_uv is not a neighbour yet, but appending at the end of the list is fine
-    connect_backward(open_valencies.front().first); // suc_vu is not a neighbour yet, but appending at the end of the list is fine
+  // ── Main fold: stepK for each remaining node (Haskell reference: foldl' stepK) ─
+  int N_final = best_effort ? N : N-1;
+  for(int k = 2; k < N_final; k++){
+    applyJump(k);
 
-    // do the remaining connect forwards
-    while(open_valencies.front().second==0){
-      if(best_effort && open_valencies.size()==2 && open_valencies.back().second==0){
-        // cerr << "leaving from rem cf" << endl;
-        break; // We're done adding vertices
-      }
-      const node_t suc_vu = open_valencies.front().first;
-      open_valencies.pop_front();
-      connect_forward(suc_vu);
-    }
+    connectFwd(k, B.back().first);
+    connectBwd(k, B.front().first);
+    int pu = 2;
+    pu = cascFwd(k, pu);
+    pu = cascBwd(k, pu);
 
-    // do the remaining connect backwards
-    while(open_valencies.back().second==0){
-      if(best_effort && open_valencies.size()==2 && open_valencies.front().second==0){
-        // cerr << "leaving from rem cb" << endl;
-        break; // We're done adding vertices
-      }
-      const node_t suc_uv = open_valencies.back().first;
-      open_valencies.pop_back();
-      connect_backward(suc_uv);
-    }
+    int open = spiral_string[k] - pu;
+    B.push_back({k, open});
 
-    // add node to spiral
-    open_valencies.push_back(make_pair(k,spiral_string[k]-pre_used_valencies));
-
-    if(spiral_string[k] - pre_used_valencies < 1){//the current atom is saturated (which may only happen for the last one)
+    if(open < 1){
       if(best_effort){
-        if(spiral_string[k] != pre_used_valencies){
-          cerr << spiral_string[k] << ", " << pre_used_valencies << endl;
-          cerr << "something's b0rked" << endl;
-          abort();
-        }
-        for(int i = 0; i < open_valencies.size(); i++){
-          if(open_valencies.front(i).second != 0){
-            cerr << open_valencies.front(i) << endl;
-            cerr << "something's b0rked" << endl;
-            abort();
-          }
-        }
-        break; // We're done adding vertices
+        if(open != 0){ cerr << "Windup: open=" << open << ", expected 0\n"; abort(); }
+        for(int i = 0; i < B.size(); i++)
+          if(B.front(i).second != 0){ cerr << "Windup: boundary not fully saturated\n"; abort(); }
+        break;
       }
-      cerr << "Cage closed but faces left (or otherwise invalid spiral)" << endl;
+      cerr << "Cage closed but faces left (or otherwise invalid spiral)\n";
       abort();
     }
-  } // iterate over atoms
+  }
 
-  // make sure we left the spiral in a sane state
-  // open_valencies must be either spiral.back() times '1' at this stage
+  // ── Validate terminal state and close last face ──────────────────────
   if(!best_effort){
-    if(open_valencies.size() != spiral_string.back()){
-      cerr << "Cage not closed but no faces left (or otherwise invalid spiral), wrong number of faces left" << endl;
+    if(B.size() != spiral_string.back()){
+      cerr << "Cage not closed: " << B.size() << " boundary nodes, expected " << spiral_string.back() << "\n";
       cerr << "Incomplete triangulation = " << *this << "\n";
       abort();
     }
-    for(int i = 0; i < open_valencies.size(); i++){
-      if(open_valencies.front(i).second!=1){
-        cerr << "Cage not closed but no faces left (or otherwise invalid spiral), more than one valency left for at least one face" << endl;
-      abort();
+    for(int i = 0; i < B.size(); i++)
+      if(B.front(i).second != 1){
+        cerr << "Cage not closed: boundary node has " << B.front(i).second << " open valencies\n";
+        abort();
       }
-    }
-
-    // add remaining edges, we don't care about the valency list at this stage
-    // get a vector of nodes of the final hole, for easier orientation
-    vector<node_t> last_nodes;
-    for(int i = 0; i < open_valencies.size(); i++) last_nodes.push_back(open_valencies.front(i).first);
-    for(int i=0; i<spiral_string.back(); ++i){
-      const node_t suc_uv=last_nodes[(i+1)%last_nodes.size()];
-      const node_t suc_vu=last_nodes[(i-1+last_nodes.size())%last_nodes.size()];
-      insert_edge({N-1, last_nodes[i]}, suc_uv, suc_vu); // suc_uv is not a neighbour (except for the last edge), but appending at the end of the list is fine
-    }
-  }else{
+    closeLast();
+  } else {
     remove_isolated_vertices();
   }
 
@@ -536,31 +506,17 @@ bool Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3
   return get_spiral_implementation(f1,f2,f3,spiral,jumps,permutation,general);
 }
 
-// jumps start to count at 0
-// perform a general spiral search and return the spiral and the jump positions + their length
-// TODO: Add jumps to S0.
-// TODO: Make GSpiral data type
-// TODO: if S0 is given, no need to test for connectedness at every step - jump positions are predetermined.
-//       Pass J0 and jump according to J0
-// TODO: return GSpiral
+// Extract a (general) spiral from a starting triple.  Mirrors the Haskell
+// decomposition: orient → init3 → fold peel → validateTerminal.
 bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, const node_t f3, vector<int> &spiral,
                                               jumplist_t& jumps, vector<node_t> &permutation,
                                               const bool general, const vector<int>& S0, const jumplist_t &J0,
                                               std::span<pair<node_t,int>> boundary_buf) const {
-  // TODO: If S0 and J0 are specified, we are finding symmetry group permutations and should follow (S0,J0).
-  //       Currently J0 is ignored, but J0 should control jumps in this case.
-
-  //this routine expects empty containers pentagon_indices and jumps.  we make sure they *are* empty
-  spiral.clear();
-  jumps.clear();
-  permutation.clear();
-
-  // TODO: Static allocation everywhere. Simplify function.
+  spiral.clear();  jumps.clear();  permutation.clear();
   permutation.resize(N);
   spiral.resize(N);
 
-  // Per-node bitmask: bit j set ⟹ neighbours[u][j] is still in the remaining graph.
-  // uint16_t supports degrees up to 16 (fulleroids, not just fullerenes).
+  // ── Remaining-graph state (bitmask over original neighbours) ───────
   assert(max_degree() <= 16);
   vector<uint16_t> active_mask(N);
   for(node_t u = 0; u < N; u++)
@@ -571,9 +527,9 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
     remaining_count--;
     const auto& nv = neighbours[v];
     for(uint16_t mask = active_mask[v]; mask; mask &= mask - 1) {
-      int    i = __builtin_ctz(mask);   // neighbor index within nv
+      int    i = __builtin_ctz(mask);
       node_t w = nv[i];
-      int    j = arc_ix(w, v);          // v's position in w's neighbor list
+      int    j = arc_ix(w, v);
       active_mask[w] &= ~(1 << j);
     }
     active_mask[v] = 0;
@@ -584,14 +540,12 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
     const int n_active = __builtin_popcount(mask);
     if(n_active < 2) return false;
 
-    // Collect active neighbors of v in oriented order
     const auto& nv = neighbours[v];
     node_t active_nbrs[16];
     int k = 0;
     for(uint16_t m = mask; m; m &= m - 1)
       active_nbrs[k++] = nv[__builtin_ctz(m)];
 
-    // Count edges between consecutive active neighbors
     int n_edges = 0;
     for(int i = 0; i < k; i++) {
       node_t u = active_nbrs[i], w = active_nbrs[(i+1) % k];
@@ -606,151 +560,123 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
     return neighbours[v][__builtin_ctz(active_mask[v])];
   };
 
-  vector<int> valencies(N, 0); // valencies is the N-tuple consisting of the valencies for each node
-  int last_vertex=-1; // we'd like to know the number of the last vertex
-
-  // open_valencies is a deque with one entry per node that has been added to
-  // the spiral but is not fully saturated yet.  The entry contains the number
-  // of the node and the number of open valencies
+  // ── Boundary deque ─────────────────────────────────────────────────
   vector<pair<node_t,int>> local_buf;
   if(boundary_buf.empty()){
     int max_boundary = 3 * static_cast<int>(ceil(sqrt(N))) + 12;
     local_buf.resize(max_boundary);
     boundary_buf = local_buf;
   }
-  Deque<pair<node_t,int>> open_valencies(boundary_buf);
+  Deque<pair<node_t,int>> B(boundary_buf);
 
-  int pre_used_valencies=0; // number of valencies removed from the last vertex *before* it is added to the spiral
-  int jump_state=0; // the number of cyclic shifts of length 1 in the current series.
+  int last_vertex = -1;
+  int jump_state  = 0;
 
-  //init of the valency-list
-  for(node_t u=0; u<N; u++){
-    valencies[u] = neighbours[u].size();
-  }
+  // ── Orient: detect CW/CCW from starting triple ────────────────────
+  bool CCW = next(f1,f2) == f3;
+  if(!CCW && prev(f1,f2) != f3) return false;  // invalid starting triple
 
-  bool
-    CW  = prev(f1,f2) == f3,
-    CCW = next(f1,f2) == f3;
-
-  // check if starting nodes are a valid spiral start.
-  // TODO: Input f1,f2 and bool CW instead to only allow valid spiral starts.
-    if(!(CW || CCW)){
-    // TODO: Set a global verbosity level; Usually we don't want to look at all this stuff.
-    // cerr << "The requested nodes are not connected." << endl;
-    return false;
-  }
-
-  auto connect_forward = [&](){
-    --open_valencies.front().second;
-    ++pre_used_valencies;
-  };
-  auto connect_backward = [&](){
-    --open_valencies.back().second;
-    ++pre_used_valencies;
+  // apex: the third vertex of the triangle across boundary edge (u → w)
+  auto apex = [&](node_t u, node_t w) -> node_t {
+    return CCW ? prev(u,w) : next(u,w);
   };
 
-  // add the first three (defining) nodes
-  // first node
-  spiral[0] = valencies[f1];
-  permutation[0] = f1;
-  remove_node(f1);
-  open_valencies.push_back(make_pair(f1,valencies[f1]));
+  // ── Drain: consume one connection, cascade-pop saturated nodes ─────
+  // Returns total connections consumed on that side (1 + cascade pops).
+  auto drainFront = [&]() -> int {
+    --B.front().second;
+    int k = 1;
+    while(B.front().second == 0) { B.pop_front(); --B.front().second; k++; }
+    return k;
+  };
+  auto drainBack = [&]() -> int {
+    --B.back().second;
+    int k = 1;
+    while(B.back().second == 0) { B.pop_back(); --B.back().second; k++; }
+    return k;
+  };
 
-  // second node
-  spiral[1] = valencies[f2];
-  permutation[1] = f2;
-  remove_node(f2);
-  connect_backward();
-  open_valencies.push_back(make_pair(f2,valencies[f2]-1));
+  // ── Peel: one atomic spiral step ──────────────────────────────────
+  // Find apex across active edge, drain both ends, push.  Returns the
+  // peeled vertex, or -1 on failure.  
+  auto peel = [&]() -> node_t {
+    node_t v = apex(B.back().first, B.front().first);
+    if(v == -1) return -1;
 
-  // third node
-  spiral[2] = valencies[f3];
-  permutation[2] = f3;
-  remove_node(f3);
-  connect_backward();
-  connect_forward();
-  open_valencies.push_back(make_pair(f3,valencies[f3]-2));
+    last_vertex = first_neighbor(v);
+    remove_node(v);
+
+    int kF   = drainFront();
+    int kB   = drainBack();
+    int open = neighbours[v].size() - kF - kB;
+    if(open < 1) return -1;
+
+    B.push_back({v, open});
+    return v;
+  };
+
+  // ── General peel step: peel with cut-vertex guard + rotation ──────
+  auto generalPeelStep = [&](int stepIdx) -> node_t {
+    for(int rotations = 0; rotations < B.size(); rotations++) {
+      node_t v = apex(B.back().first, B.front().first);
+      if(v == -1) return -1;
+
+      if(is_cut_vertex(v)) {
+        B.push_back(B.front()); B.pop_front();
+        jump_state++;
+        continue;
+      }
+
+      if(jump_state > 0) { jumps.push_back({stepIdx, jump_state}); jump_state = 0; }
+
+      last_vertex = first_neighbor(v);
+      remove_node(v);
+
+      int kF   = drainFront();
+      int kB   = drainBack();
+      int open = neighbours[v].size() - kF - kB;
+      if(open < 1) return -1;
+
+      B.push_back({v, open});
+      return v;
+    }
+    return -1;  // full rotation without finding non-cut apex
+  };
+
+  // ── Initialize: place first 3 nodes (the starting triangle) ───────
+  // Each vertex of the starting triple has 2 edges consumed (one to each
+  // of the other two), so all three start with deg - 2 open valencies.
+  auto place = [&](int pos, node_t f) {
+    spiral[pos]      = neighbours[f].size();
+    permutation[pos] = f;
+    remove_node(f);
+    B.push_back({f, (int)neighbours[f].size() - 2});
+  };
+  place(0, f1);
+  place(1, f2);
+  place(2, f3);
 
   if(!S0.empty() && (spiral[0] != S0[0] || spiral[1] != S0[1] || spiral[2] != S0[2])) return false;
 
-  // iterate over all nodes (of the initial graph) but not by their respective number
-  // starting at 3 because we added 3 already
-  for(int i=3; i<N-1; ++i){
-    pre_used_valencies=0;
-    // find *the* node in *this (the original graph), that is connected to open_valencies.back() and open_valencies.front()
-    node_t u = open_valencies.back().first, w = open_valencies.front().first;
-    node_t v = CCW? prev(u,w) : next(u,w); // TODO: What is the rationale here?
-    //    cout << "u->v: " << u << " -> " << v << endl;
-    if(v == -1) return false; // non-general spiral failed
+  // ── Main fold: peel N-4 vertices ──────────────────────────────────
+  for(int i = 3; i < N-1; ++i) {
+    node_t v = general ? generalPeelStep(i) : peel();
+    if(v == -1) return false;
 
-    if(general){
-      bool cut_vertex = is_cut_vertex(v);
-      // cout << "connected? " << !is_cut_vertex << endl;
-
-      if(cut_vertex){//further cyclic rotation required
-        //perform cyclic shift on open_valencies
-        open_valencies.push_back(open_valencies.front());
-        open_valencies.pop_front();
-        //        cout << "open valencies = " << open_valencies << endl;
-        //there was no atom added, so 'i' must not be incremented
-        --i;
-        ++jump_state;
-        continue;
-      } else if(jump_state!=0){//end of cyclic rotation
-        //        cout << "//end of cyclic rotation\n";
-        jumps.push_back(make_pair(i,jump_state));
-        jump_state=0;
-      }
-    }
-
-    // record the number of the last vertex, as the neighbour of the second to last one
-    // this only needs to be done when remaining_count==2, but writing this value each cycle should be cheaper than testing something each cycle
-    // if(remaining_count==2)
-    last_vertex=first_neighbor(v);
-
-    //remove all edges of which *j is part from the remaining graph
-    remove_node(v);
-
-    connect_forward();
-    while (open_valencies.front().second==0){
-      open_valencies.pop_front();
-      connect_forward();
-    }
-
-    connect_backward();
-    while (open_valencies.back().second==0){
-      open_valencies.pop_back();
-      connect_backward();
-    }
-
-    spiral[i] = valencies[v];
+    spiral[i]      = neighbours[v].size();
     permutation[i] = v;
     if(!S0.empty() && spiral[i] != S0[i]) return false;
-
-    if(valencies[v]-pre_used_valencies < 1) return false;
-    open_valencies.push_back(make_pair(v,valencies[v]-pre_used_valencies));
-    if(open_valencies.back().second < 1) return false; //i.e., the spiral is stuck. This can only happen if the spiral missed a jump
   }
 
-  // make sure we left the loop in a sane state
-  // this probably requires some proper error handling: throw and catch and so on ...
-  if(remaining_count != 1){
-    // cerr << "more than one node left ... exiting." << endl;
-    return false;
-  }
-  const int last_valency = valencies[last_vertex];
-  if(open_valencies.size() != last_valency){
-    // cerr << "wrong number of nodes with open valencies: " << open_valencies.size() << " ... exiting." << endl;
-    return false;
-  }
-  for(int i = 0; i < open_valencies.size(); i++){
-    if(open_valencies.front(i).second != 1){
-      // cerr << "number of open valencies is not 1 (but it should be) ... exiting." << endl;
-      return false;
-    }
-  }
+  // ── Validate terminal state ───────────────────────────────────────
+  // One vertex remains; boundary must have deg(lastV) entries, all with 1 open valency.
+  if(remaining_count != 1) return false;
+  int last_valency = neighbours[last_vertex].size();
+  if(B.size() != last_valency) return false;
+  for(int i = 0; i < B.size(); i++)
+    if(B.front(i).second != 1) return false;
 
-  spiral[N-1] = last_valency;
+  spiral[N-1]      = last_valency;
   permutation[N-1] = last_vertex;
   return true;
 }
@@ -806,131 +732,78 @@ general_spiral Triangulation::get_general_spiral(const bool only_rarest_special,
   return gs;
 }
 
-// perform the canonical general spiral search and the spiral and the jump positions + their length
-// special_only is a switch to search for spirals starting at non-hexagons only
+// Canonical spiral search: find the lexicographically smallest (general) spiral.
+// Mirrors Haskell: canonicalGeneralSpiral g = tryRegular triples <|> tryGeneral triples
+//   where triples = startingTriples g
 bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, vector<vector<node_t>>& permutations, const bool only_rarest_special, const bool general, const bool CW_only) const
 {
   permutations.clear();
+
+  // ── Starting nodes: rarest non-hexagonal degree (Haskell: rarestSpecial) ──
   vector<node_t> node_starts;
-
   if(only_rarest_special){
-    int max_face_size=0;
-    for(node_t u=0;u<N;u++) if(neighbours[u].size()>max_face_size) max_face_size=neighbours[u].size();
-    //cerr << max_face_size << endl;
+    int max_deg = 0;
+    for(node_t u = 0; u < N; u++) max_deg = max(max_deg, (int)neighbours[u].size());
+    vector<int> count(max_deg + 1, 0);
+    for(node_t u = 0; u < N; u++) count[neighbours[u].size()]++;
 
-    vector<int> face_counts(max_face_size,0);
-    for(node_t u=0;u<N;u++) face_counts[neighbours[u].size()-1]++;
-    //cerr << face_counts << endl;
+    int rarest_deg = 0, rarest_count = INT_MAX;
+    for(int d = 0; d <= max_deg; d++)
+      if(d != 6 && count[d] > 0 && count[d] < rarest_count)
+        { rarest_deg = d; rarest_count = count[d]; }
 
-    // Find rarest non-hexagon face size
-    pair<int,int> fewest_face(0,INT_MAX); // size, number
-    for(int i=0; i<max_face_size; i++){
-      //cerr << face_counts[i] << fewest_face << endl;
-      if((i+1 != 6) && face_counts[i]>0 && face_counts[i]<fewest_face.second){
-        fewest_face.first=i+1;
-        fewest_face.second=face_counts[i];
-      }
-    }
-    //cerr << fewest_face << endl;
-
-    for(node_t u=0;u<N;u++)
-      if(neighbours[u].size() == fewest_face.first) node_starts.push_back(u);
-    //cerr << node_starts << endl;
+    for(node_t u = 0; u < N; u++)
+      if((int)neighbours[u].size() == rarest_deg) node_starts.push_back(u);
+  } else {
+    for(node_t u = 0; u < N; u++) node_starts.push_back(u);
   }
-  else 
-    for(node_t u=0;u<N;u++) node_starts.push_back(u);
 
-  vector<int> spiral_tmp(N),permutation_tmp(N);
+  // ── Temporaries and best-tracking ─────────────────────────────────────────
+  vector<int> spiral_tmp(N), permutation_tmp(N);
   jumplist_t jumps_tmp;
-  spiral = vector<int>(1,INT_MAX); // so it gets overwritten
-  jumps = jumplist_t(100,make_pair(0,0)); // so it gets overwritten
+  spiral = vector<int>(1, INT_MAX);                    // sentinel: any real spiral wins
+  jumps  = jumplist_t(100, make_pair(0, 0));           // sentinel: any real jumps win
 
-  // Pre-allocate boundary buffer for get_spiral_implementation (reused across all attempts)
   int max_boundary = 3 * static_cast<int>(ceil(sqrt(N))) + 12;
   vector<pair<node_t,int>> boundary_buf(max_boundary);
 
-  //cerr << "spiralstarts = " << node_starts << ";\n";
+  // ── Try all starting triples, track lexicographic minimum ─────────────────
+  // Haskell reference: mapMaybe (regularSpiral g) (startingTriples g), then minimum
+  auto tryAllTriples = [&](bool use_general) -> bool {
+    bool found = false;
+    for(node_t u : node_starts) {
+      for(node_t v : neighbours[u]) {
+        node_t w[2];
+        int n_tries;
+        if(CW_only) { w[0] = prev(u,v); n_tries = 1; }          // CW only: prev(f1,f2)==f3
+        else        { w[0] = prev(v,u); w[1] = next(v,u); n_tries = 2; }
 
-  // TODO: Write this way neater.
-  bool found_one = false;
-  for(int i=0; i<node_starts.size(); i++){
-    const node_t u=node_starts[i];
-
-    // Get regular spiral if it exists
-    for(node_t v: neighbours[u]){
-      int n_tries;
-      node_t w[2];
-      if(CW_only){
-        w[0] = prev(u,v);  // CW: prev(f1,f2)==f3
-        n_tries = 1;
-      } else {
-        w[0] = prev(v,u);
-        w[1] = next(v,u);
-        n_tries = 2;
-      }
-
-      for(int k=0;k<n_tries;k++){        // Looks like O(N^3), is O(N) (or O(1) if only_rarest_special is set)
-        // NB: general -> false to only do general if all originals fail
-        //     That's much faster on average, but gives bigger variation in times.
-        if(!get_spiral_implementation(u,v,w[k],spiral_tmp,jumps_tmp,permutation_tmp,false,{},{},boundary_buf))
-          continue;
-
-        found_one = true;
-
-        // store the shortest / lexicographically smallest (general) spiral
-        if(general_spiral{jumps_tmp,spiral_tmp} < general_spiral{jumps,spiral}){
-          jumps       = jumps_tmp;
-          spiral      = spiral_tmp;
-          permutations.clear();
-        }
-        permutations.push_back(permutation_tmp);
-      }
-    }
-  }
-
-  // If no regular spiral exists, go for the smallest general one
-  if(general && !found_one){
-    for(int i=0; i<node_starts.size(); i++){
-      const node_t u=node_starts[i];
-
-      // Get general spiral
-      for(node_t v: neighbours[u]){
-          int n_tries;
-          node_t w[2];
-          if(CW_only){
-            w[0] = prev(u,v);  // CW: prev(f1,f2)==f3
-            n_tries = 1;
-          } else {
-            w[0] = prev(v,u);
-            w[1] = next(v,u);
-            n_tries = 2;
+        for(int k = 0; k < n_tries; k++){
+          if(!get_spiral_implementation(u,v,w[k], spiral_tmp,jumps_tmp,permutation_tmp,
+                                        use_general, {},{}, boundary_buf))
+          {
+            if(use_general){ fprintf(stderr, "General spiral failed -- this should never happen!\n"); abort(); }
+            continue;
           }
-
-        for(int k=0;k<n_tries;k++){        // Looks like O(N^3), is O(N) (or O(1) if only_rarest_special is set)
-          if(!get_spiral_implementation(u,v,w[k],spiral_tmp,jumps_tmp,permutation_tmp,true,{},{},boundary_buf)){
-            cerr << "General spiral failed -- this should never happen!\n";
-            abort();
-          }
-          found_one = true;
-
-          // store the shortest / lexicographically smallest (general) spiral
+          found = true;
           if(general_spiral{jumps_tmp,spiral_tmp} < general_spiral{jumps,spiral}){
-            //    cerr << general_spiral{jumps_tmp,spiral_tmp} << " < " << general_spiral{jumps,spiral} << "\n";
-            jumps       = jumps_tmp;
-            spiral      = spiral_tmp;
+            jumps  = jumps_tmp;
+            spiral = spiral_tmp;
             permutations.clear();
-          } else {
-           //    cerr << general_spiral{jumps_tmp,spiral_tmp} << " >= " << general_spiral{jumps,spiral} << "\n";
           }
           permutations.push_back(permutation_tmp);
         }
       }
     }
-  }
-  
-  if(spiral.size()!=N) return false;
+    return found;
+  };
 
-  return true;
+  // ── Two-phase search: regular first, general only if needed ───────────────
+  bool found = tryAllTriples(false);
+  if(general && !found)
+    found = tryAllTriples(true);
+
+  return spiral.size() == N;
 }
 
 
