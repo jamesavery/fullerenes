@@ -536,25 +536,6 @@ bool Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3
   return get_spiral_implementation(f1,f2,f3,spiral,jumps,permutation,general);
 }
 
-void remove_node(const node_t u, Graph &remaining_graph){
-  remaining_graph.N--;
-  vector<node_t>& nu(remaining_graph.neighbours[u]);
-
-  //remove u from all neighbour lists and erase all neighbours from the u-list
-  for(int i=0;i<nu.size();i++){        // O(1) since neighbour count is bounded by max degree
-    const node_t& v = nu[i];
-    vector<node_t>& nv(remaining_graph.neighbours[v]);
-
-    for(int j=0;j<nv.size();j++){ // O(1) since neighbour count is bounded by max degree
-      if(nv[j] == u){
-        nv.erase(nv.begin()+j);        // Previous method destroyed orientation
-        break;
-      }
-    }
-  }
-  nu.clear();
-}
-
 // jumps start to count at 0
 // perform a general spiral search and return the spiral and the jump positions + their length
 // TODO: Add jumps to S0.
@@ -578,7 +559,53 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
   permutation.resize(N);
   spiral.resize(N);
 
-  PlanarGraph remaining_graph(Graph(neighbours,true)); // remaining_graph consists of all nodes that haven't been added to the result yet
+  // Per-node bitmask: bit j set ⟹ neighbours[u][j] is still in the remaining graph.
+  // uint16_t supports degrees up to 16 (fulleroids, not just fullerenes).
+  assert(max_degree() <= 16);
+  vector<uint16_t> active_mask(N);
+  for(node_t u = 0; u < N; u++)
+    active_mask[u] = (1 << neighbours[u].size()) - 1;
+  int remaining_count = N;
+
+  auto remove_node = [&](node_t v) {
+    remaining_count--;
+    const auto& nv = neighbours[v];
+    for(uint16_t mask = active_mask[v]; mask; mask &= mask - 1) {
+      int    i = __builtin_ctz(mask);   // neighbor index within nv
+      node_t w = nv[i];
+      int    j = arc_ix(w, v);          // v's position in w's neighbor list
+      active_mask[w] &= ~(1 << j);
+    }
+    active_mask[v] = 0;
+  };
+
+  auto is_cut_vertex = [&](node_t v) -> bool {
+    const uint16_t mask = active_mask[v];
+    const int n_active = __builtin_popcount(mask);
+    if(n_active < 2) return false;
+
+    // Collect active neighbors of v in oriented order
+    const auto& nv = neighbours[v];
+    node_t active_nbrs[16];
+    int k = 0;
+    for(uint16_t m = mask; m; m &= m - 1)
+      active_nbrs[k++] = nv[__builtin_ctz(m)];
+
+    // Count edges between consecutive active neighbors
+    int n_edges = 0;
+    for(int i = 0; i < k; i++) {
+      node_t u = active_nbrs[i], w = active_nbrs[(i+1) % k];
+      int j = arc_ix(u, w);
+      if(j >= 0 && (active_mask[u] & (1 << j)))
+        n_edges++;
+    }
+    return n_edges < k - 1;
+  };
+
+  auto first_neighbor = [&](node_t v) -> node_t {
+    return neighbours[v][__builtin_ctz(active_mask[v])];
+  };
+
   vector<int> valencies(N, 0); // valencies is the N-tuple consisting of the valencies for each node
   int last_vertex=-1; // we'd like to know the number of the last vertex
 
@@ -596,9 +623,9 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
   int pre_used_valencies=0; // number of valencies removed from the last vertex *before* it is added to the spiral
   int jump_state=0; // the number of cyclic shifts of length 1 in the current series.
 
-  //init of the valency-list and the set of nodes in the remaining graph
-  for(node_t u=0; u<remaining_graph.N; u++){
-    valencies[u] = remaining_graph.neighbours[u].size();
+  //init of the valency-list
+  for(node_t u=0; u<N; u++){
+    valencies[u] = neighbours[u].size();
   }
 
   bool
@@ -626,20 +653,20 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
   // first node
   spiral[0] = valencies[f1];
   permutation[0] = f1;
-  remove_node(f1, remaining_graph);
+  remove_node(f1);
   open_valencies.push_back(make_pair(f1,valencies[f1]));
 
   // second node
   spiral[1] = valencies[f2];
   permutation[1] = f2;
-  remove_node(f2, remaining_graph);
+  remove_node(f2);
   connect_backward();
   open_valencies.push_back(make_pair(f2,valencies[f2]-1));
 
   // third node
   spiral[2] = valencies[f3];
   permutation[2] = f3;
-  remove_node(f3, remaining_graph);
+  remove_node(f3);
   connect_backward();
   connect_forward();
   open_valencies.push_back(make_pair(f3,valencies[f3]-2));
@@ -650,18 +677,17 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
   // starting at 3 because we added 3 already
   for(int i=3; i<N-1; ++i){
     pre_used_valencies=0;
-    // find *the* node in *this (not the remaining_graph), that is connected to open_valencies.back() und open_valencies.front()
-    // we can't search in the remaining_graph because there are some edges deleted already
+    // find *the* node in *this (the original graph), that is connected to open_valencies.back() and open_valencies.front()
     node_t u = open_valencies.back().first, w = open_valencies.front().first;
     node_t v = CCW? prev(u,w) : next(u,w); // TODO: What is the rationale here?
     //    cout << "u->v: " << u << " -> " << v << endl;
     if(v == -1) return false; // non-general spiral failed
 
     if(general){
-      bool is_cut_vertex = remaining_graph.is_cut_vertex(v);
+      bool cut_vertex = is_cut_vertex(v);
       // cout << "connected? " << !is_cut_vertex << endl;
 
-      if(is_cut_vertex){//further cyclic rotation required
+      if(cut_vertex){//further cyclic rotation required
         //perform cyclic shift on open_valencies
         open_valencies.push_back(open_valencies.front());
         open_valencies.pop_front();
@@ -678,12 +704,12 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
     }
 
     // record the number of the last vertex, as the neighbour of the second to last one
-    // this only needs to be done when remaining_graph.N==2, but writing this value each cycle should be cheaper than testing something each cycle
-    // if(remaining_graph.N==2)
-    last_vertex=remaining_graph.neighbours[v][0];
+    // this only needs to be done when remaining_count==2, but writing this value each cycle should be cheaper than testing something each cycle
+    // if(remaining_count==2)
+    last_vertex=first_neighbor(v);
 
     //remove all edges of which *j is part from the remaining graph
-    remove_node(v, remaining_graph);
+    remove_node(v);
 
     connect_forward();
     while (open_valencies.front().second==0){
@@ -708,7 +734,7 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
 
   // make sure we left the loop in a sane state
   // this probably requires some proper error handling: throw and catch and so on ...
-  if(remaining_graph.N != 1){
+  if(remaining_count != 1){
     // cerr << "more than one node left ... exiting." << endl;
     return false;
   }
