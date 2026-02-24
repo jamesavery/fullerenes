@@ -320,7 +320,12 @@ class Deque {
   std::span<T> buf_;
   int head_ = 0, tail_ = 0;
 
-  int wrap(int i) const { int n = buf_.size(); return ((i % n) + n) % n; }
+  int cap() const { return buf_.size(); }
+  int wrap(int i) const { int n = cap(); return ((i % n) + n) % n; }
+
+  void check_overflow() const {
+    if(size() >= cap()){ fprintf(stderr, "Deque overflow (capacity=%d)\n", cap()); abort(); }
+  }
 
 public:
   Deque(std::span<T> buf) : buf_(buf) {}
@@ -329,15 +334,15 @@ public:
   bool empty() const { return head_ == tail_; }
   void clear()       { head_ = tail_; }
 
-  T&       front(int offset = 0)       { assert(offset >= 0 && offset < size()); return buf_[wrap(head_ + offset)]; }
-  const T& front(int offset = 0) const { assert(offset >= 0 && offset < size()); return buf_[wrap(head_ + offset)]; }
-  T&       back(int offset = 0)        { assert(offset >= 0 && offset < size()); return buf_[wrap(tail_ - 1 - offset)]; }
-  const T& back(int offset = 0) const  { assert(offset >= 0 && offset < size()); return buf_[wrap(tail_ - 1 - offset)]; }
+  T&       front(int offset = 0)       { return buf_[wrap(head_ + offset)]; }
+  const T& front(int offset = 0) const { return buf_[wrap(head_ + offset)]; }
+  T&       back(int offset = 0)        { return buf_[wrap(tail_ - 1 - offset)]; }
+  const T& back(int offset = 0) const  { return buf_[wrap(tail_ - 1 - offset)]; }
 
-  void push_back(const T& x)  { assert(size() < (int)buf_.size()); buf_[wrap(tail_++)] = x; }
-  void push_front(const T& x) { assert(size() < (int)buf_.size()); buf_[wrap(--head_)] = x; }
-  T pop_front() { assert(!empty()); return buf_[wrap(head_++)]; }
-  T pop_back()  { assert(!empty()); return buf_[wrap(--tail_)]; }
+  void push_back(const T& x)  { check_overflow(); buf_[wrap(tail_++)] = x; }
+  void push_front(const T& x) { check_overflow(); buf_[wrap(--head_)] = x; }
+  T pop_front() { return buf_[wrap(head_++)]; }
+  T pop_back()  { return buf_[wrap(--tail_)]; }
 
   friend ostream& operator<<(ostream& s, const Deque& q) {
     s << LIST_OPEN;

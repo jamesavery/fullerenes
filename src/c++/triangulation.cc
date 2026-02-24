@@ -284,7 +284,7 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
   // open_valencies is a deque with one entry per node that has been added to
   // the spiral but is not fully saturated yet.  The entry contains the number
   // of the node and the number of open valencies
-  int max_boundary = static_cast<int>(12 * sqrt(N)) + 20;
+  int max_boundary = 3 * static_cast<int>(ceil(sqrt(N))) + 12;
   vector<pair<node_t,int>> boundary_buf(max_boundary);
   Deque<pair<node_t,int>> open_valencies(boundary_buf);
 
@@ -587,7 +587,7 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
   // of the node and the number of open valencies
   vector<pair<node_t,int>> local_buf;
   if(boundary_buf.empty()){
-    int max_boundary = static_cast<int>(12 * sqrt(N)) + 20;
+    int max_boundary = 3 * static_cast<int>(ceil(sqrt(N))) + 12;
     local_buf.resize(max_boundary);
     boundary_buf = local_buf;
   }
@@ -820,7 +820,7 @@ bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, vector<ve
   jumps = jumplist_t(100,make_pair(0,0)); // so it gets overwritten
 
   // Pre-allocate boundary buffer for get_spiral_implementation (reused across all attempts)
-  int max_boundary = static_cast<int>(12 * sqrt(N)) + 20;
+  int max_boundary = 3 * static_cast<int>(ceil(sqrt(N))) + 12;
   vector<pair<node_t,int>> boundary_buf(max_boundary);
 
   //cerr << "spiralstarts = " << node_starts << ";\n";
