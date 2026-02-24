@@ -273,6 +273,30 @@ vector<face_t> Triangulation::cubic_faces() const
 struct SpiralBoundary : Deque<pair<node_t,int>> {
   using Deque::Deque;
 
+  // ── Unwind: detach connections from boundary, return total consumed ──
+  int unwind() { return drainFront() + drainBack(); }
+
+  void rotate() { push_back(front()); pop_front(); }
+
+  // ── Windup: attach node k to boundary, return total connections used ─
+  template<class InsertEdge>
+  int wind(node_t k, InsertEdge&& ins, bool best_effort = false) {
+    connectFwd(k, back().first, ins);
+    connectBwd(k, front().first, ins);
+    int pu = 2;
+    pu += cascadeFwd(k, best_effort, ins);
+    pu += cascadeBwd(k, best_effort, ins);
+    return pu;
+  }
+
+  template<class InsertEdge>
+  void closeLast(node_t last, InsertEdge&& ins) {
+    int n = size();
+    for(int i = 0; i < n; i++)
+      ins({last, front(i).first}, front((i+1)%n).first, front((i-1+n)%n).first);
+  }
+
+private:
   int drainFront() {
     --front().second;
     int k = 1;
@@ -287,7 +311,43 @@ struct SpiralBoundary : Deque<pair<node_t,int>> {
     return k;
   }
 
-  void rotate() { push_back(front()); pop_front(); }
+  template<class InsertEdge>
+  void connectFwd(node_t k, node_t suc_vu, InsertEdge& ins) {
+    ins({k, front().first}, back().first, suc_vu);
+    --front().second;
+  }
+
+  template<class InsertEdge>
+  void connectBwd(node_t k, node_t suc_uv, InsertEdge& ins) {
+    ins({k, back().first}, suc_uv, back(1).first);
+    --back().second;
+  }
+
+  template<class InsertEdge>
+  int cascadeFwd(node_t k, bool best_effort, InsertEdge& ins) {
+    int n = 0;
+    while(front().second == 0) {
+      if(best_effort && size() == 2 && back().second == 0) break;
+      node_t old = front().first;
+      pop_front();
+      connectFwd(k, old, ins);
+      n++;
+    }
+    return n;
+  }
+
+  template<class InsertEdge>
+  int cascadeBwd(node_t k, bool best_effort, InsertEdge& ins) {
+    int n = 0;
+    while(back().second == 0) {
+      if(best_effort && size() == 2 && front().second == 0) break;
+      node_t old = back().first;
+      pop_back();
+      connectBwd(k, old, ins);
+      n++;
+    }
+    return n;
+  }
 };
 
 
@@ -302,51 +362,8 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
   vector<pair<node_t,int>> boundary_buf(max_boundary);
   SpiralBoundary B(boundary_buf);
 
-  // ── Edge insertion helpers ─────────────────────────
-  //   insert_edge({k,v}, suc_uv, suc_vu): put v before suc_uv in k's list,
-  //   put k before suc_vu in v's list. If successor not found, appends.
-
-  auto connectFwd = [&](int k, node_t suc_vu){
-    insert_edge({k, B.front().first}, B.back().first, suc_vu);
-    --B.front().second;
-  };
-
-  auto connectBwd = [&](int k, node_t suc_uv){
-    insert_edge({k, B.back().first}, suc_uv, B.back(1).first);
-    --B.back().second;
-  };
-
-  // ── Cascade drains (Haskell reference: cascFwd / cascBwd) ──────────────────────
-  auto cascFwd = [&](int k, int pu) -> int {
-    while(B.front().second == 0){
-      if(best_effort && B.size() == 2 && B.back().second == 0) break;
-      node_t old = B.front().first;
-      B.pop_front();
-      connectFwd(k, old);
-      pu++;
-    }
-    return pu;
-  };
-
-  auto cascBwd = [&](int k, int pu) -> int {
-    while(B.back().second == 0){
-      if(best_effort && B.size() == 2 && B.front().second == 0) break;
-      node_t old = B.back().first;
-      B.pop_back();
-      connectBwd(k, old);
-      pu++;
-    }
-    return pu;
-  };
-
-  // ── Close last face  ─────────────────────────────
-  auto closeLast = [&](){
-    vector<node_t> nodes;
-    for(int i = 0; i < B.size(); i++) nodes.push_back(B.front(i).first);
-    int n = nodes.size();
-    for(int i = 0; i < n; i++)
-      insert_edge({N-1, nodes[i]}, nodes[(i+1)%n], nodes[(i-1+n)%n]);
-  };
+  Graph& g = *this;
+  auto ins = [&g](const arc_t& e, node_t su, node_t sv){ g.insert_edge(e, su, sv); };
 
   // ── Initialize: place first two nodes ────────────────────────────────
   B.push_back({0, spiral_string[0] - 1});
@@ -361,16 +378,10 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
       jumps.erase(jumps.begin());
     }
 
-    connectFwd(k, B.back().first);
-    connectBwd(k, B.front().first);
-    int pu = 2;
-    pu = cascFwd(k, pu);
-    pu = cascBwd(k, pu);
-
-    int open = spiral_string[k] - pu;
+    int open = spiral_string[k] - B.wind(k, ins, best_effort);
     B.push_back({k, open});
 
-    if(open < 1){
+    if(open <= 0){
       if(best_effort){
         if(open != 0){ cerr << "Windup: open=" << open << ", expected 0\n"; abort(); }
         for(int i = 0; i < B.size(); i++)
@@ -394,7 +405,7 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
         cerr << "Cage not closed: boundary node has " << B.front(i).second << " open valencies\n";
         abort();
       }
-    closeLast();
+    B.closeLast(N-1, ins);
   } else {
     remove_isolated_vertices();
   }
@@ -618,10 +629,11 @@ struct SpiralState {
 private:
   node_t regularPeel() {
     node_t v = apex();
-    if(v == -1) return -1;
-    R.remove(v);
-    int open = deg(v) - B.drainFront() - B.drainBack();
-    if(open < 1) return -1;
+    if(v == -1) return -1; // Error in the graph
+
+    R.remove(v);  // Remove the apex vertex v from the remaining graph R...
+    int open = deg(v) - B.unwind(); // ...and place it on the boundary B with its open valency
+    if(open <= 0) return -1;   
     B.push_back({v, open});
     return v;
   }
@@ -629,14 +641,23 @@ private:
   node_t generalPeel() {
     for(int rot = 0; rot < B.size(); rot++) {
       node_t v = apex();
-      if(v == -1) return -1;
-      if(R.is_cut_vertex(v)) { B.rotate(); jump_count++; continue; }
-      if(jump_count > 0) { jumps.push_back({step, jump_count}); jump_count = 0; }
-      R.remove(v);
-      int open = deg(v) - B.drainFront() - B.drainBack();
-      if(open < 1) return -1;
-      B.push_back({v, open});
-      return v;
+      if(v == -1) return -1; 
+
+      if(!R.is_cut_vertex(v)){
+	// If v is not a cut vertex, Commit accumulated jump if any, and peel v from the boundary.
+	if(jump_count > 0) { jumps.push_back({step, jump_count}); jump_count = 0; }
+
+	// The rest is the same as for the regular spiral
+	R.remove(v);
+	int open = deg(v) - B.unwind();
+	if(open < 1) return -1;
+	B.push_back({v, open});
+	return v;
+      } else {
+	// If v is a cut-vertex, jump one position and try again.
+	B.rotate(); jump_count++;
+	continue; 
+      }
     }
     return -1;
   }
