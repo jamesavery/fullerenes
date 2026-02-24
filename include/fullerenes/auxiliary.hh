@@ -328,6 +328,8 @@ class Deque {
   }
 
 public:
+  enum End { FRONT, BACK };
+
   Deque(std::span<T> buf) : buf_(buf) {}
 
   int  size()  const { return tail_ - head_; }
@@ -339,10 +341,17 @@ public:
   T&       back(int offset = 0)        { return buf_[wrap(tail_ - 1 - offset)]; }
   const T& back(int offset = 0) const  { return buf_[wrap(tail_ - 1 - offset)]; }
 
+  // Direction-parameterized access to either end of the deque.
+  T&       end(End d, int offset = 0)       { return d == FRONT ? front(offset) : back(offset); }
+  const T& end(End d, int offset = 0) const { return d == FRONT ? front(offset) : back(offset); }
+  T&       other(End d)                     { return d == FRONT ? back()  : front(); }
+  const T& other(End d)               const { return d == FRONT ? back()  : front(); }
+
   void push_back(const T& x)  { check_overflow(); buf_[wrap(tail_++)] = x; }
   void push_front(const T& x) { check_overflow(); buf_[wrap(--head_)] = x; }
   T pop_front() { return buf_[wrap(head_++)]; }
   T pop_back()  { return buf_[wrap(--tail_)]; }
+  T pop(End d)  { return d == FRONT ? pop_front() : pop_back(); }
 
   friend ostream& operator<<(ostream& s, const Deque& q) {
     s << LIST_OPEN;

@@ -297,7 +297,7 @@ struct SpiralBoundary : Deque<pair<node_t,int>> {
   // enclosed — pop it, and the new endpoint also loses one valency
   // (it too is adjacent to the apex). Continue until an endpoint with
   // remaining valency is reached. Returns total connections consumed (≥ 2).
-  int unwind() { return drainFront() + drainBack(); }
+  int unwind() { return drain(FRONT) + drain(BACK); }
 
   void rotate() { push_back(front()); pop_front(); }
 
@@ -309,11 +309,11 @@ struct SpiralBoundary : Deque<pair<node_t,int>> {
   // Returns total connections made (≥ 2).
   template<class InsertEdge>
   int wind(node_t k, InsertEdge&& ins, bool best_effort = false) {
-    connectFwd(k, back().first, ins);
-    connectBwd(k, front().first, ins);
+    connect(FRONT, k, other(FRONT).first, ins);
+    connect(BACK,  k, other(BACK).first,  ins);
     int pu = 2;
-    pu += cascadeFwd(k, best_effort, ins);
-    pu += cascadeBwd(k, best_effort, ins);
+    pu += cascade(FRONT, k, best_effort, ins);
+    pu += cascade(BACK,  k, best_effort, ins);
     return pu;
   }
 
@@ -327,69 +327,46 @@ struct SpiralBoundary : Deque<pair<node_t,int>> {
   }
 
 private:
-  // Decrement front's open valency (one connection consumed by the apex).
+  // Decrement this end's open valency (one connection consumed by the apex).
   // If it hits 0, the node is fully enclosed: pop it off the boundary,
-  // and the new front also loses a valency (the apex triangle spans it
-  // too). Repeat until the front has remaining open valency.
+  // and the new endpoint also loses a valency (the apex triangle spans it
+  // too). Repeat until the endpoint has remaining open valency.
   // Returns the number of connections absorbed from this end (≥ 1).
-  int drainFront() {
-    --front().second;
+  int drain(End d) {
+    --end(d).second;
     int k = 1;
-    while(front().second == 0) { pop_front(); --front().second; k++; }
+    while(end(d).second == 0) { pop(d); --end(d).second; k++; }
     return k;
   }
 
-  // Mirror of drainFront from the back end of the boundary.
-  int drainBack() {
-    --back().second;
-    int k = 1;
-    while(back().second == 0) { pop_back(); --back().second; k++; }
-    return k;
-  }
-
-  // Insert edge {k → front} into the planar embedding with oriented
-  // successor hints, and decrement front's open valency.
+  // Insert edge {k → endpoint} into the planar embedding with oriented
+  // successor hints, and decrement the endpoint's open valency.
+  // The two successor slots (suc_uv, suc_vu) get the cascade_from node
+  // and a structural neighbour; which slot gets which depends on direction.
   template<class InsertEdge>
-  void connectFwd(node_t k, node_t suc_vu, InsertEdge& ins) {
-    ins({k, front().first}, back().first, suc_vu);
-    --front().second;
+  void connect(End d, node_t k, node_t cascade_from, InsertEdge& ins) {
+    node_t target = end(d).first;
+    if(d == FRONT)
+      ins({k, target}, other(d).first, cascade_from);
+    else
+      ins({k, target}, cascade_from, end(d, 1).first);
+    --end(d).second;
   }
 
-  // Insert edge {k → back} and decrement back's open valency.
-  template<class InsertEdge>
-  void connectBwd(node_t k, node_t suc_uv, InsertEdge& ins) {
-    ins({k, back().first}, suc_uv, back(1).first);
-    --back().second;
-  }
-
-  // After connectFwd saturated the front node (open == 0), it is fully
-  // enclosed: pop it and connect k to the new front node. Repeat while
-  // the new front is also saturated. This is the windup analog of
-  // drainFront — same chain reaction, but with actual edge insertion.
+  // After connect saturated the endpoint (open == 0), it is fully
+  // enclosed: pop it and connect k to the new endpoint. Repeat while
+  // the new endpoint is also saturated. This is the windup analog of
+  // drain — same chain reaction, but with actual edge insertion.
   // The best_effort guard prevents closing the last two boundary nodes
   // prematurely when building partial triangulations.
   template<class InsertEdge>
-  int cascadeFwd(node_t k, bool best_effort, InsertEdge& ins) {
+  int cascade(End d, node_t k, bool best_effort, InsertEdge& ins) {
     int n = 0;
-    while(front().second == 0) {
-      if(best_effort && size() == 2 && back().second == 0) break;
-      node_t old = front().first;
-      pop_front();
-      connectFwd(k, old, ins);
-      n++;
-    }
-    return n;
-  }
-
-  // Mirror of cascadeFwd from the back end of the boundary.
-  template<class InsertEdge>
-  int cascadeBwd(node_t k, bool best_effort, InsertEdge& ins) {
-    int n = 0;
-    while(back().second == 0) {
-      if(best_effort && size() == 2 && front().second == 0) break;
-      node_t old = back().first;
-      pop_back();
-      connectBwd(k, old, ins);
+    while(end(d).second == 0) {
+      if(best_effort && size() == 2 && other(d).second == 0) break;
+      node_t old = end(d).first;
+      pop(d);
+      connect(d, k, old, ins);
       n++;
     }
     return n;
