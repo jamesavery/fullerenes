@@ -268,17 +268,45 @@ vector<face_t> Triangulation::cubic_faces() const
 
 
 // ── Layer 1: SpiralBoundary ─────────────────────────────────────────
-// Deque of (node, open-valencies) with drain/rotate primitives.
-// Used by both windup (constructor) and unwind (get_spiral_implementation).
+// The boundary is a deque representing the frontier between placed and
+// unplaced faces in a triangulation under construction or extraction.
+// Each entry is (node, open_valencies), where open_valencies counts
+// how many more edges the node needs before it is fully enclosed.
+//
+// When a new node is placed, it connects to both boundary endpoints
+// (front and back). This may trigger a chain reaction: if an endpoint
+// becomes fully saturated (open_valencies hits 0), it is absorbed into
+// the interior, exposing the next node — which also receives a connection
+// from the new node, and may itself saturate, and so on.
+//
+// This chain reaction is called:
+//   cascading (during windup) — pops saturated endpoints, inserting edges
+//   draining  (during unwind) — pops saturated endpoints, read-only
+//
+// Two symmetric public operations:
+//   wind(k, ins)  — windup: attach node k, insert edges via ins callback.
+//   unwind()      — unwind: absorb saturated endpoints after peeling apex.
+// Both return the total number of connections consumed, which is
+// subtracted from the node's degree to get its open valency on the boundary.
 struct SpiralBoundary : Deque<pair<node_t,int>> {
   using Deque::Deque;
 
-  // ── Unwind: detach connections from boundary, return total consumed ──
+  // Drain saturated endpoints from both ends after the apex connects
+  // to the boundary. Each drain decrements the endpoint's open valency
+  // (one connection to the apex); if it hits 0, the node is fully
+  // enclosed — pop it, and the new endpoint also loses one valency
+  // (it too is adjacent to the apex). Continue until an endpoint with
+  // remaining valency is reached. Returns total connections consumed (≥ 2).
   int unwind() { return drainFront() + drainBack(); }
 
   void rotate() { push_back(front()); pop_front(); }
 
-  // ── Windup: attach node k to boundary, return total connections used ─
+  // Attach node k to the boundary during windup construction.
+  // First connects k to both endpoints (front and back), inserting
+  // the edges into the graph. Then cascades: if either endpoint is
+  // now saturated, pop it and connect k to the next endpoint, repeating
+  // until both ends have remaining open valency.
+  // Returns total connections made (≥ 2).
   template<class InsertEdge>
   int wind(node_t k, InsertEdge&& ins, bool best_effort = false) {
     connectFwd(k, back().first, ins);
@@ -289,6 +317,8 @@ struct SpiralBoundary : Deque<pair<node_t,int>> {
     return pu;
   }
 
+  // Close the final node during windup: it connects to every remaining
+  // boundary node, completing the surface.
   template<class InsertEdge>
   void closeLast(node_t last, InsertEdge&& ins) {
     int n = size();
@@ -297,6 +327,11 @@ struct SpiralBoundary : Deque<pair<node_t,int>> {
   }
 
 private:
+  // Decrement front's open valency (one connection consumed by the apex).
+  // If it hits 0, the node is fully enclosed: pop it off the boundary,
+  // and the new front also loses a valency (the apex triangle spans it
+  // too). Repeat until the front has remaining open valency.
+  // Returns the number of connections absorbed from this end (≥ 1).
   int drainFront() {
     --front().second;
     int k = 1;
@@ -304,6 +339,7 @@ private:
     return k;
   }
 
+  // Mirror of drainFront from the back end of the boundary.
   int drainBack() {
     --back().second;
     int k = 1;
@@ -311,18 +347,27 @@ private:
     return k;
   }
 
+  // Insert edge {k → front} into the planar embedding with oriented
+  // successor hints, and decrement front's open valency.
   template<class InsertEdge>
   void connectFwd(node_t k, node_t suc_vu, InsertEdge& ins) {
     ins({k, front().first}, back().first, suc_vu);
     --front().second;
   }
 
+  // Insert edge {k → back} and decrement back's open valency.
   template<class InsertEdge>
   void connectBwd(node_t k, node_t suc_uv, InsertEdge& ins) {
     ins({k, back().first}, suc_uv, back(1).first);
     --back().second;
   }
 
+  // After connectFwd saturated the front node (open == 0), it is fully
+  // enclosed: pop it and connect k to the new front node. Repeat while
+  // the new front is also saturated. This is the windup analog of
+  // drainFront — same chain reaction, but with actual edge insertion.
+  // The best_effort guard prevents closing the last two boundary nodes
+  // prematurely when building partial triangulations.
   template<class InsertEdge>
   int cascadeFwd(node_t k, bool best_effort, InsertEdge& ins) {
     int n = 0;
@@ -336,6 +381,7 @@ private:
     return n;
   }
 
+  // Mirror of cascadeFwd from the back end of the boundary.
   template<class InsertEdge>
   int cascadeBwd(node_t k, bool best_effort, InsertEdge& ins) {
     int n = 0;
@@ -362,6 +408,9 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
   vector<pair<node_t,int>> boundary_buf(max_boundary);
   SpiralBoundary B(boundary_buf);
 
+  // NB: Capture via Graph& reference, not Triangulation* this —
+  // calling insert_edge through the derived pointer produces
+  // incorrect neighbour ordering in the planar embedding.
   Graph& g = *this;
   auto ins = [&g](const arc_t& e, node_t su, node_t sv){ g.insert_edge(e, su, sv); };
 
@@ -535,7 +584,12 @@ bool Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3
 
 
 // ── Layer 2: RemainingGraph ─────────────────────────────────────────
-// Per-node bitmask tracking which neighbours are still active.
+// Tracks which nodes and edges are still present during spiral extraction
+// using a per-node bitmask into the original neighbour list (max degree 16).
+//
+// Removing node v clears its bit in each neighbour's active mask,
+// effectively deleting all edges incident to v. The last remaining
+// neighbour is cached in last_nbr for the terminal validation step.
 struct RemainingGraph {
   const Triangulation& tri;
   vector<uint16_t> active;
@@ -550,6 +604,10 @@ struct RemainingGraph {
       active[u] = (1u << t.neighbours[u].size()) - 1;
   }
 
+  // Remove v from the graph: clear v's bit in each active neighbour's
+  // mask (deleting all incident edges) and zero v's own mask.
+  // Caches an arbitrary active neighbour before clearing — this becomes
+  // the final node when only one remains.
   void remove(node_t v) {
     last_nbr = tri.neighbours[v][__builtin_ctz(active[v])];
     count--;
@@ -561,6 +619,12 @@ struct RemainingGraph {
     active[v] = 0;
   }
 
+  // Test whether v is a cut vertex: would removing v disconnect its
+  // active neighbours? Since neighbours are in cyclic (planar) order,
+  // the active ones form a contiguous arc iff every consecutive pair
+  // shares an edge. If any gap exists, the path is broken and v is
+  // a cut vertex.
+  // Used by generalPeel to skip cut vertices (which would strand faces).
   bool is_cut_vertex(node_t v) const {
     uint16_t m = active[v];
     int n = __builtin_popcount(m);
@@ -577,13 +641,24 @@ struct RemainingGraph {
       int j = tri.arc_ix(u, w);
       if(j >= 0 && (active[u] & (1u << j))) edges++;
     }
-    return edges < k - 1;
+    return edges < k - 1;  // connected arc of k nodes needs exactly k-1 edges
   }
 };
 
 
 // ── Layer 3: SpiralState ────────────────────────────────────────────
-// Composes RemainingGraph + SpiralBoundary + jump bookkeeping.
+// Composes RemainingGraph + SpiralBoundary + jump bookkeeping for
+// spiral extraction (unwind direction).
+//
+// The "apex" is the unplaced node completing the triangle formed by
+// the two boundary endpoints (back, front). Each peel step identifies
+// the apex, removes it from the remaining graph, unwinds the boundary,
+// and records the node's degree in the spiral output.
+//
+// regularPeel: the apex is always unique and peelable.
+// generalPeel: if the apex is a cut vertex (removing it would disconnect
+//   the remaining graph), rotate the boundary and record a jump.
+//   Try successive rotations until a non-cut apex is found.
 struct SpiralState {
   RemainingGraph R;
   vector<pair<node_t,int>> buf;
@@ -608,11 +683,17 @@ struct SpiralState {
 
   int deg(node_t v) const { return R.tri.neighbours[v].size(); }
 
+  // The apex is the unplaced node completing the triangle between the
+  // boundary endpoints. Which side of the (back→front) arc it lies on
+  // depends on the winding orientation (CCW vs CW).
   node_t apex() const {
     node_t u = B.back().first, w = B.front().first;
     return CCW ? R.tri.prev(u,w) : R.tri.next(u,w);
   }
 
+  // Place node f at position pos in the spiral. Remove it from the
+  // remaining graph and add it to the boundary with deg(f)-2 open
+  // valencies (2 are consumed connecting to the existing boundary endpoints).
   void place(int pos, node_t f, vector<int>& spiral, vector<node_t>& perm) {
     spiral[pos] = deg(f);
     perm[pos]   = f;
@@ -688,6 +769,9 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
     if(!S0.empty() && spiral[i] != S0[i]) return false;
   }
 
+  // ── Terminal: exactly one node remains. The boundary must form its
+  // complete star — one open valency per boundary node, and boundary
+  // size equals the last node's degree.
   if(S.R.count != 1) return false;
   int last_valency = S.deg(S.R.last_nbr);
   if(S.B.size() != last_valency) return false;
