@@ -267,6 +267,30 @@ vector<face_t> Triangulation::cubic_faces() const
 }
 
 
+// ── Layer 1: SpiralBoundary ─────────────────────────────────────────
+// Deque of (node, open-valencies) with drain/rotate primitives.
+// Used by both windup (constructor) and unwind (get_spiral_implementation).
+struct SpiralBoundary : Deque<pair<node_t,int>> {
+  using Deque::Deque;
+
+  int drainFront() {
+    --front().second;
+    int k = 1;
+    while(front().second == 0) { pop_front(); --front().second; k++; }
+    return k;
+  }
+
+  int drainBack() {
+    --back().second;
+    int k = 1;
+    while(back().second == 0) { pop_back(); --back().second; k++; }
+    return k;
+  }
+
+  void rotate() { push_back(front()); pop_front(); }
+};
+
+
 // Windup: construct an oriented triangulation from a face-degree sequence.
 // Mirrors Haskell reference: windupGeneralSpiral spiral jumps = init2 >> foldl' stepK >> closeLast
 Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t& j, const bool best_effort):
@@ -276,7 +300,7 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
 
   int max_boundary = 3 * static_cast<int>(ceil(sqrt(N))) + 12;
   vector<pair<node_t,int>> boundary_buf(max_boundary);
-  Deque<pair<node_t,int>> B(boundary_buf);
+  SpiralBoundary B(boundary_buf);
 
   // ── Edge insertion helpers ─────────────────────────
   //   insert_edge({k,v}, suc_uv, suc_vu): put v before suc_uv in k's list,
@@ -315,17 +339,6 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
     return pu;
   };
 
-  // ── Jump application  ────────────────────────────
-  auto applyJump = [&](int k){
-    if(!jumps.empty() && k == jumps.front().first){
-      for(int i = jumps.front().second; i > 0; --i){
-        B.push_back(B.front());
-        B.pop_front();
-      }
-      jumps.erase(jumps.begin());
-    }
-  };
-
   // ── Close last face  ─────────────────────────────
   auto closeLast = [&](){
     vector<node_t> nodes;
@@ -343,7 +356,10 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
   // ── Main fold: stepK for each remaining node (Haskell reference: foldl' stepK) ─
   int N_final = best_effort ? N : N-1;
   for(int k = 2; k < N_final; k++){
-    applyJump(k);
+    if(!jumps.empty() && k == jumps.front().first){
+      for(int i = jumps.front().second; i > 0; --i) B.rotate();
+      jumps.erase(jumps.begin());
+    }
 
     connectFwd(k, B.back().first);
     connectBwd(k, B.front().first);
@@ -506,178 +522,159 @@ bool Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3
   return get_spiral_implementation(f1,f2,f3,spiral,jumps,permutation,general);
 }
 
+
+// ── Layer 2: RemainingGraph ─────────────────────────────────────────
+// Per-node bitmask tracking which neighbours are still active.
+struct RemainingGraph {
+  const Triangulation& tri;
+  vector<uint16_t> active;
+  int count;
+  node_t last_nbr = -1;
+
+  explicit RemainingGraph(const Triangulation& t)
+    : tri(t), count(t.N), active(t.N)
+  {
+    assert(t.max_degree() <= 16);
+    for(int u = 0; u < count; u++)
+      active[u] = (1u << t.neighbours[u].size()) - 1;
+  }
+
+  void remove(node_t v) {
+    last_nbr = tri.neighbours[v][__builtin_ctz(active[v])];
+    count--;
+    for(uint16_t m = active[v]; m; m &= m-1) {
+      int    i = __builtin_ctz(m);
+      node_t w = tri.neighbours[v][i];
+      active[w] &= ~(1u << tri.arc_ix(w, v));
+    }
+    active[v] = 0;
+  }
+
+  bool is_cut_vertex(node_t v) const {
+    uint16_t m = active[v];
+    int n = __builtin_popcount(m);
+    if(n < 2) return false;
+
+    node_t nbrs[16];
+    int k = 0;
+    for(uint16_t t = m; t; t &= t-1)
+      nbrs[k++] = tri.neighbours[v][__builtin_ctz(t)];
+
+    int edges = 0;
+    for(int i = 0; i < k; i++) {
+      node_t u = nbrs[i], w = nbrs[(i+1) % k];
+      int j = tri.arc_ix(u, w);
+      if(j >= 0 && (active[u] & (1u << j))) edges++;
+    }
+    return edges < k - 1;
+  }
+};
+
+
+// ── Layer 3: SpiralState ────────────────────────────────────────────
+// Composes RemainingGraph + SpiralBoundary + jump bookkeeping.
+struct SpiralState {
+  RemainingGraph R;
+  vector<pair<node_t,int>> buf;
+  SpiralBoundary B;
+  jumplist_t& jumps;
+  bool CCW;
+  int jump_count = 0;
+  int step = 3;
+
+  SpiralState(const Triangulation& t, node_t f1, node_t f2, node_t f3,
+              jumplist_t& jumps_out)
+    : R(t)
+    , buf(3 * (int)ceil(sqrt(t.N)) + 12)
+    , B(buf)
+    , jumps(jumps_out)
+    , CCW(t.next(f1,f2) == f3)
+  {}
+
+  bool valid(node_t f1, node_t f2, node_t f3) const {
+    return CCW || R.tri.prev(f1,f2) == f3;
+  }
+
+  int deg(node_t v) const { return R.tri.neighbours[v].size(); }
+
+  node_t apex() const {
+    node_t u = B.back().first, w = B.front().first;
+    return CCW ? R.tri.prev(u,w) : R.tri.next(u,w);
+  }
+
+  void place(int pos, node_t f, vector<int>& spiral, vector<node_t>& perm) {
+    spiral[pos] = deg(f);
+    perm[pos]   = f;
+    R.remove(f);
+    B.push_back({f, deg(f) - 2});
+  }
+
+  node_t peel(bool general) {
+    node_t v = general ? generalPeel() : regularPeel();
+    step++;
+    return v;
+  }
+
+private:
+  node_t regularPeel() {
+    node_t v = apex();
+    if(v == -1) return -1;
+    R.remove(v);
+    int open = deg(v) - B.drainFront() - B.drainBack();
+    if(open < 1) return -1;
+    B.push_back({v, open});
+    return v;
+  }
+
+  node_t generalPeel() {
+    for(int rot = 0; rot < B.size(); rot++) {
+      node_t v = apex();
+      if(v == -1) return -1;
+      if(R.is_cut_vertex(v)) { B.rotate(); jump_count++; continue; }
+      if(jump_count > 0) { jumps.push_back({step, jump_count}); jump_count = 0; }
+      R.remove(v);
+      int open = deg(v) - B.drainFront() - B.drainBack();
+      if(open < 1) return -1;
+      B.push_back({v, open});
+      return v;
+    }
+    return -1;
+  }
+};
+
+
 // Extract a (general) spiral from a starting triple.  Mirrors the Haskell
 // decomposition: orient → init3 → fold peel → validateTerminal.
 bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, const node_t f3, vector<int> &spiral,
                                               jumplist_t& jumps, vector<node_t> &permutation,
-                                              const bool general, const vector<int>& S0, const jumplist_t &J0,
-                                              std::span<pair<node_t,int>> boundary_buf) const {
-  spiral.clear();  jumps.clear();  permutation.clear();
-  permutation.resize(N);
-  spiral.resize(N);
+                                              const bool general, const vector<int>& S0, const jumplist_t &J0) const {
+  spiral.assign(N, 0);  permutation.assign(N, 0);  jumps.clear();
 
-  // ── Remaining-graph state (bitmask over original neighbours) ───────
-  assert(max_degree() <= 16);
-  vector<uint16_t> active_mask(N);
-  for(node_t u = 0; u < N; u++)
-    active_mask[u] = (1 << neighbours[u].size()) - 1;
-  int remaining_count = N;
+  SpiralState S(*this, f1, f2, f3, jumps);
+  if(!S.valid(f1, f2, f3)) return false;
 
-  auto remove_node = [&](node_t v) {
-    remaining_count--;
-    const auto& nv = neighbours[v];
-    for(uint16_t mask = active_mask[v]; mask; mask &= mask - 1) {
-      int    i = __builtin_ctz(mask);
-      node_t w = nv[i];
-      int    j = arc_ix(w, v);
-      active_mask[w] &= ~(1 << j);
-    }
-    active_mask[v] = 0;
-  };
-
-  auto is_cut_vertex = [&](node_t v) -> bool {
-    const uint16_t mask = active_mask[v];
-    const int n_active = __builtin_popcount(mask);
-    if(n_active < 2) return false;
-
-    const auto& nv = neighbours[v];
-    node_t active_nbrs[16];
-    int k = 0;
-    for(uint16_t m = mask; m; m &= m - 1)
-      active_nbrs[k++] = nv[__builtin_ctz(m)];
-
-    int n_edges = 0;
-    for(int i = 0; i < k; i++) {
-      node_t u = active_nbrs[i], w = active_nbrs[(i+1) % k];
-      int j = arc_ix(u, w);
-      if(j >= 0 && (active_mask[u] & (1 << j)))
-        n_edges++;
-    }
-    return n_edges < k - 1;
-  };
-
-  auto first_neighbor = [&](node_t v) -> node_t {
-    return neighbours[v][__builtin_ctz(active_mask[v])];
-  };
-
-  // ── Boundary deque ─────────────────────────────────────────────────
-  vector<pair<node_t,int>> local_buf;
-  if(boundary_buf.empty()){
-    int max_boundary = 3 * static_cast<int>(ceil(sqrt(N))) + 12;
-    local_buf.resize(max_boundary);
-    boundary_buf = local_buf;
-  }
-  Deque<pair<node_t,int>> B(boundary_buf);
-
-  int last_vertex = -1;
-  int jump_state  = 0;
-
-  // ── Orient: detect CW/CCW from starting triple ────────────────────
-  bool CCW = next(f1,f2) == f3;
-  if(!CCW && prev(f1,f2) != f3) return false;  // invalid starting triple
-
-  // apex: the third vertex of the triangle across boundary edge (u → w)
-  auto apex = [&](node_t u, node_t w) -> node_t {
-    return CCW ? prev(u,w) : next(u,w);
-  };
-
-  // ── Drain: consume one connection, cascade-pop saturated nodes ─────
-  // Returns total connections consumed on that side (1 + cascade pops).
-  auto drainFront = [&]() -> int {
-    --B.front().second;
-    int k = 1;
-    while(B.front().second == 0) { B.pop_front(); --B.front().second; k++; }
-    return k;
-  };
-  auto drainBack = [&]() -> int {
-    --B.back().second;
-    int k = 1;
-    while(B.back().second == 0) { B.pop_back(); --B.back().second; k++; }
-    return k;
-  };
-
-  // ── Peel: one atomic spiral step ──────────────────────────────────
-  // Find apex across active edge, drain both ends, push.  Returns the
-  // peeled vertex, or -1 on failure.  
-  auto peel = [&]() -> node_t {
-    node_t v = apex(B.back().first, B.front().first);
-    if(v == -1) return -1;
-
-    last_vertex = first_neighbor(v);
-    remove_node(v);
-
-    int kF   = drainFront();
-    int kB   = drainBack();
-    int open = neighbours[v].size() - kF - kB;
-    if(open < 1) return -1;
-
-    B.push_back({v, open});
-    return v;
-  };
-
-  // ── General peel step: peel with cut-vertex guard + rotation ──────
-  auto generalPeelStep = [&](int stepIdx) -> node_t {
-    for(int rotations = 0; rotations < B.size(); rotations++) {
-      node_t v = apex(B.back().first, B.front().first);
-      if(v == -1) return -1;
-
-      if(is_cut_vertex(v)) {
-        B.push_back(B.front()); B.pop_front();
-        jump_state++;
-        continue;
-      }
-
-      if(jump_state > 0) { jumps.push_back({stepIdx, jump_state}); jump_state = 0; }
-
-      last_vertex = first_neighbor(v);
-      remove_node(v);
-
-      int kF   = drainFront();
-      int kB   = drainBack();
-      int open = neighbours[v].size() - kF - kB;
-      if(open < 1) return -1;
-
-      B.push_back({v, open});
-      return v;
-    }
-    return -1;  // full rotation without finding non-cut apex
-  };
-
-  // ── Initialize: place first 3 nodes (the starting triangle) ───────
-  // Each vertex of the starting triple has 2 edges consumed (one to each
-  // of the other two), so all three start with deg - 2 open valencies.
-  auto place = [&](int pos, node_t f) {
-    spiral[pos]      = neighbours[f].size();
-    permutation[pos] = f;
-    remove_node(f);
-    B.push_back({f, (int)neighbours[f].size() - 2});
-  };
-  place(0, f1);
-  place(1, f2);
-  place(2, f3);
+  S.place(0, f1, spiral, permutation);
+  S.place(1, f2, spiral, permutation);
+  S.place(2, f3, spiral, permutation);
 
   if(!S0.empty() && (spiral[0] != S0[0] || spiral[1] != S0[1] || spiral[2] != S0[2])) return false;
 
-  // ── Main fold: peel N-4 vertices ──────────────────────────────────
   for(int i = 3; i < N-1; ++i) {
-    node_t v = general ? generalPeelStep(i) : peel();
+    node_t v = S.peel(general);
     if(v == -1) return false;
-
-    spiral[i]      = neighbours[v].size();
+    spiral[i]      = S.deg(v);
     permutation[i] = v;
     if(!S0.empty() && spiral[i] != S0[i]) return false;
   }
 
-  // ── Validate terminal state ───────────────────────────────────────
-  // One vertex remains; boundary must have deg(lastV) entries, all with 1 open valency.
-  if(remaining_count != 1) return false;
-  int last_valency = neighbours[last_vertex].size();
-  if(B.size() != last_valency) return false;
-  for(int i = 0; i < B.size(); i++)
-    if(B.front(i).second != 1) return false;
+  if(S.R.count != 1) return false;
+  int last_valency = S.deg(S.R.last_nbr);
+  if(S.B.size() != last_valency) return false;
+  for(int i = 0; i < S.B.size(); i++)
+    if(S.B.front(i).second != 1) return false;
 
   spiral[N-1]      = last_valency;
-  permutation[N-1] = last_vertex;
+  permutation[N-1] = S.R.last_nbr;
   return true;
 }
 
@@ -764,9 +761,6 @@ bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, vector<ve
   spiral = vector<int>(1, INT_MAX);                    // sentinel: any real spiral wins
   jumps  = jumplist_t(100, make_pair(0, 0));           // sentinel: any real jumps win
 
-  int max_boundary = 3 * static_cast<int>(ceil(sqrt(N))) + 12;
-  vector<pair<node_t,int>> boundary_buf(max_boundary);
-
   // ── Try all starting triples, track lexicographic minimum ─────────────────
   // Haskell reference: mapMaybe (regularSpiral g) (startingTriples g), then minimum
   auto tryAllTriples = [&](bool use_general) -> bool {
@@ -780,7 +774,7 @@ bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, vector<ve
 
         for(int k = 0; k < n_tries; k++){
           if(!get_spiral_implementation(u,v,w[k], spiral_tmp,jumps_tmp,permutation_tmp,
-                                        use_general, {},{}, boundary_buf))
+                                        use_general))
           {
             if(use_general){ fprintf(stderr, "General spiral failed -- this should never happen!\n"); abort(); }
             continue;
