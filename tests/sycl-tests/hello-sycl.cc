@@ -1,7 +1,7 @@
 #include <sycl/sycl.hpp>
 #include <iostream>
 
-using namespace cl::sycl;
+using namespace sycl;
 using namespace std;
 
 int main(int, char**) {
@@ -41,13 +41,10 @@ int main(int, char**) {
 
     Q.wait();
 
+    cout << "Submitting nd_range kernel with local size 1024\n";
     Q.submit([&](handler &h) {
       h.parallel_for(nd_range(range{1024*10}, range{1024}), [=](nd_item<1> idx) {
-        //Print group size
-        if (idx.get_local_id(0) == 0) {
-          if(idx.get_group(0) == 0)
-            sycl::_V1::ext::oneapi::experimental::printf("Group size: %d\n", idx.get_local_range(0));
-        }
+        (void)idx;
       });      
     });
 
@@ -56,19 +53,16 @@ int main(int, char**) {
       h.parallel_for(nd_range(range{1024*10}), [=](nd_item<1> idx) {
         //Print group size
         if (idx.get_local_id(0) == 0) {
-          sycl::_V1::ext::oneapi::experimental::printf("Group size: %d\n", idx.get_local_range(0));
+          // Device-side printf intentionally omitted for portability.
         }
       });      
     }); */
 
     Q.wait();
+    cout << "Submitting work-group kernel\n";
     Q.submit([&](handler &h) {
       h.parallel_for_work_group(range{1024*10}, [=](group<1> g) {
-        //Print group size
-        if (g.get_local_id(0) == 0) {
-          if(g.get_group_id(0) == 0)
-            sycl::_V1::ext::oneapi::experimental::printf("Group size: %d\n", g.get_local_range(0));
-        }
+        (void)g;
       });
     });
     Q.wait();

@@ -6,32 +6,37 @@ list(APPEND SYCL_LIBRARY_SOURCES
   hessian
   eigen
   sycl-util-impl
-  primitives-instantiations
   geometry-properties
 )
 
 list(APPEND SYCL_SOURCE_CUSTOM_FLAGS 
-"-Xcuda-ptxas --maxrregcount=40"    # dualize.cc
-"-Xcuda-ptxas --maxrregcount=80"    # forcefield-optimize.cc
-"-Xcuda-ptxas --maxrregcount=40"    # tutte.cc
-"-Xcuda-ptxas --maxrregcount=40"    # spherical-projection.cc
-"-Xcuda-ptxas --maxrregcount=80"     # hessian.cc
-"-Xcuda-ptxas --maxrregcount=80"     # eigen.cc
-"-Xcuda-ptxas --maxrregcount=40 -ltbb"   # sycl-util-impl.cc
-"-Xcuda-ptxas --maxrregcount=40 -ltbb"    # primitives.cc
-"-Xcuda-ptxas --maxrregcount=40"    # geometry-properties.cc
+""    # dualize.cc
+""    # forcefield-optimize.cc
+""    # tutte.cc
+""    # spherical-projection.cc
+""    # hessian.cc
+""    # eigen.cc
+""    # sycl-util-impl.cc
+""    # geometry-properties.cc
 )
 
 
 add_library(sycl_fullerene_lib SHARED nop_kernel.cc)
-set_target_properties(sycl_fullerene_lib PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} ${DPCPP_FLAGS}")
-target_link_libraries(sycl_fullerene_lib PRIVATE ${CMAKE_CXX_FLAGS} ${DPCPP_FLAGS})
+target_compile_options(sycl_fullerene_lib PRIVATE ${SYCL_FLAGS})
+target_link_options(sycl_fullerene_lib PRIVATE ${SYCL_FLAGS})
+target_link_libraries(sycl_fullerene_lib PRIVATE ${SYCL_RUNTIME_LIBS})
 
 foreach(SYCL_SOURCE FLAGS IN ZIP_LISTS SYCL_LIBRARY_SOURCES SYCL_SOURCE_CUSTOM_FLAGS)
-    add_library(${SYCL_SOURCE}_lib SHARED ${SYCL_SOURCE}.cc)
-    set_target_properties(${SYCL_SOURCE}_lib PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} ${DPCPP_FLAGS} ${FLAGS} -I/opt/nvidia/hpc_sdk/Linux_x86_64/24.11/math_libs/12.6/targets/x86_64-linux/include")
-    target_link_libraries(${SYCL_SOURCE}_lib PRIVATE ${CMAKE_CXX_FLAGS} ${DPCPP_FLAGS} ${FLAGS})
+  add_library(${SYCL_SOURCE}_lib SHARED ${SYCL_SOURCE}.cc)
+  target_compile_options(${SYCL_SOURCE}_lib PRIVATE ${SYCL_FLAGS} ${FLAGS})
+  target_link_options(${SYCL_SOURCE}_lib PRIVATE ${SYCL_FLAGS})
+  target_link_libraries(${SYCL_SOURCE}_lib PRIVATE ${SYCL_RUNTIME_LIBS})
 endforeach()
+
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  target_compile_options(forcefield-optimize_lib PRIVATE -fpermissive)
+  target_compile_options(hessian_lib PRIVATE -fpermissive)
+endif()
 
 target_link_libraries(
   sycl_fullerene_lib 
@@ -40,6 +45,5 @@ target_link_libraries(
   PRIVATE spherical-projection_lib 
   PRIVATE hessian_lib eigen_lib 
   PRIVATE sycl-util-impl_lib 
-  PRIVATE primitives-instantiations_lib 
   PRIVATE geometry-properties_lib 
 )

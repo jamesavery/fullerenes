@@ -6,8 +6,8 @@
 #include <tuple>
 #include <iterator>
 #include <type_traits>
+#include <execution>
 #include <fullerenes/kernel-headers/dualize-functor.hh>
-#include "primitives.cc"
 #include "queue-impl.cc"
 #include "forcefield-includes.cc"
 #include "kernel.cc"
@@ -122,7 +122,8 @@ SyclEvent dualize_general_impl(  SyclQueue& Q,
     });
     
     work_distribution.wait();
-    primitives::exclusive_scan(Q, rep_count_acc, scan_array_acc, K(0), Plus{});
+    Q.wait();
+    std::exclusive_scan(std::execution::par_unseq, rep_count_acc.begin(), rep_count_acc.end(), scan_array_acc.begin(), K(0), std::plus<K>{});
 
     auto arc_list_event = Q->submit([&](handler &h) {
         h.parallel_for(nd_range(range{grid_size1}, range{workgroup_size1}), [=](nd_item<1> nditem) {
@@ -280,8 +281,6 @@ SyclEvent prepare_fullerene_graph(SyclQueue& Q, Fullerene<T,K> fullerene, Span<K
         arc_list.size() < Nout*2){
         throw std::runtime_error("Insufficient memory for dualization");
     }
-    //primitives::transform_exclusive_scan(Q, 
-
     auto work_distribution = Q -> parallel_for(nd_range(range{grid_size1}, range{workgroup_size1}), [=](nd_item<1> nditem) {
         auto thid = nditem.get_global_linear_id();
         DeviceDualGraph<6, K> FD(fullerene.d_.A_dual_, fullerene.d_.deg_);
@@ -299,7 +298,8 @@ SyclEvent prepare_fullerene_graph(SyclQueue& Q, Fullerene<T,K> fullerene, Span<K
     });
 
     work_distribution.wait();
-    primitives::exclusive_scan(Q, rep_count, scan_array, K(0), Plus{});
+    Q.wait();
+    std::exclusive_scan(std::execution::par_unseq, rep_count.begin(), rep_count.end(), scan_array.begin(), K(0), std::plus<K>{});
 
     auto arc_list_event = Q -> parallel_for(nd_range(range{grid_size1}, range{workgroup_size1}), [=](nd_item<1> nditem) {
         auto idx = nditem.get_global_linear_id();

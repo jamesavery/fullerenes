@@ -12,17 +12,15 @@ struct LaunchConfig{
     
     LaunchConfig(SyclQueue& Q){
         dev = Q->get_device();
-        auto context = Q->get_context();
-        auto kernel_bundle = sycl::get_kernel_bundle<sycl::bundle_state::executable>(context, {dev});
-        try{
-            auto kernel = kernel_bundle.get_kernel(sycl::get_kernel_id<KernelName>());
-            preferred_wg_multiple = kernel.template get_info<sycl::info::kernel_device_specific::preferred_work_group_size_multiple>(dev);
-            max_wg_size = kernel.template get_info<sycl::info::kernel_device_specific::work_group_size>(dev);
-            compile_wg_size = kernel.template get_info<sycl::info::kernel_device_specific::compile_work_group_size>(dev)[0];
-            num_regs = kernel.template get_info<sycl::info::kernel_device_specific::ext_codeplay_num_regs>(dev);
-        } catch (sycl::exception& e){
-            std::cerr << "Error: " << e.what() << std::endl;
-        }
+
+        // Backend-agnostic defaults that are available across SYCL implementations.
+        preferred_wg_multiple = 1;
+        max_wg_size = dev.get_info<sycl::info::device::max_work_group_size>();
+        compile_wg_size = max_wg_size;
+        num_regs = 0;
+
+        auto sub_groups = dev.get_info<sycl::info::device::sub_group_sizes>();
+        if(!sub_groups.empty()) preferred_wg_multiple = sub_groups[0];
     }
 
     bool is_batch_execution_possible(int_t N){
@@ -43,13 +41,15 @@ struct LaunchConfig{
     size_t max_concurrent_launches(int_t N){
         if(dev.is_cpu()) return dev.get_info<sycl::info::device::max_compute_units>();
         auto max_comp_units = dev.get_info<sycl::info::device::max_compute_units>();
-        auto sub_group_size = dev.get_info<sycl::info::device::sub_group_sizes>()[0];
+        auto sub_groups = dev.get_info<sycl::info::device::sub_group_sizes>();
+        auto sub_group_size = sub_groups.empty() ? size_t(1) : sub_groups[0];
         auto ideal_nd_range = isomer_nd_range(N);
         auto round_to_nearest_multiple = [](int_t x, int_t y){return y*((x + y - 1) / y);};
-        auto work_group_size = round_to_nearest_multiple(ideal_nd_range.get_local_range().size(), sub_group_size);
-        auto n_work_groups = ideal_nd_range.get_global_range().size() / ideal_nd_range.get_local_range().size();
-        auto n_work_groups_per_cu = max_wg_size / work_group_size;
-        auto n_cus_required = n_work_groups / n_work_groups_per_cu;
+        auto local_size = ideal_nd_range.get_local_range().size();
+        auto work_group_size = std::max<size_t>(1, round_to_nearest_multiple(local_size, sub_group_size));
+        auto n_work_groups = std::max<size_t>(1, ideal_nd_range.get_global_range().size() / std::max<size_t>(1, local_size));
+        auto n_work_groups_per_cu = std::max<size_t>(1, max_wg_size / work_group_size);
+        auto n_cus_required = std::max<size_t>(1, n_work_groups / n_work_groups_per_cu);
         auto max_concurrent_launches = max_comp_units / n_cus_required;
         return std::min((int_t)max_concurrent_launches, (int_t)max_comp_units);
     }

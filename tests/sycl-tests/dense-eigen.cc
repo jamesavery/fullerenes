@@ -2,7 +2,6 @@
 #include <numeric>
 #include <array>
 #include "sycl/sycl.hpp"
-#include <oneapi/dpl/random>
 using namespace sycl;
 
 /* JA: Muy complicado. Få Jonas-tutorial om hvorfor. */

@@ -2,9 +2,20 @@
 #include <fullerenes/kernel-headers/eigen-functor.hh>
 #include "forcefield-includes.cc"
 #include <array>
+#include <cstdint>
 #include "queue-impl.cc"
-#include <oneapi/dpl/random>
 using namespace sycl;
+
+template <typename T>
+inline T deterministic_unit_random(uint32_t seed, uint32_t lane) {
+    uint32_t x = seed ^ (lane + 0x9e3779b9u + (seed << 6) + (seed >> 2));
+    x ^= x >> 16;
+    x *= 0x7feb352du;
+    x ^= x >> 15;
+    x *= 0x846ca68bu;
+    x ^= x >> 16;
+    return T(x) * (T(1.0) / T(4294967295.0));
+}
 
 template <typename T>
 void apply_all_reflections(const sycl::group<1> &cta, const sycl::local_accessor<T,1>& V, const int n, const int m, T* Q)
@@ -369,11 +380,8 @@ SyclEvent eigensolve(SyclQueue& Q, FullereneBatchView<T,K> B,
             }
             sycl::group_barrier(cta);
 
-            // Generate random starting vector
-            oneapi::dpl::uniform_real_distribution<T> distr(0.0, 1.0);            
-            oneapi::dpl::minstd_rand engine(42, tid);
-
-            V[0*N] =  distr(engine); //Seed the random number generator with the thread id
+            // Generate deterministic pseudo-random starting vector from lane id.
+            V[0*N] = deterministic_unit_random<T>(42u, static_cast<uint32_t>(tid));
             V[0*N] /= sycl::sqrt(reduce_over_group(cta, V[0*N] * V[0*N], sycl::plus<real_t>{}));
             V[0*N] = MGS(0);
             for (int i = 0; i < nLanczos; i++){
