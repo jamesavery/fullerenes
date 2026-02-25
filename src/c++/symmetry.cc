@@ -187,9 +187,13 @@ vector<Permutation> Symmetry::permutation_representation() const
   // external source (e.g. buckygen), node indices differ from spiral positions, and we must convert:
   //   automorphism[P0[i]] = P[i]  ⟺  automorphism = P0⁻¹ ∘ P
   // where P0 is the position→node map for the canonical spiral and P is for each symmetric start.
-
-  // Collect all position→node maps that produce spiral S0.
-  vector<Permutation> raw;
+  //
+  // Collect all position→node maps that produce spiral S0 with jumps J0.
+  // get_spiral_implementation checks S0 degree-by-degree but does NOT check J0,
+  // so we must verify jumps == J0 ourselves. A map with different jumps has
+  // different position-space connectivity (boundary rotations differ), making
+  // P0⁻¹∘P invalid.
+  vector<Permutation> numberings;
 
   for(node_t u=0;u<N;u++){
     if(degree(u) == S0[0])
@@ -200,21 +204,21 @@ vector<Permutation> Symmetry::permutation_representation() const
 
 	  node_t wCCW = next(u,v), wCW = prev(u,v);
 
-	  if(degree(wCCW) == S0[2] && get_spiral_implementation(u,v,wCCW,spiral,jumps,permutation,true,S0,J0))
-	    raw.push_back(permutation);
-	  if(degree(wCW)  == S0[2] && get_spiral_implementation(u,v,wCW,spiral,jumps,permutation,true,S0,J0))
-	    raw.push_back(permutation);
+	  if(degree(wCCW) == S0[2] && get_spiral_implementation(u,v,wCCW,spiral,jumps,permutation,true,S0,J0) && jumps == J0)
+	    numberings.push_back(permutation);
+	  if(degree(wCW)  == S0[2] && get_spiral_implementation(u,v,wCW,spiral,jumps,permutation,true,S0,J0) && jumps == J0)
+	    numberings.push_back(permutation);
 	}
       }
   }
 
-  if(raw.empty()) return {};
+  if(numberings.empty()) return {};
 
   // Use the first found map as P0 (the canonical reference). P0⁻¹∘P0 = identity.
-  Permutation P0_inv = raw[0].inverse();
+  Permutation P0_inv = numberings[0].inverse();
 
   vector<Permutation> pi;
-  for(auto& P : raw)
+  for(auto& P : numberings)
     pi.push_back(P0_inv * P);
 
   return pi;
