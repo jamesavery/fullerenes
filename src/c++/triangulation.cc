@@ -699,23 +699,22 @@ private:
   node_t generalPeel() {
     for(int rot = 0; rot < B.size(); rot++) {
       node_t v = apex();
-      if(v == -1 || R.active[v] == 0) return -1; // Invalid or already-removed apex
+      if(v == -1) return -1;
 
-      if(!R.is_cut_vertex(v)){
-	// If v is not a cut vertex, Commit accumulated jump if any, and peel v from the boundary.
-	if(jump_count > 0) { jumps.push_back({step, jump_count}); jump_count = 0; }
-
-	// The rest is the same as for the regular spiral
-	R.remove(v);
-	int open = deg(v) - B.unwind();
-	if(open < 1) return -1;
-	B.push_back({v, open});
-	return v;
-      } else {
-	// If v is a cut-vertex, jump one position and try again.
+      // Rotate past removed nodes and cut vertices (matches Haskell generalPeelStep).
+      if(R.active[v] == 0 || R.is_cut_vertex(v)){
 	B.rotate(); jump_count++;
-	continue; 
+	continue;
       }
+
+      // Commit accumulated jump if any, then peel v from the boundary.
+      if(jump_count > 0) { jumps.push_back({step, jump_count}); jump_count = 0; }
+
+      R.remove(v);
+      int open = deg(v) - B.unwind();
+      if(open < 1) return -1;
+      B.push_back({v, open});
+      return v;
     }
     return -1;
   }
