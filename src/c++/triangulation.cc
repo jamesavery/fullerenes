@@ -687,7 +687,7 @@ struct SpiralState {
 private:
   node_t regularPeel() {
     node_t v = apex();
-    if(v == -1) return -1; // Error in the graph
+    if(v == -1 || R.active[v] == 0) return -1; // Invalid or already-removed apex
 
     R.remove(v);  // Remove the apex vertex v from the remaining graph R...
     int open = deg(v) - B.unwind(); // ...and place it on the boundary B with its open valency
@@ -699,7 +699,7 @@ private:
   node_t generalPeel() {
     for(int rot = 0; rot < B.size(); rot++) {
       node_t v = apex();
-      if(v == -1) return -1; 
+      if(v == -1 || R.active[v] == 0) return -1; // Invalid or already-removed apex
 
       if(!R.is_cut_vertex(v)){
 	// If v is not a cut vertex, Commit accumulated jump if any, and peel v from the boundary.

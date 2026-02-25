@@ -181,35 +181,42 @@ vector<Permutation> Symmetry::arc_permutation(const vector<Permutation>& Gf) con
 
 vector<Permutation> Symmetry::permutation_representation() const
 {
-  vector<Permutation> pi;
+  // get_spiral_implementation returns position→node maps: perm[i] = node at spiral position i.
+  // When the graph was constructed from a spiral, node indices match spiral positions (P0 = identity),
+  // so these maps are directly valid node→node automorphisms. But when the graph comes from an
+  // external source (e.g. buckygen), node indices differ from spiral positions, and we must convert:
+  //   automorphism[P0[i]] = P[i]  ⟺  automorphism = P0⁻¹ ∘ P
+  // where P0 is the position→node map for the canonical spiral and P is for each symmetric start.
+
+  // Collect all position→node maps that produce spiral S0.
+  vector<Permutation> raw;
 
   for(node_t u=0;u<N;u++){
-    if(degree(u) == S0[0]) // u has same degree as vertex 1: possible spiral start
+    if(degree(u) == S0[0])
       for(const node_t &v: neighbours[u]){
-	if(degree(v) == S0[1]){ // v has same degree as vertex 2: still possible spiral start
+	if(degree(v) == S0[1]){
 	  vector<int> spiral,permutation;
 	  jumplist_t  jumps;
 
 	  node_t wCCW = next(u,v), wCW = prev(u,v);
 
-	  if(degree(wCCW) == S0[2] && get_spiral_implementation(u,v,wCCW,spiral,jumps,permutation,true,S0,J0)){
-	    // cout << "Found CCW symmetry:\n"
-	    // 	 << S0     << " = \n"
-	    // 	 << spiral << "\n"
-	    // 	 << "pi = " << permutation << "\n";
-	    pi.push_back(permutation);
-	  }
-	  if(degree(wCW)  == S0[2] && get_spiral_implementation(u,v,wCW,spiral,jumps,permutation,true,S0,J0)){
-	    // cout << "Found CW symmetry:\n"
-	    // 	 << S0     << " = \n"
-	    // 	 << spiral << "\n"
-	    // 	 << "pi = " << permutation << "\n";
-	    
-	    pi.push_back(permutation);
-	  }
+	  if(degree(wCCW) == S0[2] && get_spiral_implementation(u,v,wCCW,spiral,jumps,permutation,true,S0,J0))
+	    raw.push_back(permutation);
+	  if(degree(wCW)  == S0[2] && get_spiral_implementation(u,v,wCW,spiral,jumps,permutation,true,S0,J0))
+	    raw.push_back(permutation);
 	}
       }
   }
+
+  if(raw.empty()) return {};
+
+  // Use the first found map as P0 (the canonical reference). P0⁻¹∘P0 = identity.
+  Permutation P0_inv = raw[0].inverse();
+
+  vector<Permutation> pi;
+  for(auto& P : raw)
+    pi.push_back(P0_inv * P);
+
   return pi;
 }
 
