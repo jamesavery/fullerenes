@@ -12,4 +12,6 @@ add_test(NAME symmetry-test COMMAND symmetry-test)
 
 add_executable(deltahedron-test deltahedron-test.cc)
 target_link_libraries(deltahedron-test fullerenes GTest::GTest GTest::Main)
+target_include_directories(deltahedron-test PRIVATE ${CMAKE_SOURCE_DIR}/data)
+target_compile_definitions(deltahedron-test PRIVATE C44_DATA_DIR="${CMAKE_SOURCE_DIR}/data")
 add_test(NAME deltahedron-test COMMAND deltahedron-test)

@@ -2,6 +2,7 @@
 #include <cmath>
 #include "fullerenes/deltahedron.hh"
 #include "fullerenes/polyhedron.hh"
+#include "C44geometries.hh"
 
 using namespace std;
 
@@ -383,4 +384,286 @@ TEST_F(DeltahedronTest, GC_2_1_NoNaNPoints) {
     EXPECT_GT(result.points[u].norm(), 1e-10)
       << "zero-norm point at vertex " << u;
   }
+}
+
+// ================================================================
+// ===== C44 isomer tests =========================================
+// ================================================================
+
+// Load C44 geometry database from binary files once
+static C44Geometries load_C44() {
+  return C44Geometries::load(
+    C44_DATA_DIR "/c044all.rspi.u8",
+    C44_DATA_DIR "/c044all.geometry.f32");
+}
+
+static const C44Geometries& C44_db() {
+  static C44Geometries db = load_C44();
+  return db;
+}
+
+// Reconstruct a Deltahedron from stored C44 isomer data:
+//   spiral -> Triangulation -> dual_graph -> Polyhedron -> dual -> Deltahedron
+static Deltahedron make_C44_deltahedron(int idx) {
+  const auto& db = C44_db();
+  const uint8_t* pi = db.pentagon_indices(idx);
+  const float* pts = db.points(idx);
+
+  // Build spiral code: 24 faces (N/2+2 for C44), 12 pentagons + 12 hexagons
+  vector<int> spiral(24, 6);
+  for(int i = 0; i < 12; i++)
+    spiral[pi[i]] = 5;
+
+  // Reconstruct triangulation (fullerene dual) from spiral
+  Triangulation T(spiral);
+
+  // Get fullerene graph and attach stored optimized coordinates
+  FullereneGraph G = T.dual_graph();
+  vector<coord3d> fpoints(44);
+  for(int v = 0; v < 44; v++)
+    fpoints[v] = coord3d(pts[v*3], pts[v*3+1], pts[v*3+2]);
+
+  // Build fullerene polyhedron, take dual to get deltahedron
+  Polyhedron P(G, fpoints, 6);
+  Polyhedron dual = P.dual();
+  return Deltahedron(dual);
+}
+
+// C44 dual: V=24, E=66, F=44
+static constexpr int C44_V = 24, C44_E = 66, C44_F = 44;
+
+// ===== Node count tests across all C44 isomers =====
+
+TEST(C44DeltahedronTest, AllC44_GC_2_0_NodeCount) {
+  int expected = expected_gc_nodes(C44_V, C44_E, C44_F, 2, 0);
+  for(int idx = 0; idx < C44_db().n_isomers; idx++){
+    SCOPED_TRACE("isomer " + to_string(idx));
+    Deltahedron D = make_C44_deltahedron(idx);
+    Deltahedron result = D.GCtransform(2, 0);
+    EXPECT_EQ(result.N, expected);
+    EXPECT_EQ((int)result.points.size(), result.N);
+  }
+}
+
+TEST(C44DeltahedronTest, AllC44_GC_1_1_NodeCount) {
+  int expected = expected_gc_nodes(C44_V, C44_E, C44_F, 1, 1);
+  for(int idx = 0; idx < C44_db().n_isomers; idx++){
+    SCOPED_TRACE("isomer " + to_string(idx));
+    Deltahedron D = make_C44_deltahedron(idx);
+    Deltahedron result = D.GCtransform(1, 1);
+    EXPECT_EQ(result.N, expected);
+    EXPECT_EQ((int)result.points.size(), result.N);
+  }
+}
+
+// ===== No NaN or zero-norm coordinates =====
+
+TEST(C44DeltahedronTest, AllC44_GC_2_0_NoNaN) {
+  for(int idx = 0; idx < C44_db().n_isomers; idx++){
+    SCOPED_TRACE("isomer " + to_string(idx));
+    Deltahedron D = make_C44_deltahedron(idx);
+    Deltahedron result = D.GCtransform(2, 0);
+    for(int u = 0; u < result.N; u++){
+      for(int d = 0; d < 3; d++)
+        EXPECT_FALSE(std::isnan(result.points[u][d]));
+      EXPECT_GT(result.points[u].norm(), 1e-10);
+    }
+  }
+}
+
+TEST(C44DeltahedronTest, AllC44_GC_1_1_NoNaN) {
+  for(int idx = 0; idx < C44_db().n_isomers; idx++){
+    SCOPED_TRACE("isomer " + to_string(idx));
+    Deltahedron D = make_C44_deltahedron(idx);
+    Deltahedron result = D.GCtransform(1, 1);
+    for(int u = 0; u < result.N; u++){
+      for(int d = 0; d < 3; d++)
+        EXPECT_FALSE(std::isnan(result.points[u][d]));
+      EXPECT_GT(result.points[u].norm(), 1e-10);
+    }
+  }
+}
+
+// ===== Topology consistency =====
+
+TEST(C44DeltahedronTest, AllC44_GC_2_0_TopologyConsistency) {
+  for(int idx = 0; idx < C44_db().n_isomers; idx++){
+    SCOPED_TRACE("isomer " + to_string(idx));
+    Deltahedron D = make_C44_deltahedron(idx);
+    Deltahedron result = D.GCtransform(2, 0);
+    Triangulation topo = D.halma_transform(1);  // halma_transform(k-1)
+    EXPECT_EQ(result.N, topo.N);
+    EXPECT_EQ(result.triangles.size(), topo.triangles.size());
+  }
+}
+
+TEST(C44DeltahedronTest, AllC44_GC_1_1_TopologyConsistency) {
+  for(int idx = 0; idx < C44_db().n_isomers; idx++){
+    SCOPED_TRACE("isomer " + to_string(idx));
+    Deltahedron D = make_C44_deltahedron(idx);
+    Deltahedron result = D.GCtransform(1, 1);
+    Triangulation topo = D.Triangulation::GCtransform(1, 1);
+    EXPECT_EQ(result.N, topo.N);
+    EXPECT_EQ(result.triangles.size(), topo.triangles.size());
+  }
+}
+
+// ===== Surface preservation =====
+
+TEST(C44DeltahedronTest, AllC44_GC_2_0_SurfacePreservation) {
+  for(int idx = 0; idx < C44_db().n_isomers; idx++){
+    SCOPED_TRACE("isomer " + to_string(idx));
+    Deltahedron D = make_C44_deltahedron(idx);
+    Deltahedron result = D.GCtransform(2, 0);
+
+    for(int u = 0; u < result.N; u++){
+      double min_dist = INFINITY;
+      for(const auto& tri : D.triangles){
+        Tri3D T(D.points[tri[0]]*2, D.points[tri[1]]*2, D.points[tri[2]]*2);
+        double d = T.distance(result.points[u]);
+        if(d < min_dist) min_dist = d;
+      }
+      EXPECT_NEAR(min_dist, 0.0, 1e-10)
+        << "vertex " << u << " not on any scaled parent triangle";
+    }
+  }
+}
+
+TEST(C44DeltahedronTest, AllC44_GC_1_1_SurfacePreservation) {
+  double sqrtT = sqrt(3.0);
+  for(int idx = 0; idx < C44_db().n_isomers; idx++){
+    SCOPED_TRACE("isomer " + to_string(idx));
+    Deltahedron D = make_C44_deltahedron(idx);
+    Deltahedron result = D.GCtransform(1, 1);
+
+    for(int u = 0; u < result.N; u++){
+      double min_dist = INFINITY;
+      for(const auto& tri : D.triangles){
+        Tri3D T(D.points[tri[0]]*sqrtT, D.points[tri[1]]*sqrtT, D.points[tri[2]]*sqrtT);
+        double d = T.distance(result.points[u]);
+        if(d < min_dist) min_dist = d;
+      }
+      EXPECT_NEAR(min_dist, 0.0, 1e-10)
+        << "vertex " << u << " not on any scaled parent triangle";
+    }
+  }
+}
+
+// ===== Original vertices present =====
+
+TEST(C44DeltahedronTest, AllC44_GC_2_0_OriginalVerticesPresent) {
+  for(int idx = 0; idx < C44_db().n_isomers; idx++){
+    SCOPED_TRACE("isomer " + to_string(idx));
+    Deltahedron D = make_C44_deltahedron(idx);
+    Deltahedron result = D.GCtransform(2, 0);
+
+    // Halma path preserves node IDs: result.points[u] == 2 * D.points[u]
+    for(int u = 0; u < D.N; u++){
+      for(int d = 0; d < 3; d++){
+        EXPECT_NEAR(result.points[u][d], 2.0 * D.points[u][d], 1e-10);
+      }
+    }
+  }
+}
+
+TEST(C44DeltahedronTest, AllC44_GC_1_1_OriginalVerticesPresent) {
+  double sqrtT = sqrt(3.0);
+  for(int idx = 0; idx < C44_db().n_isomers; idx++){
+    SCOPED_TRACE("isomer " + to_string(idx));
+    Deltahedron D = make_C44_deltahedron(idx);
+    Deltahedron result = D.GCtransform(1, 1);
+
+    // Unfold/fold renumbers nodes, so search by position
+    for(int u = 0; u < D.N; u++){
+      coord3d expected = D.points[u] * sqrtT;
+      bool found = false;
+      for(int v = 0; v < result.N; v++){
+        if((result.points[v] - expected).norm() < 1e-10){
+          found = true;
+          break;
+        }
+      }
+      EXPECT_TRUE(found) << "original vertex " << u
+        << " not found at sqrt(3)*P in GC(1,1) output";
+    }
+  }
+}
+
+// ================================================================
+// ===== Larger GC transforms: GC(3,2) and GC(5,3) ===============
+// ================================================================
+
+// Helper: run all standard checks on GC(k,l) across all C44 isomers.
+// Returns number of failures for diagnostics.
+static void check_C44_GC(int k, int l, const char* label) {
+  double scale = sqrt((double)(k*k + k*l + l*l));
+  int expected_N = expected_gc_nodes(C44_V, C44_E, C44_F, k, l);
+
+  for(int idx = 0; idx < C44_db().n_isomers; idx++){
+    SCOPED_TRACE(string(label) + " isomer " + to_string(idx));
+    Deltahedron D = make_C44_deltahedron(idx);
+    Deltahedron result = D.GCtransform(k, l);
+
+    // Node count
+    EXPECT_EQ(result.N, expected_N);
+    EXPECT_EQ((int)result.points.size(), result.N);
+
+    // No NaN or zero-norm
+    for(int u = 0; u < result.N; u++){
+      for(int d = 0; d < 3; d++)
+        EXPECT_FALSE(std::isnan(result.points[u][d]));
+      EXPECT_GT(result.points[u].norm(), 1e-10);
+    }
+
+    // Topology consistency with Triangulation::GCtransform
+    Triangulation topo = D.Triangulation::GCtransform(k, l);
+    EXPECT_EQ(result.N, topo.N);
+    EXPECT_EQ(result.triangles.size(), topo.triangles.size());
+
+    // Surface preservation: every vertex lies on a scaled parent triangle
+    for(int u = 0; u < result.N; u++){
+      double min_dist = INFINITY;
+      for(const auto& tri : D.triangles){
+        Tri3D T(D.points[tri[0]]*scale, D.points[tri[1]]*scale, D.points[tri[2]]*scale);
+        double d = T.distance(result.points[u]);
+        if(d < min_dist) min_dist = d;
+      }
+      EXPECT_NEAR(min_dist, 0.0, 1e-10)
+        << "vertex " << u << " not on any scaled parent triangle";
+    }
+
+    // Original vertices present (search by position)
+    for(int u = 0; u < D.N; u++){
+      coord3d expected = D.points[u] * scale;
+      bool found = false;
+      for(int v = 0; v < result.N; v++){
+        if((result.points[v] - expected).norm() < 1e-10){
+          found = true;
+          break;
+        }
+      }
+      EXPECT_TRUE(found) << "original vertex " << u
+        << " not found at scale*P in " << label << " output";
+    }
+  }
+}
+
+// GC(3,2): T=19, scale=sqrt(19)
+TEST(C44DeltahedronTest, AllC44_GC_3_2) {
+  check_C44_GC(3, 2, "GC(3,2)");
+}
+
+// GC(5,3): T=49, scale=7
+TEST(C44DeltahedronTest, AllC44_GC_5_3) {
+  check_C44_GC(5, 3, "GC(5,3)");
+}
+
+// GC(10,10): T=300, scale=sqrt(300)=10*sqrt(3)
+TEST(C44DeltahedronTest, AllC44_GC_10_10) {
+  check_C44_GC(10, 10, "GC(10,10)");
+}
+
+// GC(10,11): T=331, scale=sqrt(331)
+TEST(C44DeltahedronTest, AllC44_GC_10_11) {
+  check_C44_GC(10, 11, "GC(10,11)");
 }
