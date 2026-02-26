@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <cmath>
 #include "fullerenes/deltahedron.hh"
 #include "fullerenes/polyhedron.hh"
 
@@ -11,10 +12,10 @@ static Deltahedron make_icosahedron() {
   return Deltahedron(ico);
 }
 
-// Expected node count for GC(k,0) on a triangulation:
-//   T = k^2, F_new = F*T, E_new = 3*F_new/2, V_new = 2 + E_new - F_new
-static int expected_gc_nodes(int V, int E, int F, int k) {
-  int T = k * k;
+// Expected node count for GC(k,l) on a triangulation:
+//   T = k^2+kl+l^2, F_new = F*T, E_new = 3*F_new/2, V_new = 2 + E_new - F_new
+static int expected_gc_nodes(int V, int E, int F, int k, int l = 0) {
+  int T = k*k + k*l + l*l;
   int F_new = F * T;
   int E_new = F_new * 3 / 2;
   return 2 + E_new - F_new;
@@ -262,5 +263,124 @@ TEST_F(DeltahedronTest, SmoothDoesNotCrash) {
   EXPECT_EQ((int)D.points.size(), D.N);
   for(int u = 0; u < D.N; u++){
     EXPECT_FALSE(std::isnan(D.points[u][0]));
+  }
+}
+
+// ================================================================
+// ===== General GC(k,l) tests (l != 0) ==========================
+// ================================================================
+
+// ===== Node count tests for chiral transforms =====
+
+TEST_F(DeltahedronTest, GC_1_1_NodeCount) {
+  Deltahedron result = ico.GCtransform(1, 1);
+  EXPECT_EQ(result.N, expected_gc_nodes(V0, E0, F0, 1, 1));  // 32
+  EXPECT_EQ((int)result.points.size(), result.N);
+}
+
+TEST_F(DeltahedronTest, GC_2_1_NodeCount) {
+  Deltahedron result = ico.GCtransform(2, 1);
+  EXPECT_EQ(result.N, expected_gc_nodes(V0, E0, F0, 2, 1));  // 72
+  EXPECT_EQ((int)result.points.size(), result.N);
+}
+
+// ===== Original vertices present at sqrt(T)*P_original =====
+// Node IDs are NOT preserved through unfold/fold, so we search by position.
+
+TEST_F(DeltahedronTest, GC_1_1_OriginalVerticesPresent) {
+  Deltahedron result = ico.GCtransform(1, 1);
+  double sqrtT = sqrt(3.0);
+
+  for(int u = 0; u < ico.N; u++){
+    coord3d expected = ico.points[u] * sqrtT;
+    bool found = false;
+    for(int v = 0; v < result.N; v++){
+      if((result.points[v] - expected).norm() < 1e-10){
+        found = true;
+        break;
+      }
+    }
+    EXPECT_TRUE(found) << "original vertex " << u
+      << " not found at sqrt(3)*P in GC(1,1) output";
+  }
+}
+
+TEST_F(DeltahedronTest, GC_2_1_OriginalVerticesPresent) {
+  Deltahedron result = ico.GCtransform(2, 1);
+  double sqrtT = sqrt(7.0);
+
+  for(int u = 0; u < ico.N; u++){
+    coord3d expected = ico.points[u] * sqrtT;
+    bool found = false;
+    for(int v = 0; v < result.N; v++){
+      if((result.points[v] - expected).norm() < 1e-10){
+        found = true;
+        break;
+      }
+    }
+    EXPECT_TRUE(found) << "original vertex " << u
+      << " not found at sqrt(7)*P in GC(2,1) output";
+  }
+}
+
+// ===== Surface preservation: all vertices lie on scaled parent triangles =====
+
+TEST_F(DeltahedronTest, GC_1_1_SurfacePreservation) {
+  Deltahedron result = ico.GCtransform(1, 1);
+  double sqrtT = sqrt(3.0);
+
+  for(int u = 0; u < result.N; u++){
+    double min_dist = INFINITY;
+    for(const auto& tri : ico.triangles){
+      Tri3D T(ico.points[tri[0]]*sqrtT, ico.points[tri[1]]*sqrtT, ico.points[tri[2]]*sqrtT);
+      double d = T.distance(result.points[u]);
+      if(d < min_dist) min_dist = d;
+    }
+    EXPECT_NEAR(min_dist, 0.0, 1e-10)
+      << "vertex " << u << " not on any scaled parent triangle plane";
+  }
+}
+
+// ===== Topology consistency: matches Triangulation::GCtransform =====
+
+TEST_F(DeltahedronTest, GC_1_1_TopologyConsistency) {
+  Deltahedron result = ico.GCtransform(1, 1);
+  Triangulation topo = ico.Triangulation::GCtransform(1, 1);
+
+  EXPECT_EQ(result.N, topo.N);
+  EXPECT_EQ(result.triangles.size(), topo.triangles.size());
+}
+
+TEST_F(DeltahedronTest, GC_2_1_TopologyConsistency) {
+  Deltahedron result = ico.GCtransform(2, 1);
+  Triangulation topo = ico.Triangulation::GCtransform(2, 1);
+
+  EXPECT_EQ(result.N, topo.N);
+  EXPECT_EQ(result.triangles.size(), topo.triangles.size());
+}
+
+// ===== No NaN or zero-norm coordinates =====
+
+TEST_F(DeltahedronTest, GC_1_1_NoNaNPoints) {
+  Deltahedron result = ico.GCtransform(1, 1);
+  for(int u = 0; u < result.N; u++){
+    for(int d = 0; d < 3; d++){
+      EXPECT_FALSE(std::isnan(result.points[u][d]))
+        << "NaN at vertex " << u << " coord " << d;
+    }
+    EXPECT_GT(result.points[u].norm(), 1e-10)
+      << "zero-norm point at vertex " << u;
+  }
+}
+
+TEST_F(DeltahedronTest, GC_2_1_NoNaNPoints) {
+  Deltahedron result = ico.GCtransform(2, 1);
+  for(int u = 0; u < result.N; u++){
+    for(int d = 0; d < 3; d++){
+      EXPECT_FALSE(std::isnan(result.points[u][d]))
+        << "NaN at vertex " << u << " coord " << d;
+    }
+    EXPECT_GT(result.points[u].norm(), 1e-10)
+      << "zero-norm point at vertex " << u;
   }
 }
