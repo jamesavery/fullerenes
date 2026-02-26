@@ -48,22 +48,15 @@ public:
   vector<coord3d> optimized_geometry(const vector<coord3d>& initial_geometry, int opt_method = 3, double ftol = 1e-12) const;
 
   static FullereneGraph C20() {
-    PlanarGraph g;
-    g.layout2d.resize(20);
-    set<edge_t> edge_set;
-    for(node_t u=0;u<20;u++)
-      g.layout2d[u] = coord2d(C20_layout2d[u][0],C20_layout2d[u][1]);
-
-    for(int i=0;i<30;i++)
-      edge_set.insert(edge_t(C20_edges[i][0],C20_edges[i][1]));
-    
-    g.update_from_edgeset(edge_set);
-    return FullereneGraph(g,g.layout2d);
+    // CW-oriented neighbour lists for dodecahedral C20, obtained from buckygen
+    return FullereneGraph(Graph(neighbours_t{
+      {1,4,7},   {2,0,9},    {3,1,10},   {4,2,13},
+      {5,0,3},   {6,4,14},   {7,5,16},   {8,0,6},
+      {9,7,17},  {12,1,8},   {11,2,12},  {13,10,19},
+      {10,9,18}, {14,3,11},  {15,5,13},  {16,14,19},
+      {17,6,15}, {18,8,16},  {19,12,17}, {15,11,18}
+    }, true));
   }
-
-private:
-  static node_t C20_edges[30][2];
-  static double C20_layout2d[20][2];
 };
 
 

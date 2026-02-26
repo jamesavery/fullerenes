@@ -60,9 +60,10 @@ struct Polyhedron : public PlanarGraph {
   bool optimize_other(bool optimize_angles = true, map<edge_t, double> zero_values_dist=map<edge_t, double>());
 
   static Polyhedron C20() {
+    constexpr double bond_length = 1.45; // approximate C-C bond length in Angstrom
     vector<coord3d> points(20);
     for(node_t u=0;u<20;u++)
-      points[u] = coord3d(C20_points[u][0],C20_points[u][1],C20_points[u][2]);
+      points[u] = coord3d(dodecahedron_points[u][0],dodecahedron_points[u][1],dodecahedron_points[u][2]) * bond_length;
     return Polyhedron(FullereneGraph::C20(),points);
   }
 
@@ -125,7 +126,7 @@ struct Polyhedron : public PlanarGraph {
 		   int line_colour = 0x888888, int vertex_colour = 0x667744, int face_colour = 0xc03500,
 		   double line_width = 0.7, double vertex_diameter = 2.0, double face_opacity = 0.4) const;
 
-  static double C20_points[20][3];
+  static double dodecahedron_points[20][3];
 };
 
 

@@ -63,7 +63,7 @@ public:
   
   //  Unfolding unfold() const;
   Triangulation GCtransform(const unsigned k=1, const unsigned l=0) const;
-  Triangulation halma_transform(int m) const;
+  Triangulation halma_transform(int m, vector<map<edge_t,node_t>>* face_grids = nullptr) const;
 
   // spiral stuff
   bool get_spiral_implementation(const node_t f1, const node_t f2, const node_t f3, vector<int>& v, jumplist_t& j,

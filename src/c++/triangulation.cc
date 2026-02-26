@@ -452,7 +452,7 @@ Triangulation Triangulation::GCtransform(const unsigned k, const unsigned l) con
    return t;
 }
 
-Triangulation Triangulation::halma_transform(int m) const {
+Triangulation Triangulation::halma_transform(int m, vector<map<edge_t,node_t>>* face_grids) const {
   if(m<0) return Triangulation(*this);
 
   map<arc_t,vector<node_t>> arc_nodes;
@@ -490,6 +490,8 @@ Triangulation Triangulation::halma_transform(int m) const {
       for(int k=j+1;k<=m;k++)
         grid[edge_t(j,k)] = v_new++;
   }
+
+  if(face_grids) *face_grids = face_grid;
 
   node_t N_new = v_new;
 
