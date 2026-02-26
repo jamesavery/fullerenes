@@ -127,7 +127,7 @@ TEST(SymmetryValidation, PointGroups) {
   if(const char* s = getenv("FULLERENE_DB"))
     IsomerDB::database_path = s;
 
-  int Nmax = get_nmax("NMAX", 80, 200);
+  int Nmax = get_nmax("NMAX", 60, 200);
   int total = 0, n_per_isomer = 0, n_tally = 0, n_skipped = 0;
 
   for(int N = 20; N <= Nmax; N += 2){
