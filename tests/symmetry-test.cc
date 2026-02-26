@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include <cstdlib>
+#include <fstream>
 #include <map>
 #include <array>
 #include <string>
@@ -7,14 +8,11 @@
 #include "fullerenes/symmetry.hh"
 #include "fullerenes/isomerdb.hh"
 #include "fullerenes/buckygen-wrapper.hh"
+#include "fullerenes/auxiliary.hh"  // pad_string
 
 using namespace std;
 
-// Override database path from environment if set.
-static void configure_database_path() {
-  if(const char* s = getenv("FULLERENE_DB"))
-    IsomerDB::database_path = s;
-}
+static bool tally_only = false;
 
 // Read Nmax from environment variable, clamped to [20, hard_max].
 static int get_nmax(const char* env_var, int default_val, int hard_max) {
@@ -23,6 +21,13 @@ static int get_nmax(const char* env_var, int default_val, int hard_max) {
     if(v >= 20 && v % 2 == 0) return min(v, hard_max);
   }
   return default_val;
+}
+
+// Check if the database file exists for a given N.
+static bool database_exists(int N) {
+  string filename = IsomerDB::database_path + "/All/c"
+    + pad_string(to_string(N), 3, '0') + "all.database";
+  return ifstream(filename).good();
 }
 
 // Build RSPI->group map from the All database for a given N.
@@ -40,101 +45,119 @@ static map<array<int,12>, string> load_nontrivial_rspi(int N) {
   return result;
 }
 
-// Build group->count map from the All database for a given N.
-// Returns only nontrivial entries.
-static map<string, int> load_nontrivial_counts(int N) {
-  IsomerDB db = IsomerDB::readPDB(N, false);
+// Build reference group->count from the embedded symmetry data in IsomerDB.
+// Returns empty map if N is out of range.
+static map<string, int> load_embedded_counts(int N) {
   map<string, int> counts;
-  for(auto& e : db.entries){
-    string group = PointGroup(string(e.group, 3)).to_string();
-    if(group == "C1") continue;
-    counts[group]++;
+  vector<string> groups = IsomerDB::symmetries(N, false);
+  for(auto& g : groups){
+    string name = PointGroup(g).to_string();
+    if(name == "C1") continue;
+    int64_t c = IsomerDB::number_isomers(N, g, false);
+    if(c > 0) counts[name] = c;
   }
   return counts;
 }
 
-// Test 1: Per-isomer point group validation.
-// For each buckygen isomer, compute symmetry and compare against database RSPI->group.
-TEST(SymmetryValidation, PointGroupPerIsomer) {
-  configure_database_path();
-  int Nmax = get_nmax("NMAX_FULL", 70, 70);
-  int total = 0, checked = 0;
+// Per-isomer validation for one N: check each isomer's point group against DB.
+static void check_per_isomer(int N, int& total) {
+  auto ref = load_nontrivial_rspi(N);
 
-  for(int N = 20; N <= Nmax; N += 2){
-    if(N == 22) continue;
+  BuckyGen::buckygen_queue Q = BuckyGen::start(N, false, false);
+  Graph g;
+  int count = 0;
+  while(BuckyGen::next_fullerene(Q, g)){
+    count++;
+    Triangulation T(g);
+    Symmetry S(T);
+    string computed = S.point_group().to_string();
 
-    auto ref = load_nontrivial_rspi(N);
-    if(ref.empty() && N > 20) continue;  // Skip if no database
+    vector<int> rspi_vec;
+    jumplist_t jumps;
+    FullereneDual(T).get_rspi(rspi_vec, jumps);
+    array<int,12> rspi;
+    copy(rspi_vec.begin(), rspi_vec.end(), rspi.begin());
 
-    BuckyGen::buckygen_queue Q = BuckyGen::start(N, false, false);
-    Graph g;
-    int count = 0;
-    while(BuckyGen::next_fullerene(Q, g)){
-      count++;
-      Triangulation T(g);
-      Symmetry S(T);
-      string computed = S.point_group().to_string();
+    auto it = ref.find(rspi);
+    string expected = (it != ref.end()) ? it->second : "C1";
 
-      // Get canonical RSPI to look up in reference
-      vector<int> rspi_vec;
-      jumplist_t jumps;
-      FullereneDual(T).get_rspi(rspi_vec, jumps);
-      array<int,12> rspi;
-      copy(rspi_vec.begin(), rspi_vec.end(), rspi.begin());
-
-      auto it = ref.find(rspi);
-      string expected = (it != ref.end()) ? it->second : "C1";
-
-      EXPECT_EQ(computed, expected)
-        << "N=" << N << " isomer #" << count;
-    }
-    total += count;
-    checked++;
-    fprintf(stderr, "N=%3d: %6d isomers checked (%zu nontrivial in ref)\n",
-            N, count, ref.size());
+    EXPECT_EQ(computed, expected)
+      << "N=" << N << " isomer #" << count;
   }
-  fprintf(stderr, "\nTotal: %d isomers across %d sizes\n", total, checked);
+  total += count;
+  fprintf(stderr, "N=%3d: %6d isomers, per-isomer check (%zu nontrivial in ref)\n",
+          N, count, ref.size());
 }
 
-// Test 2: Group count validation.
-// For each N, tally symmetry groups from buckygen and compare against database counts.
-TEST(SymmetryValidation, GroupCounts) {
-  configure_database_path();
-  int Nmax = get_nmax("NMAX_TALLY", 80, 130);
-  int checked = 0;
+// Tally validation for one N: check group counts against embedded data.
+static void check_tally(int N, int& total) {
+  auto ref_counts = load_embedded_counts(N);
+
+  BuckyGen::buckygen_queue Q = BuckyGen::start(N, false, false);
+  Graph g;
+  map<string, int> computed_counts;
+  int count = 0;
+  while(BuckyGen::next_fullerene(Q, g)){
+    count++;
+    Triangulation T(g);
+    Symmetry S(T);
+    string group = S.point_group().to_string();
+    if(group != "C1")
+      computed_counts[group]++;
+  }
+
+  for(auto& [group, expected] : ref_counts){
+    EXPECT_EQ(computed_counts[group], expected)
+      << "N=" << N << " group=" << group;
+  }
+  for(auto& [group, cnt] : computed_counts){
+    EXPECT_TRUE(ref_counts.count(group) > 0)
+      << "N=" << N << " unexpected group " << group << " (count=" << cnt << ")";
+  }
+
+  total += count;
+  fprintf(stderr, "N=%3d: %6d isomers, tally check (%zu nontrivial groups)\n",
+          N, count, computed_counts.size());
+}
+
+// Unified test: for each N, prefer per-isomer check (if DB file exists),
+// otherwise fall back to tally check (using embedded count data).
+// With --test_type=tally, always use tally check.
+TEST(SymmetryValidation, PointGroups) {
+  if(const char* s = getenv("FULLERENE_DB"))
+    IsomerDB::database_path = s;
+
+  int Nmax = get_nmax("NMAX", 80, 200);
+  int total = 0, n_per_isomer = 0, n_tally = 0, n_skipped = 0;
 
   for(int N = 20; N <= Nmax; N += 2){
     if(N == 22) continue;
 
-    auto ref_counts = load_nontrivial_counts(N);
-
-    BuckyGen::buckygen_queue Q = BuckyGen::start(N, false, false);
-    Graph g;
-    map<string, int> computed_counts;
-    int total_isomers = 0;
-    while(BuckyGen::next_fullerene(Q, g)){
-      total_isomers++;
-      Triangulation T(g);
-      Symmetry S(T);
-      string group = S.point_group().to_string();
-      if(group != "C1")
-        computed_counts[group]++;
+    if(!tally_only && database_exists(N)){
+      check_per_isomer(N, total);
+      n_per_isomer++;
+    } else if(!load_embedded_counts(N).empty()){
+      check_tally(N, total);
+      n_tally++;
+    } else {
+      fprintf(stderr, "N=%3d: skipped (no reference data)\n", N);
+      n_skipped++;
     }
-
-    // Check each reference group appears with the right count
-    for(auto& [group, expected] : ref_counts){
-      EXPECT_EQ(computed_counts[group], expected)
-        << "N=" << N << " group=" << group;
-    }
-    // Check no extra groups computed that aren't in reference
-    for(auto& [group, count] : computed_counts){
-      EXPECT_TRUE(ref_counts.count(group) > 0)
-        << "N=" << N << " unexpected group " << group << " (count=" << count << ")";
-    }
-
-    checked++;
-    fprintf(stderr, "N=%3d: %6d isomers, %zu nontrivial groups\n",
-            N, total_isomers, computed_counts.size());
   }
-  fprintf(stderr, "\n%d sizes checked\n", checked);
+
+  fprintf(stderr, "\nTotal: %d isomers, %d per-isomer, %d tally, %d skipped\n",
+          total, n_per_isomer, n_tally, n_skipped);
+}
+
+int main(int argc, char** argv) {
+  ::testing::InitGoogleTest(&argc, argv);
+
+  // Check for --test_type=tally among remaining args.
+  for(int i = 1; i < argc; i++){
+    string arg = argv[i];
+    if(arg == "--test_type=tally" || arg == "tally")
+      tally_only = true;
+  }
+
+  return RUN_ALL_TESTS();
 }

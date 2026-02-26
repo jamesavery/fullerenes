@@ -7,5 +7,5 @@ target_link_libraries(spiral-roundtrip-test fullerenes GTest::GTest GTest::Main)
 add_test(NAME spiral-roundtrip-test COMMAND spiral-roundtrip-test)
 
 add_executable(symmetry-test symmetry-test.cc)
-target_link_libraries(symmetry-test fullerenes GTest::GTest GTest::Main)
+target_link_libraries(symmetry-test fullerenes GTest::GTest)
 add_test(NAME symmetry-test COMMAND symmetry-test)
