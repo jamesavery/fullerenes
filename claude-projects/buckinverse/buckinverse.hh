@@ -1,0 +1,207 @@
+#pragma once
+
+// Buckinverse: Invert buckygen extension operations.
+// Given a fullerene dual graph (Triangulation), find a reduction path to a seed.
+
+#include "fullerenes/triangulation.hh"
+#include <cassert>
+#include <optional>
+#include <vector>
+#include <string>
+
+namespace buckinverse {
+
+// =====================================================================
+// Direction: DRight (CW walk) or DLeft (CCW walk)
+// =====================================================================
+enum class Dir { DRight, DLeft };
+
+inline Dir flipDir(Dir d) {
+    return d == Dir::DRight ? Dir::DLeft : Dir::DRight;
+}
+
+// =====================================================================
+// Navigation primitives for fullerene dual graphs (degree 5-6 triangulations)
+// These wrap Graph::next/prev with buckygen-specific straight/turn operations.
+// All assume CW-ordered neighbour lists (is_oriented == true).
+// =====================================================================
+
+// Advance k positions CW from v around u's neighbour list.
+inline node_t advanceCW(const Graph& g, node_t u, node_t v, int k) {
+    int pos = g.arc_ix(u, v);
+    assert(pos >= 0 && "v must be a neighbour of u");
+    int d = g.degree(u);
+    return g.neighbours[u][((pos + k) % d + d) % d];
+}
+
+// Straight-ahead through u when entering from `from`.
+// At degree-6: always 3 positions CW from `from`.
+// At degree-5: 3 positions for DRight, 2 positions for DLeft.
+inline node_t straightAhead(const Graph& g, Dir dir, node_t u, node_t from) {
+    int d = g.degree(u);
+    if (d == 6) return advanceCW(g, u, from, 3);
+    // degree 5
+    if (dir == Dir::DRight) return advanceCW(g, u, from, 3);
+    else return advanceCW(g, u, from, 2);
+}
+
+// Turn-ahead (bent path) through u when entering from `from`.
+// DRight: 2 positions CW. DLeft: deg-2 positions CW.
+inline node_t turnAhead(const Graph& g, Dir dir, node_t u, node_t from) {
+    if (dir == Dir::DRight) return advanceCW(g, u, from, 2);
+    else return advanceCW(g, u, from, g.degree(u) - 2);
+}
+
+// Side neighbour: the parallel-path vertex.
+// DRight: prevCW(a, b). DLeft: nextCW(a, b).
+inline node_t sideNbr(const Graph& g, Dir dir, node_t a, node_t b) {
+    return (dir == Dir::DRight) ? g.prev(a, b) : g.next(a, b);
+}
+
+// =====================================================================
+// Degree-5 vertex enumeration
+// =====================================================================
+
+inline std::vector<node_t> deg5vertices(const Graph& g) {
+    std::vector<node_t> result;
+    for (int v = 0; v < g.N; ++v)
+        if (g.degree(v) == 5) result.push_back(v);
+    return result;
+}
+
+// =====================================================================
+// Expansion types
+// =====================================================================
+
+struct ExpKind {
+    enum Type { L_type, B_type, F_type };
+    Type type;
+    int i, j;  // L_i: i >= 0, j unused. B_{i,j}: i,j >= 0. F: both unused.
+
+    int reductionLength() const {
+        switch (type) {
+            case L_type: return i + 1;
+            case B_type: return i + j + 2;
+            case F_type: return 0;
+        }
+        return 0;
+    }
+
+    int newVertices() const {
+        switch (type) {
+            case L_type: return i + 2;
+            case B_type: return i + j + 3;
+            case F_type: return 5;
+        }
+        return 0;
+    }
+
+    std::string toString() const {
+        switch (type) {
+            case L_type: return "L" + std::to_string(i);
+            case B_type: return "B(" + std::to_string(i) + "," + std::to_string(j) + ")";
+            case F_type: return "F";
+        }
+        return "?";
+    }
+
+    bool operator==(const ExpKind& o) const {
+        return type == o.type && i == o.i && j == o.j;
+    }
+};
+
+inline ExpKind Lk(int i)          { return {ExpKind::L_type, i, 0}; }
+inline ExpKind Bk(int i, int j)   { return {ExpKind::B_type, i, j}; }
+inline ExpKind Fk()               { return {ExpKind::F_type, 0, 0}; }
+
+// =====================================================================
+// Expansion / Reduction triples
+// =====================================================================
+
+struct Expansion {
+    ExpKind kind;
+    node_t u, v;   // Starting directed edge (u is degree-5 for L/B)
+    Dir dir;
+
+    std::string toString() const {
+        return kind.toString() + " (" + std::to_string(u) + "->" +
+               std::to_string(v) + ") " +
+               (dir == Dir::DRight ? "R" : "L");
+    }
+};
+
+// A Reduction is the same triple as an Expansion but used in the inverse direction.
+using Reduction = Expansion;
+
+// =====================================================================
+// Path info: main path and parallel path computed from the graph
+// =====================================================================
+
+struct PathInfo {
+    std::vector<node_t> path;      // Main path vertices
+    std::vector<node_t> parallel;  // Parallel path vertices
+    bool valid = false;
+};
+
+// =====================================================================
+// Seed graphs
+// =====================================================================
+
+enum class SeedType { C20, C28, C30, NotASeed };
+
+// Construct seed graphs as Triangulation objects
+Triangulation makeSeedC20();
+Triangulation makeSeedC28();
+Triangulation makeSeedC30();
+
+// Identify which seed a small triangulation is (by vertex count, since
+// the three seeds have unique vertex counts: 12, 16, 17).
+// Returns NotASeed if the graph doesn't match any seed size.
+SeedType identifySeed(const Triangulation& t);
+
+inline std::string seedName(SeedType s) {
+    switch (s) {
+        case SeedType::C20: return "C20";
+        case SeedType::C28: return "C28";
+        case SeedType::C30: return "C30";
+        case SeedType::NotASeed: return "not a seed";
+    }
+    return "?";
+}
+
+// =====================================================================
+// Path computation
+// =====================================================================
+
+// Compute a straight path of numEntries vertices starting from directed
+// edge (u, v) in direction dir. Returns valid=false if path self-intersects.
+PathInfo computeStraightPath(const Graph& g, node_t u, node_t v,
+                             Dir dir, int numEntries);
+
+// Compute a B_{0,0} bent path starting from (u, v) in direction dir.
+PathInfo computeBentZeroPath(const Graph& g, node_t u, node_t v, Dir dir);
+
+// Compute a B_{i,j} bent path (i+j > 0) starting from (u, v) in direction dir.
+PathInfo computeBentPath(const Graph& g, node_t u, node_t v,
+                         Dir dir, int bi, int bj);
+
+// =====================================================================
+// Reduction enumeration (Phase 2)
+// =====================================================================
+
+// Enumerate all valid reduction sites up to the given max reduction length.
+// Default maxRedLen=5 matches the Haskell allReductions.
+std::vector<Reduction> allReductions(const Graph& g, int maxRedLen = 5);
+
+// Follow straight-ahead from u through v until a degree-5 vertex is found.
+// Returns {endpoint, prevVertex, distance} or empty optional if not found
+// within maxDist steps or if a cycle is detected.
+struct StraightEndpoint {
+    node_t endpoint;
+    node_t prev;
+    int distance;
+};
+std::optional<StraightEndpoint> followStraightToFive(
+    const Graph& g, node_t u, node_t v, int maxDist);
+
+} // namespace buckinverse
