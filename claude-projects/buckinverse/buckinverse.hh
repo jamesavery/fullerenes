@@ -209,6 +209,34 @@ struct InvSite {
     std::vector<node_t> tp;      // true parallel vertices (remain, get reconnected)
 };
 
+// =====================================================================
+// Extension path: portable representation of seed → fullerene route
+// =====================================================================
+
+// One expansion step (insert strip vertices and rewire path/tp).
+// Vertex IDs are in the final (full-size) graph's numbering.
+struct ExtensionStep {
+    ExpKind kind;
+    Dir dir;
+    std::vector<node_t> strip;   // vertices to insert
+    std::vector<node_t> path;    // existing vertices (reconnected)
+    std::vector<node_t> tp;      // existing vertices (reconnected)
+};
+
+// Full extension path from seed to target fullerene.
+// Steps are in expansion order (seed → full graph).
+struct ExtensionPath {
+    SeedType seed;
+    int full_N;                           // vertex count of full graph
+    std::vector<ExtensionStep> steps;     // in expansion order
+
+    std::string toString() const {
+        std::string s = seedName(seed) + " [" + std::to_string(full_N) + "v]:";
+        for (auto& st : steps) s += " " + st.kind.toString();
+        return s;
+    }
+};
+
 // Find all valid L0 inversion sites on the graph.
 // An L0 site is a pair of adjacent degree-5 vertices (the strip) with the
 // correct expansion topology around them.
@@ -259,6 +287,14 @@ struct ReducibleDual {
         uint8_t active;      // Bitmask: bit i set iff nbr[i] is present
     };
 
+    // A recorded reduction step: the site plus saved strip vertex states.
+    // Saved states are needed because prior steps may have modified strip
+    // vertices via splice (e.g., path[k] in step i becomes strip[j] later).
+    struct ReductionStep {
+        InvSite site;
+        std::vector<std::pair<node_t, Vertex>> saved;
+    };
+
     std::vector<Vertex> V;   // Indexed by original vertex ID (never resized)
     std::set<node_t> deg5;   // The 12 degree-5 vertices (maintained)
     int n_alive;
@@ -281,14 +317,23 @@ struct ReducibleDual {
     // Mutations: O(1) each
     void splice(node_t u, node_t old_v, node_t new_v);  // Replace neighbour
     void snip(node_t u, node_t v);                       // Remove neighbour
+    void unsnip(node_t u, node_t v);                     // Reverse of snip
     void kill(node_t v);                                  // Delete vertex
+    void unkill(node_t v, const Vertex& saved);          // Reverse of kill
 
     // Reduction: O(1) per call
     std::optional<InvSite> findSite(int maxRedLen = 5) const;
     void reduce(const InvSite& site);
 
-    // Full loop: O(N) total
+    // Expansion: O(1) per call — inverse of reduce
+    void expand(const ReductionStep& step);
+
+    // Full reduction loop: O(N) total
     SeedType reduceToSeed(int maxRedLen = 5);
+    SeedType reduceToSeed(std::vector<ReductionStep>& path, int maxRedLen = 5);
+
+    // Reduce and return extension path (seed → full graph direction)
+    ExtensionPath reduceToExtensionPath(int maxRedLen = 5);
 
     // Extract compacted Graph: O(N)
     Graph toGraph() const;
@@ -300,7 +345,7 @@ private:
     std::optional<InvSite> findB00Site() const;
     std::optional<InvSite> findFRingSite() const;
 
-    // Reconnection
+    // Reconnection (reduction direction)
     void reconnectStraight(const std::vector<node_t>& path,
                            const std::vector<node_t>& strip,
                            const std::vector<node_t>& tp);
@@ -311,6 +356,18 @@ private:
     void reconnectRing(const std::vector<node_t>& ring,
                        const std::vector<node_t>& strip,
                        const std::vector<node_t>& outer);
+
+    // Reconnection (expansion direction — reverse of reduction)
+    void expandStraight(const std::vector<node_t>& path,
+                        const std::vector<node_t>& strip,
+                        const std::vector<node_t>& tp);
+    void expandBent(const std::vector<node_t>& path,
+                    const std::vector<node_t>& strip,
+                    const std::vector<node_t>& tp,
+                    int bentPos, int bentLen);
+    void expandRing(const std::vector<node_t>& ring,
+                    const std::vector<node_t>& strip,
+                    const std::vector<node_t>& outer);
 };
 
 } // namespace buckinverse

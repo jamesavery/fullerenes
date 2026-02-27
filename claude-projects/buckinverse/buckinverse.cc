@@ -1278,6 +1278,22 @@ void ReducibleDual::kill(node_t v) {
     deg5.erase(v);
 }
 
+void ReducibleDual::unsnip(node_t u, node_t v) {
+    for (int i = 0; i < D_MAX; i++) {
+        if (!(V[u].active & (1u << i)) && V[u].nbr[i] == v) {
+            V[u].active |= (1u << i);
+            return;
+        }
+    }
+    assert(false && "unsnip: v not found in inactive positions of u");
+}
+
+void ReducibleDual::unkill(node_t v, const Vertex& saved) {
+    V[v] = saved;
+    n_alive++;
+    if (degree(v) == 5) deg5.insert(v);
+}
+
 // --- Reconnection ---
 
 void ReducibleDual::reconnectStraight(
@@ -1350,6 +1366,136 @@ void ReducibleDual::reconnectRing(
         splice(outer[i], strip[im1], ring[i]);
         splice(outer[i], strip[i], ring[ip1]);
     }
+}
+
+// --- Expansion reconnection (reverse of reduction) ---
+
+void ReducibleDual::expandStraight(
+        const std::vector<node_t>& path,
+        const std::vector<node_t>& strip,
+        const std::vector<node_t>& tp) {
+    int n = (int)strip.size();
+
+    // Reverse of reconnectStraight, undoing each operation in reverse order.
+    // reconnectStraight does:
+    //   snip(path[0], strip[0])
+    //   for k=1..n: splice(path[k], strip[k-1], tp[k-1])
+    //              splice(path[k], strip[k], tp[k])     [k<n]
+    //   for k=0..n-1: splice(tp[k], strip[k-1], path[k])  [k>0]
+    //                 splice(tp[k], strip[k], path[k+1])
+    //   snip(tp[n], strip[n-1])
+
+    unsnip(tp[n], strip[n-1]);
+
+    for (int k = n - 1; k >= 0; k--) {
+        splice(tp[k], path[k+1], strip[k]);
+        if (k > 0) splice(tp[k], path[k], strip[k-1]);
+    }
+
+    for (int k = n; k >= 1; k--) {
+        if (k < n) splice(path[k], tp[k], strip[k]);
+        splice(path[k], tp[k-1], strip[k-1]);
+    }
+
+    unsnip(path[0], strip[0]);
+}
+
+void ReducibleDual::expandBent(
+        const std::vector<node_t>& path,
+        const std::vector<node_t>& strip,
+        const std::vector<node_t>& tp,
+        int bentPos, int bentLen) {
+    int numNew = (int)strip.size();
+
+    // Reverse of reconnectBent, undoing each operation in reverse order.
+    // reconnectBent does:
+    //   snip(path[0], strip[0])
+    //   snip(path[bentLen+4], strip[numNew-1])
+    //   before-bend path: k=1..bentPos+1
+    //   before-bend tp: k=0..bentPos
+    //   bend: bi=bentPos+2
+    //   after-bend path: k=bi+1..bentLen+3
+    //   after-bend tp: k=bentPos+2..bentLen+2
+
+    int bi = bentPos + 2;
+
+    // Undo after-bend tp (last operations first)
+    for (int k = bentLen + 2; k >= bentPos + 2; k--) {
+        if (k < bentLen + 2) splice(tp[k], path[k+2], strip[k+1]);
+        splice(tp[k], path[k+1], strip[k]);
+    }
+
+    // Undo after-bend path
+    for (int k = bentLen + 3; k >= bi + 1; k--) {
+        splice(path[k], tp[k-1], strip[k-1]);
+        splice(path[k], tp[k-2], strip[k-2]);
+    }
+
+    // Undo bend
+    splice(tp[bi-1], path[bi+1], strip[bi]);
+    splice(tp[bi-1], path[bi], strip[bi-1]);
+    splice(tp[bi-1], path[bi-1], strip[bi-2]);
+    splice(path[bi], tp[bi-1], strip[bi-1]);
+
+    // Undo before-bend tp
+    for (int k = bentPos; k >= 0; k--) {
+        splice(tp[k], path[k+1], strip[k]);
+        if (k > 0) splice(tp[k], path[k], strip[k-1]);
+    }
+
+    // Undo before-bend path
+    for (int k = bentPos + 1; k >= 1; k--) {
+        splice(path[k], tp[k], strip[k]);
+        splice(path[k], tp[k-1], strip[k-1]);
+    }
+
+    // Undo endpoint snips
+    unsnip(path[bentLen + 4], strip[numNew - 1]);
+    unsnip(path[0], strip[0]);
+}
+
+void ReducibleDual::expandRing(
+        const std::vector<node_t>& ring,
+        const std::vector<node_t>& strip,
+        const std::vector<node_t>& outer) {
+    // Reverse of reconnectRing. reconnectRing does for i=0..4:
+    //   splice(ring[i], strip[im1], outer[im1])
+    //   splice(ring[i], strip[i], outer[i])
+    //   splice(outer[i], strip[im1], ring[i])
+    //   splice(outer[i], strip[i], ring[ip1])
+    // Undo in reverse order (i=4..0, operations reversed within each i):
+    for (int i = 4; i >= 0; i--) {
+        int im1 = (i + 4) % 5, ip1 = (i + 1) % 5;
+        splice(outer[i], ring[ip1], strip[i]);
+        splice(outer[i], ring[i], strip[im1]);
+        splice(ring[i], outer[i], strip[i]);
+        splice(ring[i], outer[im1], strip[im1]);
+    }
+}
+
+// --- Expand (inverse of reduce) ---
+
+void ReducibleDual::expand(const ReductionStep& step) {
+    const auto& site = step.site;
+
+    // 1. Undo deg5 updates from reduce()
+    if (site.kind.type != ExpKind::F_type) {
+        deg5.erase(site.path[0]);
+        deg5.erase(site.tp.back());
+    }
+
+    // 2. Unkill strip vertices (restore saved state)
+    for (auto& [id, saved] : step.saved)
+        unkill(id, saved);
+
+    // 3. Undo reconnection
+    if (site.kind.type == ExpKind::L_type)
+        expandStraight(site.path, site.strip, site.tp);
+    else if (site.kind.type == ExpKind::B_type)
+        expandBent(site.path, site.strip, site.tp,
+                   site.kind.i, site.kind.i + site.kind.j);
+    else
+        expandRing(site.path, site.strip, site.tp);
 }
 
 // --- Reduce ---
@@ -1746,6 +1892,46 @@ SeedType ReducibleDual::reduceToSeed(int maxRedLen) {
         case 17: return SeedType::C30;
         default: return SeedType::NotASeed;
     }
+}
+
+SeedType ReducibleDual::reduceToSeed(std::vector<ReductionStep>& path, int maxRedLen) {
+    path.clear();
+    int max_steps = (int)V.size();
+    while (auto site = findSite(maxRedLen)) {
+        if (--max_steps < 0) return SeedType::NotASeed;
+
+        // Save strip vertex states before reduction destroys them
+        ReductionStep step;
+        step.site = *site;
+        for (node_t s : site->strip)
+            step.saved.push_back({s, V[s]});
+
+        reduce(*site);
+        path.push_back(std::move(step));
+    }
+
+    switch (n_alive) {
+        case 12: return SeedType::C20;
+        case 16: return SeedType::C28;
+        case 17: return SeedType::C30;
+        default: return SeedType::NotASeed;
+    }
+}
+
+ExtensionPath ReducibleDual::reduceToExtensionPath(int maxRedLen) {
+    std::vector<ReductionStep> steps;
+    SeedType seed = reduceToSeed(steps, maxRedLen);
+
+    ExtensionPath ep;
+    ep.seed = seed;
+    ep.full_N = (int)V.size();
+
+    // Convert reduction steps to expansion steps in reverse order
+    for (int i = (int)steps.size() - 1; i >= 0; i--) {
+        const auto& site = steps[i].site;
+        ep.steps.push_back({site.kind, site.dir, site.strip, site.path, site.tp});
+    }
+    return ep;
 }
 
 Graph ReducibleDual::toGraph() const {
