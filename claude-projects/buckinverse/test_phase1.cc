@@ -190,7 +190,7 @@ void test_paths() {
                 auto pi = computeStraightPath(c28, u, v, d, 3);  // L0: 3 entries
                 if (pi.valid) {
                     CHECK((int)pi.path.size() == 3, "L0 path has 3 entries");
-                    CHECK((int)pi.parallel.size() == 2, "L0 parallel has 2 entries");
+                    CHECK((int)pi.parallel.size() == 3, "L0 parallel has 3 entries");
                     CHECK(c28.arc_ix(pi.path[0], pi.path[1]) >= 0,
                           "path[0]-path[1] are adjacent");
                     CHECK(c28.arc_ix(pi.path[1], pi.path[2]) >= 0,
@@ -211,7 +211,7 @@ void test_paths() {
                 auto pi = computeStraightPath(c28, u, v, d, 4);  // L1: 4 entries
                 if (pi.valid) {
                     CHECK((int)pi.path.size() == 4, "L1 path has 4 entries");
-                    CHECK((int)pi.parallel.size() == 3, "L1 parallel has 3 entries");
+                    CHECK((int)pi.parallel.size() == 4, "L1 parallel has 4 entries");
                     valid_L1_count++;
                 }
             }

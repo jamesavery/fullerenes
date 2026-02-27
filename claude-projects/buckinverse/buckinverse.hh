@@ -186,10 +186,51 @@ PathInfo computeBentPath(const Graph& g, node_t u, node_t v,
                          Dir dir, int bi, int bj);
 
 // =====================================================================
+// Reduction surgery (Phase 3)
+// =====================================================================
+
+// Apply a reduction to produce a smaller graph.
+// Returns the reduced graph. The input must be a valid oriented triangulation
+// and the reduction must be a valid reduction site (as returned by allReductions).
+// NOTE: This uses the expansion-site formulation (Phase 2). For arbitrary graph
+// inversion, use invertReduction() instead.
+Graph applyReduction(const Graph& g, const Reduction& red);
+
+// =====================================================================
+// Inversion: reduce arbitrary graphs (Phase 3)
+// =====================================================================
+
+// A validated inversion site with all vertices identified.
+struct InvSite {
+    ExpKind kind;
+    Dir dir;
+    std::vector<node_t> strip;   // strip vertices to remove
+    std::vector<node_t> path;    // path vertices (remain, get reconnected)
+    std::vector<node_t> tp;      // true parallel vertices (remain, get reconnected)
+};
+
+// Find all valid L0 inversion sites on the graph.
+// An L0 site is a pair of adjacent degree-5 vertices (the strip) with the
+// correct expansion topology around them.
+std::vector<InvSite> findL0InvSites(const Graph& g);
+
+// Find all valid F (nanotube ring) inversion sites on the graph.
+// An F site is a 5-cycle of degree-6 strip vertices sitting between a
+// parallel ring 5-cycle and a set of 5 outer (cap) vertices.
+std::vector<InvSite> findFRingInvSites(const Graph& g);
+
+// Find all valid inversion sites (L0, L_i, B(i,j), F) up to given max reduction length.
+std::vector<InvSite> allInvSites(const Graph& g, int maxRedLen = 5);
+
+// Apply an inversion site to produce a smaller graph.
+// Returns Graph() (N==0) on failure.
+Graph invertReduction(const Graph& g, const InvSite& site);
+
+// =====================================================================
 // Reduction enumeration (Phase 2)
 // =====================================================================
 
-// Enumerate all valid reduction sites up to the given max reduction length.
+// Enumerate all valid expansion sites (for canonical algorithm).
 // Default maxRedLen=5 matches the Haskell allReductions.
 std::vector<Reduction> allReductions(const Graph& g, int maxRedLen = 5);
 

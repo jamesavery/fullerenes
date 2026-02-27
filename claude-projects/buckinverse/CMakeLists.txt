@@ -30,6 +30,13 @@ target_link_libraries(test_phase2 buckinverse)
 set_target_properties(test_phase2 PROPERTIES
     BUILD_RPATH ${FULLERENES_LIBDIR})
 
+# Phase 3 tests
+add_executable(test_phase3 test_phase3.cc)
+target_link_libraries(test_phase3 buckinverse)
+set_target_properties(test_phase3 PROPERTIES
+    BUILD_RPATH ${FULLERENES_LIBDIR})
+
 enable_testing()
 add_test(NAME phase1 COMMAND test_phase1)
 add_test(NAME phase2 COMMAND test_phase2)
+add_test(NAME phase3 COMMAND test_phase3)

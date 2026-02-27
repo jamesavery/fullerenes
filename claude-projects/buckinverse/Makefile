@@ -10,7 +10,7 @@ LIBS = -L$(LIBDIR) -lfullerenes -Wl,-rpath,$(LIBDIR)
 # Fortran runtime (needed by libfullerenes)
 FLIBS = -lgfortran
 
-all: test_phase1 test_phase2
+all: test_phase1 test_phase2 test_phase3 test_scale
 
 buckinverse.o: buckinverse.cc buckinverse.hh
 	$(CXX) $(CXXFLAGS) $(INCLUDE) -c $< -o $@
@@ -21,11 +21,18 @@ test_phase1: test_phase1.cc buckinverse.o
 test_phase2: test_phase2.cc buckinverse.o
 	$(CXX) $(CXXFLAGS) $(INCLUDE) $^ -o $@ $(LIBS) $(FLIBS)
 
-test: test_phase1 test_phase2
+test_phase3: test_phase3.cc buckinverse.o
+	$(CXX) $(CXXFLAGS) $(INCLUDE) $^ -o $@ $(LIBS) $(FLIBS)
+
+test_scale: test_scale.cc buckinverse.o
+	$(CXX) $(CXXFLAGS) $(INCLUDE) $^ -o $@ $(LIBS) $(FLIBS)
+
+test: test_phase1 test_phase2 test_phase3
 	./test_phase1
 	./test_phase2
+	./test_phase3
 
 clean:
-	rm -f *.o test_phase1 test_phase2
+	rm -f *.o test_phase1 test_phase2 test_phase3 test_scale
 
 .PHONY: all test clean
