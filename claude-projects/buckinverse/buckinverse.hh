@@ -245,4 +245,72 @@ struct StraightEndpoint {
 std::optional<StraightEndpoint> followStraightToFive(
     const Graph& g, node_t u, node_t v, int maxDist);
 
+// =====================================================================
+// ReducibleDual: O(N) reduction to seed via bitmask-over-fixed-array.
+// Follows the RemainingGraph pattern (triangulation.cc) extended with
+// in-place edge mutation (splice) for reduction reconnection.
+// =====================================================================
+
+struct ReducibleDual {
+    static constexpr int D_MAX = 6;  // Max degree in fullerene dual
+
+    struct Vertex {
+        node_t nbr[D_MAX];  // CW-ordered neighbours (fixed positions)
+        uint8_t active;      // Bitmask: bit i set iff nbr[i] is present
+    };
+
+    std::vector<Vertex> V;   // Indexed by original vertex ID (never resized)
+    std::set<node_t> deg5;   // The 12 degree-5 vertices (maintained)
+    int n_alive;
+
+    // Construction: O(N)
+    explicit ReducibleDual(const Graph& g);
+
+    // Queries
+    int  degree(node_t u) const { return __builtin_popcount(V[u].active); }
+    bool alive(node_t u)  const { return V[u].active != 0; }
+    int  N()               const { return n_alive; }
+    int  arc_ix(node_t u, node_t v) const;
+    node_t next(node_t u, node_t v) const;
+    node_t prev(node_t u, node_t v) const;
+
+    // Navigation (buckygen-style)
+    node_t advanceCW(node_t u, node_t v, int k) const;
+    node_t straightAhead(Dir dir, node_t u, node_t from) const;
+
+    // Mutations: O(1) each
+    void splice(node_t u, node_t old_v, node_t new_v);  // Replace neighbour
+    void snip(node_t u, node_t v);                       // Remove neighbour
+    void kill(node_t v);                                  // Delete vertex
+
+    // Reduction: O(1) per call
+    std::optional<InvSite> findSite(int maxRedLen = 5) const;
+    void reduce(const InvSite& site);
+
+    // Full loop: O(N) total
+    SeedType reduceToSeed(int maxRedLen = 5);
+
+    // Extract compacted Graph: O(N)
+    Graph toGraph() const;
+
+private:
+    // Site finders (return first valid site or nullopt)
+    std::optional<InvSite> findL0Site() const;
+    std::optional<InvSite> findLiSite(int maxRedLen) const;
+    std::optional<InvSite> findB00Site() const;
+    std::optional<InvSite> findFRingSite() const;
+
+    // Reconnection
+    void reconnectStraight(const std::vector<node_t>& path,
+                           const std::vector<node_t>& strip,
+                           const std::vector<node_t>& tp);
+    void reconnectBent(const std::vector<node_t>& path,
+                       const std::vector<node_t>& strip,
+                       const std::vector<node_t>& tp,
+                       int bentPos, int bentLen);
+    void reconnectRing(const std::vector<node_t>& ring,
+                       const std::vector<node_t>& strip,
+                       const std::vector<node_t>& outer);
+};
+
 } // namespace buckinverse

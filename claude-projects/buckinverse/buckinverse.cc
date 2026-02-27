@@ -1192,4 +1192,576 @@ std::vector<Reduction> allReductions(const Graph& g, int maxRedLen) {
     return result;
 }
 
+// =====================================================================
+// ReducibleDual implementation
+// =====================================================================
+
+ReducibleDual::ReducibleDual(const Graph& g)
+    : V(g.N), n_alive(g.N)
+{
+    for (int u = 0; u < g.N; u++) {
+        int d = g.degree(u);
+        assert(d <= D_MAX);
+        V[u].active = (1u << d) - 1;
+        for (int i = 0; i < d; i++)
+            V[u].nbr[i] = g.neighbours[u][i];
+        if (d == 5) deg5.insert(u);
+    }
+}
+
+int ReducibleDual::arc_ix(node_t u, node_t v) const {
+    uint8_t m = V[u].active;
+    for (; m; m &= m - 1) {
+        int i = __builtin_ctz(m);
+        if (V[u].nbr[i] == v) return i;
+    }
+    return -1;
+}
+
+node_t ReducibleDual::next(node_t u, node_t v) const {
+    int pos = arc_ix(u, v);
+    if (pos < 0) return -1;
+    for (int step = 1; step <= D_MAX; step++) {
+        int p = (pos + step) % D_MAX;
+        if (V[u].active & (1u << p)) return V[u].nbr[p];
+    }
+    return -1;
+}
+
+node_t ReducibleDual::prev(node_t u, node_t v) const {
+    int pos = arc_ix(u, v);
+    if (pos < 0) return -1;
+    for (int step = 1; step <= D_MAX; step++) {
+        int p = (pos - step + D_MAX) % D_MAX;
+        if (V[u].active & (1u << p)) return V[u].nbr[p];
+    }
+    return -1;
+}
+
+node_t ReducibleDual::advanceCW(node_t u, node_t v, int k) const {
+    node_t cur = v;
+    for (int i = 0; i < k; i++) {
+        cur = next(u, cur);
+        if (cur < 0) return -1;
+    }
+    return cur;
+}
+
+node_t ReducibleDual::straightAhead(Dir dir, node_t u, node_t from) const {
+    int d = degree(u);
+    if (d == 6) return advanceCW(u, from, 3);
+    if (dir == Dir::DRight) return advanceCW(u, from, 3);
+    else return advanceCW(u, from, 2);
+}
+
+void ReducibleDual::splice(node_t u, node_t old_v, node_t new_v) {
+    uint8_t m = V[u].active;
+    for (; m; m &= m - 1) {
+        int i = __builtin_ctz(m);
+        if (V[u].nbr[i] == old_v) { V[u].nbr[i] = new_v; return; }
+    }
+    assert(false && "splice: old_v not found in active neighbours of u");
+}
+
+void ReducibleDual::snip(node_t u, node_t v) {
+    uint8_t m = V[u].active;
+    for (; m; m &= m - 1) {
+        int i = __builtin_ctz(m);
+        if (V[u].nbr[i] == v) { V[u].active &= ~(1u << i); return; }
+    }
+    assert(false && "snip: v not found in active neighbours of u");
+}
+
+void ReducibleDual::kill(node_t v) {
+    V[v].active = 0;
+    n_alive--;
+    deg5.erase(v);
+}
+
+// --- Reconnection ---
+
+void ReducibleDual::reconnectStraight(
+        const std::vector<node_t>& path,
+        const std::vector<node_t>& strip,
+        const std::vector<node_t>& tp) {
+    int n = (int)strip.size();
+
+    snip(path[0], strip[0]);
+
+    for (int k = 1; k <= n; k++) {
+        splice(path[k], strip[k-1], tp[k-1]);
+        if (k < n) splice(path[k], strip[k], tp[k]);
+    }
+
+    for (int k = 0; k < n; k++) {
+        if (k > 0) splice(tp[k], strip[k-1], path[k]);
+        splice(tp[k], strip[k], path[k+1]);
+    }
+
+    snip(tp[n], strip[n-1]);
+}
+
+void ReducibleDual::reconnectBent(
+        const std::vector<node_t>& path,
+        const std::vector<node_t>& strip,
+        const std::vector<node_t>& tp,
+        int bentPos, int bentLen) {
+    int numNew = (int)strip.size();
+
+    snip(path[0], strip[0]);
+    snip(path[bentLen + 4], strip[numNew - 1]);
+
+    // Before bend
+    for (int k = 1; k <= bentPos + 1; k++) {
+        splice(path[k], strip[k-1], tp[k-1]);
+        splice(path[k], strip[k], tp[k]);
+    }
+    for (int k = 0; k <= bentPos; k++) {
+        if (k > 0) splice(tp[k], strip[k-1], path[k]);
+        splice(tp[k], strip[k], path[k+1]);
+    }
+
+    // Bend
+    int bi = bentPos + 2;
+    splice(path[bi], strip[bi-1], tp[bi-1]);
+    splice(tp[bi-1], strip[bi-2], path[bi-1]);
+    splice(tp[bi-1], strip[bi-1], path[bi]);
+    splice(tp[bi-1], strip[bi], path[bi+1]);
+
+    // After bend
+    for (int k = bi + 1; k <= bentLen + 3; k++) {
+        splice(path[k], strip[k-2], tp[k-2]);
+        splice(path[k], strip[k-1], tp[k-1]);
+    }
+    for (int k = bentPos + 2; k <= bentLen + 2; k++) {
+        splice(tp[k], strip[k], path[k+1]);
+        if (k < bentLen + 2) splice(tp[k], strip[k+1], path[k+2]);
+    }
+}
+
+void ReducibleDual::reconnectRing(
+        const std::vector<node_t>& ring,
+        const std::vector<node_t>& strip,
+        const std::vector<node_t>& outer) {
+    for (int i = 0; i < 5; i++) {
+        int im1 = (i + 4) % 5, ip1 = (i + 1) % 5;
+        splice(ring[i], strip[im1], outer[im1]);
+        splice(ring[i], strip[i], outer[i]);
+        splice(outer[i], strip[im1], ring[i]);
+        splice(outer[i], strip[i], ring[ip1]);
+    }
+}
+
+// --- Reduce ---
+
+void ReducibleDual::reduce(const InvSite& site) {
+    if (site.kind.type == ExpKind::L_type)
+        reconnectStraight(site.path, site.strip, site.tp);
+    else if (site.kind.type == ExpKind::B_type)
+        reconnectBent(site.path, site.strip, site.tp,
+                      site.kind.i, site.kind.i + site.kind.j);
+    else
+        reconnectRing(site.path, site.strip, site.tp);
+
+    for (node_t s : site.strip) kill(s);
+
+    // Update deg5: snip reduces degree by 1 (6→5 at path endpoints)
+    if (site.kind.type != ExpKind::F_type) {
+        deg5.insert(site.path[0]);
+        deg5.insert(site.tp.back());
+    }
+}
+
+// --- Site Finding ---
+
+static bool rdStripTopologyClean(const ReducibleDual& g,
+        const std::vector<node_t>& path,
+        const std::vector<node_t>& strip,
+        const std::vector<node_t>& tp) {
+    std::set<node_t> valid;
+    for (node_t x : path) valid.insert(x);
+    for (node_t x : strip) valid.insert(x);
+    for (node_t x : tp) valid.insert(x);
+
+    for (node_t s : strip) {
+        uint8_t m = g.V[s].active;
+        for (; m; m &= m - 1) {
+            node_t n = g.V[s].nbr[__builtin_ctz(m)];
+            if (!valid.count(n)) return false;
+        }
+    }
+    return true;
+}
+
+std::optional<InvSite> ReducibleDual::findL0Site() const {
+    for (node_t s0 : deg5) {
+        uint8_t m = V[s0].active;
+        for (; m; m &= m - 1) {
+            node_t s1 = V[s0].nbr[__builtin_ctz(m)];
+            if (degree(s1) != 5 || s1 <= s0) continue;
+
+            for (Dir dir : {Dir::DRight, Dir::DLeft}) {
+                node_t path_1, tp_1, path_0, tp_0;
+                if (dir == Dir::DRight) {
+                    path_1 = next(s0, s1);
+                    tp_1   = prev(s0, s1);
+                    path_0 = next(s0, path_1);
+                    tp_0   = prev(s0, tp_1);
+                } else {
+                    path_1 = prev(s0, s1);
+                    tp_1   = next(s0, s1);
+                    path_0 = prev(s0, path_1);
+                    tp_0   = next(s0, tp_1);
+                }
+
+                node_t path_2, tp_2;
+                if (dir == Dir::DRight) {
+                    path_2 = prev(s1, path_1);
+                    tp_2   = prev(s1, path_2);
+                } else {
+                    path_2 = next(s1, path_1);
+                    tp_2   = next(s1, path_2);
+                }
+
+                if (degree(path_0) != 6 || degree(tp_2) != 6) continue;
+                if (arc_ix(path_0, path_1) < 0 || arc_ix(path_2, path_1) < 0) continue;
+
+                std::set<node_t> all = {s0, s1, path_0, path_1, path_2, tp_0, tp_1, tp_2};
+                if ((int)all.size() != 8) continue;
+
+                InvSite site;
+                site.kind = Lk(0); site.dir = dir;
+                site.strip = {s0, s1};
+                site.path = {path_0, path_1, path_2};
+                site.tp = {tp_0, tp_1, tp_2};
+                if (!rdStripTopologyClean(*this, site.path, site.strip, site.tp)) continue;
+                return site;
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<InvSite> ReducibleDual::findLiSite(int maxRedLen) const {
+    for (node_t s0 : deg5) {
+        uint8_t m0 = V[s0].active;
+        for (; m0; m0 &= m0 - 1) {
+            node_t s1 = V[s0].nbr[__builtin_ctz(m0)];
+            if (degree(s1) != 6) continue;
+
+            // Walk strip chain through degree-6 vertices
+            std::vector<node_t> sc = {s0, s1};
+            node_t prv = s0, cur = s1;
+            bool chainOK = true;
+            while (degree(cur) == 6) {
+                node_t nxt = advanceCW(cur, prv, 3);
+                for (node_t x : sc) if (x == nxt) { chainOK = false; break; }
+                if (!chainOK) break;
+                sc.push_back(nxt);
+                prv = cur; cur = nxt;
+                if ((int)sc.size() > maxRedLen + 1) { chainOK = false; break; }
+            }
+            if (!chainOK || degree(cur) != 5) continue;
+
+            int i_val = (int)sc.size() - 2;
+            if (i_val < 1 || i_val + 1 > maxRedLen) continue;
+
+            for (Dir dir : {Dir::DRight, Dir::DLeft}) {
+                int pLen = i_val + 3;
+                std::vector<node_t> path(pLen), tp(pLen);
+
+                if (dir == Dir::DRight) {
+                    path[1] = next(s0, s1);
+                    path[0] = next(s0, path[1]);
+                    tp[0]   = next(s0, path[0]);
+                    tp[1]   = next(s0, tp[0]);
+                } else {
+                    path[1] = prev(s0, s1);
+                    path[0] = prev(s0, path[1]);
+                    tp[1]   = next(s0, s1);
+                    tp[0]   = next(s0, tp[1]);
+                }
+
+                bool ok = true;
+                for (int j = 1; j <= i_val && ok; j++) {
+                    node_t sj = sc[j], sp = sc[j-1], sn = sc[j+1];
+                    if (dir == Dir::DRight) {
+                        if (next(sj, sp) != tp[j]) { ok = false; break; }
+                        tp[j+1] = next(sj, tp[j]);
+                        if (next(sj, tp[j+1]) != sn) { ok = false; break; }
+                        path[j+1] = next(sj, sn);
+                        if (next(sj, path[j+1]) != path[j]) { ok = false; break; }
+                    } else {
+                        if (next(sj, sp) != path[j]) { ok = false; break; }
+                        path[j+1] = next(sj, path[j]);
+                        if (next(sj, path[j+1]) != sn) { ok = false; break; }
+                        tp[j+1] = next(sj, sn);
+                        if (next(sj, tp[j+1]) != tp[j]) { ok = false; break; }
+                    }
+                }
+                if (!ok) continue;
+
+                node_t sf = sc[i_val+1], sfp = sc[i_val];
+                if (dir == Dir::DRight) {
+                    if (next(sf, sfp) != tp[i_val+1]) continue;
+                    tp[i_val+2] = next(sf, tp[i_val+1]);
+                    path[i_val+2] = next(sf, tp[i_val+2]);
+                    if (next(sf, path[i_val+2]) != path[i_val+1]) continue;
+                } else {
+                    if (next(sf, sfp) != path[i_val+1]) continue;
+                    path[i_val+2] = next(sf, path[i_val+1]);
+                    tp[i_val+2] = next(sf, path[i_val+2]);
+                    if (next(sf, tp[i_val+2]) != tp[i_val+1]) continue;
+                }
+
+                if (degree(path[0]) != 6 || degree(tp[i_val+2]) != 6) continue;
+
+                std::set<node_t> all;
+                for (node_t x : sc) all.insert(x);
+                for (node_t x : path) all.insert(x);
+                for (node_t x : tp) all.insert(x);
+                if ((int)all.size() != (int)(sc.size() + path.size() + tp.size()))
+                    continue;
+
+                if (!rdStripTopologyClean(*this, path, sc, tp)) continue;
+
+                InvSite site;
+                site.kind = Lk(i_val); site.dir = dir;
+                site.strip = sc; site.path = path; site.tp = tp;
+                return site;
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<InvSite> ReducibleDual::findB00Site() const {
+    for (node_t a : deg5) {
+        uint8_t ma = V[a].active;
+        for (; ma; ma &= ma - 1) {
+            node_t b = V[a].nbr[__builtin_ctz(ma)];
+            if (degree(b) != 6) continue;
+
+            uint8_t mb = V[b].active;
+            for (; mb; mb &= mb - 1) {
+                node_t c = V[b].nbr[__builtin_ctz(mb)];
+                if (c == a || degree(c) != 5) continue;
+                if (arc_ix(a, c) >= 0) continue;  // a NOT adj c
+
+                for (Dir dir : {Dir::DRight, Dir::DLeft}) {
+                    node_t p0, q0, q1, p1;
+                    if (dir == Dir::DRight) {
+                        p1 = next(a, b); p0 = next(a, p1);
+                        q0 = next(a, p0); q1 = next(a, q0);
+                    } else {
+                        p1 = prev(a, b); p0 = prev(a, p1);
+                        q1 = next(a, b); q0 = next(a, q1);
+                    }
+
+                    // Validate q1 from b's perspective
+                    node_t bq1;
+                    if (dir == Dir::DRight) {
+                        bq1 = next(b, a);
+                    } else {
+                        bq1 = next(b, c);
+                    }
+                    if (bq1 != q1) continue;
+
+                    node_t p2, p3;
+                    if (dir == Dir::DRight) {
+                        p2 = prev(b, p1); p3 = prev(b, p2);
+                    } else {
+                        p2 = next(b, p1); p3 = next(b, p2);
+                    }
+
+                    node_t q2, p4;
+                    if (dir == Dir::DRight) {
+                        q2 = next(c, q1); p4 = next(c, q2);
+                    } else {
+                        q2 = prev(c, q1); p4 = prev(c, q2);
+                    }
+
+                    if (degree(p0) != 6 || degree(p4) != 6) continue;
+
+                    std::set<node_t> all = {a, b, c, p0, p1, p2, p3, p4, q0, q1, q2};
+                    if ((int)all.size() != 11) continue;
+
+                    std::vector<node_t> strip = {a, b, c};
+                    std::vector<node_t> path = {p0, p1, p2, p3, p4};
+                    std::vector<node_t> tp = {q0, q1, q2};
+
+                    if (!rdStripTopologyClean(*this, path, strip, tp)) continue;
+
+                    InvSite site;
+                    site.kind = Bk(0, 0); site.dir = dir;
+                    site.strip = strip; site.path = path; site.tp = tp;
+                    return site;
+                }
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<InvSite> ReducibleDual::findFRingSite() const {
+    // Detect nanotube pole: a degree-5 vertex all of whose neighbours are degree-5
+    node_t pole = -1;
+    for (node_t v : deg5) {
+        bool all_deg5 = true;
+        uint8_t m = V[v].active;
+        for (uint8_t t = m; t; t &= t - 1) {
+            if (degree(V[v].nbr[__builtin_ctz(t)]) != 5) { all_deg5 = false; break; }
+        }
+        if (all_deg5) { pole = v; break; }
+    }
+    if (pole < 0) return std::nullopt;
+
+    // Collect pole-neighbours (all degree-5)
+    std::set<node_t> poleNbrs;
+    uint8_t mp = V[pole].active;
+    for (; mp; mp &= mp - 1)
+        poleNbrs.insert(V[pole].nbr[__builtin_ctz(mp)]);
+
+    // From a pole-neighbour q, find ring_start (degree-6 neighbour of q)
+    node_t q = *poleNbrs.begin();
+    node_t ring_start = -1;
+    uint8_t mq = V[q].active;
+    for (; mq; mq &= mq - 1) {
+        node_t w = V[q].nbr[__builtin_ctz(mq)];
+        if (degree(w) == 6) { ring_start = w; break; }
+    }
+    if (ring_start < 0) return std::nullopt;
+
+    // Find ring_second: a degree-6 neighbour of ring_start that is ALSO adjacent
+    // to a pole-neighbour (distinguishes ring vertices from strip vertices)
+    node_t ring_second = -1;
+    uint8_t mr = V[ring_start].active;
+    for (; mr; mr &= mr - 1) {
+        node_t w = V[ring_start].nbr[__builtin_ctz(mr)];
+        if (degree(w) != 6) continue;
+        // Check if w is adjacent to any pole-neighbour
+        uint8_t mw = V[w].active;
+        bool adj_pole_nbr = false;
+        for (uint8_t tw = mw; tw; tw &= tw - 1) {
+            if (poleNbrs.count(V[w].nbr[__builtin_ctz(tw)])) { adj_pole_nbr = true; break; }
+        }
+        if (adj_pole_nbr) { ring_second = w; break; }
+    }
+    if (ring_second < 0) return std::nullopt;
+
+    // Trace 5-cycle via straight-ahead (advanceCW 3 at degree 6)
+    std::vector<node_t> ring = {ring_start, ring_second};
+    node_t prv = ring_start, cur = ring_second;
+    for (int step = 2; step < 5; step++) {
+        node_t nxt = advanceCW(cur, prv, 3);
+        if (degree(nxt) != 6) return std::nullopt;
+        ring.push_back(nxt);
+        prv = cur; cur = nxt;
+    }
+    if (advanceCW(cur, prv, 3) != ring_start) return std::nullopt;
+
+    std::set<node_t> ringSet(ring.begin(), ring.end());
+    if ((int)ringSet.size() != 5) return std::nullopt;
+
+    // Find strip: common non-ring degree-6 neighbour of consecutive ring vertices
+    std::vector<node_t> strip(5, -1);
+    for (int i = 0; i < 5; i++) {
+        int j = (i + 1) % 5;
+        uint8_t mi = V[ring[i]].active;
+        for (; mi; mi &= mi - 1) {
+            node_t w = V[ring[i]].nbr[__builtin_ctz(mi)];
+            if (ringSet.count(w)) continue;
+            if (degree(w) == 6 && arc_ix(ring[j], w) >= 0) { strip[i] = w; break; }
+        }
+        if (strip[i] < 0) return std::nullopt;
+    }
+
+    std::set<node_t> stripSet(strip.begin(), strip.end());
+    if ((int)stripSet.size() != 5) return std::nullopt;
+
+    // Verify strip 5-cycle
+    for (int i = 0; i < 5; i++)
+        if (arc_ix(strip[i], strip[(i+1)%5]) < 0) return std::nullopt;
+
+    // Find outer vertices
+    std::vector<std::vector<node_t>> extras(5);
+    for (int i = 0; i < 5; i++) {
+        uint8_t mi = V[strip[i]].active;
+        for (; mi; mi &= mi - 1) {
+            node_t w = V[strip[i]].nbr[__builtin_ctz(mi)];
+            if (!ringSet.count(w) && !stripSet.count(w)) extras[i].push_back(w);
+        }
+        if ((int)extras[i].size() != 2) return std::nullopt;
+    }
+
+    std::vector<node_t> outer(5, -1);
+    for (int i = 0; i < 5; i++) {
+        int im1 = (i + 4) % 5;
+        for (node_t x : extras[im1])
+            for (node_t y : extras[i])
+                if (x == y) { outer[i] = x; goto rd_found_outer; }
+        rd_found_outer:
+        if (outer[i] < 0) return std::nullopt;
+    }
+
+    std::set<node_t> outerSet(outer.begin(), outer.end());
+    if ((int)outerSet.size() != 5) return std::nullopt;
+
+    if (!rdStripTopologyClean(*this, ring, strip, outer)) return std::nullopt;
+
+    InvSite site;
+    site.kind = Fk(); site.dir = Dir::DRight;
+    site.strip = strip; site.path = ring; site.tp = outer;
+    return site;
+}
+
+std::optional<InvSite> ReducibleDual::findSite(int maxRedLen) const {
+    // Only accept reductions that produce valid fullerene dual vertex counts:
+    // 12 (C20) or >= 14 (C24+). C22 (13v) doesn't exist; below 12 is impossible.
+    auto ok = [&](const std::optional<InvSite>& s) -> bool {
+        if (!s) return false;
+        int result = n_alive - (int)s->strip.size();
+        return result == 12 || result >= 14;
+    };
+
+    if (auto s = findL0Site(); ok(s)) return s;
+    if (maxRedLen >= 2) {
+        if (auto s = findLiSite(maxRedLen); ok(s)) return s;
+        if (auto s = findB00Site(); ok(s)) return s;
+    }
+    if (auto s = findFRingSite(); ok(s)) return s;
+    return std::nullopt;
+}
+
+SeedType ReducibleDual::reduceToSeed(int maxRedLen) {
+    int max_steps = (int)V.size();  // At most N reductions possible
+    while (auto site = findSite(maxRedLen)) {
+        if (--max_steps < 0) return SeedType::NotASeed;  // Safety limit
+        reduce(*site);
+    }
+
+    switch (n_alive) {
+        case 12: return SeedType::C20;
+        case 16: return SeedType::C28;
+        case 17: return SeedType::C30;
+        default: return SeedType::NotASeed;
+    }
+}
+
+Graph ReducibleDual::toGraph() const {
+    std::vector<int> remap(V.size(), -1);
+    int id = 0;
+    for (int u = 0; u < (int)V.size(); u++)
+        if (alive(u)) remap[u] = id++;
+
+    neighbours_t adj(id);
+    for (int u = 0; u < (int)V.size(); u++) {
+        if (!alive(u)) continue;
+        uint8_t m = V[u].active;
+        for (; m; m &= m - 1)
+            adj[remap[u]].push_back(remap[V[u].nbr[__builtin_ctz(m)]]);
+    }
+    return Graph(adj, true);
+}
+
 } // namespace buckinverse

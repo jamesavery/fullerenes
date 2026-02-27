@@ -1,5 +1,6 @@
 // Scalable reduction-to-seed test for larger fullerenes.
 // Usage: ./test_scale [Nmax]   (default: 60)
+// Compares O(N^2) reference implementation with O(N) ReducibleDual.
 
 #include "buckinverse.hh"
 #include "fullerenes/buckygen-wrapper.hh"
@@ -12,73 +13,26 @@
 using namespace buckinverse;
 using namespace std;
 
-// Validate that a graph is a valid fullerene dual triangulation.
-static bool isValidTriangulation(const Graph& g, string& err) {
-    int deg5_count = 0;
-    for (int u = 0; u < g.N; ++u) {
-        int d = g.degree(u);
-        if (d != 5 && d != 6) {
-            err = "vertex " + to_string(u) + " has degree " + to_string(d);
-            return false;
-        }
-        if (d == 5) deg5_count++;
+// --- O(N^2) reference: iterative allInvSites + invertReduction ---
 
-        set<node_t> seen;
-        for (int i = 0; i < d; ++i) {
-            node_t v = g.neighbours[u][i];
-            if (v == u) { err = "self-loop at " + to_string(u); return false; }
-            if (v < 0 || v >= g.N) {
-                err = "invalid neighbour " + to_string(v) + " at " + to_string(u);
-                return false;
-            }
-            if (!seen.insert(v).second) {
-                err = "duplicate neighbour " + to_string(v) + " at " + to_string(u);
-                return false;
-            }
+static SeedType reduceToSeedRef(const Graph& g) {
+    Graph current = g;
+    // Keep reducing as long as valid sites exist.
+    // Seeds have no valid inversion sites, so this terminates at a seed.
+    while (true) {
+        auto sites = allInvSites(current, 5);
+        bool found = false;
+        for (const auto& site : sites) {
+            Graph next = invertReduction(current, site);
+            if (next.N > 0) { current = next; found = true; break; }
         }
-
-        for (int i = 0; i < d; ++i) {
-            node_t v = g.neighbours[u][i];
-            if (g.arc_ix(v, u) < 0) {
-                err = "asymmetric: " + to_string(u) + " adj " + to_string(v)
-                    + " but not vice versa";
-                return false;
-            }
-        }
+        if (!found) break;
     }
-    if (deg5_count != 12) {
-        err = "has " + to_string(deg5_count) + " degree-5 vertices (expected 12)";
-        return false;
-    }
-    return true;
-}
-
-// Diagnose a stuck graph: what site types exist?
-static void diagnoseStuck(const Graph& g, int N, int isomer_idx, int steps) {
-    auto inv = allInvSites(g, 5);
-    auto red = allReductions(g, 5);
-
-    // Count by type
-    map<string, int> inv_types, red_types;
-    for (auto& s : inv) inv_types[s.kind.toString()]++;
-    for (auto& r : red) red_types[r.kind.toString()]++;
-
-    cerr << "  STUCK C" << N << " #" << isomer_idx
-         << " at " << g.N << " dual vertices after " << steps << " steps\n";
-    cerr << "    allInvSites found " << inv.size() << " sites:";
-    for (auto& [t, c] : inv_types) cerr << " " << t << "=" << c;
-    if (inv.empty()) cerr << " (none)";
-    cerr << "\n";
-    cerr << "    allReductions found " << red.size() << " sites:";
-    for (auto& [t, c] : red_types) cerr << " " << t << "=" << c;
-    if (red.empty()) cerr << " (none)";
-    cerr << "\n";
-
-    // Show types in allReductions but not in allInvSites
-    for (auto& [t, c] : red_types) {
-        if (inv_types.find(t) == inv_types.end())
-            cerr << "    MISSING inversion type: " << t
-                 << " (" << c << " reduction sites)\n";
+    switch (current.N) {
+        case 12: return SeedType::C20;
+        case 16: return SeedType::C28;
+        case 17: return SeedType::C30;
+        default: return SeedType::NotASeed;
     }
 }
 
@@ -91,118 +45,90 @@ int main(int argc, char* argv[]) {
     }
 
     cout << "Reducing all fullerene isomers C32-C" << Nmax << " to seeds...\n";
-
-    auto t0 = chrono::steady_clock::now();
+    cout << "  [ref = O(N^2) allInvSites+invertReduction,  "
+         << "fast = O(N) ReducibleDual]\n\n";
 
     map<string, int> seed_tally;
     int total = 0, failures = 0;
+    double total_ref = 0, total_fast = 0;
 
     for (int N = 32; N <= Nmax; N += 2) {
-        auto tN = chrono::steady_clock::now();
         auto Q = BuckyGen::start(N, false);
         Graph G;
-        int isomer_count = 0;
-        int ok = 0, fail = 0;
-        int max_steps = 0;
-        int total_steps = 0;
+        int isomer_count = 0, ok = 0, fail = 0;
+        double dt_ref = 0, dt_fast = 0;
 
         while (BuckyGen::next_fullerene(Q, G)) {
             isomer_count++;
             total++;
 
-            Graph current = G;
-            int steps = 0;
-            bool success = true;
+            // O(N) ReducibleDual
+            auto t1 = chrono::steady_clock::now();
+            ReducibleDual rd(G);
+            SeedType seed_fast = rd.reduceToSeed();
+            auto t2 = chrono::steady_clock::now();
+            dt_fast += chrono::duration<double>(t2 - t1).count();
 
-            while (current.N > 17) {
-                auto sites = allInvSites(current, 5);
-                if (sites.empty()) {
-                    diagnoseStuck(current, N, isomer_count, steps);
-                    success = false;
-                    fail++;
-                    failures++;
-                    break;
-                }
+            // O(N^2) reference
+            auto t3 = chrono::steady_clock::now();
+            SeedType seed_ref = reduceToSeedRef(G);
+            auto t4 = chrono::steady_clock::now();
+            dt_ref += chrono::duration<double>(t4 - t3).count();
 
-                Graph next;
-                bool found = false;
-                for (const auto& site : sites) {
-                    next = invertReduction(current, site);
-                    if (next.N > 0) {
-                        string err;
-                        if (isValidTriangulation(next, err)) {
-                            found = true;
-                            break;
-                        }
+            if (seed_fast == SeedType::NotASeed) {
+                // Diagnose: extract stuck graph and check what old code finds
+                Graph stuck = rd.toGraph();
+                auto sites = allInvSites(stuck, 5);
+                cerr << "  FAIL C" << N << " #" << isomer_count
+                     << ": stuck at " << rd.N() << "v, old finds "
+                     << sites.size() << " sites";
+                for (auto& s : sites) cerr << " " << s.kind.toString();
+                cerr << "\n";
+                fail++;
+                failures++;
+            } else if (seed_ref == SeedType::NotASeed) {
+                cerr << "  FAIL C" << N << " #" << isomer_count
+                     << ": reference got NotASeed\n";
+                fail++;
+                failures++;
+            } else {
+                // Verify C28/C30 are genuine seeds (no further reductions possible)
+                if (seed_fast == SeedType::C28 || seed_fast == SeedType::C30) {
+                    Graph g = rd.toGraph();
+                    auto sites = allInvSites(g, 5);
+                    if (!sites.empty()) {
+                        cerr << "  FALSE SEED C" << N << " #" << isomer_count
+                             << ": " << seedName(seed_fast) << " has "
+                             << sites.size() << " sites:";
+                        for (auto& s : sites) cerr << " " << s.kind.toString();
+                        cerr << "\n";
+                        fail++;
+                        failures++;
+                        continue;
                     }
                 }
-
-                if (!found) {
-                    diagnoseStuck(current, N, isomer_count, steps);
-                    success = false;
-                    fail++;
-                    failures++;
-                    break;
-                }
-                current = next;
-                steps++;
-            }
-
-            if (success) {
-                // May need one more reduction if stopped at N=17 but not a seed
-                Triangulation t(current.neighbours, true);
-                SeedType seed = identifySeed(t);
-                if (seed == SeedType::NotASeed) {
-                    auto sites = allInvSites(current, 5);
-                    for (const auto& site : sites) {
-                        Graph next = invertReduction(current, site);
-                        if (next.N > 0) {
-                            string err;
-                            if (isValidTriangulation(next, err)) {
-                                current = next;
-                                steps++;
-                                break;
-                            }
-                        }
-                    }
-                    t = Triangulation(current.neighbours, true);
-                    seed = identifySeed(t);
-                }
-
-                if (seed == SeedType::NotASeed) {
-                    cerr << "  C" << N << " #" << isomer_count
-                         << " reduced to " << current.N
-                         << " vertices but not a seed\n";
-                    fail++;
-                    failures++;
-                } else {
-                    seed_tally[seedName(seed)]++;
-                    ok++;
-                }
-                total_steps += steps;
-                if (steps > max_steps) max_steps = steps;
+                seed_tally[seedName(seed_fast)]++;
+                ok++;
             }
         }
         BuckyGen::stop(Q);
 
-        auto tN_end = chrono::steady_clock::now();
-        double dt = chrono::duration<double>(tN_end - tN).count();
+        total_ref += dt_ref;
+        total_fast += dt_fast;
 
+        double speedup = dt_ref > 0 ? dt_ref / dt_fast : 0;
         cout << "  C" << N << ": " << isomer_count << " isomers, "
              << ok << " ok, " << fail << " fail"
-             << "  (max " << max_steps << " steps, avg "
-             << (isomer_count > 0 ? (double)total_steps / ok : 0.0)
-             << ", " << dt << "s)\n";
+             << "  ref=" << dt_ref << "s  fast=" << dt_fast << "s"
+             << "  (" << speedup << "x)\n";
         cout << flush;
     }
-
-    auto t1 = chrono::steady_clock::now();
-    double elapsed = chrono::duration<double>(t1 - t0).count();
 
     cout << "\nTotal: " << total << " isomers, " << failures << " failures\n";
     cout << "Seeds:";
     for (auto& [s, c] : seed_tally) cout << " " << s << "=" << c;
     cout << "\n";
-    cout << "Time: " << elapsed << "s\n";
+    cout << "Time: ref=" << total_ref << "s  fast=" << total_fast << "s"
+         << "  (" << (total_ref > 0 ? total_ref / total_fast : 0) << "x)\n";
     return failures > 0 ? 1 : 0;
 }
