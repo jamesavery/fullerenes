@@ -15,3 +15,19 @@ target_link_libraries(deltahedron-test fullerenes GTest::GTest GTest::Main)
 target_include_directories(deltahedron-test PRIVATE ${CMAKE_SOURCE_DIR}/data)
 target_compile_definitions(deltahedron-test PRIVATE C44_DATA_DIR="${CMAKE_SOURCE_DIR}/data")
 add_test(NAME deltahedron-test COMMAND deltahedron-test)
+
+add_executable(buckinverse-phase1-test buckinverse-phase1-test.cc)
+target_link_libraries(buckinverse-phase1-test fullerenes GTest::GTest GTest::Main)
+add_test(NAME buckinverse-phase1-test COMMAND buckinverse-phase1-test)
+
+add_executable(buckinverse-phase2-test buckinverse-phase2-test.cc)
+target_link_libraries(buckinverse-phase2-test fullerenes GTest::GTest GTest::Main)
+add_test(NAME buckinverse-phase2-test COMMAND buckinverse-phase2-test)
+
+add_executable(buckinverse-phase3-test buckinverse-phase3-test.cc)
+target_link_libraries(buckinverse-phase3-test fullerenes GTest::GTest GTest::Main)
+add_test(NAME buckinverse-phase3-test COMMAND buckinverse-phase3-test)
+
+add_executable(buckinverse-roundtrip-test buckinverse-roundtrip-test.cc)
+target_link_libraries(buckinverse-roundtrip-test fullerenes GTest::GTest GTest::Main)
+add_test(NAME buckinverse-roundtrip-test COMMAND buckinverse-roundtrip-test)

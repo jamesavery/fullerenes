@@ -1,4 +1,4 @@
-#include "buckinverse.hh"
+#include "fullerenes/buckinverse.hh"
 #include <algorithm>
 #include <set>
 
