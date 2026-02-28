@@ -1209,6 +1209,12 @@ ReducibleDual::ReducibleDual(const Graph& g)
     }
 }
 
+ReducibleDual::ReducibleDual(int capacity)
+    : V(capacity), n_alive(0)
+{
+    for (auto& v : V) v.active = 0;
+}
+
 int ReducibleDual::arc_ix(node_t u, node_t v) const {
     uint8_t m = V[u].active;
     for (; m; m &= m - 1) {
@@ -1286,6 +1292,34 @@ void ReducibleDual::unsnip(node_t u, node_t v) {
         }
     }
     assert(false && "unsnip: v not found in inactive positions of u");
+}
+
+void ReducibleDual::insertAfter(node_t u, node_t v, node_t after) {
+    // Insert v into u's CW ordering right after 'after'.
+    // u must be degree 5 (one inactive position). Promotes u to degree 6.
+    assert(degree(u) == 5);
+
+    // Extract current 5 active neighbors in CW order (by physical position)
+    node_t cw[5]; int ci = 0;
+    for (int p = 0; p < D_MAX; p++)
+        if (V[u].active & (1u << p))
+            cw[ci++] = V[u].nbr[p];
+    assert(ci == 5);
+
+    // Find 'after' in CW sequence
+    int ins = -1;
+    for (int i = 0; i < 5; i++)
+        if (cw[i] == after) { ins = i; break; }
+    assert(ins >= 0 && "insertAfter: 'after' not found in CW of u");
+
+    // Build new 6-element CW: insert v right after 'after'
+    node_t new_cw[6];
+    for (int i = 0; i <= ins; i++) new_cw[i] = cw[i];
+    new_cw[ins + 1] = v;
+    for (int i = ins + 1; i < 5; i++) new_cw[i + 1] = cw[i];
+
+    for (int i = 0; i < D_MAX; i++) V[u].nbr[i] = new_cw[i];
+    V[u].active = 0x3f;  // all 6 bits active
 }
 
 void ReducibleDual::unkill(node_t v, const Vertex& saved) {
@@ -1496,6 +1530,183 @@ void ReducibleDual::expand(const ReductionStep& step) {
                    site.kind.i, site.kind.i + site.kind.j);
     else
         expandRing(site.path, site.strip, site.tp);
+}
+
+// --- Standalone expand (from ExtensionStep, no saved state) ---
+// Uses insertAfter instead of unsnip for snipped endpoints, because
+// strip vertices created from CW formulas don't have inactive positions.
+
+void ReducibleDual::expand(const ExtensionStep& step) {
+    const auto& kind = step.kind;
+    const auto& dir = step.dir;
+    const auto& strip = step.strip;
+    const auto& path = step.path;
+    const auto& tp = step.tp;
+
+    // 1. Undo deg5 updates from the original reduce()
+    if (kind.type != ExpKind::F_type) {
+        deg5.erase(path[0]);
+        deg5.erase(tp.back());
+    }
+
+    // 2. Create strip vertices with computed CW adjacency
+    int n = (int)strip.size();
+
+    if (kind.type == ExpKind::L_type) {
+        for (int si = 0; si < n; si++) {
+            node_t v = strip[si];
+            if (si == 0) {
+                if (dir == Dir::DRight) {
+                    V[v].nbr[0]=path[0]; V[v].nbr[1]=tp[0]; V[v].nbr[2]=tp[1];
+                    V[v].nbr[3]=strip[1]; V[v].nbr[4]=path[1];
+                } else {
+                    V[v].nbr[0]=path[0]; V[v].nbr[1]=path[1]; V[v].nbr[2]=strip[1];
+                    V[v].nbr[3]=tp[1]; V[v].nbr[4]=tp[0];
+                }
+                V[v].active = 0x1f; n_alive++; deg5.insert(v);
+            } else if (si == n - 1) {
+                if (dir == Dir::DRight) {
+                    V[v].nbr[0]=strip[si-1]; V[v].nbr[1]=tp[si]; V[v].nbr[2]=tp[si+1];
+                    V[v].nbr[3]=path[si+1]; V[v].nbr[4]=path[si];
+                } else {
+                    V[v].nbr[0]=strip[si-1]; V[v].nbr[1]=path[si]; V[v].nbr[2]=path[si+1];
+                    V[v].nbr[3]=tp[si+1]; V[v].nbr[4]=tp[si];
+                }
+                V[v].active = 0x1f; n_alive++; deg5.insert(v);
+            } else {
+                if (dir == Dir::DRight) {
+                    V[v].nbr[0]=strip[si-1]; V[v].nbr[1]=tp[si]; V[v].nbr[2]=tp[si+1];
+                    V[v].nbr[3]=strip[si+1]; V[v].nbr[4]=path[si+1]; V[v].nbr[5]=path[si];
+                } else {
+                    V[v].nbr[0]=strip[si-1]; V[v].nbr[1]=path[si]; V[v].nbr[2]=path[si+1];
+                    V[v].nbr[3]=strip[si+1]; V[v].nbr[4]=tp[si+1]; V[v].nbr[5]=tp[si];
+                }
+                V[v].active = 0x3f; n_alive++;
+            }
+        }
+
+        // 3. Fix path/tp vertices: insertAfter for endpoints, splice for interior.
+        // Insert strip[n-1] into tp[n] (5→6)
+        if (dir == Dir::DRight)
+            insertAfter(tp[n], strip[n-1], path[n]);
+        else
+            insertAfter(tp[n], strip[n-1], tp[n-1]);
+
+        // Reverse tp splices (same as expandStraight but without unsnip)
+        for (int k = n - 1; k >= 0; k--) {
+            splice(tp[k], path[k+1], strip[k]);
+            if (k > 0) splice(tp[k], path[k], strip[k-1]);
+        }
+
+        // Reverse path splices
+        for (int k = n; k >= 1; k--) {
+            if (k < n) splice(path[k], tp[k], strip[k]);
+            splice(path[k], tp[k-1], strip[k-1]);
+        }
+
+        // Insert strip[0] into path[0] (5→6)
+        if (dir == Dir::DRight)
+            insertAfter(path[0], strip[0], tp[0]);
+        else
+            insertAfter(path[0], strip[0], path[1]);
+
+    } else if (kind.type == ExpKind::B_type) {
+        assert(kind.i == 0 && kind.j == 0 && n == 3);
+        node_t a = strip[0], b = strip[1], c = strip[2];
+        int bentPos = 0, bentLen = 0, numNew = 3;
+
+        // Create a, b, c
+        if (dir == Dir::DRight) {
+            V[a].nbr[0]=path[0]; V[a].nbr[1]=tp[0]; V[a].nbr[2]=tp[1];
+            V[a].nbr[3]=b; V[a].nbr[4]=path[1];
+        } else {
+            V[a].nbr[0]=path[0]; V[a].nbr[1]=path[1]; V[a].nbr[2]=b;
+            V[a].nbr[3]=tp[1]; V[a].nbr[4]=tp[0];
+        }
+        V[a].active = 0x1f; n_alive++; deg5.insert(a);
+
+        if (dir == Dir::DRight) {
+            V[b].nbr[0]=a; V[b].nbr[1]=tp[1]; V[b].nbr[2]=c;
+            V[b].nbr[3]=path[3]; V[b].nbr[4]=path[2]; V[b].nbr[5]=path[1];
+        } else {
+            V[b].nbr[0]=a; V[b].nbr[1]=path[1]; V[b].nbr[2]=path[2];
+            V[b].nbr[3]=path[3]; V[b].nbr[4]=c; V[b].nbr[5]=tp[1];
+        }
+        V[b].active = 0x3f; n_alive++;
+
+        if (dir == Dir::DRight) {
+            V[c].nbr[0]=b; V[c].nbr[1]=tp[1]; V[c].nbr[2]=tp[2];
+            V[c].nbr[3]=path[4]; V[c].nbr[4]=path[3];
+        } else {
+            V[c].nbr[0]=b; V[c].nbr[1]=path[3]; V[c].nbr[2]=path[4];
+            V[c].nbr[3]=tp[2]; V[c].nbr[4]=tp[1];
+        }
+        V[c].active = 0x1f; n_alive++; deg5.insert(c);
+
+        // 3. Fix path/tp: insertAfter for endpoints, splice for interior.
+        // Insert strip[numNew-1] = c into path[bentLen+4] = path[4] (5→6)
+        if (dir == Dir::DRight)
+            insertAfter(path[bentLen + 4], strip[numNew - 1], path[bentLen + 3]);
+        else
+            insertAfter(path[bentLen + 4], strip[numNew - 1], tp[numNew - 1]);
+
+        // Reverse after-bend tp splices
+        int bi = bentPos + 2;
+        for (int k = bentLen + 2; k >= bentPos + 2; k--) {
+            if (k < bentLen + 2) splice(tp[k], path[k+2], strip[k+1]);
+            splice(tp[k], path[k+1], strip[k]);
+        }
+
+        // Reverse after-bend path splices
+        for (int k = bentLen + 3; k >= bi + 1; k--) {
+            splice(path[k], tp[k-1], strip[k-1]);
+            splice(path[k], tp[k-2], strip[k-2]);
+        }
+
+        // Reverse bend
+        splice(tp[bi-1], path[bi+1], strip[bi]);
+        splice(tp[bi-1], path[bi], strip[bi-1]);
+        splice(tp[bi-1], path[bi-1], strip[bi-2]);
+        splice(path[bi], tp[bi-1], strip[bi-1]);
+
+        // Reverse before-bend tp splices
+        for (int k = bentPos; k >= 0; k--) {
+            splice(tp[k], path[k+1], strip[k]);
+            if (k > 0) splice(tp[k], path[k], strip[k-1]);
+        }
+
+        // Reverse before-bend path splices
+        for (int k = bentPos + 1; k >= 1; k--) {
+            splice(path[k], tp[k], strip[k]);
+            splice(path[k], tp[k-1], strip[k-1]);
+        }
+
+        // Insert strip[0] = a into path[0] (5→6)
+        if (dir == Dir::DRight)
+            insertAfter(path[0], strip[0], tp[0]);
+        else
+            insertAfter(path[0], strip[0], path[1]);
+
+    } else {
+        // F-ring: detect chirality, create strip, use expandRing (no unsnip needed)
+        node_t nxt = next(path[0], tp[0]);
+        bool orderingA = (nxt == tp[4]);
+
+        for (int i = 0; i < 5; i++) {
+            int im1 = (i + 4) % 5, ip1 = (i + 1) % 5;
+            node_t v = strip[i];
+            if (orderingA) {
+                V[v].nbr[0]=path[i]; V[v].nbr[1]=path[ip1]; V[v].nbr[2]=strip[ip1];
+                V[v].nbr[3]=tp[ip1]; V[v].nbr[4]=tp[i]; V[v].nbr[5]=strip[im1];
+            } else {
+                V[v].nbr[0]=path[i]; V[v].nbr[1]=strip[im1]; V[v].nbr[2]=tp[i];
+                V[v].nbr[3]=tp[ip1]; V[v].nbr[4]=strip[ip1]; V[v].nbr[5]=path[ip1];
+            }
+            V[v].active = 0x3f; n_alive++;
+        }
+
+        expandRing(path, strip, tp);
+    }
 }
 
 // --- Reduce ---
@@ -1926,6 +2137,16 @@ ExtensionPath ReducibleDual::reduceToExtensionPath(int maxRedLen) {
     ep.seed = seed;
     ep.full_N = (int)V.size();
 
+    // Record seed state: full vertex data (including inactive positions for unsnip)
+    for (int u = 0; u < (int)V.size(); u++) {
+        if (!alive(u)) continue;
+        ExtensionPath::SeedVertex sv;
+        sv.id = u;
+        for (int i = 0; i < D_MAX; i++) sv.nbr[i] = V[u].nbr[i];
+        sv.active = V[u].active;
+        ep.seed_state.push_back(sv);
+    }
+
     // Convert reduction steps to expansion steps in reverse order
     for (int i = (int)steps.size() - 1; i >= 0; i--) {
         const auto& site = steps[i].site;
@@ -1948,6 +2169,26 @@ Graph ReducibleDual::toGraph() const {
             adj[remap[u]].push_back(remap[V[u].nbr[__builtin_ctz(m)]]);
     }
     return Graph(adj, true);
+}
+
+Graph graphFromExtensionPath(const ExtensionPath& ep) {
+    // Create empty ReducibleDual with full capacity
+    ReducibleDual rd(ep.full_N);
+
+    // Place seed vertices (full state including inactive positions)
+    for (auto& sv : ep.seed_state) {
+        for (int i = 0; i < ReducibleDual::D_MAX; i++)
+            rd.V[sv.id].nbr[i] = sv.nbr[i];
+        rd.V[sv.id].active = sv.active;
+        rd.n_alive++;
+        if (rd.degree(sv.id) == 5) rd.deg5.insert(sv.id);
+    }
+
+    // Apply expansion steps
+    for (auto& step : ep.steps)
+        rd.expand(step);
+
+    return rd.toGraph();
 }
 
 } // namespace buckinverse

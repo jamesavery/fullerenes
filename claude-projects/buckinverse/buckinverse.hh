@@ -228,10 +228,22 @@ struct ExtensionStep {
 struct ExtensionPath {
     SeedType seed;
     int full_N;                           // vertex count of full graph
+
+    // Seed state: full vertex data for alive vertices after full reduction.
+    // Includes inactive nbr[] positions, which hold "shadow" strip vertex IDs
+    // from prior splice/snip operations, needed by unsnip during expansion.
+    struct SeedVertex {
+        node_t id;
+        node_t nbr[6];
+        uint8_t active;
+    };
+    std::vector<SeedVertex> seed_state;
+
     std::vector<ExtensionStep> steps;     // in expansion order
 
     std::string toString() const {
-        std::string s = seedName(seed) + " [" + std::to_string(full_N) + "v]:";
+        std::string s = seedName(seed) + " [" + std::to_string(full_N) + "v, "
+                        + std::to_string(seed_state.size()) + " seed verts]:";
         for (auto& st : steps) s += " " + st.kind.toString();
         return s;
     }
@@ -302,6 +314,10 @@ struct ReducibleDual {
     // Construction: O(N)
     explicit ReducibleDual(const Graph& g);
 
+    // Construct with given capacity, all vertices dead.
+    // Used by graphFromExtensionPath to build from seed + extension path.
+    explicit ReducibleDual(int capacity);
+
     // Queries
     int  degree(node_t u) const { return __builtin_popcount(V[u].active); }
     bool alive(node_t u)  const { return V[u].active != 0; }
@@ -320,13 +336,18 @@ struct ReducibleDual {
     void unsnip(node_t u, node_t v);                     // Reverse of snip
     void kill(node_t v);                                  // Delete vertex
     void unkill(node_t v, const Vertex& saved);          // Reverse of kill
+    void insertAfter(node_t u, node_t v, node_t after);  // Insert v after 'after' in u's CW (5→6)
 
     // Reduction: O(1) per call
     std::optional<InvSite> findSite(int maxRedLen = 5) const;
     void reduce(const InvSite& site);
 
-    // Expansion: O(1) per call — inverse of reduce
+    // Expansion: O(1) per call — inverse of reduce (round-trip, uses saved state)
     void expand(const ReductionStep& step);
+
+    // Standalone expansion: O(1) per call — creates strip vertices from CW formulas.
+    // Does NOT require saved state; works from seed + extension path alone.
+    void expand(const ExtensionStep& step);
 
     // Full reduction loop: O(N) total
     SeedType reduceToSeed(int maxRedLen = 5);
@@ -369,5 +390,9 @@ private:
                     const std::vector<node_t>& strip,
                     const std::vector<node_t>& outer);
 };
+
+// Reconstruct a fullerene dual graph from a seed + extension path.
+// This is standalone: does not require the original graph or any saved state.
+Graph graphFromExtensionPath(const ExtensionPath& ep);
 
 } // namespace buckinverse
