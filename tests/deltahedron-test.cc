@@ -2,6 +2,7 @@
 #include <cmath>
 #include "fullerenes/deltahedron.hh"
 #include "fullerenes/polyhedron.hh"
+#include "fullerenes/isomerdb.hh"
 #include "C44geometries.hh"
 
 using namespace std;
@@ -757,4 +758,74 @@ TEST(C44DeltahedronTest, Optimize_AllC44) {
         EXPECT_FALSE(std::isnan(D.points[u][d]));
     }
   }
+}
+
+// ================================================================
+// ===== Larger fullerene dual optimization tests =================
+// ================================================================
+
+// Helper: build Deltahedron from IsomerDB entry using zero_order_geometry (unoptimized).
+// This gives a rough starting guess -- the whole point is to test whether
+// the deltahedron optimizer can handle a poor initial geometry.
+static Deltahedron make_deltahedron_from_db(int N, const IsomerDB::Entry& entry) {
+  FullereneGraph G = IsomerDB::makeIsomer(N, entry);
+  if(G.layout2d.empty())
+    G.layout2d = G.tutte_layout();
+  vector<coord3d> points = G.zero_order_geometry();
+  Polyhedron P(G, points, 6);
+  Polyhedron dual = P.dual();
+  return Deltahedron(dual);
+}
+
+// Parametrized test for optimizing fullerene duals of a given size.
+// Tests all IPR isomers for the given N.
+static void test_optimize_fullerene_duals(int N, int max_isomers = -1) {
+  IsomerDB db = IsomerDB::readPDB(N, /*IPR=*/true);
+  ASSERT_GT(db.entries.size(), 0u) << "No IPR isomers found for C" << N;
+
+  int n_test = (max_isomers > 0) ? min(max_isomers, (int)db.entries.size())
+                                 : (int)db.entries.size();
+
+  for(int idx = 0; idx < n_test; idx++){
+    SCOPED_TRACE("C" + to_string(N) + " IPR isomer " + to_string(idx));
+    Deltahedron D = make_deltahedron_from_db(N, db.entries[idx]);
+
+    int V_dual = N/2 + 2;
+    EXPECT_EQ(D.N, V_dual) << "dual vertex count should be N/2+2";
+
+    EdgeStats before = EdgeStats::compute(D);
+    bool converged = D.optimize(D.points);
+
+    EdgeStats after = EdgeStats::compute(D);
+
+    // Optimization should not increase variance
+    EXPECT_LT(after.variance, before.variance + 1e-10);
+
+    // Check convergence and quality
+    EXPECT_TRUE(converged) << "optimizer did not converge";
+    EXPECT_LT(after.variance, 1e-6)
+      << "edge length variance should be very small after optimization"
+      << " (before: " << before.variance << ", after: " << after.variance << ")";
+
+    // No NaN
+    for(int u = 0; u < D.N; u++)
+      for(int d = 0; d < 3; d++)
+        EXPECT_FALSE(std::isnan(D.points[u][d]));
+  }
+}
+
+TEST(LargeDeltahedronTest, Optimize_C60_IPR) {
+  test_optimize_fullerene_duals(60, 100);   // 1 IPR isomer, V_dual=32
+}
+
+TEST(LargeDeltahedronTest, Optimize_C80_IPR) {
+  test_optimize_fullerene_duals(80, 100);   // 7 IPR isomers, V_dual=42
+}
+
+TEST(LargeDeltahedronTest, Optimize_C100_IPR) {
+  test_optimize_fullerene_duals(100, 100);  // 450 IPR isomers, V_dual=52
+}
+
+TEST(LargeDeltahedronTest, Optimize_C120_IPR) {
+  test_optimize_fullerene_duals(120, 100);  // 1812 IPR isomers, V_dual=62
 }
