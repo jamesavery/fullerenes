@@ -15,70 +15,51 @@ double Polyhedron::diameter() const {
   return dmax;
 };
 
+// Helper: build the extended point list for centroid triangulation.
+// Appends each face's centroid to the vertex list.
+static vector<coord3d> centroid_points(const vector<coord3d>& points, const vector<face_t>& faces) {
+  vector<coord3d> pts(points.begin(), points.end());
+  for (const auto& f : faces) pts.push_back(f.centroid(points));
+  return pts;
+}
+
 double Polyhedron::surface_area() const {
+  vector<tri_t>  tris(centroid_triangulation(faces));
+  vector<coord3d> pts(centroid_points(points, faces));
+
   double A = 0;
-
-  // vector<tri_t> tris(triangulation(faces));
-  
-  // for(size_t i=0;i<tris.size();i++){
-  //   const tri_t& tri(tris[i]);
-  //   Tri3D T(points[tri[0]],points[tri[1]],points[tri[2]]);
-  //   A += T.area();
-  // }
-  // return A;
-
-  vector<tri_t> tris(centroid_triangulation(faces));
-  vector<coord3d> centroid_points(points.begin(),points.end());
-  for(int i=0;i<faces.size();i++) centroid_points.push_back(faces[i].centroid(points));
-  
-  for(size_t i=0;i<tris.size();i++){
-    const tri_t& tri(tris[i]);
-    Tri3D T(centroid_points[tri[0]],centroid_points[tri[1]],centroid_points[tri[2]]);
-    A += T.area();
-  }
+  for (const auto& tri : tris)
+    A += Tri3D(pts[tri[0]], pts[tri[1]], pts[tri[2]]).area();
   return A;
 }
 
-double Polyhedron::volume_tetra() const {
-  vector<tri_t>   tris(centroid_triangulation(faces));
-  vector<coord3d> centroid_points(points.begin(),points.end());
-  for(int i=0;i<faces.size();i++) centroid_points.push_back(faces[i].centroid(points));
-
-  double V = 0,Vm=0,Vp=0;
-
-  // Now generate tetrahedra and either add or subtract volume according to which direction the face is pointing
-  coord3d zero(0,0,0);
-  for(size_t i=0;i<tris.size();i++){
-    const face_t& t(tris[i]);
-    Tri3D T(centroid_points[t[0]],centroid_points[t[1]],centroid_points[t[2]]);
-    double dV = Tetra3D(T.a,T.b,T.c,zero).volume();
-    V += (T.back_face(zero)? 1 : -1)*dV;
-    if(T.back_face(zero)) Vp += dV;
-    else Vm += dV;
-    //    if(!T.back_face(zero))
-      //      cerr << "Tri " << t << " / " << T << " is a front face.\n";
-  }
-  fprintf(stderr,"V = %f - %f = %f\n",Vp,Vm,V);
-  return fabs(V);
-}
-
+// Signed volume via the divergence theorem: V = (1/3) ∮ r·n̂ dA.
+// For a flat triangle, a·n̂ = b·n̂ = c·n̂ (constant on plane), so using
+// any vertex gives the exact integral over the triangle.
 double Polyhedron::volume_divergence() const {
   vector<tri_t>   tris(centroid_triangulation(faces));
-  vector<coord3d> centroid_points(points.begin(),points.end());
-  for(int i=0;i<faces.size();i++) centroid_points.push_back(faces[i].centroid(points));
-
-  //  cerr << "points = {"; for(int i=0;i<centroid_points.size();i++) cerr << centroid_points[i] << (i+1<centroid_points.size()? ", ":"};\n");
+  vector<coord3d> pts(centroid_points(points, faces));
 
   double V = 0;
-
-  // Now generate tetrahedra and either add or subtract volume according to which direction the face is pointing
-  for(size_t i=0;i<tris.size();i++){
-    const face_t& t(tris[i]);
-    Tri3D T(centroid_points[t[0]],centroid_points[t[1]],centroid_points[t[2]]);
-
-    V += ((T.a).dot(T.n))*T.area()/T.n.norm();
+  for (const auto& t : tris) {
+    Tri3D T(pts[t[0]], pts[t[1]], pts[t[2]]);
+    V += T.a.dot(T.n) * T.area() / T.n.norm();
   }
-  return fabs(V/3.0);
+  return fabs(V / 3.0);
+}
+
+// Signed volume via signed tetrahedra from the origin:
+// V = (1/6) Σ a·(b×c) for each triangle (a,b,c).
+double Polyhedron::volume_tetra() const {
+  vector<tri_t>   tris(centroid_triangulation(faces));
+  vector<coord3d> pts(centroid_points(points, faces));
+
+  double V = 0;
+  for (const auto& t : tris) {
+    const coord3d &a = pts[t[0]], &b = pts[t[1]], &c = pts[t[2]];
+    V += a.dot(b.cross(c));
+  }
+  return fabs(V / 6.0);
 }
 
 Polyhedron Polyhedron::incremental_convex_hull() const {
