@@ -667,3 +667,94 @@ TEST(C44DeltahedronTest, AllC44_GC_10_10) {
 TEST(C44DeltahedronTest, AllC44_GC_10_11) {
   check_C44_GC(10, 11, "GC(10,11)");
 }
+
+// ================================================================
+// ===== Optimization tests =======================================
+// ================================================================
+
+// Helper: compute edge length statistics (mean, variance, max deviation)
+struct EdgeStats {
+  double mean, variance, max_dev;
+  static EdgeStats compute(const Deltahedron& D) {
+    EdgeStats s;
+    vector<edge_t> edges = D.undirected_edges();
+    vector<double> lengths(edges.size());
+    for(int i = 0; i < (int)edges.size(); i++)
+      lengths[i] = coord3d::dist(D.points[edges[i].first],
+                                  D.points[edges[i].second]);
+    s.mean = 0;
+    for(double l : lengths) s.mean += l;
+    s.mean /= lengths.size();
+
+    s.variance = 0;
+    s.max_dev = 0;
+    for(double l : lengths){
+      double dev = l - s.mean;
+      s.variance += dev * dev;
+      s.max_dev = max(s.max_dev, fabs(dev));
+    }
+    s.variance /= lengths.size();
+    return s;
+  }
+};
+
+// ===== Icosahedron: already equilateral, should converge immediately =====
+
+TEST_F(DeltahedronTest, Optimize_Icosahedron_StaysFixed) {
+  Deltahedron D = ico;  // copy
+  bool converged = D.optimize(ico.points);
+  EXPECT_TRUE(converged);
+
+  // Should be very close to original (up to possible uniform scale)
+  EdgeStats stats = EdgeStats::compute(D);
+  EXPECT_LT(stats.variance, 1e-16)
+    << "icosahedron edge variance should be near-zero after optimization";
+}
+
+// ===== Perturbed icosahedron: should recover equilateral =====
+
+TEST_F(DeltahedronTest, Optimize_PerturbedIcosahedron) {
+  Deltahedron D = ico;
+
+  // Add noise to the coordinates
+  vector<coord3d> noisy(ico.points);
+  srand(42);
+  for(int u = 0; u < D.N; u++){
+    for(int d = 0; d < 3; d++)
+      noisy[u][d] += 0.05 * (2.0 * rand() / RAND_MAX - 1.0);
+  }
+
+  EdgeStats before = EdgeStats::compute(Deltahedron(D, noisy));
+  EXPECT_GT(before.variance, 1e-6) << "perturbation should create variance";
+
+  bool converged = D.optimize(noisy);
+  EXPECT_TRUE(converged);
+
+  EdgeStats after = EdgeStats::compute(D);
+  EXPECT_LT(after.variance, before.variance * 0.01)
+    << "optimization should reduce edge length variance by 100x";
+  EXPECT_LT(after.variance, 1e-6)
+    << "optimized edge length variance should be very small";
+}
+
+// ===== C44 duals: optimize should reduce edge length variance =====
+
+TEST(C44DeltahedronTest, Optimize_AllC44) {
+  for(int idx = 0; idx < C44_db().n_isomers; idx++){
+    SCOPED_TRACE("isomer " + to_string(idx));
+    Deltahedron D = make_C44_deltahedron(idx);
+
+    EdgeStats before = EdgeStats::compute(D);
+    bool converged = D.optimize(D.points);
+
+    EdgeStats after = EdgeStats::compute(D);
+    EXPECT_LT(after.variance, before.variance + 1e-10)
+      << "optimization should not increase edge length variance";
+
+    // Check no NaN
+    for(int u = 0; u < D.N; u++){
+      for(int d = 0; d < 3; d++)
+        EXPECT_FALSE(std::isnan(D.points[u][d]));
+    }
+  }
+}

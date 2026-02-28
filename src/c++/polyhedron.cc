@@ -406,7 +406,7 @@ Polyhedron Polyhedron::leapfrog_dual() const
   size_t Nf = faces.size();
   
   Polyhedron Plf(Graph(N+Nf,true));
-  Plf.points.reserve(N+Nf);
+  Plf.points.resize(N+Nf);
    
   // Start with all the existing nodes
   for(node_t u=0;u<N;u++){
@@ -519,7 +519,7 @@ bool Polyhedron::is_triangulation() const {
 bool Polyhedron::is_invalid() const {
   bool has_nans = false;
   for(auto p: points){
-    if(std::isnan(p[0])||std::isnan(p[1])||std::isnan(p[1])) has_nans = true;
+    if(std::isnan(p[0])||std::isnan(p[1])||std::isnan(p[2])) has_nans = true;
   }
   return has_nans;
 }
