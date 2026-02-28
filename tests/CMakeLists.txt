@@ -31,3 +31,11 @@ add_test(NAME buckinverse-phase3-test COMMAND buckinverse-phase3-test)
 add_executable(buckinverse-roundtrip-test buckinverse-roundtrip-test.cc)
 target_link_libraries(buckinverse-roundtrip-test fullerenes GTest::GTest GTest::Main)
 add_test(NAME buckinverse-roundtrip-test COMMAND buckinverse-roundtrip-test)
+
+add_executable(deltahedron-geometry-test deltahedron-geometry-test.cc)
+target_link_libraries(deltahedron-geometry-test fullerenes GTest::GTest GTest::Main)
+add_test(NAME deltahedron-geometry-test COMMAND deltahedron-geometry-test)
+
+add_executable(convex-hull-test convex-hull-test.cc)
+target_link_libraries(convex-hull-test fullerenes GTest::GTest GTest::Main)
+add_test(NAME convex-hull-test COMMAND convex-hull-test)

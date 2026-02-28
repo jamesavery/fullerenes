@@ -563,7 +563,7 @@ struct Tri3D {
     return intersects(x);
   }
 
-  void flip(){ coord3d t = b; b = c; c = t; t = u; u = v; v = u; n = n*-1; }
+  void flip(){ coord3d t = b; b = c; c = t; t = u; u = v; v = t; n = n*-1; }
   void flip_normal(){ n = n*-1.0; }
 
   bool back_face(const coord3d& p) const {

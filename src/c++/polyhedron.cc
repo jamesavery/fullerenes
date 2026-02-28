@@ -84,128 +84,131 @@ double Polyhedron::volume_divergence() const {
 Polyhedron Polyhedron::incremental_convex_hull() const {
   list<tri_t> output;
   typedef list<tri_t>::iterator triit;
-  list<node_t> work_queue;
   srandom(42); // Seed random numbers with constant for reproducible behaviour
 
-  // 1. Create initial tetrahedron.
-  // 1.1 Find 4 non-coplanar points
-  Tri3D T(points,tri_t(0,1,2));
-  
-  for(node_t u=3;u<N;u++) work_queue.push_front(u);
+  // 1. Create initial tetrahedron from 4 non-coplanar points.
+  Tri3D T(points, tri_t(0, 1, 2));
 
-  // Get the point furthest from the (0,1,2)-plane
+  // Find the point furthest from the (0,1,2)-plane
   double distmax = 0;
-  list<node_t>::iterator v(work_queue.begin());
-  for(list<node_t>::iterator u(work_queue.begin());u!=work_queue.end();u++){
-    double dist = T.distance(points[*u]);
-    if(dist > distmax){
-      distmax = dist;
-      v = u;
-    }
+  node_t v_best = 3;
+  for (node_t u = 3; u < N; u++) {
+    double dist = T.distance(points[u]);
+    if (dist > distmax) { distmax = dist; v_best = u; }
   }
 
-  // 1.2 Add faces to output
-  // cerr << "// 1. Create initial tetrahedron: [0, 1, 2, " << *v << "], volume = "<<Tetra3D(points[0],points[1],points[2],points[*v]).volume() << ". \n";
-  output.push_back(tri_t(0,1,2));
-  output.push_back(tri_t(0,1,*v));
-  output.push_back(tri_t(0,2,*v));
-  output.push_back(tri_t(1,2,*v));
+  output.push_back(tri_t(0, 1, 2));
+  output.push_back(tri_t(0, 1, v_best));
+  output.push_back(tri_t(0, 2, v_best));
+  output.push_back(tri_t(1, 2, v_best));
 
-  coord3d c((points[0]+points[1]+points[2]+points[*v])/4.0);
-  work_queue.erase(v);
+  // Orient all initial faces outward (away from tetrahedron centroid)
+  coord3d c((points[0] + points[1] + points[2] + points[v_best]) / 4.0);
+  for (tri_t& t : output)
+    if (!Tri3D(points, t).back_face(c)) t.flip();
 
-  for(triit t(output.begin());t!=output.end();t++){
-    // Make sure all faces point away from the centroid. 
-    if(!Tri3D(points,*t).back_face(c)) t->flip(); 
-  }
-    
+  // 2. Incrementally add each remaining vertex
+  for (node_t u = 3; u < N; u++) {
+    if (u == v_best) continue;
 
-
-  // 2. For each remaining vertex u
-  // cerr << "// 2. For each remaining vertex u\n";
-  for(list<node_t>::const_iterator u(work_queue.begin());u!=work_queue.end();u++){
+    // Small perturbation for numerical robustness (breaks degeneracies from coplanar points)
     long r = random();
-    const coord3d perturbation(r&0xff,(r>>8)&0xff,(r>>16)&0xff);
+    coord3d perturbation(r & 0xff, (r >> 8) & 0xff, (r >> 16) & 0xff);
+    coord3d p = points[u] * (coord3d(1, 1, 1) + perturbation * 1e-13);
 
-    // Perturb p randomly
-    coord3d p(points[*u]);
-    p *= (coord3d(1,1,1)+perturbation*1e-13);
-
-    // 2.1 Find all faces visible from p ( (f.centroid() - p).dot(f.n) > 0 ) 
+    // 2.1 Find all faces visible from p
     list<triit> visible;
-    map<arc_t,bool> is_visible;
-    coord3d centre; // Centre of visible faces
-    for(triit t(output.begin());t!=output.end();t++){
-      if(!Tri3D(points,*t).back_face(p)) { 
+    map<arc_t, bool> is_visible;
+    coord3d centre;
+    for (triit t = output.begin(); t != output.end(); t++) {
+      if (!Tri3D(points, *t).back_face(p)) {
         visible.push_back(t);
-        for(int i=0;i<3;i++) 
-          is_visible[arc_t(t->u(i),t->u((i+1)%3))] = true; 
+        for (int i = 0; i < 3; i++)
+          is_visible[{t->u(i), t->u((i + 1) % 3)}] = true;
         centre += t->centroid(points);
       }
     }
-    if(visible.size() != 0) centre /= visible.size();
+    if (visible.empty()) continue;
+    centre /= visible.size();
 
-    // 2.2 Build set of horizon edges: each edge e in visible faces that has f_a visible, f_b invisible
+    // 2.2 Build horizon edges (boundary between visible and invisible faces)
+    //     and delete visible faces
     list<edge_t> horizon;
-    for(list<triit>::const_iterator tvi(visible.begin()); tvi!=visible.end(); tvi++){
-      const tri_t& tv(**tvi);
-
-      for(int j=0;j<3;j++){
-        const arc_t e(tv[j],tv[(j+1)%3]);
-
-        if( (is_visible[e] && !is_visible[arc_t(e.second,e.first)]) || (!is_visible[e] && is_visible[arc_t(e.second,e.first)]) )
+    for (triit tv : visible) {
+      for (int j = 0; j < 3; j++) {
+        arc_t e{(*tv)[j], (*tv)[(j + 1) % 3]};
+        arc_t e_rev{e.second, e.first};
+        if (is_visible[e] != is_visible[e_rev])
           horizon.push_back(edge_t(e));
       }
-      // 2.3 Delete visible faces from output set. 
-      output.erase(*tvi);
+      output.erase(tv);
     }
 
-    // 2.4 For each e in horizon, add tri_t(u,e[0],e[1]) to output set. 
-    for(list<edge_t>::const_iterator e(horizon.begin()); e!=horizon.end(); e++){
-      tri_t t(*u,e->first,e->second);
-
-      //        Make sure new faces point outwards. 
-      if(!Tri3D(points,t).back_face(centre)) t.flip();
-
-
-      triit ti = output.insert(output.end(),t);
-      //      for(int j=0;j<3;j++)
-        //        edgetri[arc_t(t[j],t[(j+1)%3])] = ti;
+    // 2.3 Add new faces connecting u to each horizon edge, oriented outward
+    for (const edge_t& e : horizon) {
+      tri_t t(u, e.first, e.second);
+      if (!Tri3D(points, t).back_face(centre)) t.flip();
+      output.push_back(t);
     }
-    if(output.size() > N*N*10){
-      fprintf(stderr,"Something went horribly wrong in computation of convex hull:\n");
-      fprintf(stderr,"Data sizes: output(%ld), visible(%ld), is_visible(%ld), horizon(%ld), horizon-visible: %ld\n",
-              output.size(),visible.size(),is_visible.size(),horizon.size(),horizon.size()-visible.size());
+
+    if (output.size() > (size_t)N * N * 10) {
+      cerr << "Convex hull error: output size " << output.size() << " exceeds safety limit\n";
     }
   }
-    
-  // 3. Finally, construct the graph and the output polyhedron object
+
+  // 3. Construct oriented graph directly from hull triangles
+  // 3.1 Remap vertices to contiguous indices
   set<node_t> used_nodes;
-  for(triit t(output.begin()); t!=output.end(); t++)
-    for(int i=0;i<3;i++)
-      used_nodes.insert(t->u(i));
-  map<node_t,node_t> nodemap;
+  for (const tri_t& t : output)
+    for (int i = 0; i < 3; i++)
+      used_nodes.insert(t.u(i));
+
+  map<node_t, node_t> nodemap;
   vector<coord3d> remaining_points(used_nodes.size());
-  node_t i=0;
-  for(set<node_t>::const_iterator u(used_nodes.begin()); u!=used_nodes.end(); u++,i++){
-    nodemap[*u] = i;
-    remaining_points[i] = points[*u];
+  node_t idx = 0;
+  for (node_t u : used_nodes) {
+    nodemap[u] = idx;
+    remaining_points[idx] = points[u];
+    idx++;
+  }
+  node_t M = remaining_points.size();
+
+  // 3.2 Build arc_next map: for each directed edge (a,b) in a triangle (a,b,c),
+  //     arc_next[(a,b)] = c. Also record one neighbour per vertex for fan start.
+  map<arc_t, node_t> arc_next;
+  vector<node_t> first_neighbour(M, -1);
+  for (const tri_t& t : output) {
+    node_t a = nodemap[t[0]], b = nodemap[t[1]], c = nodemap[t[2]];
+    arc_next[{a, b}] = c;
+    arc_next[{b, c}] = a;
+    arc_next[{c, a}] = b;
+    if (first_neighbour[a] < 0) first_neighbour[a] = b;
+    if (first_neighbour[b] < 0) first_neighbour[b] = c;
+    if (first_neighbour[c] < 0) first_neighbour[c] = a;
   }
 
-  set<edge_t> edges;
-  for(triit t(output.begin()); t!=output.end(); t++)
-    for(int i=0;i<3;i++)
-      edges.insert(edge_t(nodemap[t->u(i)],nodemap[t->u((i+1)%3)]));
-    
-  PlanarGraph g(edges);
-  cout << "Polyhedron is "<< (g.N != N?"not ":"") << "equal to convex hull.\n"; 
-  vector<face_t> faces;
-  for(list<tri_t>::const_iterator o(output.begin());o!=output.end();o++){
-    const tri_t& f(*o);
-    faces.push_back(tri_t(nodemap[f[0]],nodemap[f[1]],nodemap[f[2]]));
+  // 3.3 Build oriented neighbour lists by fan traversal.
+  //     For vertex u, follow arc_next[(u, v)] around the fan.
+  //     This produces CCW order (outward normals).
+  neighbours_t nb(M);
+  for (node_t u = 0; u < M; u++) {
+    node_t v = first_neighbour[u];
+    node_t v0 = v;
+    do {
+      nb[u].push_back(v);
+      v = arc_next.at({u, v});
+    } while (v != v0);
   }
+
+  // 3.4 Assemble oriented PlanarGraph and face list
+  PlanarGraph g(Graph(nb, true));
+  vector<face_t> faces;
+  faces.reserve(output.size());
+  for (const tri_t& t : output)
+    faces.push_back(tri_t(nodemap[t[0]], nodemap[t[1]], nodemap[t[2]]));
   g.outer_face = faces[0];
-  return Polyhedron(g,remaining_points,3,faces);
+
+  return Polyhedron(g, remaining_points, 3, faces);
 }
 
 struct sort_ccw_coord3d {
