@@ -917,7 +917,9 @@ static double deltahedron_energy_and_gradient(
     }
   }
 
-  // E_conv: smooth convexity bias via softplus.
+  // E_conv: smooth convexity bias via softplus (currently disabled in optimize(),
+  // replaced by periodic vertex reflection; retained for gradient_check() and
+  // potential future use).
   // For each qualifying vertex, compute signed height h above neighbor centroid
   // plane (positive = convex). Penalty: k_conv * sigma * log(1 + exp(-h/sigma)).
   // Nearly zero for h > 0, linear in -h for h < 0, smooth everywhere.
@@ -1026,45 +1028,58 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
   const double k_bond   = 1.0;
   const double k_angle  = 1.0;
   const double k_curv   = 2.0;
+  // E_conv (softplus convexity penalty) is disabled: periodic vertex reflection
+  // is cheaper and more robust. The E_conv code is retained in
+  // deltahedron_energy_and_gradient() and can be re-enabled by setting k_conv > 0.
+  const double k_conv   = 0;
 
   // CG parameters
   const double c1 = 1e-4;        // Armijo parameter
 
-  // Three-phase optimization:
-  //   Phase 1: k_conv + k_flat active — flip concave regions (approximate conv gradient)
-  //   Phase 2: k_flat active, k_conv off — settle into flat/equilateral (exact gradient)
+  // Two-phase optimization:
+  //   Phase 1: k_flat active — settle into flat/equilateral
   //            Early exit when gradient norm drops 100x from phase start.
-  //   Phase 3: k_flat off, k_conv off — pure equilateral convergence (exact gradient)
+  //   Phase 2: k_flat off — pure equilateral convergence
   //            Converges when gradient norm < grad_tol.
-  // Each phase gets up to max_iter/3 iterations.
-  const int phase_budget = max_iter / 3;
+  // Convexity is maintained by periodic vertex reflection (every
+  // reflect_interval iterations), not by an energy term.
+  const int phase_budget = max_iter / 2;
   double k_flat = 2.0;
-  double k_conv = 2.0;
   int phase = 1;
-  double phase2_grad_norm0 = 0;   // gradient norm at start of phase 2
-  int phase1_prev_concave = N;    // concave vertex count at last phase 1 check
-  int phase1_stall_count = 0;     // consecutive checks with no concavity improvement
+  double phase1_grad_norm0 = 0;   // gradient norm at start of phase 1
 
-  // Helper: count concave vertices (deg<=6 with negative convexity height)
-  auto count_concave = [&]() -> int {
-    int n_concave = 0;
+  // Periodic convexity reflection: every reflect_interval iterations, check
+  // for deeply concave vertices (h < -0.1*L) and reflect them through their
+  // neighbor centroid plane.  Replaces the E_conv energy term.
+  const int reflect_interval = 1;
+
+  auto reflect_concave = [&]() -> bool {
+    bool any = false;
     for(int v = 0; v < N; v++){
-      int dv = (int)neighbours[v].size();
-      if(dv > 6) continue;
-      coord3d cent(0,0,0);
-      for(int j = 0; j < dv; j++) cent += points[neighbours[v][j]];
-      cent /= (double)dv;
-      coord3d nfan(0,0,0);
-      for(int j = 0; j < dv; j++){
+      int d = (int)neighbours[v].size();
+      if(d > 6) continue;
+
+      coord3d centroid(0,0,0);
+      for(int j = 0; j < d; j++) centroid += points[neighbours[v][j]];
+      centroid /= (double)d;
+
+      coord3d n_fan(0,0,0);
+      for(int j = 0; j < d; j++){
         coord3d e1 = points[neighbours[v][j]] - points[v];
-        coord3d e2 = points[neighbours[v][(j+1)%dv]] - points[v];
-        nfan += e1.cross(e2);
+        coord3d e2 = points[neighbours[v][(j+1)%d]] - points[v];
+        n_fan += e1.cross(e2);
       }
-      double nl = nfan.norm();
-      if(nl < 1e-15) continue;
-      if((points[v] - cent).dot(nfan / nl) < 0) n_concave++;
+      double n_len = n_fan.norm();
+      if(n_len < 1e-15) continue;
+      coord3d n_hat = n_fan / n_len;
+
+      double h = (points[v] - centroid).dot(n_hat);
+      if(h < -0.1 * L){
+        points[v] = centroid + n_hat * (-h);
+        any = true;
+      }
     }
-    return n_concave;
+    return any;
   };
 
   // Helper: reset CG with current force constants
@@ -1078,6 +1093,7 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
 
   double E;
   reset_cg(E, grad, dir);
+  phase1_grad_norm0 = sqrt(vec_dot(grad, grad));
 
   bool converged = false;
   int phase_start = 0;
@@ -1085,43 +1101,27 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
   for(int iter = 0; iter < max_iter; iter++){
     iterations_used = iter + 1;
 
-    // Phase transition checks (every 50 iterations)
-    if(phase < 3 && iter > phase_start && iter % 50 == 49){
+    // Periodic convexity reflection
+    if(iter > 0 && iter % reflect_interval == 0){
+      if(reflect_concave())
+        reset_cg(E, grad, dir);  // geometry changed, reset CG
+    }
+
+    // Phase transition check (every 50 iterations)
+    if(phase == 1 && iter > phase_start && iter % 50 == 49){
       bool advance = (iter - phase_start >= phase_budget);
 
-      if(!advance && phase == 1){
-        int nc = count_concave();
-        if(nc == 0){
-          advance = true;  // all convex — move on
-        } else if(nc >= phase1_prev_concave){
-          phase1_stall_count++;
-          if(phase1_stall_count >= 2)
-            advance = true;  // no improvement for 100 iters — convexity term settled
-        } else {
-          phase1_stall_count = 0;  // reset on improvement
-        }
-        phase1_prev_concave = nc;
-      }
-
-      // Phase 2 early exit: gradient dropped 100x from phase start
-      if(!advance && phase == 2 && phase2_grad_norm0 > 0){
+      // Early exit: gradient dropped 100x from phase start
+      if(!advance && phase1_grad_norm0 > 0){
         double gn = sqrt(vec_dot(grad, grad));
-        if(gn < phase2_grad_norm0 * 0.01) advance = true;
+        if(gn < phase1_grad_norm0 * 0.01) advance = true;
       }
 
       if(advance){
-        if(phase == 1){
-          k_conv = 0;
-          phase = 2;
-          phase_start = iter;
-          reset_cg(E, grad, dir);
-          phase2_grad_norm0 = sqrt(vec_dot(grad, grad));
-        } else {
-          k_flat = 0;
-          phase = 3;
-          phase_start = iter;
-          reset_cg(E, grad, dir);
-        }
+        k_flat = 0;
+        phase = 2;
+        phase_start = iter;
+        reset_cg(E, grad, dir);
       }
     }
 
@@ -1171,129 +1171,6 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
     // Update search direction
     for(int i = 0; i < N; i++)
       dir[i] = grad[i] * (-1.0) + dir[i] * beta;
-  }
-
-  // Post-optimization fix: reflect any deeply concave vertices through their
-  // neighbor centroid plane. The equilateral energy is roughly symmetric around
-  // h=0, so if we landed in a concave local minimum at h=-d, there should be a
-  // convex one near h=+d. After reflecting, re-run a short optimization with
-  // k_conv active to settle into the convex basin.
-  {
-    bool any_reflected = false;
-    for(int v = 0; v < N; v++){
-      int d = (int)neighbours[v].size();
-      if(d > 6) continue;
-
-      coord3d centroid(0,0,0);
-      for(int j = 0; j < d; j++) centroid += points[neighbours[v][j]];
-      centroid /= (double)d;
-
-      coord3d n_fan(0,0,0);
-      for(int j = 0; j < d; j++){
-        coord3d e1 = points[neighbours[v][j]] - points[v];
-        coord3d e2 = points[neighbours[v][(j+1)%d]] - points[v];
-        n_fan += e1.cross(e2);
-      }
-      double n_len = n_fan.norm();
-      if(n_len < 1e-15) continue;
-      coord3d n_hat = n_fan / n_len;
-
-      double h = (points[v] - centroid).dot(n_hat);
-      if(h < -0.1 * L){  // deeply concave: more than 10% of edge length
-        // Reflect through centroid plane: place vertex at centroid + |h| * n_hat
-        points[v] = centroid + n_hat * (-h);
-        any_reflected = true;
-      }
-    }
-
-    if(any_reflected){
-      // Re-optimize with k_conv active, using remaining iteration budget
-      // or at least max_iter/3 more iterations.
-      int reopt_budget = max(max_iter / 3, max_iter - iterations_used);
-      k_conv = 2.0;
-      k_flat = 2.0;
-      phase = 1;
-      phase_start = iterations_used;
-      phase1_prev_concave = N;
-      phase1_stall_count = 0;
-
-      reset_cg(E, grad, dir);
-
-      converged = false;
-      int reopt_start = iterations_used;
-      for(int iter = 0; iter < reopt_budget; iter++){
-        iterations_used = reopt_start + iter + 1;
-
-        // Phase transitions (same logic as main loop)
-        if(phase < 3 && iter > 0 && iter % 50 == 49){
-          bool advance = (iter >= phase_budget);
-
-          if(!advance && phase == 1){
-            int nc = count_concave();
-            if(nc == 0) advance = true;
-            else if(nc >= phase1_prev_concave){
-              phase1_stall_count++;
-              if(phase1_stall_count >= 2) advance = true;
-            } else {
-              phase1_stall_count = 0;
-            }
-            phase1_prev_concave = nc;
-          }
-
-          if(!advance && phase == 2 && phase2_grad_norm0 > 0){
-            double gn = sqrt(vec_dot(grad, grad));
-            if(gn < phase2_grad_norm0 * 0.01) advance = true;
-          }
-
-          if(advance){
-            if(phase == 1){
-              k_conv = 0; phase = 2;
-              reset_cg(E, grad, dir);
-              phase2_grad_norm0 = sqrt(vec_dot(grad, grad));
-            } else {
-              k_flat = 0; phase = 3;
-              reset_cg(E, grad, dir);
-            }
-          }
-        }
-
-        double grad_norm2 = vec_dot(grad, grad);
-        if(grad_norm2 < grad_tol * grad_tol){
-          converged = true;
-          break;
-        }
-
-        double slope = vec_dot(grad, dir);
-        if(slope > 0){
-          for(int i = 0; i < N; i++) dir[i] = grad[i] * (-1.0);
-          slope = -grad_norm2;
-        }
-
-        double alpha = 1.0;
-        for(int ls = 0; ls < 60; ls++){
-          for(int i = 0; i < N; i++) x_trial[i] = points[i] + dir[i] * alpha;
-          double E_trial = deltahedron_energy_only(*this, edges, x_trial, L,
-                                                   k_bond, k_angle, k_curv, k_flat, k_conv);
-          if(E_trial <= E + c1 * alpha * slope) break;
-          alpha *= 0.5;
-        }
-
-        for(int i = 0; i < N; i++) points[i] = points[i] + dir[i] * alpha;
-        grad_old = grad;
-        E = deltahedron_energy_and_gradient(*this, edges, points, &grad, L,
-                                            k_bond, k_angle, k_curv, k_flat, k_conv);
-
-        double gg_old = vec_dot(grad_old, grad_old);
-        double beta = 0.0;
-        if(gg_old > 1e-30){
-          vector<coord3d> gdiff(N);
-          for(int i = 0; i < N; i++) gdiff[i] = grad[i] - grad_old[i];
-          beta = max(0.0, vec_dot(grad, gdiff) / gg_old);
-        }
-        for(int i = 0; i < N; i++)
-          dir[i] = grad[i] * (-1.0) + dir[i] * beta;
-      }
-    }
   }
 
   return converged;
