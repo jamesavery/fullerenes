@@ -101,7 +101,28 @@ Fortran routines handle ring spiral indexing, coordinate generation, force-field
 
 ## Database
 
-`database/` contains fullerene isomer data (ring spiral pentagon indices) in subdirectories: `All/` (general, up to C150), `IPR/` (isolated pentagon rule, up to C200), `Yoshida/`, `HOG/`. Path configured via `FULLERENE_DATABASE_PATH` CMake variable.
+`database/` contains fullerene isomer data (ring spiral pentagon indices). The database is complete up to C130. Subdirectories: `All/` (general), `IPR/` (isolated pentagon rule), `Yoshida/`, `HOG/`. Path configured via `FULLERENE_DATABASE_PATH` CMake variable.
+
+**IMPORTANT: Always use the IsomerDB C++ interface** (`include/fullerenes/isomerdb.hh`, `src/c++/isomerdb.cc`) to access isomer data. Never try to read the raw database files directly or guess their format.
+
+Key API:
+```cpp
+// Get number of isomers (hard-coded in Nisomers_data arrays, no file I/O needed)
+int64_t n = IsomerDB::number_isomers(60, "Any", false);  // 1812 general C60 isomers
+int64_t n = IsomerDB::number_isomers(60, "Any", true);   // 1 IPR C60 isomer
+
+// Read all isomers for a given N
+IsomerDB db = IsomerDB::readPDB(60, false);  // all 1812 C60 isomers
+IsomerDB db = IsomerDB::readPDB(80, true);   // 7 IPR C80 isomers
+
+// Get a single isomer and build its graph
+IsomerDB::Entry e = IsomerDB::getIsomer(60, idx, false);
+FullereneGraph G = IsomerDB::makeIsomer(60, e);
+```
+
+Isomer counts (general): C20=1, C24=1, C26=1, C28=2, C30=3, C32=6, C34=6, C36=15, C38=17, C40=40, C42=45, C44=89, C46=116, C48=199, C50=271, C60=1812, C70=8149, C80=31924, C100=285914.
+Isomer counts (IPR): C60=1, C70=1, C72=1, C74=1, C76=2, C78=5, C80=7, C82=9, C84=24, C86=19, C88=35, C90=46, C92=86, C94=134, C96=187, C98=259, C100=450.
+Fullerenes exist for all even N >= 20 except N=22.
 
 ## Rules
 
@@ -111,8 +132,8 @@ Fortran routines handle ring spiral indexing, coordinate generation, force-field
 
 ## Invariants
 
-- **Orientation**: All graphs must be constructed oriented from the start (`is_oriented == true`). Never call `orient_neighbours()` — if you find yourself needing it, the graph was constructed wrong. New code should always produce oriented neighbour lists directly.
-- **`zero_order_geometry()`**: Do not use this function in new code. It is fragile and often fails.
+- **Orientation**: All graphs and triangulations must ALWAYS be oriented. This is not optional — orientation must be maintained at all times when inserting or removing edges or vertices. Never call `orient_neighbours()` or `orient_triangulation()` — if you find yourself needing them, the graph was constructed wrong. New code must always produce oriented neighbour lists directly and preserve orientation through every topological operation. If you encounter a situation where a graph or triangulation is not oriented, treat it as a bug.
+- **`zero_order_geometry()`**: This function is fragile and often fails for larger graphs. It is OK to use for seed graphs (C20/C28/C30) but should be avoided for larger fullerenes.
 
 ## Recent Development Notes
 

@@ -317,7 +317,6 @@ struct matrix3d {
 
     if(D==0){			// Second order equation. TODO: FP comparison
       long double Disc = sqrtl(B*B-4*A*C);
-      cout << "D = " << Disc << std::endl;
       return coord3d(0,(-B-Disc)/(2.L*A),(-B+Disc)/(2.L*A));
     }
 
@@ -329,8 +328,10 @@ struct matrix3d {
 
     // François Viète's solution to cubic polynomials with three real roots. 
     coord3d t;
-    long double K = 2*sqrtl(-p/3.L), 
-                theta0 = (1.L/3.L)*acosl((3.L*q)/(2.L*p)*sqrtl(-3.L/p));
+    long double cos_arg = (3.L*q)/(2.L*p)*sqrtl(-3.L/p);
+    cos_arg = std::max(-1.0L, std::min(1.0L, cos_arg)); // clamp for FP robustness
+    long double K = 2*sqrtl(-p/3.L),
+                theta0 = (1.L/3.L)*acosl(cos_arg);
     for(int k=0;k<3;k++) t[k] = K*cosl(theta0-k*2.L*M_PI/3.L);
 
     // lambda = t - B/(3A)
