@@ -394,6 +394,13 @@ struct matrix3d {
     return make_pair(lambda,C);
   }
 
+  // Skew-symmetric cross product matrix: cross_matrix(a) * b == a.cross(b)
+  static matrix3d cross_matrix(const coord3d& a) {
+    return matrix3d(   0, -a[2],  a[1],
+                    a[2],     0, -a[0],
+                   -a[1],  a[0],     0);
+  }
+
   static matrix3d unit_matrix(){
     return matrix3d(1,0,0,0,1,0,0,0,1);
   }

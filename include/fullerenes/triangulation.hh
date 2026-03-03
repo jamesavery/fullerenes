@@ -30,7 +30,7 @@ public:
     orient_triangulation(triangles);
     orient_neighbours();
   }
-  Triangulation(const neighbours_t& neighbours, bool already_oriented = true) : PlanarGraph(Graph(neighbours)) { update(already_oriented); }
+  Triangulation(const neighbours_t& neighbours, bool already_oriented = true) : PlanarGraph(Graph(neighbours, already_oriented)) { update(already_oriented); }
 
   Triangulation(const vector<int>& spiral_string, const jumplist_t& jumps = jumplist_t(), const bool best_effort=false); // and the opposite of 'best-effort' is 'fast and robust'
   Triangulation(const spiral_nomenclature &fsn): Triangulation(fsn.spiral.spiral_code, fsn.spiral.jumps, true){} // best_effort = true

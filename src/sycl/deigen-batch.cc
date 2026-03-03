@@ -10,7 +10,7 @@ typedef double real_t;
 typedef std::complex<real_t> complex_t;
 constexpr real_t machine_precision = std::numeric_limits<real_t>::epsilon();//std::pow(std::numeric_limits<real_t>::radix,-std::numeric_limits<real_t>::digits);
 
-
+// TODO: Why does it look like something casts to float32 somewhere? (Or is numpy.linalg wrong?)
 
 class SpanMatrix : public MDSpan<scalar,2>
 {
@@ -139,11 +139,21 @@ auto reflection_vector(/*in*/const SpanVector a, const real_t anorm,
   return std::tuple{v, sigma};
 }
 
+// PAS PAA! For det skal jo strides, naar det skal vaere rigtigt. Det skal slet ikke vaere saadan her! 
+// Du er en daarlig pige.
 struct QHQ_workspace {
   MDSpan<scalar,1> v, vc, vHA;
 
   QHQ_workspace(int n, scalar *v_data, scalar *vc_data, scalar *vHA_data): v(v_data,{n}), vc(vc_data,{n}), vHA(vHA_data,{n}) {}
 };   
+
+
+struct T_QTQ_workspace {
+  MDSpan<real_t,1> a, v, D, L, U;
+
+  T_QTQ_workspace(int n, scalar *a_data, scalar *v_data, scalar *D_data, scalar *L_data, scalar *U_data): 
+    a(a_data,{2}), v(v_data,{2}), D(D_data,{n+1}), L(L_data,{n+1}), U(U_data,{2*(n+1)}) {}  
+};
 
 scalar dot(MDSpan<scalar,1> a, MDSpan<scalar,1> b)
 {
@@ -167,7 +177,7 @@ void QHQ(/*in/out*/SpanMatrix A, QHQ_workspace w, SpanMatrix Q={})
 
   for(int k=0;k<n-2;k++){
     int l = n-k-1; // Length of super-diagonal
-    const SpanVector a( A({k,k+1},l) ); 
+    const SpanVector a( A({k,k+1},l) ); // Potentially complex
     real_t anorm = sqrt(a.norm_sqr());
 
     if(anorm < numerical_zero) continue; /* Already eliminated, don't divide by 0 */
@@ -182,10 +192,9 @@ void QHQ(/*in/out*/SpanMatrix A, QHQ_workspace w, SpanMatrix Q={})
   }
 }
 
-#if 0
 // TODO: T_QTQ based on Givens rotations (should be possible to do with fewer operations)
 //int QTQ_calls = 0;
-void T_QTQ(const int n, const real_t *Din, const real_t *Lin, real_t *Dout, real_t *Lout, real_t *Vout, real_t shift=0)
+void T_QTQ(const int n, MDSpan<real_t,1> Din, MDSpan<real_t,1> Lin, MDSpan<real_t,1> Dout, MDSpan<real_t,1> Lout, MDSpan<real_t,1> Vout, T_QTQ_workspace w, real_t shift=0)
 {
   //  QTQ_calls ++;
   // Unrolled
@@ -195,8 +204,8 @@ void T_QTQ(const int n, const real_t *Din, const real_t *Lin, real_t *Dout, real
   //  for(int i=0;i<n;i++) max_norm = std::max(max_norm, std::abs(Din[i]) + 2*std::abs(Lin[i]));
   //  numerical_zero = 10*max_norm*machine_precision;//TODO: max_norm for symmetric tridiagonal
   numerical_zero = 100*machine_precision;
-  
-  real_t a[2], v[2], D[n+1], L[n+1], U[2*(n+1)];
+
+  auto [a, v, D, L, U] = w;
 
   for(int i=0;i<n+1;i++){
     D[i] = Din[i]-shift;		// Diagonal
@@ -209,6 +218,10 @@ void T_QTQ(const int n, const real_t *Din, const real_t *Lin, real_t *Dout, real
       Vout[2*i] = 0; Vout[2*i+1] = 0;	// i'th reflection vector. (0,0) yields "no reflection". Must be initialized due to skipped steps.          
     }
   }
+
+  std::cout << "D = " << Span(D.data(),n) << ";\n";
+  std::cout << "L = " << Span(L.data(),n) << ";\n";
+  std::cout << "U = " << Span(U.data(),2*(n+1)) << ";\n";
 
   for(int k=0;k<n-1;k++)
     if(fabs(L[k]) > numerical_zero)  // Only process if subdiagonal element is not already zero.
@@ -232,9 +245,9 @@ void T_QTQ(const int n, const real_t *Din, const real_t *Lin, real_t *Dout, real
       // // Udrullet 
       // //    apply_reflection(T({k,k+2},{k,k+3}),v);
       // //      if(k+1<n){			// k=n-1 case handled by padding with zeros
-      real_t   vTA[3] = {D[ k ]*v[0] + L[ k ]*v[1],  // T(k,k  )*v[0] + T(k+1,k  )*v[1]
-      			 U[ k ]*v[0] + D[k+1]*v[1],  // T(k,k+1)*v[0] + T(k+1,k+1)*v[1]
-      			 U[(n+1)+k]*v[0] + U[k+1]*v[1]}; // T(k,k+2)*v[0] + T(k+1,k+2)*v[1]
+      real_t vTA[3] = {D[ k ]*v[0] + L[ k ]*v[1],  // T(k,k  )*v[0] + T(k+1,k  )*v[1]
+      			           U[ k ]*v[0] + D[k+1]*v[1],  // T(k,k+1)*v[0] + T(k+1,k+1)*v[1]
+      			           U[(n+1)+k]*v[0] + U[k+1]*v[1]}; // T(k,k+2)*v[0] + T(k+1,k+2)*v[1]
 
       D[ k ]     -= 2*v[0]*vTA[0];
       L[ k ]     -= 2*v[1]*vTA[0];
@@ -280,7 +293,7 @@ void T_QTQ(const int n, const real_t *Din, const real_t *Lin, real_t *Dout, real
     }
   }
 }
-
+#if 0
 template <typename scalar> 
 void apply_all_reflections(const real_t *V, const int n, SpanMatrix& Q)
 {

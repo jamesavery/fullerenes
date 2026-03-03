@@ -75,58 +75,25 @@ TEST(SpanMatrix, CoalesceTest)
 
 TEST(SpanMatrix, QHQ_test)
 {
-//     constexpr int m = 3, n = 3, p = 4;
-//     std::array<double,p*m*n> A_data = {                                       
-//                                        0, -1, 2, 
-//                                       -1, 2, 1, 
-//                                        2, 1, -2, 
-
-//                                         0, -1, 0, 
-//                                        -1, -2, -1, 
-//                                        0, -1, 2, 
-
-//                                        0, 0, 1, 
-//                                        0, 2, 0, 
-//                                        1, 0, 0, 
-                                       
-//                                        -2, -2,1, 
-//                                        -2, 0, 1, 
-//                                        1, 1, 2};
-
-    constexpr int m = 4, n = 4, p = 3;
-    std::array<double,p*m*n> A_data = {
-        1, 2, 3, 4,
-        2, 3, 5, 6,
-        3, 5, 6, 7,
-        4, 6, 7, 8,
-
-        5, 4, 3, 2,
-        4, 3, 2, 1,
-        3, 2, 1, 0,
-        2, 1, 0, -1,
-
-        17, 18, 19, 20,
-        18, 27, 21, 22,
-        19, 21, 22, 23,
-        20, 22, 23, 24
-    };
+    constexpr int m = 3, n = 3, p = 4;
+    std::array<double,p*m*n> A_data = {0, -1, 2, -1, 2, 1, 2, 1, -2, 0, -1, 0, -1, -2, -1, 0, -1, 2, 0, 0, 1, 0, 2, 0, 1, 0, 0, -2, -2, 1, -2, 0, 1, 1, 1, 2};
     std::array<double,p*m*n> A_coal;
-    MDSpan<double,3> A_flat(A_data.data(),{p,m,n}), 
-                     A(A_coal.data(), {p,m,n},{1,p*m,p});
+    MDSpan<double,3> A_flat(A_data.data(),{4,3,3}), 
+                     A(A_coal.data(), {4,3,3},{1,p*m,p});
 
-    for(int i=0;i<p;i++)
-        for(int j=0;j<m;j++)
-            for(int k=0;k<n;k++)
+    for(int i=0;i<4;i++)
+        for(int j=0;j<3;j++)
+            for(int k=0;k<3;k++)
                 A[{i,j,k}] = A_flat[{i,j,k}];
     
     double v[n], vc[n], vHA[n];
 
-    for(int i=0;i<p;i++){
-        SpanMatrix Ai = A({i,0,0}, n,n);
+    for(int i=0;i<4;i++){
+        SpanMatrix Ai = A({i,0,0}, 3,3);
         QHQ_workspace w(n, v,vc,vHA);
-        std::cout << "A"<<i<<" = " << Ai << ";\n";        
+        std::cout << "Ai = \n" << Ai << "\n";        
         QHQ(Ai, w);
-        std::cout << "A"<<i<<"T = " << Ai << "\n";                
+        std::cout << "Ai Tridiagonalized = \n" << Ai << "\n";                
     }
 }
 

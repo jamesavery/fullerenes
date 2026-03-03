@@ -129,11 +129,37 @@ Fullerenes exist for all even N >= 20 except N=22.
 - **No git commits**: Never commit to git yourself. Instead, show the proposed commit message and let the user commit manually.
 - **No backticks in commit messages**: Commit messages get pasted into an editor where backticks cause problems. Use plain text instead.
 - **Never stage claude-projects/**: The `claude-projects/` directory has its own separate git repo. Never add, stage, or commit files under `claude-projects/` to the fullerene repository. It is listed in `.gitignore`.
+- **Never kill background processes without asking**: Long-running computations (benchmarks, enumerations) may represent hours of irreplaceable work. Never use TaskStop or any other means to terminate a running background task without explicit user approval. If you need to change code that a running process uses, modify the code and rebuild separately — do not stop the running process. If a rerun is needed, ask the user first and explain what would be lost.
+- **Long-running experiments must support partial results and resumption**: When writing benchmarks or experiments that may run for a long time: (1) Write partial results incrementally (e.g., flush JSON after each isomer, or write checkpoints periodically) so that killing or crashing doesn't lose all progress. (2) Where possible, support restarting from a partially completed state (e.g., save enumeration state, or accept a "start from" parameter). Never design an experiment that only writes output at the very end.
 
 ## Invariants
 
 - **Orientation**: All graphs and triangulations must ALWAYS be oriented. This is not optional — orientation must be maintained at all times when inserting or removing edges or vertices. Never call `orient_neighbours()` or `orient_triangulation()` — if you find yourself needing them, the graph was constructed wrong. New code must always produce oriented neighbour lists directly and preserve orientation through every topological operation. If you encounter a situation where a graph or triangulation is not oriented, treat it as a bug.
 - **`zero_order_geometry()`**: This function is fragile and often fails for larger graphs. It is OK to use for seed graphs (C20/C28/C30) but should be avoided for larger fullerenes.
+- **No radial assumptions**: Never assume fullerene geometry is spherical. Fullerenes can be elongated (nanotubes), oblate, or irregular. Never use "distance from origin" or "radial projection" as a geometric primitive — it only works for spheres. Instead, use local geometric information: outward face/fan normals derived from the CW/CCW orientation of neighbor lists, neighbor centroids, and edge vectors. The orientation convention is CCW-on-outside (fan normal from consecutive edge cross products points outward).
+- **Iteration budgets are safeguards, not tuning knobs**: Never try to speed up optimization by reducing max iteration counts. The max iterations should be generous enough to never be reached. Instead, improve convergence speed by fixing convergence criteria (tolerances, scaling), improving the energy landscape (better preconditioners, better initial geometry), or reducing per-iteration cost. If the optimizer is hitting the iteration budget, the problem is that convergence is too slow — solve that rather than forcing a cruder result by cutting the budget.
+- **Alexandrov's embedding theorem**: By Alexandrov's theorem, every deltahedron (convex polyhedron with all-equilateral triangular faces) has a unique convex isometric embedding (up to rigid motion) where ALL triangles are perfectly equilateral. If the optimizer produces non-equilateral triangles (angle error > 0), that is an optimizer failure — the true energy minimum has zero angle error. Never claim angle error is "intrinsic to the topology."
+
+## Deltahedron (Dual Geometry Optimizer)
+
+The `Deltahedron` class (`include/fullerenes/deltahedron.hh`, `src/c++/deltahedron.cc`) computes equilateral-triangle embeddings of fullerene dual graphs. Key entry point:
+
+```cpp
+Deltahedron D = Deltahedron::fromExtensionPathOptimized(ep);
+```
+
+This reduces a fullerene to a seed (C20/C28/C30), uses precomputed seed geometry, and incrementally expands with per-step patch optimization (trust-region Newton) and global CG relaxation.
+
+### Benchmark and diagnostic tools (benchmarks/)
+
+- **bench_epopt** — Batch quality benchmark. Generates M random isomers of size N via buckygen + reservoir sampling, runs fromExtensionPathOptimized on each, outputs JSON with per-isomer quality stats (edge_cv, edge_relerr_max, h_min, n_concave, ang_min/max/std, ang_relerr_max, gmax_L, iters, ms) and summary statistics. Supports resumption from partial JSON output.
+  Usage: `bench_epopt N M output.json`
+- **bench_report.py** — Formats bench_epopt JSON output as markdown tables with summary across sizes and worst-5 outliers.
+  Usage: `python3 bench_report.py bench_C60.json bench_C70.json ...`
+- **patch_diag** — Per-expansion-step diagnostic (GTest). Replays the expansion pipeline manually, dumping mol2 after each sub-phase (lift, patch optimize, full CG). Prints per-vertex h values, edge lengths, signed triangle volumes. Edit target isomer (N, buckygen index) before use.
+- **step_mol2** — Step-by-step quality evolution. Builds partial ExtensionPaths (first k steps) and shows quality stats at each intermediate size.
+
+Build (from build2/): `cmake --build . --target bench_epopt` (or patch_diag, step_mol2).
 
 ## Recent Development Notes
 

@@ -890,6 +890,53 @@ TEST_F(DeltahedronTest, GradientCheck_LargePerturbation) {
   EXPECT_LT(err, 1e-5) << "Analytic gradient must match FD within 1e-5";
 }
 
+// ===== Hessian check: analytical vs FD for optimize_patch's Hessian =====
+// All three energy terms (E_bond, E_angle, E_conv) have exact analytical Hessians.
+
+TEST_F(DeltahedronTest, HessianCheck_Icosahedron) {
+  // All vertices free, small perturbation
+  vector<coord3d> noisy(ico.points);
+  srand(456);
+  for(int u = 0; u < ico.N; u++)
+    for(int d = 0; d < 3; d++)
+      noisy[u][d] += 0.05 * (2.0 * rand() / RAND_MAX - 1.0);
+
+  vector<bool> free_mask(ico.N, true);
+  double err = ico.hessian_check(noisy, free_mask, {}, 0, 1e-5, true);
+  printf("Hessian check (icosahedron, all free): max relative error = %.2e\n", err);
+  EXPECT_LT(err, 5e-3) << "Analytical Hessian must match FD within 5e-3";
+}
+
+TEST_F(DeltahedronTest, HessianCheck_PartiallyFixed) {
+  // Fix half the vertices (boundary), free the other half
+  vector<coord3d> noisy(ico.points);
+  srand(789);
+  for(int u = 0; u < ico.N; u++)
+    for(int d = 0; d < 3; d++)
+      noisy[u][d] += 0.05 * (2.0 * rand() / RAND_MAX - 1.0);
+
+  vector<bool> free_mask(ico.N, false);
+  for(int i = 0; i < ico.N; i += 2) free_mask[i] = true;
+  double err = ico.hessian_check(noisy, free_mask, {}, 0, 1e-5, true);
+  printf("Hessian check (icosahedron, partial free): max relative error = %.2e\n", err);
+  EXPECT_LT(err, 5e-3) << "Analytical Hessian must match FD within 5e-3";
+}
+
+TEST_F(DeltahedronTest, HessianCheck_WithConcavity) {
+  // Large perturbation to create concavities, exercising E_conv Hessian
+  vector<coord3d> noisy(ico.points);
+  srand(321);
+  for(int u = 0; u < ico.N; u++)
+    for(int d = 0; d < 3; d++)
+      noisy[u][d] += 0.3 * (2.0 * rand() / RAND_MAX - 1.0);
+
+  vector<bool> free_mask(ico.N, true);
+  // Use tighter FD step for curved landscape
+  double err = ico.hessian_check(noisy, free_mask, {}, 0, 1e-6, true);
+  printf("Hessian check (icosahedron, with concavity): max relative error = %.2e\n", err);
+  EXPECT_LT(err, 5e-3) << "Analytical Hessian must match FD within 5e-3";
+}
+
 // ===== Icosahedron: already equilateral, should converge immediately =====
 
 TEST_F(DeltahedronTest, Optimize_Icosahedron_StaysFixed) {
@@ -1034,7 +1081,10 @@ TEST(C44DeltahedronTest, Optimize_AllC44) {
     s.print_row(idx);
     all_stats.push_back(s);
 
-    EXPECT_LT(s.L_cv, 0.1) << "edge length CV should be small";
+    EXPECT_LT(s.L_cv, 0.03) << "C44 #" << idx << " L_cv=" << s.L_cv;
+    EXPECT_GT(s.h_min, -0.02) << "C44 #" << idx << " h_min=" << s.h_min;
+    EXPECT_GT(s.ang_min, 45.0) << "C44 #" << idx << " ang_min=" << s.ang_min;
+    EXPECT_LT(s.ang_max, 75.0) << "C44 #" << idx << " ang_max=" << s.ang_max;
 
     for(int u = 0; u < D.N; u++)
       for(int d = 0; d < 3; d++)
@@ -1096,7 +1146,10 @@ static void test_optimize_fullerene_duals(int N, int max_isomers = -1, bool IPR 
     if(!converged) failed_indices.push_back(idx);
     all_stats.push_back(s);
 
-    EXPECT_LT(s.L_cv, 0.1) << "edge length CV should be small";
+    EXPECT_LT(s.L_cv, 0.03) << "C" << N << " #" << idx << " L_cv=" << s.L_cv;
+    EXPECT_GT(s.h_min, -0.02) << "C" << N << " #" << idx << " h_min=" << s.h_min;
+    EXPECT_GT(s.ang_min, 45.0) << "C" << N << " #" << idx << " ang_min=" << s.ang_min;
+    EXPECT_LT(s.ang_max, 75.0) << "C" << N << " #" << idx << " ang_max=" << s.ang_max;
 
     for(int u = 0; u < D.N; u++)
       for(int d = 0; d < 3; d++)
@@ -1168,24 +1221,35 @@ TEST(OptimizeTest, SmallFullerenes) {
 
     // Find worst stats
     double worst_Lcv = 0, worst_hmin = INFINITY;
+    double worst_ang_min = 180, worst_ang_max = 0, worst_ang_std = 0;
     int n_concave = 0;
     for(auto& s : stats){
       worst_Lcv = max(worst_Lcv, s.L_cv);
       worst_hmin = min(worst_hmin, s.h_min);
+      worst_ang_min = min(worst_ang_min, s.ang_min);
+      worst_ang_max = max(worst_ang_max, s.ang_max);
+      worst_ang_std = max(worst_ang_std, s.ang_std);
       if(s.h_min < -0.01) n_concave++;
     }
 
-    printf("  C%-3d: %3d/%3d isomers, %2d NC, %2d concave, worst L_cv=%.5f, worst h_min=%+.4f\n",
-           N, n_test, n_all, (int)nc.size(), n_concave, worst_Lcv, worst_hmin);
+    printf("  C%-3d: %3d/%3d  %2d NC  L_cv=%.5f  h_min=%+.4f  ang=[%.2f,%.2f] std=%.3f  %d concave\n",
+           N, n_test, n_all, (int)nc.size(), worst_Lcv, worst_hmin,
+           worst_ang_min, worst_ang_max, worst_ang_std, n_concave);
 
     total += n_test;
     total_nc += (int)nc.size();
     total_concave += n_concave;
 
-    // All should have reasonable geometry
+    // Geometry quality assertions: both triangle quality and convexity
     for(int i = 0; i < n_test; i++){
-      EXPECT_LT(stats[i].L_cv, 0.1)
-        << "C" << N << " isomer " << indices[i] << " edge length CV too large";
+      EXPECT_LT(stats[i].L_cv, 0.03)
+        << "C" << N << " isomer " << indices[i] << " L_cv=" << stats[i].L_cv;
+      EXPECT_GT(stats[i].h_min, -0.02)
+        << "C" << N << " isomer " << indices[i] << " h_min=" << stats[i].h_min;
+      EXPECT_GT(stats[i].ang_min, 45.0)
+        << "C" << N << " isomer " << indices[i] << " ang_min=" << stats[i].ang_min;
+      EXPECT_LT(stats[i].ang_max, 75.0)
+        << "C" << N << " isomer " << indices[i] << " ang_max=" << stats[i].ang_max;
     }
   }
   printf("  Total: %d isomers, %d NC, %d concave\n", total, total_nc, total_concave);
@@ -1232,6 +1296,18 @@ TEST(OptimizeTest, C60_Hard) {
   }
   printf("NC=%d, convex=%d, concave=%d, stuck=%d\n",
          (int)nc.size(), n_convex, n_concave, n_stuck);
+
+  // Quality assertions: all isomers should have acceptable geometry
+  for(int i = 0; i < (int)all_stats.size(); i++){
+    EXPECT_LT(all_stats[i].L_cv, 0.03)
+      << "C60 #" << hard[i] << " L_cv=" << all_stats[i].L_cv;
+    EXPECT_GT(all_stats[i].h_min, -0.02)
+      << "C60 #" << hard[i] << " h_min=" << all_stats[i].h_min;
+    EXPECT_GT(all_stats[i].ang_min, 45.0)
+      << "C60 #" << hard[i] << " ang_min=" << all_stats[i].ang_min;
+    EXPECT_LT(all_stats[i].ang_max, 75.0)
+      << "C60 #" << hard[i] << " ang_max=" << all_stats[i].ang_max;
+  }
 }
 
 // Tier 2b: IPR C60-Ih pentakis dodecahedron validation.
@@ -1315,6 +1391,18 @@ TEST(OptimizeTest, C100_Sample) {
   }
   OptStats::print_summary(all_stats);
   printf("NC=%d of %d\n", (int)nc.size(), n_sample);
+
+  // Quality assertions
+  for(int i = 0; i < (int)all_stats.size(); i++){
+    EXPECT_LT(all_stats[i].L_cv, 0.03)
+      << "C100 #" << sample_indices[i] << " L_cv=" << all_stats[i].L_cv;
+    EXPECT_GT(all_stats[i].h_min, -0.02)
+      << "C100 #" << sample_indices[i] << " h_min=" << all_stats[i].h_min;
+    EXPECT_GT(all_stats[i].ang_min, 45.0)
+      << "C100 #" << sample_indices[i] << " ang_min=" << all_stats[i].ang_min;
+    EXPECT_LT(all_stats[i].ang_max, 75.0)
+      << "C100 #" << sample_indices[i] << " ang_max=" << all_stats[i].ang_max;
+  }
 }
 
 // ================================================================

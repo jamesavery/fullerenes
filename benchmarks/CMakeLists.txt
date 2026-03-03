@@ -21,3 +21,19 @@ if(ENABLE_SYCL)
 	target_link_libraries(generate_benchmark ${SYCL_FULLERENE_LIBS} ${SYCL_RUNTIME_LIBS})
 	target_link_libraries(fullerene-optimize-seq ${SYCL_FULLERENE_LIBS} ${SYCL_RUNTIME_LIBS})
 endif()
+
+add_executable(patch_diag patch_diag.cc)
+target_link_libraries(patch_diag fullerenes)
+
+
+add_executable(step_mol2 step_mol2.cc)
+target_link_libraries(step_mol2 fullerenes)
+
+add_executable(bench_epopt bench_epopt.cc)
+target_link_libraries(bench_epopt fullerenes)
+
+add_executable(bench_quality bench_quality.cc)
+target_link_libraries(bench_quality fullerenes)
+
+add_executable(bench_quality_pipeline bench_quality_pipeline.cc)
+target_link_libraries(bench_quality_pipeline fullerenes)

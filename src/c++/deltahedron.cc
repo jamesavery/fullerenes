@@ -3,8 +3,11 @@
 #include "fullerenes/unfold.hh"
 #include "fullerenes/buckinverse.hh"
 #include <cmath>
+#include <climits>
 #include <numeric>
 #include <queue>
+#include <set>
+#include <chrono>
 
 Deltahedron::Deltahedron(const Triangulation& T, const vector<coord3d>& points)
   : Triangulation(T), points(points)
@@ -25,6 +28,45 @@ vector<face_t> Deltahedron::compute_dual_faces() const {
   return faces;
 }
 
+double Deltahedron::max_angle_relerr() const {
+  double max_re = 0;
+  const double target = M_PI / 3.0;
+  for (const auto& t : triangles) {
+    for (int c = 0; c < 3; c++) {
+      coord3d ea = points[t[(c+1)%3]] - points[t[c]];
+      coord3d eb = points[t[(c+2)%3]] - points[t[c]];
+      double cos_th = ea.dot(eb) / (ea.norm() * eb.norm());
+      cos_th = max(-1.0, min(1.0, cos_th));
+      double th = acos(cos_th);
+      double re = fabs(th - target) / target;
+      if (re > max_re) max_re = re;
+    }
+  }
+  return max_re;
+}
+
+int Deltahedron::count_concave() const {
+  int n_concave = 0;
+  for (int v = 0; v < N; v++) {
+    int deg = (int)neighbours[v].size();
+    coord3d centroid(0,0,0);
+    for (int nb : neighbours[v]) centroid = centroid + points[nb];
+    centroid = centroid * (1.0 / deg);
+    coord3d fan_normal(0,0,0);
+    for (int j = 0; j < deg; j++) {
+      coord3d e1 = points[neighbours[v][j]] - points[v];
+      coord3d e2 = points[neighbours[v][(j+1)%deg]] - points[v];
+      fan_normal = fan_normal + e1.cross(e2);
+    }
+    double nn = fan_normal.norm();
+    if (nn < 1e-15) continue;
+    coord3d nhat = fan_normal / nn;
+    double h = (points[v] - centroid).dot(nhat);
+    if (h < 0) n_concave++;
+  }
+  return n_concave;
+}
+
 void Deltahedron::smooth(double q) {
   vector<coord3d> new_points(N);
   for(node_t u = 0; u < N; u++){
@@ -36,8 +78,7 @@ void Deltahedron::smooth(double q) {
   points = new_points;
 }
 
-Deltahedron Deltahedron::GCtransform(unsigned k, unsigned l) const {
-  if(l == 0){
+Deltahedron Deltahedron::halma_transform(unsigned k) const {
     // Halma path: direct subdivision via face grids, preserves node IDs
     int m = k - 1;
     int n = k;  // = m+1
@@ -61,8 +102,11 @@ Deltahedron Deltahedron::GCtransform(unsigned k, unsigned l) const {
       }
     }
 
-    return Deltahedron(T_new, new_points);
-  }
+    return Deltahedron(T_new, new_points);  
+}
+
+Deltahedron Deltahedron::GCtransform(unsigned k, unsigned l) const {
+  if(l==0 || k==0) return halma_transform(max(k,l));
 
   // General (k,l) path: unfold to Eisenstein plane, scale, fold back.
   // Then assign 3D coordinates via barycentric interpolation within
@@ -74,7 +118,7 @@ Deltahedron Deltahedron::GCtransform(unsigned k, unsigned l) const {
   // 1. Unfold, scale by w, fold to get new topology
   Unfolding u_orig(static_cast<const Triangulation&>(*this));
   Unfolding gcu(u_orig * w);
-  Folding gcf(gcu);
+  Folding   gcf(gcu);
   Triangulation T_new(gcf.fold());
 
   // 2. Assign 3D coordinates by iterating over original faces.
@@ -100,13 +144,11 @@ Deltahedron Deltahedron::GCtransform(unsigned k, unsigned l) const {
     node_t nu = tri[0], nv = tri[1], nw = tri[2];
 
     // Scaled Eisenstein corners of this face
-    Eisenstein EU = gcu.arc_coords.at({nu, nv}).first;
-    Eisenstein EV = gcu.arc_coords.at({nu, nv}).second;
+    auto [EU,EV] = gcu.arc_coords.at({nu,nv});
     Eisenstein EW = EU + (EV - EU).nextCCW();
 
     // Side vectors and determinant (should equal T for CCW faces)
-    Eisenstein d1 = EV - EU;
-    Eisenstein d2 = EW - EU;
+    Eisenstein d1 = EV - EU, d2 = EW - EU;
 
     // Bounding box of the scaled triangle
     int amin = min({EU.first, EV.first, EW.first});
@@ -116,14 +158,14 @@ Deltahedron Deltahedron::GCtransform(unsigned k, unsigned l) const {
 
     for(int ea = amin; ea <= amax; ea++){
       for(int eb = bmin; eb <= bmax; eb++){
-        Eisenstein e(ea, eb);
+        Eisenstein e = {ea, eb};
 
         // Containment test: all turns >= 0 for CCW triangle
         if(Eisenstein::turn(EU, EV, e) < 0) continue;
         if(Eisenstein::turn(EV, EW, e) < 0) continue;
         if(Eisenstein::turn(EW, EU, e) < 0) continue;
 
-        // Look up the output node ID
+        // Look up the output node ID for each Eisenstein point e inside the triangle T
         auto it = gcf.final_grid.find(e);
         if(it == gcf.final_grid.end()) continue;
         node_t node_id = it->second;
@@ -150,31 +192,6 @@ using buckinverse::ExtensionPath;
 using buckinverse::ExtensionStep;
 using buckinverse::ExpKind;
 using buckinverse::ReducibleDual;
-
-// Thomas algorithm for tridiagonal system with coord3d values.
-// diag[i] = diagonal entries, rhs[i] = right-hand sides.
-// Sub- and super-diagonal entries are all -1.
-// Returns solution in-place in rhs.
-static void solveTridiagonal(const vector<double>& diag, vector<coord3d>& rhs) {
-    int n = (int)rhs.size();
-    if (n == 0) return;
-    if (n == 1) { rhs[0] = rhs[0] / diag[0]; return; }
-
-    // Forward sweep (modify diag and rhs in-place via copies)
-    vector<double> d(diag);
-    vector<double> c(n - 1, -1.0);  // super-diagonal
-
-    for (int i = 1; i < n; i++) {
-        double w = -1.0 / d[i - 1];  // sub-diagonal / d'[i-1]
-        d[i] -= w * c[i - 1];
-        rhs[i] = rhs[i] - rhs[i - 1] * w;
-    }
-
-    // Back substitution
-    rhs[n - 1] = rhs[n - 1] / d[n - 1];
-    for (int i = n - 2; i >= 0; i--)
-        rhs[i] = (rhs[i] - rhs[i + 1] * c[i]) / d[i];
-}
 
 // Solve 5x5 cyclic tridiagonal system for F-ring.
 // All diagonal entries = 6, sub/super-diagonal = -1, corner entries = -1.
@@ -227,6 +244,7 @@ static void solveCyclicTridiag5(vector<coord3d>& rhs) {
 
 // Compute strip vertex coordinates for one expansion step.
 // points[] is indexed by ReducibleDual vertex IDs (full graph numbering).
+// TODO: Cleanup (cleaner code, factor into higher-level abstractions  + add clearer descriptions of the method).
 static void computeStripCoords(const ExtensionStep& step, vector<coord3d>& points) {
     const auto& strip = step.strip;
     const auto& path = step.path;
@@ -234,59 +252,184 @@ static void computeStripCoords(const ExtensionStep& step, vector<coord3d>& point
     int n = (int)strip.size();
 
     if (step.kind.type == ExpKind::L_type) {
-        // L-type: n strip verts, n+1 path/tp verts
-        // Tridiagonal system: diag = 5 at endpoints, 6 at interior
-        vector<double> diag(n);
-        vector<coord3d> rhs(n);
-
-        for (int j = 0; j < n; j++) {
-            diag[j] = (j == 0 || j == n - 1) ? 5.0 : 6.0;
-            rhs[j] = points[path[j]] + points[path[j + 1]]
-                    + points[tp[j]] + points[tp[j + 1]];
-        }
-        solveTridiagonal(diag, rhs);
+        // L-type: quad centroid initial placement.
         for (int j = 0; j < n; j++)
-            points[strip[j]] = rhs[j];
+            points[strip[j]] = (points[path[j]] + points[path[j + 1]]
+                              + points[tp[j]] + points[tp[j + 1]]) * 0.25;
 
     } else if (step.kind.type == ExpKind::B_type) {
-        // B(0,0): 3 strip verts, 5 path verts, 3 tp verts
+        // B(0,0): quad centroid for each of the 3 strip vertices.
         assert(step.kind.i == 0 && step.kind.j == 0 && n == 3);
-        vector<double> diag = {5.0, 6.0, 5.0};
-        vector<coord3d> rhs(3);
-        rhs[0] = points[path[0]] + points[path[1]] + points[tp[0]] + points[tp[1]];
-        rhs[1] = points[path[1]] + points[path[2]] + points[path[3]] + points[tp[1]];
-        rhs[2] = points[path[3]] + points[path[4]] + points[tp[1]] + points[tp[2]];
-
-        solveTridiagonal(diag, rhs);
-        for (int j = 0; j < 3; j++)
-            points[strip[j]] = rhs[j];
+        points[strip[0]] = (points[path[0]] + points[path[1]]
+                          + points[tp[0]] + points[tp[1]]) * 0.25;
+        points[strip[1]] = (points[path[1]] + points[path[2]]
+                          + points[path[3]] + points[tp[1]]) * 0.25;
+        points[strip[2]] = (points[path[3]] + points[path[4]]
+                          + points[tp[1]] + points[tp[2]]) * 0.25;
 
     } else {
-        // F-ring: 5 strip verts in a cycle, all deg-6
+        // F-ring: antiprism placement on the local cylinder.
+        // For each strip[i], place at the bisector angle of path[i] and
+        // path[(i+1)%5], at the cylinder radius and midpoint height.
+        // This correctly handles any index offset between path and tp arrays.
         assert(n == 5);
-        vector<coord3d> rhs(5);
+
+        // 1. Ring centroids
+        coord3d c_path(0,0,0), c_tp(0,0,0);
+        for (int i = 0; i < 5; i++) {
+            c_path += points[path[i]];
+            c_tp   += points[tp[i]];
+        }
+        c_path = c_path / 5.0;
+        c_tp   = c_tp   / 5.0;
+
+        // 2. Cylinder axis (path center toward tp center)
+        coord3d axis = c_tp - c_path;
+        double axis_len = axis.norm();
+        if (axis_len < 1e-9) {
+	  // I'm pretty sure this should never happen. TODO: Verify.
+	  fprintf(stderr,"ERROR: Rings coincide. This should never happen.\n");
+	  abort();
+	  /*
+            // Degenerate: rings coincide. Fall back to Laplacian.
+            vector<coord3d> rhs(5);
+            for (int i = 0; i < 5; i++) {
+                int ip1 = (i + 1) % 5;
+                rhs[i] = points[path[i]] + points[path[ip1]]
+                       + points[tp[i]] + points[tp[ip1]];
+            }
+            solveCyclicTridiag5(rhs);
+            for (int i = 0; i < 5; i++)
+                points[strip[i]] = rhs[i];
+            return;  // skip projection below
+	  */
+        }
+        axis = axis / axis_len;
+
+        // 3. Cylinder radius from path ring
+        double r = 0;
+        for (int i = 0; i < 5; i++) {
+            coord3d v = points[path[i]] - c_path;
+            coord3d radial = v - axis * v.dot(axis);
+            r += radial.norm();
+        }
+        r /= 5.0;
+
+        // 4. Local coordinate frame perpendicular to axis
+        coord3d v0 = points[path[0]] - c_path;
+        coord3d e1 = v0 - axis * v0.dot(axis);
+        e1 = e1 / e1.norm();
+        coord3d e2 = axis.cross(e1);
+
+        // 5. Strip center at midpoint between ring centroids
+        coord3d c_strip = (c_path + c_tp) * 0.5;
+
+        // 6. Place each strip[i] at the bisector angle of path[i] and path[(i+1)%5]
         for (int i = 0; i < 5; i++) {
             int ip1 = (i + 1) % 5;
-            rhs[i] = points[path[i]] + points[path[ip1]]
-                   + points[tp[i]] + points[tp[ip1]];
+            // Compute radial directions for path[i] and path[ip1]
+            coord3d vi   = points[path[i]] - c_path;
+            coord3d vip1 = points[path[ip1]] - c_path;
+            coord3d ri   = vi - axis * vi.dot(axis);
+            coord3d rip1 = vip1 - axis * vip1.dot(axis);
+            // Bisector direction (sum of normalized radials)
+            coord3d bisector = ri / ri.norm() + rip1 / rip1.norm();
+            double blen = bisector.norm();
+            if (blen < 1e-12) {
+                // path[i] and path[ip1] are diametrically opposite; use perpendicular
+                bisector = axis.cross(ri);
+                blen = bisector.norm();
+            }
+            bisector = bisector / blen;
+            points[strip[i]] = c_strip + bisector * r;
         }
-        solveCyclicTridiag5(rhs);
-        for (int i = 0; i < 5; i++)
-            points[strip[i]] = rhs[i];
-    }
-
-    // Reproject strip vertices to the unit sphere.
-    // The tridiagonal solve gives correct angular positions but places
-    // strip vertices interior to the sphere (centroid of points on a sphere
-    // is inside it). Since all vertices should lie on a unit sphere centered
-    // at origin, normalize each strip vertex to unit length.
-    for (int j = 0; j < n; j++) {
-        double r = points[strip[j]].norm();
-        if (r > 1e-12)
-            points[strip[j]] = points[strip[j]] / r;
+        return;
     }
 }
 
+// Lift strip vertices outward to match the surface height of their neighbours.
+// After computeStripCoords + rd.expand, each strip vertex sits at the quad
+// centroid which is inside the surface (chord vs arc). We compute the fan
+// normal (points outward from CCW convention) and push each strip vertex
+// outward along it until its h value (height above neighbour centroid along
+// the fan normal) matches the average h of its non-strip neighbours.
+//
+// TODO: Cleanup (cleaner code, factor into higher-level abstractions  + add clearer descriptions of the method).
+static void liftStripToSurface(const ExtensionStep& step,
+                                const ReducibleDual& rd,
+                                vector<coord3d>& points) {
+    // Collect strip vertex IDs into a set for fast lookup.
+    set<int> strip_set(step.strip.begin(), step.strip.end());
+
+    for (int s : step.strip) {
+        // Gather CCW-ordered neighbours from active bitmask
+        vector<int> nbrs;
+        uint8_t m = rd.V[s].active;
+        for (; m; m &= m - 1)
+            nbrs.push_back(rd.V[s].nbr[__builtin_ctz(m)]);
+        int d = (int)nbrs.size();
+        if (d < 3) continue;
+
+        // Compute h for each non-strip neighbour: its height above ITS own
+        // neighbour centroid along ITS own fan normal. This tells us how far
+        // "above" the local surface each boundary vertex sits.
+        double h_target = 0;
+        int n_boundary = 0;
+        for (int nb : nbrs) {
+            if (strip_set.count(nb)) continue;  // skip other strip vertices
+
+            // Gather nb's neighbours
+            vector<int> nb_nbrs;
+            uint8_t mb = rd.V[nb].active;
+            for (; mb; mb &= mb - 1)
+                nb_nbrs.push_back(rd.V[nb].nbr[__builtin_ctz(mb)]);
+            int db = (int)nb_nbrs.size();
+            if (db < 3) continue;
+
+            coord3d c_nb(0,0,0);
+            for (int nn : nb_nbrs) c_nb += points[nn];
+            c_nb /= (double)db;
+
+            coord3d nf(0,0,0);
+            for (int j = 0; j < db; j++) {
+                coord3d e1 = points[nb_nbrs[j]] - points[nb];
+                coord3d e2 = points[nb_nbrs[(j+1)%db]] - points[nb];
+                nf += e1.cross(e2);
+            }
+            double nl = nf.norm();
+            if (nl < 1e-15) continue;
+
+            double h_nb = (points[nb] - c_nb).dot(nf / nl);
+            h_target += h_nb;
+            n_boundary++;
+        }
+        if (n_boundary == 0) continue;
+        h_target /= n_boundary;
+
+        // Now compute h for the strip vertex itself
+        coord3d centroid(0,0,0);
+        for (int nb : nbrs) centroid += points[nb];
+        centroid /= (double)d;
+
+        coord3d n_fan(0,0,0);
+        for (int j = 0; j < d; j++) {
+            coord3d e1 = points[nbrs[j]] - points[s];
+            coord3d e2 = points[nbrs[(j+1)%d]] - points[s];
+            n_fan += e1.cross(e2);
+        }
+        double n_len = n_fan.norm();
+        if (n_len < 1e-15) continue;
+        coord3d n_hat = n_fan / n_len;
+
+        double h_current = (points[s] - centroid).dot(n_hat);
+
+        // Push outward along the fan normal to match target h
+        points[s] = points[s] + n_hat * (h_target - h_current);
+    }
+}
+
+
+// TODO: Move seed data to its own file that all can use.
 // =====================================================================
 // Precomputed seed dual geometry (force-field optimized face centroids)
 // Generated by gen_seeds from IsomerDB + FullereneGraph::optimized_geometry
@@ -424,6 +567,7 @@ static const vector<coord3d>& seedPoints(buckinverse::SeedType s) {
 // ep seed_state graph. Since both are isomorphic, they produce the same
 // canonical spiral, giving permutations that compose into the mapping.
 // Returns mapping: precomputed_vertex -> ep_vertex_id.
+//TODO: Is this still needed?
 static vector<int> matchSeedViaSpiralImpl(
     const neighbours_t& precomp,
     const ExtensionPath& ep)
@@ -604,10 +748,11 @@ Deltahedron Deltahedron::fromExtensionPath(const ExtensionPath& ep) {
         if (rd.degree(sv.id) == 5) rd.deg5.insert(sv.id);
     }
 
-    // 3. For each expansion step: compute coords then expand topology
+    // 3. For each expansion step: compute coords, expand topology, enforce convexity
     for (const auto& step : ep.steps) {
         computeStripCoords(step, points);
         rd.expand(step);
+        liftStripToSurface(step, rd, points);
     }
 
     // 4. Extract compact Graph with renumbered coordinates
@@ -655,9 +800,92 @@ static Deltahedron extractCompact(
     return Deltahedron(Triangulation(adj, true), compact_pts);
 }
 
-Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, int max_iter_per_step) {
+// Helper: extract a small patch sub-Deltahedron containing only the vertices
+// near a just-expanded strip. Free vertices = strip + path + tp; boundary
+// (fixed) = one-ring of (path ∪ tp) that is not in {strip, path, tp}.
+// Returns the sub-Deltahedron plus:
+//   free_mask[m]: true for free vertices in the sub-graph
+//   interior_mask[m]: true for vertices whose full neighbor set is in the patch
+//                     (i.e. patch degree == graph degree; false for truncated boundary)
+//   remap[full_N]: full→sub ID mapping (-1 if not in patch)
+static Deltahedron extractPatch(
+    const ReducibleDual& rd, int full_N,
+    const ExtensionStep& step,
+    const vector<coord3d>& points,
+    vector<bool>& free_mask,
+    vector<bool>& interior_mask,
+    vector<int>& remap)
+{
+    // 1. Collect free vertices (strip + path + tp)
+    set<int> free_set;
+    for (int v : step.strip) free_set.insert(v);
+    for (int v : step.path)  free_set.insert(v);
+    for (int v : step.tp)    free_set.insert(v);
+
+    // 2. Expand to one-ring of (path ∪ tp) for the fixed boundary
+    set<int> patch_set = free_set;
+    for (int v : step.path) {
+        uint8_t m = rd.V[v].active;
+        for (; m; m &= m - 1)
+            patch_set.insert(rd.V[v].nbr[__builtin_ctz(m)]);
+    }
+    for (int v : step.tp) {
+        uint8_t m = rd.V[v].active;
+        for (; m; m &= m - 1)
+            patch_set.insert(rd.V[v].nbr[__builtin_ctz(m)]);
+    }
+
+    // 3. Remap patch vertices to 0..m-1
+    remap.assign(full_N, -1);
+    int id = 0;
+    for (int v : patch_set) remap[v] = id++;
+    int m = id;
+
+    // 4. Build adjacency for the sub-graph (only edges within patch)
+    neighbours_t adj(m);
+    for (int u : patch_set) {
+        uint8_t mask = rd.V[u].active;
+        for (; mask; mask &= mask - 1) {
+            int nb = rd.V[u].nbr[__builtin_ctz(mask)];
+            if (remap[nb] >= 0)
+                adj[remap[u]].push_back(remap[nb]);
+        }
+    }
+
+    // 5. Build free_mask
+    free_mask.assign(m, false);
+    for (int v : free_set)
+        if (remap[v] >= 0) free_mask[remap[v]] = true;
+
+    // 6. Build interior_mask: true iff all graph neighbors are in the patch
+    //    (patch degree == graph degree). False for boundary vertices whose
+    //    neighbor sets are truncated — E_conv would compute bogus h values.
+    interior_mask.assign(m, false);
+    for (int u : patch_set) {
+        int graph_deg = rd.degree(u);
+        int patch_deg = (int)adj[remap[u]].size();
+        interior_mask[remap[u]] = (patch_deg == graph_deg);
+    }
+
+    // 7. Extract coordinates
+    vector<coord3d> patch_pts(m);
+    for (int v : patch_set) patch_pts[remap[v]] = points[v];
+
+    return Deltahedron(Triangulation(adj, true), patch_pts);
+}
+
+Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, int max_iter_per_step, FILE* log, StepCallback diag,
+                                                     OptMethod method, double step_tol, double final_tol, long long max_work_per_step,
+                                                     double step_angle_tol, double final_angle_tol) {
     int full_N = ep.full_N;
     vector<coord3d> points(full_N);
+
+    // Timing accumulators (only used when opt_log is set)
+    using clk = chrono::steady_clock;
+    double ms_seed = 0, ms_place = 0, ms_reflect = 0, ms_patch = 0, ms_cg = 0, ms_final = 0;
+    int total_cg_iters = 0, total_patch_iters = 0;
+    int acc_energy = 0, acc_grad = 0, acc_hv = 0;
+    auto t0 = clk::now();
 
     // 1. Compute seed geometry
     computeSeedGeometry(ep, points);
@@ -671,33 +899,175 @@ Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, int
         rd.n_alive++;
         if (rd.degree(sv.id) == 5) rd.deg5.insert(sv.id);
     }
+    ms_seed = chrono::duration<double,milli>(clk::now() - t0).count();
 
-    // 3. For each expansion step: place strip, expand topology, optimize
-    for (const auto& step : ep.steps) {
-
-        // a. Place strip vertices via Laplacian solve
-        computeStripCoords(step, points);
-
-        // b. Expand topology
-        rd.expand(step);
-
-        // c. Extract compact Deltahedron with current coordinates
-        vector<int> remap;
-        Deltahedron D = extractCompact(rd, full_N, points, remap);
-
-        // d. Optimize geometry (CG relaxation toward equilateral triangles)
-        //    Use limited iterations with loose tolerance for intermediate steps.
-        D.optimize(D.points, 0, max_iter_per_step, 1e-8);
-
-        // e. Write optimized coordinates back to full array
-        for (int u = 0; u < full_N; u++)
-            if (remap[u] >= 0)
-                points[u] = D.points[remap[u]];
+    // Diagnostic: seed geometry snapshot
+    if (diag) {
+        vector<int> seed_remap;
+        Deltahedron D_seed = extractCompact(rd, full_N, points, seed_remap);
+        diag(0, "seed", D_seed);
     }
 
-    // 4. Final extraction
+    // 3. For each expansion step: place strip, expand topology, optimize
+    int step_idx = 0;
+    for (const auto& step : ep.steps) {
+        auto ts = clk::now();
+
+        // a. Place strip vertices (quad centroid initial guess)
+        computeStripCoords(step, points);
+
+        // b. Expand topology + enforce outward convexity
+        rd.expand(step);
+        liftStripToSurface(step, rd, points);
+
+        auto t_place = clk::now();
+        ms_place += chrono::duration<double,milli>(t_place - ts).count();
+
+        // Diagnostic: after strip placement + lift
+        if (diag) {
+            vector<int> diag_remap;
+            Deltahedron D_diag = extractCompact(rd, full_N, points, diag_remap);
+            diag(step_idx + 1, "placed", D_diag);
+        }
+
+        // c. Reflect concave free vertices on the full graph (before patch extraction).
+        //    This is O(N) and saves the optimizer from spending expensive CG iterations
+        //    fighting concavity from inverted strip vertices.
+        {
+            set<int> free_set;
+            for (int v : step.strip) free_set.insert(v);
+            for (int v : step.path)  free_set.insert(v);
+            for (int v : step.tp)    free_set.insert(v);
+
+            vector<int> refl_remap;
+            Deltahedron D = extractCompact(rd, full_N, points, refl_remap);
+
+            // Build fixed mask: only free_set vertices may be reflected
+            vector<bool> refl_fixed(D.N, true);
+            for (int u : free_set)
+                if (refl_remap[u] >= 0) refl_fixed[refl_remap[u]] = false;
+
+            for (int pass = 0; pass < 3; pass++)
+                if (D.reflect_concave(D.points, 0, refl_fixed) == 0) break;
+
+            // Copy reflected coords back to full array
+            for (int u = 0; u < full_N; u++)
+                if (refl_remap[u] >= 0)
+                    points[u] = D.points[refl_remap[u]];
+        }
+        auto t_refl = clk::now();
+        ms_reflect += chrono::duration<double,milli>(t_refl - t_place).count();
+
+        // Diagnostic: after reflect
+        if (diag) {
+            vector<int> diag_remap;
+            Deltahedron D_diag = extractCompact(rd, full_N, points, diag_remap);
+            diag(step_idx + 1, "reflected", D_diag);
+        }
+
+        // d. Extract small patch sub-graph (O(1) vertices)
+        vector<bool> free_mask, interior_mask;
+        vector<int> patch_remap;
+        Deltahedron patch = extractPatch(rd, full_N, step, points,
+                                         free_mask, interior_mask, patch_remap);
+
+        // e. Trust-region optimize on patch only (strip + path + tp free)
+        patch.opt_log = log;
+        patch.optimize_patch(patch.points, free_mask, interior_mask);
+        patch.opt_log = nullptr;
+        total_patch_iters += patch.iterations_used;
+
+        // f. Copy patch free-vertex coords back to full array
+        for (int u = 0; u < full_N; u++)
+            if (patch_remap[u] >= 0 && free_mask[patch_remap[u]])
+                points[u] = patch.points[patch_remap[u]];
+
+        auto t_patch = clk::now();
+        ms_patch += chrono::duration<double,milli>(t_patch - t_refl).count();
+
+        // Diagnostic: after patch optimize, BEFORE full-graph CG (the key snapshot)
+        if (diag) {
+            vector<int> diag_remap;
+            Deltahedron D_diag = extractCompact(rd, full_N, points, diag_remap);
+            diag(step_idx + 1, "patched", D_diag);
+        }
+
+        // g. Full-graph CG relaxation to release accumulated strain.
+        vector<int> full_remap;
+        Deltahedron D = extractCompact(rd, full_N, points, full_remap);
+
+        int iter_budget = max_iter_per_step > 0 ? max_iter_per_step : 3*D.N;
+        D.opt_k_flat = 0;  // skip E_flat in intermediate steps (final CG uses default)
+        D.opt_method = method;
+        // Log CG details for a few representative steps
+        int n_steps = (int)ep.steps.size();
+        bool log_this = log && (step_idx <= 2 || step_idx == n_steps/2 || step_idx >= n_steps - 2);
+        if (log_this) D.opt_log = log;
+        D.optimize(D.points, 0, iter_budget, step_tol, {}, max_work_per_step, step_angle_tol);
+        if (log_this) D.opt_log = nullptr;
+        total_cg_iters += D.iterations_used;
+        acc_energy += D.n_energy_evals;
+        acc_grad += D.n_grad_evals;
+        acc_hv += D.n_hv_evals;
+
+        // h. Write optimized coordinates back to full array
+        for (int u = 0; u < full_N; u++)
+            if (full_remap[u] >= 0)
+                points[u] = D.points[full_remap[u]];
+
+        auto t_cg = clk::now();
+        ms_cg += chrono::duration<double,milli>(t_cg - t_patch).count();
+
+        // Diagnostic: after CG
+        if (diag) {
+            vector<int> diag_remap;
+            Deltahedron D_diag = extractCompact(rd, full_N, points, diag_remap);
+            diag(step_idx + 1, "cg", D_diag);
+        }
+
+        if (log) {
+            fprintf(log, "  step %2d: N=%3d place=%.1f refl=%.1f patch=%.1f(%d) cg=%.1f(%d) ms\n",
+                    step_idx, D.N,
+                    chrono::duration<double,milli>(t_place - ts).count(),
+                    chrono::duration<double,milli>(t_refl - t_place).count(),
+                    chrono::duration<double,milli>(t_patch - t_refl).count(), patch.iterations_used,
+                    chrono::duration<double,milli>(t_cg - t_patch).count(), D.iterations_used);
+        }
+        step_idx++;
+    }
+
+    // 4. Final extraction + full optimization
+    auto t_final = clk::now();
     vector<int> remap;
-    return extractCompact(rd, full_N, points, remap);
+    Deltahedron D = extractCompact(rd, full_N, points, remap);
+    // Diagnostic: before final optimization
+    if (diag) diag((int)ep.steps.size() + 1, "patched", D);
+
+    D.opt_k_flat = 0;  // geometry is already 3D from seed expansion; E_flat fights equilateral
+    D.opt_method = method;
+    D.optimize(D.points, 0, 12*D.N, final_tol, {}, max_work_per_step, final_angle_tol);
+    ms_final = chrono::duration<double,milli>(clk::now() - t_final).count();
+
+    // Diagnostic: after final optimization
+    if (diag) diag((int)ep.steps.size() + 1, "final", D);
+
+    // Accumulate eval counters from all per-step + final optimize calls
+    acc_energy += D.n_energy_evals;
+    acc_grad += D.n_grad_evals;
+    acc_hv += D.n_hv_evals;
+    D.n_energy_evals = acc_energy;
+    D.n_grad_evals = acc_grad;
+    D.n_hv_evals = acc_hv;
+
+    if (log) {
+        double ms_total = chrono::duration<double,milli>(clk::now() - t0).count();
+        fprintf(log, "  totals: seed=%.0f place=%.0f refl=%.0f patch=%.0f(%d) cg=%.0f(%d) final=%.0f(%d) total=%.0f ms\n",
+                ms_seed, ms_place, ms_reflect, ms_patch, total_patch_iters,
+                ms_cg, total_cg_iters, ms_final, D.iterations_used, ms_total);
+    }
+
+    D.iterations_used += total_cg_iters;
+    return D;
 }
 
 // =====================================================================
@@ -758,7 +1128,8 @@ static double deltahedron_energy_and_gradient(
     double k_angle,
     double k_curv,
     double k_flat,
-    double k_conv)
+    double k_conv,
+    const vector<bool>& conv_mask = {})  // if non-empty, restrict E_conv to these vertices
 {
   const int N = D.N;
   double energy = 0.0;
@@ -929,6 +1300,7 @@ static double deltahedron_energy_and_gradient(
     for(int v = 0; v < N; v++){
       int d = (int)D.neighbours[v].size();
       if(d > 6) continue;
+      if(!conv_mask.empty() && !conv_mask[v]) continue;  // skip truncated boundary verts
 
       // Neighbor centroid
       coord3d centroid(0,0,0);
@@ -998,180 +1370,1277 @@ static double vec_dot(const vector<coord3d>& a, const vector<coord3d>& b){
   return s;
 }
 
+static double vec_norm(const vector<coord3d>& a){
+  return sqrt(vec_dot(a, a));
+}
+
+// a[i] += alpha * b[i]
+static void vec_axpy(vector<coord3d>& a, double alpha, const vector<coord3d>& b){
+  for(int i = 0; i < (int)a.size(); i++)
+    a[i] = a[i] + b[i] * alpha;
+}
+
+static void vec_scale(vector<coord3d>& a, double alpha){
+  for(int i = 0; i < (int)a.size(); i++)
+    a[i] = a[i] * alpha;
+}
+
+static void vec_zero(vector<coord3d>& a){
+  for(int i = 0; i < (int)a.size(); i++)
+    a[i] = coord3d(0,0,0);
+}
+
+// ---------- Hessian-vector product (matrix-free) ----------
+//
+// Computes Hv = H * v for the same energy terms used in optimize():
+// E_bond, E_angle, E_curv, and E_flat.  Does NOT assemble H.
+//
+// Caller must zero-initialize Hv before calling.
+//
+static void deltahedron_hv_product(
+    const Deltahedron& D,
+    const vector<edge_t>& edges,
+    const vector<coord3d>& x,
+    const vector<coord3d>& v,
+    vector<coord3d>& Hv,
+    double L,
+    double k_bond, double k_angle, double k_curv, double k_flat,
+    const vector<bool>& fixed = {})
+{
+  const int N = D.N;
+  const matrix3d I = matrix3d::unit_matrix();
+  const double theta0 = M_PI / 3.0;
+
+  // Helper: apply 3x3 block M to vertex pair (i,j), accumulating M*v[j] into Hv[i]
+  auto apply_block = [&](int vi, int vj, const matrix3d& M){
+    Hv[vi] = Hv[vi] + M * v[vj];
+  };
+
+  // --- E_bond Hv ---
+  // Per edge: M = k*[(1-L/r)*I + (L/r^3)*d⊗d]
+  // Hv[u] += M*(v[u]-v[v]),  Hv[v] -= M*(v[u]-v[v])
+  if(k_bond > 0){
+    for(const edge_t& e : edges){
+      int u = e.first, vv = e.second;
+      coord3d d = x[u] - x[vv];
+      double r = d.norm();
+      if(r < 1e-15) continue;
+
+      coord3d dv = v[u] - v[vv];
+      // M*dv = k*(1 - L/r)*dv + k*(L/r^3)*(d.dv)*d
+      coord3d Mdv = dv * (k_bond * (1 - L/r)) + d * (k_bond * L / (r*r*r) * d.dot(dv));
+      Hv[u] = Hv[u] + Mdv;
+      Hv[vv] = Hv[vv] - Mdv;
+    }
+  }
+
+  // --- E_angle Hv ---
+  // Per triangle corner: compute arm-space blocks Haa, Hcc, Hac and scatter.
+  if(k_angle > 0){
+    for(const auto& tri : D.triangles){
+      for(int c = 0; c < 3; c++){
+        int b = tri[c], a = tri[(c+2)%3], dd = tri[(c+1)%3];
+        coord3d va = x[a] - x[b], vc = x[dd] - x[b];
+        double ra = va.norm(), rc = vc.norm();
+        if(ra < 1e-15 || rc < 1e-15) continue;
+
+        coord3d ua = va / ra, uc = vc / rc;
+        double C = max(-1.0, min(1.0, ua.dot(uc)));
+        double theta = acos(C);
+        double S = sin(theta);
+        if(S < 1e-10) continue;
+
+        double dev = theta - theta0;
+        double alpha = 1.0 - dev * C / S;
+
+        coord3d p, q;
+        coord3d::dangle(va, vc, p, q);
+
+        matrix3d sym_ac = ua.outer(uc) + uc.outer(ua);
+
+        matrix3d Haa = p.outer(p) * (k_angle * alpha)
+          + (sym_ac + I * C - ua.outer(ua) * (3*C)) * (k_angle * dev / (ra*ra * S));
+
+        matrix3d Hcc = q.outer(q) * (k_angle * alpha)
+          + (sym_ac + I * C - uc.outer(uc) * (3*C)) * (k_angle * dev / (rc*rc * S));
+
+        matrix3d Hac = p.outer(q) * (k_angle * alpha)
+          + (ua.outer(ua) + uc.outer(uc) - ua.outer(uc) * C - I) * (k_angle * dev / (ra*rc * S));
+
+        // Scatter: same pattern as assemble_patch_hessian, but M*v instead of storing M
+        matrix3d Hab = Haa + Hac;
+        matrix3d Hcb = Hcc + Hac.transpose();
+
+        // H(a,a)*v[a] + H(a,dd)*v[dd] + H(a,b)*v[b]
+        Hv[a] = Hv[a] + Haa * v[a] + Hac * v[dd] + (-Hab) * v[b];
+        // H(dd,a)*v[a] + H(dd,dd)*v[dd] + H(dd,b)*v[b]
+        Hv[dd] = Hv[dd] + Hac.transpose() * v[a] + Hcc * v[dd] + (-Hcb) * v[b];
+        // H(b,a)*v[a] + H(b,dd)*v[dd] + H(b,b)*v[b]
+        Hv[b] = Hv[b] + (-Hab.transpose()) * v[a] + (-Hcb.transpose()) * v[dd] + (Hab + Hcb) * v[b];
+      }
+    }
+  }
+
+  // --- E_curv Hv ---
+  // E_curv = (k_curv/2) * sum_v (K_target - angle_sum)^2
+  // H_curv = k_curv * sum_v [dK⊗dK + dev * d^2K/dx^2]
+  //
+  // For the rank-1 term: dK_v/dx is the Gaussian curvature gradient at vertex v.
+  // dK_v/dx[ni] = -da_i - dc_{i-1}  (sum of angle derivatives at v)
+  // dK_v/dx[v]  = sum_i (da_i + dc_i)
+  //
+  // For the d^2K/dx^2 term: same arm-space angle Hessian blocks as E_angle,
+  // but summed per-vertex (over the fan of angles at v) instead of per-triangle.
+  if(k_curv > 0){
+    for(int vertex = 0; vertex < N; vertex++){
+      int deg = (int)D.neighbours[vertex].size();
+
+      // First pass: compute angle sum, derivatives, and curvature deviation
+      double angle_sum = 0;
+      vector<coord3d> da_list(deg), dc_list(deg);
+      for(int i = 0; i < deg; i++){
+        int ni  = D.neighbours[vertex][i];
+        int ni1 = D.neighbours[vertex][(i+1) % deg];
+        coord3d va = x[ni] - x[vertex], vc = x[ni1] - x[vertex];
+        angle_sum += coord3d::angle(va, vc);
+        coord3d::dangle(va, vc, da_list[i], dc_list[i]);
+      }
+      double dev = deg * M_PI / 3.0 - angle_sum;
+
+      // Rank-1 term: Hv += k_curv * (dK . v) * dK
+      // dK/dx[ni] = -sum of da_i terms pointing to ni - sum of dc_j terms pointing to ni
+      // dK/dx[v] = sum_i (da_i + dc_i)  (the chain rule d(va)/d(x_b) = -I part)
+      //
+      // But dK.v = -dev_weight * sum_i (da_i . (v[ni] - v[vertex]) + dc_i . (v[ni1] - v[vertex]))
+      // where dev_weight = ... actually let's compute it directly.
+      //
+      // The gradient of E_curv at vertex `vertex` contributes:
+      //   g[ni]  += w * da_i   (for each i where ni = neighbours[vertex][i])
+      //   g[ni1] += w * dc_i
+      //   g[vertex] -= w * (da_i + dc_i)
+      // where w = -k_curv * dev.
+      //
+      // So the Jacobian dK/dx (without the -k_curv*dev factor) has:
+      //   (dK/dx)[ni]     += -da_i       (and also -dc_{i-1})
+      //   (dK/dx)[vertex] += (da_i + dc_i)
+      //
+      // For the rank-1 Hv: factor = k_curv * (dK . v), then scatter factor * dK.
+      // dK = d(angle_sum)/dx  (gradient of angle sum, not energy gradient)
+
+      // Compute dK . v = sum_i [ da_i . v[ni] + dc_i . v[ni1] - (da_i + dc_i) . v[vertex] ]
+      double dK_dot_v = 0;
+      for(int i = 0; i < deg; i++){
+        int ni  = D.neighbours[vertex][i];
+        int ni1 = D.neighbours[vertex][(i+1) % deg];
+        dK_dot_v += da_list[i].dot(v[ni] - v[vertex]) + dc_list[i].dot(v[ni1] - v[vertex]);
+      }
+
+      // Scatter: Hv += k_curv * dK_dot_v * dK
+      double w = k_curv * dK_dot_v;
+      for(int i = 0; i < deg; i++){
+        int ni  = D.neighbours[vertex][i];
+        int ni1 = D.neighbours[vertex][(i+1) % deg];
+        Hv[ni]     = Hv[ni]     + da_list[i] * w;
+        Hv[ni1]    = Hv[ni1]    + dc_list[i] * w;
+        Hv[vertex] = Hv[vertex] - (da_list[i] + dc_list[i]) * w;
+      }
+
+      // Curvature correction term: k_curv * dev * d^2(angle_sum)/dx^2 * v
+      // This is the same angle Hessian blocks as E_angle, but summed over the
+      // fan of angles at vertex `vertex`, weighted by k_curv * dev.
+      if(fabs(dev) > 1e-15){
+        double w2 = -k_curv * dev;  // negative because dev = target - sum, d(dev)/d(angle) = -1
+
+        for(int i = 0; i < deg; i++){
+          int ni  = D.neighbours[vertex][i];
+          int ni1 = D.neighbours[vertex][(i+1) % deg];
+          int b = vertex;
+
+          coord3d va = x[ni] - x[b], vc = x[ni1] - x[b];
+          double ra = va.norm(), rc = vc.norm();
+          if(ra < 1e-15 || rc < 1e-15) continue;
+
+          coord3d ua = va / ra, uc = vc / rc;
+          double Cos = max(-1.0, min(1.0, ua.dot(uc)));
+          double theta = acos(Cos);
+          double Sin = sin(theta);
+          if(Sin < 1e-10) continue;
+
+          double angle_dev = theta - theta0;
+          double alph = 1.0 - angle_dev * Cos / Sin;
+
+          coord3d p_a, q_c;
+          coord3d::dangle(va, vc, p_a, q_c);
+
+          matrix3d sym = ua.outer(uc) + uc.outer(ua);
+
+          matrix3d Haa = p_a.outer(p_a) * alph
+            + (sym + I * Cos - ua.outer(ua) * (3*Cos)) * (angle_dev / (ra*ra * Sin));
+
+          matrix3d Hcc = q_c.outer(q_c) * alph
+            + (sym + I * Cos - uc.outer(uc) * (3*Cos)) * (angle_dev / (rc*rc * Sin));
+
+          matrix3d Hac_m = p_a.outer(q_c) * alph
+            + (ua.outer(ua) + uc.outer(uc) - ua.outer(uc) * Cos - I) * (angle_dev / (ra*rc * Sin));
+
+          // Scale by w2 and scatter (same pattern)
+          matrix3d Hab_m = Haa + Hac_m;
+          matrix3d Hcb_m = Hcc + Hac_m.transpose();
+
+          Hv[ni]  = Hv[ni]  + (Haa * v[ni] + Hac_m * v[ni1] + (-Hab_m) * v[b]) * w2;
+          Hv[ni1] = Hv[ni1] + (Hac_m.transpose() * v[ni] + Hcc * v[ni1] + (-Hcb_m) * v[b]) * w2;
+          Hv[b]   = Hv[b]   + ((-Hab_m.transpose()) * v[ni] + (-Hcb_m.transpose()) * v[ni1] + (Hab_m + Hcb_m) * v[b]) * w2;
+        }
+      }
+    }
+  }
+
+  // --- E_flat Hv --- (phase 1 only, via finite-difference)
+  // Hv_flat = (g_flat(x + eps*v) - g_flat(x - eps*v)) / (2*eps)
+  if(k_flat > 0){
+    double eps = 1e-7 * L;
+    vector<coord3d> x_plus(N), x_minus(N), g_plus(N), g_minus(N);
+    for(int i = 0; i < N; i++){
+      x_plus[i]  = x[i] + v[i] * eps;
+      x_minus[i] = x[i] - v[i] * eps;
+    }
+    // Compute E_flat gradient at x+eps*v and x-eps*v
+    // Use the full energy_and_gradient but only with k_flat, everything else zero
+    deltahedron_energy_and_gradient(D, edges, x_plus,  &g_plus,  L, 0, 0, 0, k_flat, 0);
+    deltahedron_energy_and_gradient(D, edges, x_minus, &g_minus, L, 0, 0, 0, k_flat, 0);
+
+    double inv2eps = 1.0 / (2.0 * eps);
+    for(int i = 0; i < N; i++)
+      Hv[i] = Hv[i] + (g_plus[i] - g_minus[i]) * inv2eps;
+  }
+
+  // Zero out fixed vertices
+  if(!fixed.empty())
+    for(int i = 0; i < N; i++)
+      if(fixed[i]) Hv[i] = coord3d(0,0,0);
+}
+
 // Compute energy only (no gradient), for line search.
 static double deltahedron_energy_only(
     const Deltahedron& D,
     const vector<edge_t>& edges,
     const vector<coord3d>& x,
-    double L, double k_bond, double k_angle, double k_curv, double k_flat, double k_conv)
+    double L, double k_bond, double k_angle, double k_curv, double k_flat, double k_conv,
+    const vector<bool>& conv_mask = {})
 {
-  return deltahedron_energy_and_gradient(D, edges, x, nullptr, L, k_bond, k_angle, k_curv, k_flat, k_conv);
+  return deltahedron_energy_and_gradient(D, edges, x, nullptr, L, k_bond, k_angle, k_curv, k_flat, k_conv, conv_mask);
 }
 
-bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double target_L, int max_iter, double grad_tol)
+// Check convexity constraint: h(v) >= -tau*L for all free vertices.
+// Returns true if all constraints satisfied.
+static bool check_convexity(const Deltahedron& D, const vector<coord3d>& x,
+                            const vector<bool>& free_mask, double L, double tau = 0.05)
+{
+  for(int v = 0; v < D.N; v++){
+    if(!free_mask[v]) continue;
+    int d = (int)D.neighbours[v].size();
+
+    coord3d centroid(0,0,0);
+    for(int j = 0; j < d; j++) centroid += x[D.neighbours[v][j]];
+    centroid /= (double)d;
+
+    coord3d n_fan(0,0,0);
+    for(int j = 0; j < d; j++){
+      coord3d e1 = x[D.neighbours[v][j]] - x[v];
+      coord3d e2 = x[D.neighbours[v][(j+1)%d]] - x[v];
+      n_fan += e1.cross(e2);
+    }
+    double n_len = n_fan.norm();
+    if(n_len < 1e-15) continue;
+
+    double h = (x[v] - centroid).dot(n_fan / n_len);
+    if(h < -tau * L) return false;
+  }
+  return true;
+}
+
+// Assemble exact analytical Hessian for the patch optimizer.
+// E_bond: exact.  E_angle: exact.  E_conv: exact (including d²h/dx² correction).
+// H must be ndof x ndof (ndof = 3*nfree), zero-initialized by caller.
+static void assemble_patch_hessian(
+    const Deltahedron& D,
+    const vector<edge_t>& edges,
+    const vector<coord3d>& x,
+    vector<vector<double>>& H,
+    const vector<int>& free_idx,
+    double L,
+    double k_bond, double k_angle, double k_conv, double sigma,
+    const vector<bool>& conv_mask)
+{
+  int nfree = (int)free_idx.size();
+  const matrix3d I = matrix3d::unit_matrix();
+
+  // Reverse map: vertex -> index in free_idx (-1 if not free)
+  vector<int> fmap(D.N, -1);
+  for(int k = 0; k < nfree; k++) fmap[free_idx[k]] = k;
+
+  // Scatter 3x3 block M into H at vertex-pair (vi, vj).
+  auto add_block = [&](int vi, int vj, const matrix3d& M){
+    int ki = fmap[vi], kj = fmap[vj];
+    if(ki < 0 || kj < 0) return;
+    for(int p = 0; p < 3; p++)
+      for(int q = 0; q < 3; q++)
+        H[3*ki+p][3*kj+q] += M(p,q);
+  };
+
+  // --- E_bond = (k/2) Sum_edges (|x_u - x_v| - L)^2 ---
+  // Exact Hessian per edge: M = k*[(1-L/r)*I + (L/r^3)*d⊗d]
+  // H(u,u) = H(v,v) = +M,  H(u,v) = H(v,u) = -M
+  if(k_bond > 0){
+    for(const edge_t& e : edges){
+      int u = e.first, v = e.second;
+      coord3d d = x[u] - x[v];
+      double r = d.norm();
+      if(r < 1e-15) continue;
+
+      matrix3d M = I * (k_bond * (1 - L/r)) + d.outer(d) * (k_bond * L / (r*r*r));
+
+      add_block(u, u, M);
+      add_block(v, v, M);
+      add_block(u, v, -M);
+      add_block(v, u, -M);
+    }
+  }
+
+  // --- E_angle = (k/2) Sum_corners (theta - pi/3)^2 ---
+  // Exact Hessian.  Angle theta at vertex b, arms va = x_a - x_b, vc = x_c - x_b.
+  // Unit vectors ua = va/ra, uc = vc/rc.  C = cos(theta), S = sin(theta).
+  // First derivatives: p = dtheta/d(va), q = dtheta/d(vc) (from coord3d::dangle).
+  //
+  // Arm-space Hessian (second derivatives w.r.t. va, vc):
+  //   alpha = 1 - dev*cot(theta)
+  //   Haa = k*alpha * p⊗p + (k*dev)/(ra^2*S) * [ua⊗uc + uc⊗ua + C*I - 3C*ua⊗ua]
+  //   Hcc = k*alpha * q⊗q + (k*dev)/(rc^2*S) * [uc⊗ua + ua⊗uc + C*I - 3C*uc⊗uc]
+  //   Hac = k*alpha * p⊗q + (k*dev)/(ra*rc*S) * [ua⊗ua + uc⊗uc - C*ua⊗uc - I]
+  //
+  // Chain rule to vertex coordinates (d(va)/d(x_b) = -I, d(vc)/d(x_b) = -I):
+  //   H(a,b) = -(Haa + Hac),  H(c,b) = -(Hcc + Hca),  H(b,b) = sum of all four
+  if(k_angle > 0){
+    const double theta0 = M_PI / 3.0;
+    for(const auto& tri : D.triangles){
+      for(int c = 0; c < 3; c++){
+        int b = tri[c], a = tri[(c+2)%3], dd = tri[(c+1)%3];
+        coord3d va = x[a] - x[b], vc = x[dd] - x[b];
+        double ra = va.norm(), rc = vc.norm();
+        if(ra < 1e-15 || rc < 1e-15) continue;
+
+        coord3d ua = va / ra, uc = vc / rc;
+        double C = max(-1.0, min(1.0, ua.dot(uc)));
+        double theta = acos(C);
+        double S = sin(theta);
+        if(S < 1e-10) continue;
+
+        double dev = theta - theta0;
+        double alpha = 1.0 - dev * C / S;
+
+        coord3d p, q;
+        coord3d::dangle(va, vc, p, q);
+
+        // Arm-space Hessian blocks (rank-1 + correction)
+        matrix3d sym_ac = ua.outer(uc) + uc.outer(ua);  // symmetric part, shared by Haa and Hcc
+
+        matrix3d Haa = p.outer(p) * (k_angle * alpha)
+          + (sym_ac + I * C - ua.outer(ua) * (3*C)) * (k_angle * dev / (ra*ra * S));
+
+        matrix3d Hcc = q.outer(q) * (k_angle * alpha)
+          + (sym_ac + I * C - uc.outer(uc) * (3*C)) * (k_angle * dev / (rc*rc * S));
+
+        matrix3d Hac = p.outer(q) * (k_angle * alpha)
+          + (ua.outer(ua) + uc.outer(uc) - ua.outer(uc) * C - I) * (k_angle * dev / (ra*rc * S));
+
+        // Scatter to vertex coordinates via chain rule
+        add_block(a, a, Haa);
+        add_block(a, dd, Hac);
+        add_block(dd, a, Hac.transpose());
+        add_block(dd, dd, Hcc);
+
+        matrix3d Hab = Haa + Hac;               // H(a,b) = -Hab
+        matrix3d Hcb = Hcc + Hac.transpose();   // H(c,b) = -Hcb
+        add_block(a, b, -Hab);
+        add_block(b, a, -Hab.transpose());
+        add_block(dd, b, -Hcb);
+        add_block(b, dd, -Hcb.transpose());
+        add_block(b, b, Hab + Hcb);
+      }
+    }
+  }
+
+  // --- E_conv = k * Sum_v softplus(-h/sigma) ---
+  // Exact Hessian: d²E/dh² * (dh/dx)⊗(dh/dx) + dE/dh * d²h/dx²
+  // where d²E/dh² = (k/sigma²) * sig * (1 - sig),  dE/dh = -(k/sigma) * sig.
+  //
+  // h = (x_v - centroid) · n_hat,  n_hat = N/|N|,  N = Σ (e_i × e_{i+1}).
+  // Key fact: dN/dx_v = 0 (telescoping), so dn_hat/dx_v = 0 and d²h/dx_v² = 0.
+  //
+  // Hessian blocks of h:
+  //   H_{vv} = 0
+  //   H_{v,j} = P · [Δe_j]× / |N|                     (dn_hat/dx_{n_j})
+  //   H_{j,k} = -(1/d)Qk + {[Δe_j]×/d + (Δe_j × n_hat)⊗g_k + h·[Δe_j]×·Qk
+  //             + δ_{k,j-1}[r_perp]× - δ_{k,j+1}[r_perp]×} / |N|
+  //             - w_j ⊗ (n_hat × Δe_k) / |N|²
+  // where Qk = P·[Δe_k]×/|N|, Δe_j = e_{j-1} - e_{j+1}, [·]× = cross_matrix.
+  if(k_conv > 0){
+    using Mx = matrix3d;  // shorthand
+
+    for(int v = 0; v < D.N; v++){
+      int d = (int)D.neighbours[v].size();
+      if(d > 6) continue;
+      if(!conv_mask.empty() && !conv_mask[v]) continue;
+
+      coord3d centroid(0,0,0);
+      for(int i = 0; i < d; i++) centroid += x[D.neighbours[v][i]];
+      centroid /= (double)d;
+
+      coord3d N_fan(0,0,0);
+      for(int i = 0; i < d; i++){
+        coord3d e1 = x[D.neighbours[v][i]] - x[v];
+        coord3d e2 = x[D.neighbours[v][(i+1)%d]] - x[v];
+        N_fan += e1.cross(e2);
+      }
+      double N_len = N_fan.norm();
+      if(N_len < 1e-15) continue;
+      coord3d n_hat = N_fan / N_len;
+
+      double h = (x[v] - centroid).dot(n_hat);
+      double z = h / sigma;
+      double sig;
+      if(z > 20) sig = 0;
+      else if(z < -20) sig = 1;
+      else sig = 1.0 / (1 + exp(z));
+
+      double d2Edh2 = (k_conv / sigma) * sig * (1 - sig);
+      double dEdh   = -k_conv * sig;
+      if(abs(d2Edh2) < 1e-15 && abs(dEdh) < 1e-15) continue;
+
+      coord3d r_perp = (x[v] - centroid) - n_hat * h;
+      const Mx P = I - n_hat.outer(n_hat);
+      const Mx R = Mx::cross_matrix(r_perp);  // [r_perp]×
+
+      // Precompute per-neighbor data
+      struct NbrData {
+        int id;          // global vertex index
+        coord3d De;      // Δe_j = e_{j-1} - e_{j+1}
+        coord3d g;       // dh/dx_{n_j}
+        coord3d w;       // r_perp × Δe_j / |N|
+        Mx Dex;          // [Δe_j]×
+        Mx Q;            // P · [Δe_j]× / |N|
+      };
+      vector<NbrData> nb(d);
+      for(int j = 0; j < d; j++){
+        nb[j].id = D.neighbours[v][j];
+        coord3d ej_prev = x[D.neighbours[v][(j+d-1)%d]] - x[v];
+        coord3d ej_next = x[D.neighbours[v][(j+1)%d]]   - x[v];
+        nb[j].De  = ej_prev - ej_next;
+        nb[j].g   = n_hat * (-1.0/d) + r_perp.cross(nb[j].De) / N_len;
+        nb[j].w   = r_perp.cross(nb[j].De) / N_len;
+        nb[j].Dex = Mx::cross_matrix(nb[j].De);
+        nb[j].Q   = P * nb[j].Dex * (1.0/N_len);
+      }
+
+      // --- Rank-1 term: d²E/dh² * (dh/dx)⊗(dh/dx) ---
+      if(abs(d2Edh2) > 1e-15){
+        // v-v block (g_v = n_hat)
+        add_block(v, v, n_hat.outer(n_hat) * d2Edh2);
+        // v-j and j-v blocks
+        for(int j = 0; j < d; j++){
+          Mx Bvj = n_hat.outer(nb[j].g) * d2Edh2;
+          add_block(v, nb[j].id, Bvj);
+          add_block(nb[j].id, v, Bvj.transpose());
+        }
+        // j-k blocks
+        for(int j = 0; j < d; j++)
+          for(int k = 0; k < d; k++)
+            add_block(nb[j].id, nb[k].id, nb[j].g.outer(nb[k].g) * d2Edh2);
+      }
+
+      // --- Correction term: dE/dh * d²h/dx² ---
+      if(abs(dEdh) > 1e-15){
+        // H_{vv} = 0  (nothing to add)
+
+        // H_{v,j} = P · [Δe_j]× / |N|
+        for(int j = 0; j < d; j++){
+          Mx Hvj = nb[j].Q * dEdh;
+          add_block(v, nb[j].id, Hvj);
+          add_block(nb[j].id, v, Hvj.transpose());
+        }
+
+        // H_{j,k} blocks
+        for(int j = 0; j < d; j++){
+          for(int k = 0; k < d; k++){
+            // Term A: -(1/d) Qk
+            Mx Hjk = nb[k].Q * (-1.0/d);
+            // Term B: [Δe_j]× / (d·|N|)
+            Hjk += nb[j].Dex * (1.0 / (d * N_len));
+            // Term C: (Δe_j × n_hat) ⊗ g_k / |N|
+            Hjk += nb[j].De.cross(n_hat).outer(nb[k].g) * (1.0/N_len);
+            // Term D: h · [Δe_j]× · Qk / |N|
+            Hjk += nb[j].Dex * nb[k].Q * (h / N_len);
+            // Term E: δ_{k,j-1} [r_perp]× / |N|
+            if(k == (j+d-1)%d) Hjk += R * (1.0/N_len);
+            // Term F: -δ_{k,j+1} [r_perp]× / |N|
+            if(k == (j+1)%d)   Hjk += R * (-1.0/N_len);
+            // Term G: -w_j ⊗ (n_hat × Δe_k) / |N|
+            // (from product rule: (r_perp × Δe_j) · d(1/|N|)/dx_{n_k}, and w_j = (r_perp × Δe_j)/|N|)
+            Hjk += nb[j].w.outer(n_hat.cross(nb[k].De)) * (-1.0/N_len);
+
+            add_block(nb[j].id, nb[k].id, Hjk * dEdh);
+          }
+        }
+      }
+    }
+  }
+}
+
+bool Deltahedron::optimize_patch(const vector<coord3d>& initial_geometry,
+                                 const vector<bool>& free_mask,
+                                 const vector<bool>& interior_mask,
+                                 double target_L, int max_iter, double grad_tol)
 {
   assert((int)initial_geometry.size() == N);
+  assert((int)free_mask.size() == N);
   points = initial_geometry;
+
+  vector<edge_t> edges = undirected_edges();
+
+  // Target edge length from boundary-only edges (both endpoints fixed).
+  double L = target_L;
+  if(L <= 0){
+    double sum = 0; int count = 0;
+    for(const edge_t& e : edges){
+      if(free_mask[e.first] || free_mask[e.second]) continue;
+      sum += coord3d::dist(points[e.first], points[e.second]);
+      count++;
+    }
+    if(count == 0)  // fallback: all edges
+      for(const edge_t& e : edges){
+        sum += coord3d::dist(points[e.first], points[e.second]);
+        count++;
+      }
+    L = sum / count;
+  }
+
+  // Force constants: bond + angle + convexity bias, no curvature/flatness.
+  const double k_bond = 1.0, k_angle = 1.0;
+  const double k_curv = 0, k_flat = 0, k_conv = 5.0;
+  const double conv_tau = 0.05;  // hard convexity threshold: h >= -tau*L
+
+  // Collect free vertex indices
+  vector<int> free_idx;
+  for(int i = 0; i < N; i++)
+    if(free_mask[i]) free_idx.push_back(i);
+  int nfree = (int)free_idx.size();
+  int ndof = 3 * nfree;
+  if(ndof == 0) return true;
+
+  // Lambdas wrapping energy/gradient computation.
+  // interior_mask restricts E_conv to vertices with full neighbor sets in the
+  // patch — boundary vertices have truncated degree and produce bogus h values.
+  auto energy_fn = [&](const vector<coord3d>& x) -> double {
+    return deltahedron_energy_only(*this, edges, x, L, k_bond, k_angle, k_curv, k_flat, k_conv, interior_mask);
+  };
+  auto grad_fn = [&](const vector<coord3d>& x, vector<coord3d>& g) -> double {
+    return deltahedron_energy_and_gradient(*this, edges, x, &g, L, k_bond, k_angle, k_curv, k_flat, k_conv, interior_mask);
+  };
+
+  // Extract free-vertex gradient components into flat vector
+  auto extract_grad = [&](const vector<coord3d>& g, vector<double>& gf){
+    gf.resize(ndof);
+    for(int k = 0; k < nfree; k++)
+      for(int c = 0; c < 3; c++)
+        gf[3*k+c] = g[free_idx[k]][c];
+  };
+
+  vector<coord3d> grad(N);
+  vector<double> gf(ndof);
+  double E_prev = 1e30;
+  int stall_count = 0;
+
+  // Trust region parameters
+  double Delta_max = L;          // max trust region radius
+  double Delta = 0.5 * L;       // initial trust region radius
+
+  for(int iter = 0; iter < max_iter; iter++){
+    iterations_used = iter + 1;
+
+    double E = grad_fn(points, grad);
+    extract_grad(grad, gf);
+
+    double gnorm = 0;
+    for(double v : gf) gnorm += v*v;
+    gnorm = sqrt(gnorm);
+    if(gnorm < grad_tol) return true;
+
+    // Trust region stall detection: exit if Delta has shrunk to near-zero
+    if(Delta < 1e-12 * L){
+      stall_count++;
+      if(stall_count >= 3) return false;
+    } else stall_count = 0;
+
+    // Assemble exact analytical Hessian
+    vector<vector<double>> H(ndof, vector<double>(ndof, 0.0));
+    const double sigma = 0.2 * L;
+    assemble_patch_hessian(*this, edges, points, H, free_idx,
+                           L, k_bond, k_angle, k_conv, sigma, interior_mask);
+
+    // --- Solve (H + lambda*I) delta = -g via Gaussian elimination ---
+    auto solve_linear = [&](const vector<vector<double>>& M,
+                            const vector<double>& rhs_in,
+                            vector<double>& x_out) -> bool {
+      vector<vector<double>> A = M;
+      vector<double> rhs = rhs_in;
+      x_out.resize(ndof);
+      for(int col = 0; col < ndof; col++){
+        int best = col;
+        for(int row = col+1; row < ndof; row++)
+          if(fabs(A[row][col]) > fabs(A[best][col])) best = row;
+        swap(A[col], A[best]);
+        swap(rhs[col], rhs[best]);
+        if(fabs(A[col][col]) < 1e-30) return false;
+        for(int row = col+1; row < ndof; row++){
+          double f = A[row][col] / A[col][col];
+          for(int j = col; j < ndof; j++) A[row][j] -= f * A[col][j];
+          rhs[row] -= f * rhs[col];
+        }
+      }
+      for(int i = ndof-1; i >= 0; i--){
+        x_out[i] = rhs[i];
+        for(int j = i+1; j < ndof; j++) x_out[i] -= A[i][j] * x_out[j];
+        x_out[i] /= A[i][i];
+      }
+      return true;
+    };
+
+    auto solve_shifted = [&](double lambda, vector<double>& delta_out) -> bool {
+      vector<vector<double>> A = H;
+      for(int i = 0; i < ndof; i++) A[i][i] += lambda;
+      vector<double> rhs(ndof);
+      for(int i = 0; i < ndof; i++) rhs[i] = -gf[i];
+      return solve_linear(A, rhs, delta_out);
+    };
+
+    auto vec_norm = [](const vector<double>& v) -> double {
+      double s = 0; for(double x : v) s += x*x; return sqrt(s);
+    };
+
+    auto vec_dot = [](const vector<double>& a, const vector<double>& b) -> double {
+      double s = 0; for(size_t i = 0; i < a.size(); i++) s += a[i]*b[i]; return s;
+    };
+
+    // LDL^T to count negative pivots and find most-negative pivot
+    int n_neg_eig = 0;
+    double min_pivot = 1e30;
+    {
+      vector<vector<double>> Lf(ndof, vector<double>(ndof, 0.0));
+      vector<double> Df(ndof, 0.0);
+      for(int i = 0; i < ndof; i++){
+        double sum = H[i][i];
+        for(int k = 0; k < i; k++) sum -= Lf[i][k]*Lf[i][k]*Df[k];
+        Df[i] = sum;
+        if(sum < min_pivot) min_pivot = sum;
+        if(sum < 0) n_neg_eig++;
+        double dabs = max(fabs(sum), 1e-30);
+        for(int j = i+1; j < ndof; j++){
+          double s = H[j][i];
+          for(int k = 0; k < i; k++) s -= Lf[j][k]*Lf[i][k]*Df[k];
+          Lf[j][i] = s / dabs;
+        }
+      }
+    }
+
+    // --- Trust-region subproblem: bisect on lambda to find ||delta(lambda)|| ~ Delta ---
+    vector<double> delta(ndof);
+    double dnorm = 0;
+    double lambda = 0;
+    const char* step_type = "newton";
+
+    // Try unconstrained Newton first
+    bool solved = solve_shifted(0, delta);
+    dnorm = solved ? vec_norm(delta) : 1e30;
+    double slope = solved ? vec_dot(gf, delta) : 1;
+
+    if(!solved || dnorm > Delta || slope > 0){
+      // Bisect on lambda to find (H+lambda*I)^{-1}g with ||delta|| ~ Delta
+      double lambda_lo = 0, lambda_hi = gnorm / Delta + 1.0;
+      for(int probe = 0; probe < 10; probe++){
+        if(solve_shifted(lambda_hi, delta)){
+          dnorm = vec_norm(delta);
+          slope = vec_dot(gf, delta);
+          if(dnorm <= Delta && slope <= 0) break;
+        }
+        lambda_hi *= 4;
+      }
+      for(int bis = 0; bis < 20; bis++){
+        lambda = 0.5 * (lambda_lo + lambda_hi);
+        if(!solve_shifted(lambda, delta)){
+          lambda_lo = lambda; continue;
+        }
+        dnorm = vec_norm(delta);
+        slope = vec_dot(gf, delta);
+        if(dnorm > Delta || slope > 0) lambda_lo = lambda;
+        else lambda_hi = lambda;
+      }
+      lambda = lambda_hi;
+      solve_shifted(lambda, delta);
+      dnorm = vec_norm(delta);
+      step_type = "reg-newton";
+    }
+
+    // Predicted reduction from quadratic model: -(g'*delta + 0.5*delta'*H*delta)
+    double pred = 0;
+    for(int i = 0; i < ndof; i++){
+      pred -= gf[i] * delta[i];
+      for(int j = 0; j < ndof; j++)
+        pred -= 0.5 * delta[i] * H[i][j] * delta[j];
+    }
+
+    // Trial point
+    vector<coord3d> x_trial = points;
+    for(int k = 0; k < nfree; k++)
+      for(int c = 0; c < 3; c++)
+        x_trial[free_idx[k]][c] = points[free_idx[k]][c] + delta[3*k+c];
+
+    double Et = energy_fn(x_trial);
+    double actual = E - Et;
+    bool convex = check_convexity(*this, x_trial, free_mask, L, conv_tau);
+
+    // Trust region update
+    double rho = (pred > 0) ? actual / pred : -1;
+    bool accepted = (rho > 0.1) && convex;
+    const char* tr_action;
+    if(accepted){
+      for(int k = 0; k < nfree; k++)
+        for(int c = 0; c < 3; c++)
+          points[free_idx[k]][c] = x_trial[free_idx[k]][c];
+      if(rho > 0.75 && dnorm > 0.5 * Delta){
+        Delta = min(2.0 * Delta, Delta_max);
+        tr_action = "expand";
+      } else {
+        tr_action = "keep";
+      }
+    } else {
+      Delta *= 0.25;
+      if(Delta < 1e-14 * L) Delta = 1e-14 * L;
+      tr_action = convex ? "shrink" : "conv-shrink";
+    }
+
+    if(opt_log){
+      fprintf(opt_log, "    patch %3d: E=%.6e |g|=%.3e |d|=%.2e D=%.2e rho=%.2f %-14s %s neg=%d\n",
+              iter, E, gnorm, dnorm, Delta, rho, step_type,
+              tr_action, n_neg_eig);
+    }
+  }
+  return false;  // didn't converge
+}
+
+int Deltahedron::reflect_concave(vector<coord3d>& pts, double threshold,
+                                  const vector<bool>& fixed) const
+{
+  bool has_fixed = !fixed.empty();
+  int count = 0;
+  for(int v = 0; v < N; v++){
+    if(has_fixed && fixed[v]) continue;
+    int d = (int)neighbours[v].size();
+    if(d > 6) continue;
+
+    coord3d centroid(0,0,0);
+    for(int j = 0; j < d; j++) centroid += pts[neighbours[v][j]];
+    centroid /= (double)d;
+
+    coord3d n_fan(0,0,0);
+    for(int j = 0; j < d; j++){
+      coord3d e1 = pts[neighbours[v][j]] - pts[v];
+      coord3d e2 = pts[neighbours[v][(j+1)%d]] - pts[v];
+      n_fan += e1.cross(e2);
+    }
+    double n_len = n_fan.norm();
+    if(n_len < 1e-15) continue;
+    coord3d n_hat = n_fan / n_len;
+
+    double h = (pts[v] - centroid).dot(n_hat);
+    if(h < -threshold){
+      pts[v] = centroid + n_hat * (-h);
+      count++;
+    }
+  }
+  return count;
+}
+
+bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double target_L, int max_iter, double grad_tol,
+                           const vector<bool>& fixed, long long max_work, double angle_tol)
+{
+  assert((int)initial_geometry.size() == N);
+  assert(fixed.empty() || (int)fixed.size() == N);
+  points = initial_geometry;
+  const bool has_fixed = !fixed.empty();
 
   // Cache edge list (avoid recomputing on every energy evaluation)
   vector<edge_t> edges = undirected_edges();
 
-  // Target edge length: use provided value, or mean of initial edge lengths
+  // Target edge length: use provided value, or mean of initial edge lengths.
   double L = target_L;
   if(L <= 0){
-    for(const edge_t& e : edges)
-      L += coord3d::dist(points[e.first], points[e.second]);
-    L /= edges.size();
+    double sum = 0; int count = 0;
+    for(const edge_t& e : edges){
+      sum += coord3d::dist(points[e.first], points[e.second]);
+      count++;
+    }
+    L = sum / count;
   }
 
   // Force constants (fixed throughout)
   const double k_bond   = 1.0;
   const double k_angle  = 1.0;
   const double k_curv   = 2.0;
-  // E_conv (softplus convexity penalty) is disabled: periodic vertex reflection
-  // is cheaper and more robust. The E_conv code is retained in
-  // deltahedron_energy_and_gradient() and can be re-enabled by setting k_conv > 0.
   const double k_conv   = 0;
-
-  // CG parameters
-  const double c1 = 1e-4;        // Armijo parameter
 
   // Two-phase optimization:
   //   Phase 1: k_flat active — settle into flat/equilateral
-  //            Early exit when gradient norm drops 100x from phase start.
   //   Phase 2: k_flat off — pure equilateral convergence
-  //            Converges when gradient norm < grad_tol.
-  // Convexity is maintained by periodic vertex reflection (every
-  // reflect_interval iterations), not by an energy term.
   const int phase_budget = max_iter / 2;
-  double k_flat = 2.0;
-  int phase = 1;
-  double phase1_grad_norm0 = 0;   // gradient norm at start of phase 1
+  double k_flat = opt_k_flat;
+  int phase = (k_flat > 0) ? 1 : 2;
+  double phase1_grad_norm0 = 0;
 
-  // Periodic convexity reflection: every reflect_interval iterations, check
-  // for deeply concave vertices (h < -0.1*L) and reflect them through their
-  // neighbor centroid plane.  Replaces the E_conv energy term.
-  const int reflect_interval = 1;
+  const double refl_threshold = 0.05 * L;
+  const double c1 = 1e-4;        // Armijo parameter
 
-  auto reflect_concave = [&]() -> bool {
-    bool any = false;
-    for(int v = 0; v < N; v++){
-      int d = (int)neighbours[v].size();
-      if(d > 6) continue;
+  // Shared helpers
+  auto zero_fixed_grad = [&](vector<coord3d>& grad){
+    if(has_fixed) for(int i = 0; i < N; i++) if(fixed[i]) grad[i] = coord3d(0,0,0);
+  };
 
-      coord3d centroid(0,0,0);
-      for(int j = 0; j < d; j++) centroid += points[neighbours[v][j]];
-      centroid /= (double)d;
+  // Evaluation counters
+  n_energy_evals = 0;
+  n_grad_evals = 0;
+  n_hv_evals = 0;
 
-      coord3d n_fan(0,0,0);
-      for(int j = 0; j < d; j++){
-        coord3d e1 = points[neighbours[v][j]] - points[v];
-        coord3d e2 = points[neighbours[v][(j+1)%d]] - points[v];
-        n_fan += e1.cross(e2);
-      }
-      double n_len = n_fan.norm();
-      if(n_len < 1e-15) continue;
-      coord3d n_hat = n_fan / n_len;
+  // Work budget: total_work = n_energy + N*n_grad + N*n_hv
+  auto total_work_fn = [&]() -> long long {
+    return (long long)n_energy_evals + (long long)N * n_grad_evals + (long long)N * n_hv_evals;
+  };
+  if(max_work > 0 && max_iter <= 0) max_iter = INT_MAX;
 
-      double h = (points[v] - centroid).dot(n_hat);
-      if(h < -0.1 * L){
-        points[v] = centroid + n_hat * (-h);
-        any = true;
+  auto compute_eg = [&](vector<coord3d>& grad) -> double {
+    n_grad_evals++;
+    double E = deltahedron_energy_and_gradient(*this, edges, points, &grad, L,
+                                                k_bond, k_angle, k_curv, k_flat, k_conv);
+    zero_fixed_grad(grad);
+    return E;
+  };
+
+  auto compute_e_only = [&](const vector<coord3d>& x_trial) -> double {
+    n_energy_evals++;
+    return deltahedron_energy_only(*this, edges, x_trial, L, k_bond, k_angle, k_curv, k_flat, k_conv);
+  };
+
+  auto compute_gmax = [&](const vector<coord3d>& grad) -> double {
+    double gmax = 0;
+    for(int i = 0; i < N; i++){
+      if(has_fixed && fixed[i]) continue;
+      gmax = max(gmax, grad[i].norm());
+    }
+    return gmax * L;
+  };
+
+  auto edge_cv = [&]() -> double {
+    double s = 0, s2 = 0;
+    for(const edge_t& e : edges){
+      double d = coord3d::dist(points[e.first], points[e.second]);
+      s += d; s2 += d*d;
+    }
+    int ne = (int)edges.size();
+    double mu = s / ne;
+    return sqrt(max(0.0, s2/ne - mu*mu)) / mu;
+  };
+
+  // Periodic reflection (shared by all methods)
+  auto do_reflect = [&]() -> bool {
+    return reflect_concave(points, refl_threshold, fixed) > 0;
+  };
+
+  // Phase transition logic (shared by all methods)
+  // Returns true if phase changed.
+  auto check_phase_transition = [&](int iter, int phase_start_iter, const vector<coord3d>& grad) -> bool {
+    if(phase != 1 || iter <= phase_start_iter || iter % 50 != 49) return false;
+    bool advance = (iter - phase_start_iter >= phase_budget);
+    if(!advance && phase1_grad_norm0 > 0){
+      double gn = vec_norm(grad);
+      if(gn < phase1_grad_norm0 * 0.01) advance = true;
+    }
+    if(advance){
+      k_flat = 0;
+      phase = 2;
+      return true;
+    }
+    return false;
+  };
+
+  // Backtracking Armijo line search (shared by CG and L-BFGS)
+  auto line_search = [&](double E, const vector<coord3d>& grad, const vector<coord3d>& dir,
+                         vector<coord3d>& x_trial) -> double {
+    double slope = vec_dot(grad, dir);
+    double alpha = 1.0;
+    for(int ls = 0; ls < 60; ls++){
+      for(int i = 0; i < N; i++) x_trial[i] = points[i] + dir[i] * alpha;
+      double E_trial = compute_e_only(x_trial);
+      if(E_trial <= E + c1 * alpha * slope) break;
+      double denom = 2.0 * (E_trial - E - slope * alpha);
+      if(denom > 1e-30){
+        double alpha_q = -slope * alpha * alpha / denom;
+        alpha = max(0.1 * alpha, min(0.5 * alpha, alpha_q));
+      } else {
+        alpha *= 0.5;
       }
     }
-    return any;
+    return alpha;
   };
 
-  // Helper: reset CG with current force constants
-  auto reset_cg = [&](double& E, vector<coord3d>& grad, vector<coord3d>& dir){
-    E = deltahedron_energy_and_gradient(*this, edges, points, &grad, L,
-                                         k_bond, k_angle, k_curv, k_flat, k_conv);
-    for(int i = 0; i < N; i++) dir[i] = grad[i] * (-1.0);
-  };
+  const int log_interval = opt_log ? max(1, max_iter / 20) : 0;
+  const char* method_name = (opt_method == OptMethod::CG) ? "CG" :
+                            (opt_method == OptMethod::LBFGS) ? "LBFGS" : "ST";
 
-  vector<coord3d> grad(N), grad_old(N), dir(N), x_trial(N);
+  vector<coord3d> grad(N);
+  double E = compute_eg(grad);
+  phase1_grad_norm0 = vec_norm(grad);
 
-  double E;
-  reset_cg(E, grad, dir);
-  phase1_grad_norm0 = sqrt(vec_dot(grad, grad));
+  if(opt_log)
+    fprintf(opt_log, "  %s start: E=%.6f |g|=%.4e L=%.4f cv=%.4f ph=%d tol=%.2e\n",
+            method_name, E, phase1_grad_norm0, L, edge_cv(), phase, grad_tol);
 
   bool converged = false;
   int phase_start = 0;
 
-  for(int iter = 0; iter < max_iter; iter++){
-    iterations_used = iter + 1;
+  // ==================== CG ====================
+  if(opt_method == OptMethod::CG){
+    vector<coord3d> grad_old(N), dir(N), x_trial(N);
+    for(int i = 0; i < N; i++) dir[i] = grad[i] * (-1.0);
+    if(has_fixed) for(int i = 0; i < N; i++) if(fixed[i]) dir[i] = coord3d(0,0,0);
 
-    // Periodic convexity reflection
-    if(iter > 0 && iter % reflect_interval == 0){
-      if(reflect_concave())
-        reset_cg(E, grad, dir);  // geometry changed, reset CG
-    }
+    for(int iter = 0; iter < max_iter; iter++){
+      iterations_used = iter + 1;
+      if(max_work > 0 && total_work_fn() >= max_work) break;
 
-    // Phase transition check (every 50 iterations)
-    if(phase == 1 && iter > phase_start && iter % 50 == 49){
-      bool advance = (iter - phase_start >= phase_budget);
-
-      // Early exit: gradient dropped 100x from phase start
-      if(!advance && phase1_grad_norm0 > 0){
-        double gn = sqrt(vec_dot(grad, grad));
-        if(gn < phase1_grad_norm0 * 0.01) advance = true;
+      // Periodic reflection
+      bool reflected = false;
+      if(iter > 0){
+        if(do_reflect()){
+          E = compute_eg(grad);
+          reflected = true;
+        }
       }
 
-      if(advance){
-        k_flat = 0;
-        phase = 2;
+      // Phase transition
+      if(check_phase_transition(iter, phase_start, grad)){
         phase_start = iter;
-        reset_cg(E, grad, dir);
+        E = compute_eg(grad);
+        for(int i = 0; i < N; i++) dir[i] = grad[i] * (-1.0);
+        if(has_fixed) for(int i = 0; i < N; i++) if(fixed[i]) dir[i] = coord3d(0,0,0);
       }
+
+      // Convergence check
+      double gmax = compute_gmax(grad);
+      if(gmax < grad_tol){ converged = true; break; }
+      if(angle_tol > 0 && max_angle_relerr() < angle_tol && count_concave() == 0){ converged = true; break; }
+
+      // Ensure descent direction
+      double slope = vec_dot(grad, dir);
+      if(slope > 0){
+        for(int i = 0; i < N; i++) dir[i] = grad[i] * (-1.0);
+        if(has_fixed) for(int i = 0; i < N; i++) if(fixed[i]) dir[i] = coord3d(0,0,0);
+      }
+
+      // Line search and update
+      double alpha = line_search(E, grad, dir, x_trial);
+      for(int i = 0; i < N; i++) points[i] = points[i] + dir[i] * alpha;
+
+      grad_old = grad;
+      E = compute_eg(grad);
+
+      // Logging
+      if(log_interval > 0 && (iter % log_interval == 0 || iter == max_iter - 1))
+        fprintf(opt_log, "  CG %4d: E=%.6f |g|=%.4e gmax*L=%.4e a=%.3e cv=%.4f ph=%d%s\n",
+                iter, E, vec_norm(grad), compute_gmax(grad), alpha, edge_cv(), phase,
+                reflected ? " R" : "");
+
+      // Polak-Ribiere beta
+      double gg_old = vec_dot(grad_old, grad_old);
+      double beta = 0.0;
+      if(gg_old > 1e-30){
+        vector<coord3d> gdiff(N);
+        for(int i = 0; i < N; i++) gdiff[i] = grad[i] - grad_old[i];
+        beta = max(0.0, vec_dot(grad, gdiff) / gg_old);
+      }
+      for(int i = 0; i < N; i++) dir[i] = grad[i] * (-1.0) + dir[i] * beta;
+      if(has_fixed) for(int i = 0; i < N; i++) if(fixed[i]) dir[i] = coord3d(0,0,0);
     }
-
-    double grad_norm2 = vec_dot(grad, grad);
-    if(grad_norm2 < grad_tol * grad_tol){
-      converged = true;
-      break;
-    }
-
-    // Backtracking line search (Armijo condition)
-    double slope = vec_dot(grad, dir);  // should be negative
-    if(slope > 0){
-      // Search direction is not a descent direction; reset to steepest descent
-      for(int i = 0; i < N; i++) dir[i] = grad[i] * (-1.0);
-      slope = -grad_norm2;
-    }
-
-    double alpha = 1.0;
-    for(int ls = 0; ls < 60; ls++){
-      for(int i = 0; i < N; i++) x_trial[i] = points[i] + dir[i] * alpha;
-      double E_trial = deltahedron_energy_only(*this, edges, x_trial, L,
-                                               k_bond, k_angle, k_curv, k_flat, k_conv);
-      if(E_trial <= E + c1 * alpha * slope) break;
-      alpha *= 0.5;
-    }
-
-    // Update position
-    for(int i = 0; i < N; i++) points[i] = points[i] + dir[i] * alpha;
-
-    // Save old gradient
-    grad_old = grad;
-
-    // New energy and gradient
-    E = deltahedron_energy_and_gradient(*this, edges, points, &grad, L,
-                                        k_bond, k_angle, k_curv, k_flat, k_conv);
-
-    // Polak-Ribiere beta (with restart: beta = max(0, ...))
-    double gg_old = vec_dot(grad_old, grad_old);
-    double beta = 0.0;
-    if(gg_old > 1e-30){
-      // PR formula: beta = dot(g, g - g_old) / dot(g_old, g_old)
-      vector<coord3d> gdiff(N);
-      for(int i = 0; i < N; i++) gdiff[i] = grad[i] - grad_old[i];
-      beta = max(0.0, vec_dot(grad, gdiff) / gg_old);
-    }
-
-    // Update search direction
-    for(int i = 0; i < N; i++)
-      dir[i] = grad[i] * (-1.0) + dir[i] * beta;
   }
+
+  // ==================== L-BFGS ====================
+  else if(opt_method == OptMethod::LBFGS){
+    const int m = 10;  // history depth
+    deque<vector<coord3d>> S, Y;
+    deque<double> rho_hist;
+    vector<coord3d> dir(N), x_trial(N), grad_old(N);
+
+    for(int iter = 0; iter < max_iter; iter++){
+      iterations_used = iter + 1;
+      if(max_work > 0 && total_work_fn() >= max_work) break;
+
+      // Periodic reflection
+      bool reflected = false;
+      if(iter > 0){
+        if(do_reflect()){
+          E = compute_eg(grad);
+          reflected = true;
+          // Clear L-BFGS history after reflection (geometry changed externally)
+          S.clear(); Y.clear(); rho_hist.clear();
+        }
+      }
+
+      // Phase transition
+      if(check_phase_transition(iter, phase_start, grad)){
+        phase_start = iter;
+        E = compute_eg(grad);
+        S.clear(); Y.clear(); rho_hist.clear();
+      }
+
+      // Convergence check
+      double gmax = compute_gmax(grad);
+      if(gmax < grad_tol){ converged = true; break; }
+      if(angle_tol > 0 && max_angle_relerr() < angle_tol && count_concave() == 0){ converged = true; break; }
+
+      // Two-loop recursion to compute search direction
+      dir = grad;  // q = grad
+      int hist_size = (int)S.size();
+      vector<double> alpha_hist(hist_size);
+
+      // Forward loop
+      for(int i = hist_size - 1; i >= 0; i--){
+        alpha_hist[i] = rho_hist[i] * vec_dot(S[i], dir);
+        vec_axpy(dir, -alpha_hist[i], Y[i]);
+      }
+
+      // Initial Hessian approximation: gamma * I
+      if(hist_size > 0){
+        double ys = vec_dot(Y.back(), S.back());
+        double yy = vec_dot(Y.back(), Y.back());
+        if(yy > 1e-30) vec_scale(dir, ys / yy);
+      }
+
+      // Backward loop
+      for(int i = 0; i < hist_size; i++){
+        double beta = rho_hist[i] * vec_dot(Y[i], dir);
+        vec_axpy(dir, alpha_hist[i] - beta, S[i]);
+      }
+
+      // dir = -H*g (negate for descent direction)
+      vec_scale(dir, -1.0);
+      if(has_fixed) for(int i = 0; i < N; i++) if(fixed[i]) dir[i] = coord3d(0,0,0);
+
+      // Safeguard: if not a descent direction, reset to -grad
+      double slope = vec_dot(grad, dir);
+      if(slope > 0){
+        for(int i = 0; i < N; i++) dir[i] = grad[i] * (-1.0);
+        if(has_fixed) for(int i = 0; i < N; i++) if(fixed[i]) dir[i] = coord3d(0,0,0);
+        S.clear(); Y.clear(); rho_hist.clear();
+      }
+
+      // Save old state for history update
+      grad_old = grad;
+
+      // Line search and update
+      double alpha = line_search(E, grad, dir, x_trial);
+      for(int i = 0; i < N; i++) points[i] = points[i] + dir[i] * alpha;
+      E = compute_eg(grad);
+
+      // Update L-BFGS history: s = alpha*dir, y = grad - grad_old
+      {
+        vector<coord3d> s(N), y(N);
+        for(int i = 0; i < N; i++){
+          s[i] = dir[i] * alpha;
+          y[i] = grad[i] - grad_old[i];
+        }
+        double ys = vec_dot(y, s);
+        if(ys > 1e-10 * vec_dot(s, s)){  // curvature condition
+          S.push_back(std::move(s));
+          Y.push_back(std::move(y));
+          rho_hist.push_back(1.0 / ys);
+          if((int)S.size() > m){ S.pop_front(); Y.pop_front(); rho_hist.pop_front(); }
+        }
+      }
+
+      // Logging
+      if(log_interval > 0 && (iter % log_interval == 0 || iter == max_iter - 1))
+        fprintf(opt_log, "  LB %4d: E=%.6f |g|=%.4e gmax*L=%.4e a=%.3e cv=%.4f ph=%d h=%d%s\n",
+                iter, E, vec_norm(grad), compute_gmax(grad), alpha, edge_cv(), phase,
+                (int)S.size(), reflected ? " R" : "");
+    }
+  }
+
+  // ==================== Steihaug-Toint ====================
+  else if(opt_method == OptMethod::STEIHAUG){
+    double Delta_max = L;
+    double Delta = 0.5 * L;
+    const int max_inner = min(3 * N, 200);
+
+    // Temp vectors for inner CG
+    vector<coord3d> z(N), r_cg(N), d_cg(N), Hd(N), x_trial(N);
+
+    for(int iter = 0; iter < max_iter; iter++){
+      iterations_used = iter + 1;
+      if(max_work > 0 && total_work_fn() >= max_work) break;
+
+      // Periodic reflection
+      bool reflected = false;
+      if(iter > 0){
+        if(do_reflect()){
+          E = compute_eg(grad);
+          reflected = true;
+        }
+      }
+
+      // Phase transition
+      if(check_phase_transition(iter, phase_start, grad)){
+        phase_start = iter;
+        E = compute_eg(grad);
+        Delta = 0.5 * L;  // reset trust region on phase change
+      }
+
+      // Convergence check
+      double gmax = compute_gmax(grad);
+      if(gmax < grad_tol){ converged = true; break; }
+      if(angle_tol > 0 && max_angle_relerr() < angle_tol && count_concave() == 0){ converged = true; break; }
+
+      // --- Steihaug CG to solve trust-region subproblem ---
+      // Approximately solve: min_z  g^T z + 0.5 z^T H z,  ||z|| <= Delta
+      vec_zero(z);
+      for(int i = 0; i < N; i++) r_cg[i] = grad[i] * (-1.0);  // r = -g
+      if(has_fixed) for(int i = 0; i < N; i++) if(fixed[i]) r_cg[i] = coord3d(0,0,0);
+      d_cg = r_cg;  // d = r
+      double rr = vec_dot(r_cg, r_cg);
+      double gnorm = sqrt(rr);
+      int inner_iters = 0;
+
+      for(int j = 0; j < max_inner; j++){
+        inner_iters = j + 1;
+
+        // Hv product
+        vec_zero(Hd);
+        n_hv_evals++;
+        deltahedron_hv_product(*this, edges, points, d_cg, Hd, L,
+                               k_bond, k_angle, k_curv, k_flat, fixed);
+
+        double kappa = vec_dot(d_cg, Hd);
+
+        if(kappa <= 1e-15 * rr){
+          // Negative or zero curvature: step to trust-region boundary along d
+          double zz = vec_dot(z, z);
+          double zd = vec_dot(z, d_cg);
+          double dd = vec_dot(d_cg, d_cg);
+          // Solve ||z + tau*d||^2 = Delta^2
+          double a_coeff = dd;
+          double b_coeff = 2.0 * zd;
+          double c_coeff = zz - Delta * Delta;
+          double disc = b_coeff * b_coeff - 4.0 * a_coeff * c_coeff;
+          double tau = (-b_coeff + sqrt(max(0.0, disc))) / (2.0 * a_coeff);
+          vec_axpy(z, tau, d_cg);
+          break;
+        }
+
+        double alpha_cg = rr / kappa;
+
+        // Check trust-region boundary
+        {
+          vector<coord3d> z_new(N);
+          for(int i = 0; i < N; i++) z_new[i] = z[i] + d_cg[i] * alpha_cg;
+          double z_new_norm = vec_norm(z_new);
+          if(z_new_norm >= Delta){
+            // Truncate to boundary
+            double zz = vec_dot(z, z);
+            double zd = vec_dot(z, d_cg);
+            double dd = vec_dot(d_cg, d_cg);
+            double a_coeff = dd;
+            double b_coeff = 2.0 * zd;
+            double c_coeff = zz - Delta * Delta;
+            double disc = b_coeff * b_coeff - 4.0 * a_coeff * c_coeff;
+            double tau = (-b_coeff + sqrt(max(0.0, disc))) / (2.0 * a_coeff);
+            vec_axpy(z, tau, d_cg);
+            break;
+          }
+          z = z_new;
+        }
+
+        // Update residual
+        vector<coord3d> r_new(N);
+        for(int i = 0; i < N; i++) r_new[i] = r_cg[i] - Hd[i] * alpha_cg;
+        if(has_fixed) for(int i = 0; i < N; i++) if(fixed[i]) r_new[i] = coord3d(0,0,0);
+
+        double rr_new = vec_dot(r_new, r_new);
+        if(sqrt(rr_new) < 0.01 * gnorm) break;  // inner convergence
+
+        double beta_cg = rr_new / rr;
+        for(int i = 0; i < N; i++) d_cg[i] = r_new[i] + d_cg[i] * beta_cg;
+        if(has_fixed) for(int i = 0; i < N; i++) if(fixed[i]) d_cg[i] = coord3d(0,0,0);
+        r_cg = r_new;
+        rr = rr_new;
+      }
+
+      // --- Evaluate trust-region step ---
+      double znorm = vec_norm(z);
+
+      // Predicted reduction: -(g.z) - 0.5*(z.Hz)
+      vec_zero(Hd);
+      n_hv_evals++;
+      deltahedron_hv_product(*this, edges, points, z, Hd, L,
+                             k_bond, k_angle, k_curv, k_flat, fixed);
+      double pred = -(vec_dot(grad, z) + 0.5 * vec_dot(z, Hd));
+
+      // Trial point
+      for(int i = 0; i < N; i++) x_trial[i] = points[i] + z[i];
+      double E_trial = compute_e_only(x_trial);
+      double actual = E - E_trial;
+
+      double rho = (pred > 1e-30) ? actual / pred : -1;
+
+      // Accept based on energy reduction only; convexity is handled
+      // by periodic reflect_concave (same as CG and L-BFGS).
+      bool accepted = (rho > 0.1);
+
+      if(accepted){
+        points = x_trial;
+        E = compute_eg(grad);
+        if(rho > 0.75 && znorm > 0.5 * Delta) Delta = min(2.0 * Delta, Delta_max);
+      } else {
+        Delta *= 0.25;
+        if(Delta < 1e-14 * L) Delta = 1e-14 * L;
+      }
+
+      // Logging
+      if(log_interval > 0 && (iter % log_interval == 0 || iter == max_iter - 1))
+        fprintf(opt_log, "  ST %4d: E=%.6f |g|=%.4e gmax*L=%.4e |z|=%.2e D=%.2e rho=%.2f in=%d ph=%d %s%s\n",
+                iter, E, vec_norm(grad), compute_gmax(grad), znorm, Delta, rho, inner_iters,
+                phase, accepted ? "acc" : "REJ", reflected ? " R" : "");
+    }
+  }
+
+  // Final stats
+  final_gmax_L = compute_gmax(grad);
+  if(opt_log)
+    fprintf(opt_log, "  %s done: %d iters, E=%.6f gmax*L=%.4e cv=%.4f %s\n",
+            method_name, iterations_used, E, final_gmax_L, edge_cv(),
+            converged ? "CONVERGED" : "budget");
+
+  // Post-optimization strict convexity cleanup
+  for(int pass = 0; pass < 3; pass++)
+    if(reflect_concave(points, 0, fixed) == 0) break;
+
+  final_angle_relerr = max_angle_relerr();
+  final_n_concave = count_concave();
 
   return converged;
 }
@@ -1218,5 +2687,110 @@ double Deltahedron::gradient_check(const vector<coord3d>& geometry, double targe
       if(rel_err > max_rel_err) max_rel_err = rel_err;
     }
   }
+  return max_rel_err;
+}
+
+double Deltahedron::hessian_check(const vector<coord3d>& geometry,
+                                  const vector<bool>& free_mask,
+                                  const vector<bool>& interior_mask,
+                                  double target_L, double eps, bool verbose) const
+{
+  vector<coord3d> x = geometry;
+  vector<edge_t> edges = undirected_edges();
+
+  // Same force constants as optimize_patch
+  const double k_bond = 1.0, k_angle = 1.0, k_conv = 5.0;
+  const double k_curv = 0, k_flat = 0;
+
+  // Target L from boundary edges (same logic as optimize_patch)
+  double L = target_L;
+  if(L <= 0){
+    double sum = 0; int count = 0;
+    for(const edge_t& e : edges){
+      if(free_mask[e.first] || free_mask[e.second]) continue;
+      sum += coord3d::dist(x[e.first], x[e.second]);
+      count++;
+    }
+    if(count == 0)
+      for(const edge_t& e : edges){
+        sum += coord3d::dist(x[e.first], x[e.second]);
+        count++;
+      }
+    L = sum / count;
+  }
+  const double sigma = 0.2 * L;
+
+  // Collect free vertex indices
+  vector<int> free_idx;
+  for(int i = 0; i < N; i++)
+    if(free_mask[i]) free_idx.push_back(i);
+  int nfree = (int)free_idx.size();
+  int ndof = 3 * nfree;
+
+  // Analytical Hessian
+  vector<vector<double>> H_an(ndof, vector<double>(ndof, 0.0));
+  assemble_patch_hessian(*this, edges, x, H_an, free_idx,
+                         L, k_bond, k_angle, k_conv, sigma, interior_mask);
+
+  // FD Hessian: differentiate gradient w.r.t. each free DOF
+  auto grad_fn = [&](const vector<coord3d>& xx, vector<double>& gf){
+    vector<coord3d> g(N, coord3d(0,0,0));
+    deltahedron_energy_and_gradient(*this, edges, xx, &g, L,
+                                    k_bond, k_angle, k_curv, k_flat, k_conv, interior_mask);
+    gf.resize(ndof);
+    for(int k = 0; k < nfree; k++)
+      for(int c = 0; c < 3; c++)
+        gf[3*k+c] = g[free_idx[k]][c];
+  };
+
+  vector<vector<double>> H_fd(ndof, vector<double>(ndof, 0.0));
+  for(int j = 0; j < ndof; j++){
+    int v = free_idx[j/3];
+    int c = j % 3;
+    vector<coord3d> xp = x, xm = x;
+    xp[v][c] += eps;
+    xm[v][c] -= eps;
+    vector<double> gp, gm;
+    grad_fn(xp, gp);
+    grad_fn(xm, gm);
+    for(int i = 0; i < ndof; i++)
+      H_fd[i][j] = (gp[i] - gm[i]) / (2 * eps);
+  }
+
+  // Compare
+  double max_rel_err = 0;
+  int worst_i = 0, worst_j = 0;
+  for(int i = 0; i < ndof; i++){
+    for(int j = 0; j < ndof; j++){
+      double denom = max(1.0, max(abs(H_an[i][j]), abs(H_fd[i][j])));
+      double rel_err = abs(H_an[i][j] - H_fd[i][j]) / denom;
+      if(rel_err > max_rel_err){
+        max_rel_err = rel_err;
+        worst_i = i; worst_j = j;
+      }
+    }
+  }
+
+  if(verbose){
+    fprintf(stderr, "Hessian check: ndof=%d, L=%.4f, eps=%.1e, max_rel_err=%.3e\n",
+            ndof, L, eps, max_rel_err);
+    fprintf(stderr, "  worst at H[%d][%d]: analytical=%.8e  FD=%.8e\n",
+            worst_i, worst_j, H_an[worst_i][worst_j], H_fd[worst_i][worst_j]);
+    // Print top-10 worst entries
+    vector<tuple<double,int,int>> errs;
+    for(int i = 0; i < ndof; i++)
+      for(int j = 0; j < ndof; j++){
+        double denom = max(1.0, max(abs(H_an[i][j]), abs(H_fd[i][j])));
+        errs.push_back({abs(H_an[i][j] - H_fd[i][j]) / denom, i, j});
+      }
+    sort(errs.rbegin(), errs.rend());
+    fprintf(stderr, "  top-10 errors:\n");
+    for(int k = 0; k < min(10, (int)errs.size()); k++){
+      auto [err, i, j] = errs[k];
+      fprintf(stderr, "    H[%d][%d]: an=% .6e  fd=% .6e  err=%.3e\n",
+              i, j, H_an[i][j], H_fd[i][j], err);
+    }
+  }
+
   return max_rel_err;
 }
