@@ -5,7 +5,7 @@
 #include <iterator>
 #include <type_traits>
 #include <algorithm>
-#include <execution>
+#include <fullerenes/sycl-headers/execution-compat.hh>
 #include <numeric>
 #include "fstream"
 #define USE_MAX_NORM 0
@@ -1970,7 +1970,7 @@ SyclEvent forcefield_optimize_impl(SyclQueue& Q, Fullerene<T,K> fullerene,
 
     auto energy = [&] (Span<coord3d> X){
         Q.wait();
-        T result = std::transform_reduce(std::execution::par_unseq, indices.begin(), indices.end(), T{0}, std::plus<T>{}, [=](K i) {
+        T result = std::transform_reduce(FULLERENE_PAR_UNSEQ indices.begin(), indices.end(), T{0}, std::plus<T>{}, [=](K i) {
             NodeNeighbours<K> node_graph(A, i);
             Constants<T,K> constants(A, i);
             T result = 0;
@@ -2009,8 +2009,8 @@ SyclEvent forcefield_optimize_impl(SyclQueue& Q, Fullerene<T,K> fullerene,
         x1 = (a + ((T)1. - tau) * (b - a));
         x2 = (a + tau * (b - a));
         Q.wait();
-        std::transform(std::execution::par_unseq, indices.begin(), indices.end(), X1.begin(), [=](K i){return X[i] + x1 * r0[i];});
-        std::transform(std::execution::par_unseq, indices.begin(), indices.end(), X2.begin(), [=](K i){return X[i] + x2 * r0[i];});
+        std::transform(FULLERENE_PAR_UNSEQ indices.begin(), indices.end(), X1.begin(), [=](K i){return X[i] + x1 * r0[i];});
+        std::transform(FULLERENE_PAR_UNSEQ indices.begin(), indices.end(), X2.begin(), [=](K i){return X[i] + x2 * r0[i];});
         T f1 = energy(X1);
         T f2 = energy(X2);
         for (int i = 0; i < 20; i++)
@@ -2022,7 +2022,7 @@ SyclEvent forcefield_optimize_impl(SyclQueue& Q, Fullerene<T,K> fullerene,
                 f1 = f2;
                 x2 = a + tau * (b - a);
                 Q.wait();
-                std::transform(std::execution::par_unseq, indices.begin(), indices.end(), X2.begin(), [=](K i){return X[i] + x2 * r0[i];});
+                std::transform(FULLERENE_PAR_UNSEQ indices.begin(), indices.end(), X2.begin(), [=](K i){return X[i] + x2 * r0[i];});
                 f2 = energy(X2);
             }
             else
@@ -2032,7 +2032,7 @@ SyclEvent forcefield_optimize_impl(SyclQueue& Q, Fullerene<T,K> fullerene,
                 f2 = f1;
                 x1 = a + ((T)1.0 - tau) * (b - a);
                 Q.wait();
-                std::transform(std::execution::par_unseq, indices.begin(), indices.end(), X1.begin(), [=](K i){return X[i] + x1 * r0[i];});
+                std::transform(FULLERENE_PAR_UNSEQ indices.begin(), indices.end(), X1.begin(), [=](K i){return X[i] + x1 * r0[i];});
                 f1 = energy(X1);
             }
         }
@@ -2048,9 +2048,9 @@ SyclEvent forcefield_optimize_impl(SyclQueue& Q, Fullerene<T,K> fullerene,
         T alpha, beta, g0_norm2, s_norm;
         gradient(X, g0);
         Q.wait();
-        std::transform(std::execution::par_unseq, indices.begin(), indices.end(), s.begin(), [=](K i){return -g0[i];});
-        s_norm = sycl::sqrt(std::transform_reduce(std::execution::par_unseq, indices.begin(), indices.end(), T{0}, std::plus<T>{}, [=](K i){return dot(s[i], s[i]);}));
-        std::transform(std::execution::par_unseq, indices.begin(), indices.end(), s.begin(), [=](K i){return s[i] / s_norm;});
+        std::transform(FULLERENE_PAR_UNSEQ indices.begin(), indices.end(), s.begin(), [=](K i){return -g0[i];});
+        s_norm = sycl::sqrt(std::transform_reduce(FULLERENE_PAR_UNSEQ indices.begin(), indices.end(), T{0}, std::plus<T>{}, [=](K i){return dot(s[i], s[i]);}));
+        std::transform(FULLERENE_PAR_UNSEQ indices.begin(), indices.end(), s.begin(), [=](K i){return s[i] / s_norm;});
 
         for (size_t i = 0; i < MaxIter; i++)
         {
@@ -2058,35 +2058,35 @@ SyclEvent forcefield_optimize_impl(SyclQueue& Q, Fullerene<T,K> fullerene,
             if (alpha > (T)0.0)
             {
                 Q.wait();
-                std::transform(std::execution::par_unseq, indices.begin(), indices.end(), X1.begin(), [=](K i){return X[i] + alpha * s[i];});
+                std::transform(FULLERENE_PAR_UNSEQ indices.begin(), indices.end(), X1.begin(), [=](K i){return X[i] + alpha * s[i];});
             }
             gradient(X1, g1);
             Q.wait();
-            g0_norm2 = std::transform_reduce(std::execution::par_unseq, indices.begin(), indices.end(), T{0}, std::plus<T>{}, [=](K i){return dot(g0[i], g0[i]);});
-            beta = sycl::max(std::transform_reduce(std::execution::par_unseq, indices.begin(), indices.end(), T{0}, std::plus<T>{}, [=](K i){return dot(g1[i], (g1[i] - g0[i]));}) / g0_norm2, (T)0.0);
+            g0_norm2 = std::transform_reduce(FULLERENE_PAR_UNSEQ indices.begin(), indices.end(), T{0}, std::plus<T>{}, [=](K i){return dot(g0[i], g0[i]);});
+            beta = sycl::max(std::transform_reduce(FULLERENE_PAR_UNSEQ indices.begin(), indices.end(), T{0}, std::plus<T>{}, [=](K i){return dot(g1[i], (g1[i] - g0[i]));}) / g0_norm2, (T)0.0);
             if (alpha > (T)0.0)
             {
                 Q.wait();
-                std::transform(std::execution::par_unseq, indices.begin(), indices.end(), X.begin(), [=](K i){return X1[i];});
+                std::transform(FULLERENE_PAR_UNSEQ indices.begin(), indices.end(), X.begin(), [=](K i){return X1[i];});
             }
             else
             {
                 Q.wait();
-                std::copy(std::execution::par_unseq, g1.begin(), g1.end(), g0.begin());
+                std::copy(FULLERENE_PAR_UNSEQ g1.begin(), g1.end(), g0.begin());
                 beta = (T)0.0;
             }
             Q.wait();
-            std::transform(std::execution::par_unseq, indices.begin(), indices.end(), s.begin(), [=](K i){return -g1[i] + beta * s[i];});
-            std::copy(std::execution::par_unseq, g1.begin(), g1.end(), g0.begin());
-            s_norm = sycl::sqrt(std::transform_reduce(std::execution::par_unseq, indices.begin(), indices.end(), T{0}, std::plus<T>{}, [=](K i){return dot(s[i], s[i]);}));
-            std::transform(std::execution::par_unseq, indices.begin(), indices.end(), s.begin(), [=](K i){return s[i] / s_norm;});
+            std::transform(FULLERENE_PAR_UNSEQ indices.begin(), indices.end(), s.begin(), [=](K i){return -g1[i] + beta * s[i];});
+            std::copy(FULLERENE_PAR_UNSEQ g1.begin(), g1.end(), g0.begin());
+            s_norm = sycl::sqrt(std::transform_reduce(FULLERENE_PAR_UNSEQ indices.begin(), indices.end(), T{0}, std::plus<T>{}, [=](K i){return dot(s[i], s[i]);}));
+            std::transform(FULLERENE_PAR_UNSEQ indices.begin(), indices.end(), s.begin(), [=](K i){return s[i] / s_norm;});
         }
     };
     bool check_convergence = false;
 
     auto convergence_check = [&] () {
         Q.wait();
-        T max_rel_bond_err = std::transform_reduce(std::execution::par_unseq, indices.begin(), indices.end(), T{0}, [](T a, T b){ return std::max(a, b); }, [=](K i){
+        T max_rel_bond_err = std::transform_reduce(FULLERENE_PAR_UNSEQ indices.begin(), indices.end(), T{0}, [](T a, T b){ return std::max(a, b); }, [=](K i){
             Constants<T,K> constants(A, i);
             NodeNeighbours<K> nodeG(A, i);
             T rel_bond_err = 0;
@@ -2096,7 +2096,7 @@ SyclEvent forcefield_optimize_impl(SyclQueue& Q, Fullerene<T,K> fullerene,
             }
             return rel_bond_err;
         });
-        T max_rel_angle_err = std::transform_reduce(std::execution::par_unseq, indices.begin(), indices.end(), T{0}, [](T a, T b){ return std::max(a, b); }, [=](K i){
+        T max_rel_angle_err = std::transform_reduce(FULLERENE_PAR_UNSEQ indices.begin(), indices.end(), T{0}, [](T a, T b){ return std::max(a, b); }, [=](K i){
             Constants<T,K> constants(A, i);
             NodeNeighbours<K> nodeG(A, i);
             T rel_angle_err = 0;
@@ -2106,7 +2106,7 @@ SyclEvent forcefield_optimize_impl(SyclQueue& Q, Fullerene<T,K> fullerene,
             }
             return rel_angle_err;
         });
-        T max_rel_dihedral_err = std::transform_reduce(std::execution::par_unseq, indices.begin(), indices.end(), T{0}, [](T a, T b){ return std::max(a, b); }, [=](K i){
+        T max_rel_dihedral_err = std::transform_reduce(FULLERENE_PAR_UNSEQ indices.begin(), indices.end(), T{0}, [](T a, T b){ return std::max(a, b); }, [=](K i){
             Constants<T,K> constants(A, i);
             NodeNeighbours<K> nodeG(A, i);
             T rel_dihedral_err = 0;

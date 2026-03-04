@@ -31,6 +31,9 @@ foreach(SYCL_SOURCE FLAGS IN ZIP_LISTS SYCL_LIBRARY_SOURCES SYCL_SOURCE_CUSTOM_F
   target_compile_options(${SYCL_SOURCE}_lib PRIVATE ${SYCL_FLAGS} ${FLAGS})
   target_link_options(${SYCL_SOURCE}_lib PRIVATE ${SYCL_FLAGS})
   target_link_libraries(${SYCL_SOURCE}_lib PRIVATE ${SYCL_RUNTIME_LIBS})
+  if(APPLE)
+    target_link_libraries(${SYCL_SOURCE}_lib PRIVATE fullerenes)
+  endif()
 endforeach()
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")

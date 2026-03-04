@@ -1,5 +1,5 @@
 #include "queue-impl.cc"
-#include <execution>
+#include <fullerenes/sycl-headers/execution-compat.hh>
 #include <algorithm>
 #include <numeric>
 #include <fullerenes/kernel-headers/geometry-functors.hh>
@@ -26,16 +26,16 @@ template <typename T>
 auto inertia_matrix(SyclQueue& Q, const Span<std::array<T,3>> X){
     symMat3<T> I;
     Q.wait();
-    T diag = std::transform_reduce(std::execution::par_unseq, X.begin(), X.end(), T(0), std::plus<T>{}, [](const auto& x) -> T {return dot(x,x);});
+    T diag = std::transform_reduce(FULLERENE_PAR_UNSEQ X.begin(), X.end(), T(0), std::plus<T>{}, [](const auto& x) -> T {return dot(x,x);});
     I.a = diag;
     I.d = diag;
     I.f = diag;
-    I.a -= std::transform_reduce(std::execution::par_unseq, X.begin(), X.end(), T(0), std::plus<T>{}, [](const auto& x){return x[0]*x[0];});
-    I.b -= std::transform_reduce(std::execution::par_unseq, X.begin(), X.end(), T(0), std::plus<T>{}, [](const auto& x){return x[0]*x[1];});
-    I.c -= std::transform_reduce(std::execution::par_unseq, X.begin(), X.end(), T(0), std::plus<T>{}, [](const auto& x){return x[0]*x[2];});
-    I.d -= std::transform_reduce(std::execution::par_unseq, X.begin(), X.end(), T(0), std::plus<T>{}, [](const auto& x){return x[1]*x[1];});
-    I.e -= std::transform_reduce(std::execution::par_unseq, X.begin(), X.end(), T(0), std::plus<T>{}, [](const auto& x){return x[1]*x[2];});
-    I.f -= std::transform_reduce(std::execution::par_unseq, X.begin(), X.end(), T(0), std::plus<T>{}, [](const auto& x){return x[2]*x[2];});
+    I.a -= std::transform_reduce(FULLERENE_PAR_UNSEQ X.begin(), X.end(), T(0), std::plus<T>{}, [](const auto& x){return x[0]*x[0];});
+    I.b -= std::transform_reduce(FULLERENE_PAR_UNSEQ X.begin(), X.end(), T(0), std::plus<T>{}, [](const auto& x){return x[0]*x[1];});
+    I.c -= std::transform_reduce(FULLERENE_PAR_UNSEQ X.begin(), X.end(), T(0), std::plus<T>{}, [](const auto& x){return x[0]*x[2];});
+    I.d -= std::transform_reduce(FULLERENE_PAR_UNSEQ X.begin(), X.end(), T(0), std::plus<T>{}, [](const auto& x){return x[1]*x[1];});
+    I.e -= std::transform_reduce(FULLERENE_PAR_UNSEQ X.begin(), X.end(), T(0), std::plus<T>{}, [](const auto& x){return x[1]*x[2];});
+    I.f -= std::transform_reduce(FULLERENE_PAR_UNSEQ X.begin(), X.end(), T(0), std::plus<T>{}, [](const auto& x){return x[2]*x[2];});
     return I;
 }
 
@@ -148,7 +148,7 @@ SyclEvent TransformCoordinatesFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T, K
     auto X = fullerene.d_.X_cubic_;
     auto P = principal_axes(Q, X);
     Q.wait();
-    std::transform(std::execution::par_unseq, X.begin(), X.end(), X.begin(), [P](auto x){return dot(P,x);});
+    std::transform(FULLERENE_PAR_UNSEQ X.begin(), X.end(), X.begin(), [P](auto x){return dot(P,x);});
     return Q.get_event();
 }
 
@@ -200,7 +200,7 @@ SyclEvent SurfaceAreaFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T, K> fullere
 
     Q.wait();
     std::iota(indices.begin(), indices.end(), 0);
-    auto result = std::transform_reduce(std::execution::par_unseq, indices.begin(), indices.end(), T(0), std::plus<T>{}, [Nf, fullerene](auto tid){
+    auto result = std::transform_reduce(FULLERENE_PAR_UNSEQ indices.begin(), indices.end(), T(0), std::plus<T>{}, [Nf, fullerene](auto tid){
         T A = 0;
         std::array<T,3> face_center = {0,0,0};
         auto face = fullerene.d_.faces_cubic_[tid];
@@ -272,7 +272,7 @@ SyclEvent VolumeFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T, K> fullerene, S
 
     Q.wait();
     std::iota(indices.begin(), indices.end(), 0);
-    auto result = std::transform_reduce(std::execution::par_unseq, indices.begin(), indices.end(), T(0), std::plus<T>{}, [Nf, fullerene](auto tid){
+    auto result = std::transform_reduce(FULLERENE_PAR_UNSEQ indices.begin(), indices.end(), T(0), std::plus<T>{}, [Nf, fullerene](auto tid){
         T V = 0;
         std::array<T,3> face_center = {0,0,0};
         auto face = fullerene.d_.faces_cubic_[tid];

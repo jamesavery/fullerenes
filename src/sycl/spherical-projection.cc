@@ -5,7 +5,7 @@
 #include <iterator>
 #include <type_traits>
 #include <algorithm>
-#include <execution>
+#include <fullerenes/sycl-headers/execution-compat.hh>
 #include <numeric>
 #include <fullerenes/kernel-headers/spherical-projection-functor.hh>
 #include <fullerenes/kernel-headers/sycl-parallel-primitives.hh>
@@ -262,7 +262,7 @@ SyclEvent spherical_projection_impl( SyclQueue& Q,
     //MSSPs
     auto N = X.size();
     Q.wait();
-    std::fill(std::execution::par_unseq, distances.begin(), distances.end(), std::numeric_limits<K>::max());
+    std::fill(FULLERENE_PAR_UNSEQ distances.begin(), distances.end(), std::numeric_limits<K>::max());
     DeviceCubicGraph FG(cubic_neighbours);
     std::array<K,6> outer_face;
     auto face_size = FG.get_face_oriented(0, FG[0][0], outer_face);
@@ -271,18 +271,18 @@ SyclEvent spherical_projection_impl( SyclQueue& Q,
 
     //Compute maximum topological distance
     Q.wait();
-    K d_max = std::reduce(std::execution::par_unseq, distances.begin(), distances.end(), K{0}, [](K a, K b){ return std::max(a, b); });
+    K d_max = std::reduce(FULLERENE_PAR_UNSEQ distances.begin(), distances.end(), K{0}, [](K a, K b){ return std::max(a, b); });
     //Count number of nodes at each distance
     Q.wait();
-    std::copy(std::execution::par_unseq, xys.subspan(0,N).begin(), xys.subspan(0,N).end(), sorted_xys.begin());
+    std::copy(FULLERENE_PAR_UNSEQ xys.subspan(0,N).begin(), xys.subspan(0,N).end(), sorted_xys.begin());
     std::iota(reduce_in.subspan(0, N).begin(), reduce_in.subspan(0, N).end(), K{0});
-    std::sort(std::execution::par_unseq, reduce_in.subspan(0, N).begin(), reduce_in.subspan(0, N).end(), [distances](K a, K b){return distances[a] < distances[b];});
-    std::transform(std::execution::par_unseq, reduce_in.subspan(0, N).begin(), reduce_in.subspan(0, N).end(), sorted_xys.begin(), [xys](K idx){return xys[idx];});
-    std::transform(std::execution::par_unseq, reduce_in.subspan(0, N).begin(), reduce_in.subspan(0, N).end(), reduce_out.begin(), [distances](K idx){return distances[idx];});
+    std::sort(FULLERENE_PAR_UNSEQ reduce_in.subspan(0, N).begin(), reduce_in.subspan(0, N).end(), [distances](K a, K b){return distances[a] < distances[b];});
+    std::transform(FULLERENE_PAR_UNSEQ reduce_in.subspan(0, N).begin(), reduce_in.subspan(0, N).end(), sorted_xys.begin(), [xys](K idx){return xys[idx];});
+    std::transform(FULLERENE_PAR_UNSEQ reduce_in.subspan(0, N).begin(), reduce_in.subspan(0, N).end(), reduce_out.begin(), [distances](K idx){return distances[idx];});
     auto summed_coordinates = reduce_in.template as_span<std::array<T,2>>().subspan(0, d_max + 1);
     primitives::reduce_by_segment(Q, reduce_out.subspan(0,N), sorted_xys, output_keys, summed_coordinates, std::equal_to<K>{}, [](std::array<T,2> a, std::array<T,2> b){return a + b;});
     Q.wait();
-    std::fill(std::execution::par_unseq, sorted_xys.template as_span<K>().subspan(0, N).begin(), sorted_xys.template as_span<K>().subspan(0, N).end(), K{1});
+    std::fill(FULLERENE_PAR_UNSEQ sorted_xys.template as_span<K>().subspan(0, N).begin(), sorted_xys.template as_span<K>().subspan(0, N).end(), K{1});
     //Compute number of nodes at each distance and store in sorted_xys at indices N to  N + d_max + 1
     auto num_nodes_at_distance = sorted_xys.subspan(N, d_max + 1).template as_span<K>().subspan(0, d_max + 1);
     
@@ -290,13 +290,13 @@ SyclEvent spherical_projection_impl( SyclQueue& Q,
     //Compute the centroid of the nodes at each distance
     auto centroids = reduce_out.template as_span<std::array<T,2>>().subspan(0, d_max + 1);
     Q.wait();
-    std::transform(std::execution::par_unseq, summed_coordinates.begin(), summed_coordinates.end(), num_nodes_at_distance.begin(), centroids.begin(), [](std::array<T,2> a, K b){return a/T(b);});
+    std::transform(FULLERENE_PAR_UNSEQ summed_coordinates.begin(), summed_coordinates.end(), num_nodes_at_distance.begin(), centroids.begin(), [](std::array<T,2> a, K b){return a/T(b);});
     //Shift the coordinates of the nodes at each distance by the centroid
     Q.wait();
-    std::transform(std::execution::par_unseq, xys.subspan(0,N).begin(), xys.subspan(0,N).end(), distances.begin(), sorted_xys.begin(), [centroids](std::array<T,2> a, K b){return a - centroids[b];});
+    std::transform(FULLERENE_PAR_UNSEQ xys.subspan(0,N).begin(), xys.subspan(0,N).end(), distances.begin(), sorted_xys.begin(), [centroids](std::array<T,2> a, K b){return a - centroids[b];});
     //Compute the spherical coordinates of the nodes at each distance
     Q.wait();
-    std::transform(std::execution::par_unseq, sorted_xys.subspan(0,N).begin(), sorted_xys.subspan(0,N).end(), distances.begin(), X.begin(), [d_max](std::array<T,2> xy, K dist){
+    std::transform(FULLERENE_PAR_UNSEQ sorted_xys.subspan(0,N).begin(), sorted_xys.subspan(0,N).end(), distances.begin(), X.begin(), [d_max](std::array<T,2> xy, K dist){
         T dtheta = T(M_PI)/T(d_max+1);
         T phi = dtheta*(dist+0.5);
         T theta = sycl::atan2(xy[0],xy[1]);
@@ -304,19 +304,19 @@ SyclEvent spherical_projection_impl( SyclQueue& Q,
     });
     //Compute center of mass
     Q.wait();
-    std::array<T,3> cm = std::reduce(std::execution::par_unseq, X.begin(), X.end(), std::array<T,3>{0.0, 0.0, 0.0}, [](std::array<T,3> a, std::array<T,3> b){return a + b;});
+    std::array<T,3> cm = std::reduce(FULLERENE_PAR_UNSEQ X.begin(), X.end(), std::array<T,3>{0.0, 0.0, 0.0}, [](std::array<T,3> a, std::array<T,3> b){return a + b;});
     cm /= T(N);
     //Shift the coordinates by the center of mass
-    std::transform(std::execution::par_unseq, X.begin(), X.end(), X.begin(), [cm](std::array<T,3> a){return a - cm;});
+    std::transform(FULLERENE_PAR_UNSEQ X.begin(), X.end(), X.begin(), [cm](std::array<T,3> a){return a - cm;});
     //Compute the average distance between nodes
-    T Ravg = std::transform_reduce(std::execution::par_unseq, X.begin(), X.end(), cubic_neighbours.template as_span<std::array<K,3>>().begin(), T{0.0}, std::plus<T>{}, [X](std::array<T,3> a, std::array<K,3> neighbours){
+    T Ravg = std::transform_reduce(FULLERENE_PAR_UNSEQ X.begin(), X.end(), cubic_neighbours.template as_span<std::array<K,3>>().begin(), T{0.0}, std::plus<T>{}, [X](std::array<T,3> a, std::array<K,3> neighbours){
         T local_Ravg = 0.0;
         for (size_t i = 0; i < 3; i++){ local_Ravg += norm(a - X[neighbours[i]]); }
         return local_Ravg;
     }) / T(3*N);
     //Scale the coordinates
     T scalerad = 4.0;
-    std::transform(std::execution::par_unseq, X.begin(), X.end(), X.begin(), [scalerad, Ravg](std::array<T,3> a){return a*scalerad*T(1.5)/Ravg;});
+    std::transform(FULLERENE_PAR_UNSEQ X.begin(), X.end(), X.begin(), [scalerad, Ravg](std::array<T,3> a){return a*scalerad*T(1.5)/Ravg;});
     auto ret_event = Q.get_event();
     return ret_event;
 }

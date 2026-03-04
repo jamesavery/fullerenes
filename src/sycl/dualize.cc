@@ -6,7 +6,7 @@
 #include <tuple>
 #include <iterator>
 #include <type_traits>
-#include <execution>
+#include <fullerenes/sycl-headers/execution-compat.hh>
 #include <fullerenes/kernel-headers/dualize-functor.hh>
 #include "queue-impl.cc"
 #include "forcefield-includes.cc"
@@ -123,7 +123,7 @@ SyclEvent dualize_general_impl(  SyclQueue& Q,
     
     work_distribution.wait();
     Q.wait();
-    std::exclusive_scan(std::execution::par_unseq, rep_count_acc.begin(), rep_count_acc.end(), scan_array_acc.begin(), K(0), std::plus<K>{});
+    std::exclusive_scan(FULLERENE_PAR_UNSEQ rep_count_acc.begin(), rep_count_acc.end(), scan_array_acc.begin(), K(0), std::plus<K>{});
 
     auto arc_list_event = Q->submit([&](handler &h) {
         h.parallel_for(nd_range(range{grid_size1}, range{workgroup_size1}), [=](nd_item<1> nditem) {
@@ -299,7 +299,7 @@ SyclEvent prepare_fullerene_graph(SyclQueue& Q, Fullerene<T,K> fullerene, Span<K
 
     work_distribution.wait();
     Q.wait();
-    std::exclusive_scan(std::execution::par_unseq, rep_count.begin(), rep_count.end(), scan_array.begin(), K(0), std::plus<K>{});
+    std::exclusive_scan(FULLERENE_PAR_UNSEQ rep_count.begin(), rep_count.end(), scan_array.begin(), K(0), std::plus<K>{});
 
     auto arc_list_event = Q -> parallel_for(nd_range(range{grid_size1}, range{workgroup_size1}), [=](nd_item<1> nditem) {
         auto idx = nditem.get_global_linear_id();

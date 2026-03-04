@@ -47,13 +47,15 @@ struct FullereneDataMembers{
 
 template <template<typename> class Container, typename K>
 struct FullereneMetaMembers{
-    mutable Container<size_t> ID_;               // Buckygen ID of the isomer {1}
+    mutable Container<uint64_t> ID_;               // Buckygen ID of the isomer {1}
     mutable Container<K> iterations_;       // Number of forcefield CG iterations performed so far {1}
     mutable Container<StatusFlag> flags_;   // Status flags of the isomers {1}
     mutable Container<K> valid_indices_;    // Indices of the valid isomers {1}
 
     FullereneMetaMembers() = default;
     ~FullereneMetaMembers() = default;
+    FullereneMetaMembers(Container<uint64_t> id, Container<K> iters, Container<StatusFlag> flags, Container<K> valid)
+        : ID_(std::move(id)), iterations_(std::move(iters)), flags_(std::move(flags)), valid_indices_(std::move(valid)) {}
     FullereneMetaMembers<Container, K>(const FullereneMetaMembers<Container, K> &other) = default;
     FullereneMetaMembers<Container, K>(FullereneMetaMembers<Container, K> &&other) = default;
     FullereneMetaMembers<Container, K> &operator=(const FullereneMetaMembers<Container, K> &other) = default;
