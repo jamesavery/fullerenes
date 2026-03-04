@@ -2,7 +2,7 @@ enable_language(Fortran)
 
 #add_library(fortran_spiral   STATIC spiral-standalone.f)
 #add_library(fortran_hamilton STATIC hamilton-sa.f)
-find_package(OpenMP REQUIRED)
+# find_package(OpenMP REQUIRED)
 
 add_library(fortran_config config.f)
 add_library(fortran_opt    opt-standalone.f geometry.f force.f dddihedral.f diag.f)

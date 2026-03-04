@@ -164,12 +164,12 @@ if(DEFINED ENV{CRAYPE_VERSION})
   message("Cray compiler environment detected")
   set(CMAKE_Fortran_FLAGS "-fPIC -O3")
 else()
- set(CMAKE_Fortran_FLAGS "-fPIC -cpp -O3 -m64 -mcmodel=medium")
+ set(CMAKE_Fortran_FLAGS "-fPIC -cpp -O3 -m64 -mcmodel=small")
 endif()
 
 # C++ compiler flags
 
-set(CMAKE_CXX_FLAGS "-fPIC -O3 -m64 -pthread -fopenmp")
+set(CMAKE_CXX_FLAGS "-fPIC -O3 -m64 -pthread")
 
 configure_file(
   ${CMAKE_SOURCE_DIR}/include/fullerenes/config.hh.in
