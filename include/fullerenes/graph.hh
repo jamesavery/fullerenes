@@ -7,7 +7,7 @@
 //    or can be a view of memory allocated elsewhere by passing a pointer at construction ( owns_memory == false)
 //  * clean up interface (not everything is needed)
 //  * layout2d() should no longer be a part of PlanarGraph - separate out
-//  * arc_t -> arc_t
+//  * dedge_t -> arc_t
 //  * add more efficient interface that exploits arc representations of the form (u,i) instead of (u,v) (with v = neighbours[u][i])
 //  * remove dependency on hashes (Use N*3 tables instead). arc2cubic (tri), arc2dual, carc2darc, etc.
 //  * simplify computation of dual
@@ -34,10 +34,11 @@ using namespace std;
 
 // TODO: public Views::sparsity<node_t>
 struct Graph {
-  node_t N;
-  neighbours_t neighbours;
+  node_t N;		        // TODO: Make Graph simply inherit from neighbours_t
+  neighbours_t neighbours;	// TODO: Make Graph simply inherit from neighbours_t
   bool is_oriented; //TODO: We're going to assume that G is always oriented
-  
+
+  Graph(int N=0, bool is_oriented=true): N(N), is_oriented(is_oriented) {}
   Graph(const neighbours_t& neighbours, bool is_oriented=true) :
     N(neighbours.N()),
     neighbours(neighbours),
