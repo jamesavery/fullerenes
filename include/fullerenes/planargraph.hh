@@ -12,7 +12,7 @@ public:
   vector<coord2d> layout2d; 	// If graph is planar, we can associate a 2D layout
   typedef spiral_nomenclature::construction_scheme_t construction_scheme_t;
 
-  //PlanarGraph() {} // TODO: Does it make sense to have a default constructor for a span-view?
+  PlanarGraph() {} // TODO: Does it make sense to have a default constructor for a span-view?
   PlanarGraph(const PlanarGraph& g) : Graph(g), layout2d(g.layout2d) {  }
   PlanarGraph(const Graph& g, const node_t s=-1, const node_t t=0, const node_t r=0) : Graph(g)
   {
@@ -67,9 +67,9 @@ public:
   }
 
 
-  PlanarGraph dual_graph(unsigned int Fmax=INT_MAX, bool planar_layout=true) const;
+  PlanarGraph& dual_graph(PlanarGraph &result, unsigned int Fmax=INT_MAX, bool planar_layout=true) const;
   // the dual of the LF, ie a Triangulation is returned
-  PlanarGraph leapfrog_dual() const;
+  PlanarGraph& leapfrog_dual(PlanarGraph &result) const;
   // Every polyhedral graph G can be represented by a triangulation.
   //  1. If G is a triangulation, it is G
   //  2. If G is cubic, it is its dual
