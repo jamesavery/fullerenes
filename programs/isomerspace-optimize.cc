@@ -74,10 +74,11 @@ int main(int ac, char **argv)
   int num_finished = 0,
       num_converged = 0,
       num_failed =0;
-  Graph G;
+
   auto Nf = N/2 + 2;
-  G.neighbours = neighbours_t(Nf, std::vector<node_t>(6));
-  G.N = Nf;
+
+  Allocators::Triangulation G_mem(Nf,6);
+  Graph G(G_mem); 
 
   auto T0 = steady_clock::now();
   auto
