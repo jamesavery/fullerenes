@@ -119,7 +119,7 @@ void dualize(sycl::queue&Q, IsomerBatch<T,K>& batch, const LaunchPolicy policy){
         accessor     statuses_dev        (batch.statuses, h, read_only);
         /* 
         std::cout << N * capacity << std::endl; */
-        h.parallel_for<class dualize>(sycl::nd_range(sycl::range{N*capacity}, sycl::range{N}), [=](nd_item<1> nditem) {
+        h.parallel_for(sycl::nd_range(sycl::range{N*capacity}, sycl::range{N}), [=](nd_item<1> nditem) {
             auto cta = nditem.get_group();
             node_t f = nditem.get_local_linear_id();    // Face-node index
             auto isomer = nditem.get_group_linear_id(); // Isomer    index
@@ -145,7 +145,7 @@ void dualize(sycl::queue&Q, IsomerBatch<T,K>& batch, const LaunchPolicy policy){
             }
             sycl::group_barrier(cta);
 
-            node_t scan_result = exclusive_scan_over_group(cta, rep_count, plus<node_t>{});
+            node_t scan_result = exclusive_scan_over_group(cta, rep_count, sycl::plus<node_t>{});
 
             if (f < Nf){
                 node_t arc_count = 0;
@@ -217,7 +217,7 @@ void dualize_V1(sycl::queue&Q, IsomerBatch<T,K>& batch, const LaunchPolicy polic
         accessor     statuses_dev        (batch.statuses, h, read_only);
         /* 
         std::cout << N * capacity << std::endl; */
-        h.parallel_for<class dualize_V1>(sycl::nd_range(sycl::range{lcm*capacity}, sycl::range{lcm}), [=](nd_item<1> nditem) {
+        h.parallel_for(sycl::nd_range(sycl::range{lcm*capacity}, sycl::range{lcm}), [=](nd_item<1> nditem) {
             auto cta = nditem.get_group();
             node_t f = nditem.get_local_linear_id();    // Face-node index
             auto isomer = nditem.get_group_linear_id(); // Isomer    index
@@ -243,7 +243,7 @@ void dualize_V1(sycl::queue&Q, IsomerBatch<T,K>& batch, const LaunchPolicy polic
             }
             sycl::group_barrier(cta);
 
-            node_t scan_result = exclusive_scan_over_group(cta, rep_count, plus<node_t>{});
+            node_t scan_result = exclusive_scan_over_group(cta, rep_count, sycl::plus<node_t>{});
 
             if (f < Nf){
                 node_t arc_count = 0;
@@ -282,3 +282,5 @@ void dualize_V1(sycl::queue&Q, IsomerBatch<T,K>& batch, const LaunchPolicy polic
 
 template void dualize<float,uint16_t>(sycl::queue&Q, IsomerBatch<float,uint16_t>& batch, const LaunchPolicy policy);
 template void dualize_V1<float,uint16_t>(sycl::queue&Q, IsomerBatch<float,uint16_t>& batch, const LaunchPolicy policy);
+template void dualize<double,uint16_t>(sycl::queue&Q, IsomerBatch<double,uint16_t>& batch, const LaunchPolicy policy);
+template void dualize_V1<double,uint16_t>(sycl::queue&Q, IsomerBatch<double,uint16_t>& batch, const LaunchPolicy policy);

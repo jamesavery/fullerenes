@@ -13,7 +13,7 @@ set_source_files_properties(forcefield.cu PROPERTIES COMPILE_FLAGS           "$(
 set_source_files_properties(binning.cu PROPERTIES COMPILE_FLAGS              "$(CMAKE_CUDA_FLAGS) --maxrregcount=80")
 add_library(cuda_lib SHARED isomer_queue.cu cu_array.cu misc_cuda.cu forcefield.cu tutte.cu spherical_projection.cu dualize.cu benchmark_functions.cu eigen.cu hessian.cu properties.cu binning.cu)
 #TODO: Why doesn't this use CMAKE_CUDA_ARCHITECTURE? Not every NVIDIA user uses RTX 3080!
-set_property(TARGET cuda_lib PROPERTY CUDA_ARCHITECTURES "86")
+#set_property(TARGET cuda_lib PROPERTY CUDA_ARCHITECTURES "86")
 #set_target_properties(cuda_lib PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 #set_target_properties(cuda_lib PROPERTIES POSITION_INDEPENDENT_CODE ON)
 #set_target_properties(cuda_lib PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)

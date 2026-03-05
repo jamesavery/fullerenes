@@ -289,7 +289,7 @@ __device__ void reduction_V3(T* sdata, const T data = (T)0){
 
 
 template <typename T>
-__device__ void reduction_V4(T* sdata, const T data, unsigned int n_warps, int warp_switch){
+__device__ void reduction_V4(T* sdata, const T data, const int n_warps, const int WarpSwitch = 5){
     cg::thread_block_tile<32> tile32 = cg::tiled_partition<32>(cg::this_thread_block());
     auto warpid = threadIdx.x >> 5;
     auto laneid = threadIdx.x & 31;
@@ -298,7 +298,7 @@ __device__ void reduction_V4(T* sdata, const T data, unsigned int n_warps, int w
     if (laneid == 0) sdata[warpid + blockDim.x] = temp;
     BLOCK_SYNC
     if (warpid == 0) {
-        switch (warp_switch)
+        switch (WarpSwitch)
         {
         case 1:
             temp = cg::reduce(cg::tiled_partition<2>(cg::this_thread_block()), sdata[laneid + blockDim.x], cg::plus<T>());
@@ -350,7 +350,7 @@ __device__ void reduction_V6(T* sdata, const T data = (T)0, T* result = nullptr)
 }
 
 template <typename T>
-__device__ void reduction_V7(T* sdata, const T data = (T)0, T* result = nullptr, unsigned int n_warps = 1, int warp_switch = 0){
+__device__ void reduction_V7(T* sdata, const T data = (T)0, T* result = nullptr, int pow2 = 0){
     *result = (T)0;
     cg::thread_block_tile<32> tile32 = cg::tiled_partition<32>(cg::this_thread_block());
     auto warpid = threadIdx.x >> 5;
@@ -359,7 +359,7 @@ __device__ void reduction_V7(T* sdata, const T data = (T)0, T* result = nullptr,
     sdata[warpid + blockDim.x] = temp;
     BLOCK_SYNC
     if (warpid == 0) {
-        switch (warp_switch)
+        switch (pow2)
         {
         case 1:
             *result = cg::reduce(cg::tiled_partition<2>(cg::this_thread_block()), sdata[laneid + blockDim.x], cg::plus<T>());

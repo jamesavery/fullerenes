@@ -4,6 +4,8 @@ set(SYCL_EXECUTABLES
   full_pipeline_strong_scaling  
   sequential_dualize
   lockstep_dualize
+  matmul
+  lobpcg-proto
 )
 
 foreach(EXECUTABLE ${SYCL_EXECUTABLES})
@@ -13,7 +15,7 @@ endforeach()
 foreach(EXECUTABLE ${SYCL_EXECUTABLES})
   add_executable(${EXECUTABLE} ${EXECUTABLE}.cc)  
   target_include_directories(${EXECUTABLE} PRIVATE ${DPCPP_INCLUDE} ${DPCPP_INCLUDE}/sycl)
-  target_link_libraries(${EXECUTABLE} PRIVATE sycl_fullerene_lib sycl fullerenes m)
+  target_link_libraries(${EXECUTABLE} PRIVATE sycl_fullerene_lib sycl fullerenes)
   target_link_options(${EXECUTABLE} PRIVATE     
     "SHELL:${DPCPP_LINK_FLAGS}"
     "SHELL:${DPCPP_FLAGS}"

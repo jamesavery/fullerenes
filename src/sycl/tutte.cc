@@ -27,7 +27,7 @@ void tutte_layout(sycl::queue& Q, IsomerBatch<T,K>& batch, const LaunchPolicy po
         local_accessor<coord2d, 1>  xys_smem(N, h);    
         local_accessor<coord2d, 1>  newxys_smem(N, h);
 
-        h.parallel_for<class tutte>(sycl::nd_range(sycl::range(N*capacity), sycl::range(N)), [=](nd_item<1> nditem) {
+        h.parallel_for(sycl::nd_range(sycl::range(N*capacity), sycl::range(N)), [=](nd_item<1> nditem) {
  
             const auto   cta               = nditem.get_group();
             const auto   a                 = nditem.get_local_linear_id(); // Atom  vertex index in graph
@@ -105,3 +105,4 @@ void tutte_layout(sycl::queue& Q, IsomerBatch<T,K>& batch, const LaunchPolicy po
 }
 
 template void tutte_layout<float,uint16_t>(sycl::queue& Q, IsomerBatch<float,uint16_t>& batch, const LaunchPolicy policy);
+template void tutte_layout<double,uint16_t>(sycl::queue& Q, IsomerBatch<double,uint16_t>& batch, const LaunchPolicy policy);

@@ -6,14 +6,64 @@
 #include <algorithm>
 #define PRINT_CHECK 1
 using namespace sycl;
+    // Function to parse command line arguments
+void parseArguments(int argc, char** argv, size_t& N, size_t& BatchSize, std::string& device_type, bool& use_double_precision, size_t& Nlanczos, bool& print_out) {
+    for (int i = 1; i < argc; i++) {
+        std::string arg = argv[i];
+        if (arg == "-N") {
+            if (i + 1 < argc) {
+                N = std::stoul(argv[i + 1]);
+                i++;
+            }
+        } else if (arg == "-BatchSize") {
+            if (i + 1 < argc) {
+                BatchSize = std::stoul(argv[i + 1]);
+                i++;
+            }
+        } else if (arg == "-DeviceType") {
+            if (i + 1 < argc) {
+                device_type = argv[i + 1];
+                i++;
+            }
+        } else if (arg == "-DoublePrecision") {
+            use_double_precision = true;
+        } else if (arg == "-Nlanczos") {
+            if (i + 1 < argc) {
+                Nlanczos = std::stoul(argv[i + 1]);
+                i++;
+            }
+        } else if (arg == "-PrintOut") {
+            print_out = true;
+        }
+    }
+    if (argc == 1 || std::find(argv, argv + argc, "-h") != argv + argc) {
+        std::cout << "Usage: " << argv[0] << " [-N <size_t>] [-BatchSize <size_t>] [-DeviceType <string>] [-DoublePrecision] [-Nlanczos <size_t>] [-PrintOut]" << std::endl;
+        std::cout << "Defaults: N = 20, BatchSize = 1, DeviceType = gpu, DoublePrecision = false, Nlanczos = 50, PrintOut = false" << std::endl;
+    }
+}
+
 int main(int argc, char** argv) {
     typedef float real_t;
     typedef uint16_t node_t;
 
-    size_t N  = argc>1 ? strtol(argv[1],0,0) : 20;
+    size_t N = 20;
+    size_t BatchSize = 1;
+    std::string device_type = "gpu";
+    bool use_double_precision = false;
+    size_t Nlanczos = 50;
+    bool print_out = false;
+
+    parseArguments(argc, argv, N, BatchSize, device_type, use_double_precision, Nlanczos, print_out);
     size_t Nf = N/2 + 2;
-    size_t BatchSize = argc>2 ? strtol(argv[2],0,0) : 1;
-    std::string device_type = argc>3 ? argv[3] : "gpu";
+    
+    if (use_double_precision) {
+        std::cout << "Using double precision" << std::endl;
+        using real_t = double;
+    } else {
+        std::cout << "Using single precision" << std::endl;
+        using real_t = float;
+    }
+
 
     auto selector =  device_type == "cpu" ? sycl::cpu_selector_v : sycl::gpu_selector_v;
 
@@ -58,12 +108,14 @@ int main(int argc, char** argv) {
 
     sycl::buffer<real_t, 1> hessians(range<1>(N*90*BatchSize));
     sycl::buffer<node_t, 1> cols(range<1>(N*90*BatchSize));
+    sycl::buffer<real_t, 1> eigenvalues(range<1>(N*3*BatchSize));
+    sycl::buffer<real_t, 1> eigenvalue_ends(range<1>(BatchSize*2));
     compute_hessians(Q, batch, hessians, cols, LaunchPolicy::SYNC);
-
-    
+    eigensolve<EigensolveMode::FULL_SPECTRUM>(Q, batch, hessians, cols, eigenvalues);
+    eigensolve<EigensolveMode::ENDS>(Q, batch, hessians, cols, eigenvalue_ends, LaunchPolicy::SYNC, Nlanczos);
 
     #if PRINT_CHECK
-    std::cout << "Output Cubic Graph:" << std::endl;
+    /* std::cout << "Output Cubic Graph:" << std::endl;
     for (size_t ii = 0; ii < BatchSize; ii++)
     {
         sycl::host_accessor acc_cubic(batch.cubic_neighbours, sycl::read_only);
@@ -119,6 +171,31 @@ int main(int argc, char** argv) {
                 }
                 std::cout << std::endl;
             }
+        }
+    }
+    
+     */
+    if(print_out)
+    {   
+        std::cout << "Output Eigenvalues:" << std::endl;
+        sycl::host_accessor acc_eigenvalues(eigenvalues, sycl::read_only);
+        for (size_t ii = 0; ii < BatchSize; ii++)
+        {
+            for (size_t i = 0; i < N*3; i++)
+            {
+                    std::cout << acc_eigenvalues[ii*N*3 + i] << ", ";
+            }
+            std::cout << std::endl;
+        }
+        std::cout << "Output Eigenvalue Ends:" << std::endl;
+        sycl::host_accessor acc_eigenvalue_ends(eigenvalue_ends, sycl::read_only);
+        for (size_t ii = 0; ii < BatchSize; ii++)
+        {
+            for (size_t i = 0; i < 2; i++)
+            {
+                    std::cout << acc_eigenvalue_ends[ii*2 + i] << ", ";
+            }
+            std::cout << std::endl;
         }
     }
     #endif

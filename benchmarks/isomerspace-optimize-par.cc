@@ -7,7 +7,7 @@
 
 using namespace chrono;
 using namespace chrono_literals;
-
+#include "fullerenes/isomerdb.hh"
 #include "fullerenes/isomer_queue.hh"
 #include "fullerenes/device_io.hh"
 #include "fullerenes/gpu/kernels.hh"
@@ -35,8 +35,8 @@ int main(int argc, char** argv){
         Graph G;
 
         auto batch_size = isomerspace_forcefield::optimal_batch_size(N);
-        auto n_fullerenes = IsomerDB::number_fullerenes(N);	
-        auto sample_size = min(batch_size*1,n_fullerenes);
+        auto n_fullerenes = IsomerDB::number_isomers(N);	
+        auto sample_size = min(batch_size*1,(int)n_fullerenes);
         if (n_fullerenes < batch_size){
             sample_size = n_fullerenes;
         } else if (n_fullerenes < batch_size*2){
@@ -99,8 +99,8 @@ int main(int argc, char** argv){
             device_io::IsomerQueue isomer_q_cubic(N,0);
             device_io::IsomerQueue OutQueue(N,0);
             OutQueue.resize(sample_size);
-            isomer_q_cubic.resize(min(n_fullerenes,10000 + sample_size));
-            isomer_q.resize(min(n_fullerenes,sample_size));
+            isomer_q_cubic.resize(min((int)n_fullerenes,10000 + sample_size));
+            isomer_q.resize(min((int)n_fullerenes,sample_size));
             for (int i = 0; i < sample_size; i++){
                 for (size_t j = 0; j < Nf; j++){
                     G.neighbours[j].clear();
@@ -122,7 +122,7 @@ int main(int argc, char** argv){
             T_X0s[l] += isomerspace_X0::time_spent() - TX0;
 
             device_io::copy(batch1, batch0);
-            while(isomer_q_cubic.get_size() < min(n_fullerenes,10000)){
+            while(isomer_q_cubic.get_size() < min((int)n_fullerenes,10000)){
                 isomer_q_cubic.insert(batch1);
                 device_io::copy(batch1, batch0);
             }

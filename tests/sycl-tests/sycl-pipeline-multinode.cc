@@ -11,7 +11,7 @@
 using namespace sycl;
 using namespace std;
 
-typedef double device_real_t;		
+typedef float device_real_t;		
 typedef uint16_t device_node_t;
 constexpr device_node_t EMPTY_NODE = std::numeric_limits<device_node_t>::max(); /* Do this centrally */
 

@@ -46,7 +46,7 @@ struct IsomerBatch
     pointers =   {{"cubic_neighbours",(void**)&cubic_neighbours, sizeof(device_node_t)*3, true}, {"dual_neighbours", (void**)&dual_neighbours, sizeof(device_node_t)*4, true}, {"face_degrees", (void**)&face_degrees, sizeof(uint8_t)*1, true}, {"X", (void**)&X, sizeof(device_real_t)*3, true}, {"xys", (void**)&xys, sizeof(device_real_t)*2, true}, {"statuses", (void**)&statuses, sizeof(IsomerStatus), false}, {"IDs", (void**)&IDs, sizeof(size_t), false}, {"iterations", (void**)&iterations, sizeof(size_t), false}};
   }
 
-  IsomerBatch(size_t n_atoms, size_t n_isomers, int device  = 0) :
+  IsomerBatch(size_t n_atoms, size_t n_isomers, int device  = 0); /* :
     n_atoms(n_atoms), isomer_capacity(n_isomers), n_faces(n_atoms/2+2), m_device(device) {
     typedef device_node_t node_t;
   
@@ -65,17 +65,17 @@ struct IsomerBatch
       memset(*ptr,0, n_isomers*isomer_size);
     }
     allocated = true;
-  }
+  } */
   
 
   void operator=(const IsomerBatch &);
   
-  ~IsomerBatch(){
+  ~IsomerBatch();/* {
     if (allocated == true)
       for (size_t i = 0; i < pointers.size(); i++) 
 	free(*get<1>(pointers[i])); 
     allocated = false;
-  }
+  } */
       
     void set_print_simple() {verbose = false;} 
     void set_print_verbose() {verbose = true;} 

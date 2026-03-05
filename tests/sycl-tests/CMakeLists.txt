@@ -3,6 +3,7 @@ set(SYCL_EXECUTABLES
   sycl-pipeline-test
   sycl-pipeline-herd
   sycl-pipeline-multinode
+  eigen-test-sycl
 )
 
 foreach(EXECUTABLE ${SYCL_EXECUTABLES})
