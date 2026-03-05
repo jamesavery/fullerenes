@@ -62,7 +62,7 @@ public:
   void          orient_neighbours();		// Ensures that neighbours are ordered consistently
   
   //  Unfolding unfold() const;
-  Triangulation GCtransform(const unsigned k=1, const unsigned l=0) const;
+  Triangulation GCtransform(unsigned k=1, unsigned l=0) const;
   Triangulation halma_transform(int m, vector<map<edge_t,node_t>>* face_grids = nullptr) const;
 
   // spiral stuff
