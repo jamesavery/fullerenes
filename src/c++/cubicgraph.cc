@@ -29,8 +29,9 @@ bool CubicGraph::get_spiral_from_cg(const node_t f1, const node_t f2, const node
   jumps.clear();
   vector<node_t> permutation_dummy;
 
-  Triangulation Dual(this->dual_graph(6));
-
+  Triangulation Dual(N/2+2);
+  this->dual_graph(Dual, 6);
+  
   if(!Dual.get_spiral(f1, f2, f3, spiral, jumps, permutation_dummy, general)) return false;
   assert(spiral.size()==N/2+2);
   return true;
@@ -41,8 +42,9 @@ bool CubicGraph::get_spiral_from_cg(vector<int> &spiral, jumplist_t &jumps, cons
   spiral.clear();
   jumps.clear();
 
-  Triangulation Dual(this->dual_graph(6));
-
+  Triangulation Dual(N/2+2);
+  this->dual_graph(Dual,6);
+  
   if(!Dual.get_spiral(spiral, jumps, general, pentagon_start)) return false;
   assert(spiral.size()==N/2+2);
   return true;
