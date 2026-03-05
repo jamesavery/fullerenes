@@ -9,8 +9,7 @@ class Triangulation;
 // Cubic planar graphs (cubic polyhedral graphs)
 // TODO: Make this more useful, merge cubic-specific stuff from planargraph, make triangulation dual produce cubicgraph
 struct CubicGraph : public PlanarGraph {
-
-  //  CubicGraph() {} // TODO: Does it make sense to have a default constructor for a span-view?
+  CubicGraph() {} 
   CubicGraph(const PlanarGraph& g) : PlanarGraph(g) {
     for(node_t u=0;u<N;u++)
       if(neighbours[u].size() != 3){
