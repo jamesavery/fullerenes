@@ -24,7 +24,7 @@ public:
   //  5. Embed in 2D
   //  6. Embed in 3D
 
-  //Triangulation(int N) : PlanarGraph(Graph(N,true)) {} // TODO: Memory needs to come from somewhere
+  Triangulation(int N=0) : PlanarGraph(Graph(N,true)) {} 
   Triangulation(const Graph& g, bool already_oriented = false) : PlanarGraph(g) { update(already_oriented); }
   Triangulation(const Graph& g, const vector<tri_t>& tris) : PlanarGraph(g), triangles(tris) { 
     orient_triangulation(triangles);
