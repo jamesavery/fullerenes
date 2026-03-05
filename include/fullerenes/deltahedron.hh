@@ -62,9 +62,9 @@ public:
   // Laplacian smoothing
   void smooth(double q);
 
-  // GC transform with 3D coordinates 
+  // GC transform with 3D coordinates
   Deltahedron GCtransform(unsigned k, unsigned l) const;
-  Deltahedron halma_transform(unsigned k) const;
+  Deltahedron halma_transform(int m) const;
 
   // Optimize geometry toward equilateral triangles.
   // Replaces this->points with optimized coordinates.

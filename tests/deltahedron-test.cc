@@ -177,7 +177,7 @@ TEST_F(DeltahedronTest, GC_3_0_FaceInteriorHarmonicProperty) {
   int k = 3;
   int m = k - 1;
   vector<map<edge_t,node_t>> face_grids;
-  ico.halma_transform(m, &face_grids);
+  static_cast<const Triangulation&>(ico).halma_transform(m, &face_grids);
   Deltahedron D = ico.GCtransform(k, 0);
 
   // Identify face-interior vertices: grid points (a,b) with a>0, b<m+1, a<b
@@ -212,7 +212,7 @@ TEST_F(DeltahedronTest, GC_5_0_FaceInteriorHarmonicProperty) {
   int k = 5;
   int m = k - 1;
   vector<map<edge_t,node_t>> face_grids;
-  ico.halma_transform(m, &face_grids);
+  static_cast<const Triangulation&>(ico).halma_transform(m, &face_grids);
   Deltahedron D = ico.GCtransform(k, 0);
 
   vector<bool> is_face_interior(D.N, false);
