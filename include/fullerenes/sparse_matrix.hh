@@ -60,6 +60,7 @@ namespace Views {
     span<nnz_t>  row_nnz;
     constexpr static node_t EMPTY_NODE = -1;
 
+    sparsity() : values((node_t*)0,0), row_start((node_t*)0,0), row_nnz((nnz_t*)0,0) {}
     sparsity(Allocators::sparsity<node_t> &G):
       values(G.values), row_start(G.row_start), row_nnz(G.row_nnz) {}
 
