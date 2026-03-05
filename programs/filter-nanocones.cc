@@ -182,7 +182,7 @@ int main(int ac, char **av)
  
   vector<general_spiral> isomers = FullereneDual::isomer_search(filter_nanocones(14*14,30,1,3*3,2*2,10*10,5,7), N,100000,false,false,N_chunks,chunk_index);
 
-  
+  cout << isomers << endl; 
   
   return 0;
 }
