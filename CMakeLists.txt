@@ -9,9 +9,14 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(FULLERENE_DATABASE_PATH ${CMAKE_SOURCE_DIR}/database/ CACHE PATH "Path to fullerene database root")
 set(FORTRAN_NMAX 5000 CACHE STRING "Maximum vertex count for Fortran routines using statically allocated memory")
 
+# Try Intel MKL first (faster), fall back to any available BLAS/LAPACK
 set(BLA_VENDOR Intel10_64lp_seq)
-find_package(BLAS)
-find_package(LAPACK)
+find_package(BLAS QUIET)
+if(NOT BLAS_FOUND)
+  unset(BLA_VENDOR)
+  find_package(BLAS REQUIRED)
+endif()
+find_package(LAPACK REQUIRED)
 find_package(GSL)
 
 # Shared between CUDA and SYCL
