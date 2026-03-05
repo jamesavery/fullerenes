@@ -40,10 +40,12 @@ PlanarGraph PlanarGraph::enveloping_triangulation(construction_scheme_t &scheme)
     return *this;
   } else if(is_cubic()){
     scheme = spiral_nomenclature::CUBIC;
-    return dual_graph();
+    Triangulation T(N/2+2);
+    return dual_graph(T,max_degree());
   } else {
     scheme = spiral_nomenclature::LEAPFROG;
-    return leapfrog_dual();
+    Triangulation T(N+N/2+2);    
+    return leapfrog_dual(T);
   }
 }
 
@@ -52,11 +54,15 @@ PlanarGraph PlanarGraph::enveloping_triangulation(const construction_scheme_t &s
   switch(scheme){
   case spiral_nomenclature::TRIANGULATION:
     return *this;
-  case spiral_nomenclature::CUBIC:
-    return dual_graph();
+  case spiral_nomenclature::CUBIC: {
+    Triangulation T(N/2+2);
+    return dual_graph(T,max_degree());
+  }
   case spiral_nomenclature::LEAPFROG:
-  default:
-    return leapfrog_dual();
+  default: {
+    Triangulation T(N+N/2+2);        
+    return leapfrog_dual(T);
+  }
   }
 }
 
@@ -157,7 +163,7 @@ bool PlanarGraph::layout_is_crossingfree() const
 // 'true'.
 bool PlanarGraph::is_cut_vertex(const node_t v) const {
   assert(is_oriented); // we need oriented (sorted) neighbours of v (direction doesn't matter)
-  const vector<node_t> &nv = neighbours[v];
+  const auto &nv = neighbours[v];
   const int n_neighbours = nv.size();
   if(n_neighbours < 2) return false;
 
@@ -177,135 +183,69 @@ bool PlanarGraph::is_cut_vertex(const node_t v) const {
 }
 
 
-
-PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const
+PlanarGraph& PlanarGraph::dual_graph(PlanarGraph &dual, unsigned int Fmax, bool planar_layout) const
 {
-  if(is_oriented){
+  assert(is_oriented);
 
-    // Each directed edge uniquely identifies a face
-    vector<arc_t>            face_reps = compute_face_representations(Fmax);
-    unordered_map<arc_t,int> face_numbers(face_reps.size());
-    for(int i=0;i<face_reps.size();i++) face_numbers[face_reps[i]] = i;
-
-    // cerr << "face_reps  = " << face_reps << ";\n";
-    // cerr << "face_reps' = " << get_keys(face_numbers) << ";\n";
-    // cerr << "face_nums  = " << get_values(face_numbers) << ";\n";
-    //    cerr << "faces      = " << compute_faces_oriented(Fmax) << ";\n";
-    
-    PlanarGraph dual(face_numbers.size());
-
-    arc_t e_f;
-    node_t  i_f;
-    for(const auto &ei: face_numbers){
-      // e_f is minimal directed edge representation of face f, i_f is its face number.      
-      tie(e_f,i_f) = ei;
-      // cerr << "Processing face " << i_f << ": " << e_f << " -> " << get_face_oriented(e_f,Fmax) << ";\n";
-      
-      // Now iterate along face f's directed edges in CCW order:
-      // This visits each face neighbour in CCW order.
-      node_t u=e_f.first, v=e_f.second, w=-1, i=0;
-      do {
-        // e_g is MDE-representation of opposite face along edge e_f
-        arc_t e_g = get_face_representation({v,u},Fmax);
-        // cerr << "Processing face: " << arc_t{u,v} << " -> " << get_face_oriented({u,v},Fmax)<<" "
-        //      << " opposite " << e_g << " -> " << get_face_oriented(e_g,Fmax) << ";\n";
-        dual.neighbours[i_f].push_back(face_numbers[e_g]);
-
-        w = prev(v,u); u = v; v = w; // CCW node neighbour order + CCW face order
-        assert(++i <= Fmax);        // Face larger than Fmax or corrupted graph
-      } while (u != e_f.first);
-    }
-    assert(dual.is_consistently_oriented());
-    dual.is_oriented = true;
-    
-    if(planar_layout && layout2d.size() == N){
-      dual.layout2d = vector<coord2d>(face_numbers.size());
-
-      for(const auto &ei: face_numbers){
-        arc_t e_f = ei.first; node_t i_f = ei.second;
-        face_t f = get_face_oriented(e_f,Fmax);
-        
-        dual.layout2d[i_f] = f.centroid(layout2d);
-      }
-    }
-
-    return dual;
-    // Proper implementation of general oriented planar graph dual ends
-  } else {
-    // TODO: ********** Get rid of all this junk below! ******************
-    IDCounter<face_t> face_numbers;
-    PlanarGraph dual;
-    vector<edge_t> edges = undirected_edges(); // TODO: In new planargraph, this is unnecessary
-    int Nfaces = edges.size()-N+2;
-    dual.N = Nfaces;
-    dual.neighbours.resize(Nfaces);
-
-    //  cerr << "dual_graph(" << Fmax << ")\n";
-    vector<face_t> allfaces = compute_faces(Fmax,planar_layout);
-
-    if(Nfaces != allfaces.size()){
-      fprintf(stderr,"%d != %d faces: Graph is not polyhedral.\n",Nfaces,int(allfaces.size()));
-      cout << "errgraph = " << *this << endl;
-    }
-
-    // Construct mapping e -> faces containing e (these are mutually adjacent)
-    //  cerr << "dual_graph::construct facenodes\n";
-    map< edge_t, set<int> > facenodes;
-    for(unsigned int i=0;i<allfaces.size(); i++){
-      const face_t& face(allfaces[i]);
-      //  cerr << "Face "<<i<<": " << face << endl;
-      for(unsigned int j=0;j<face.size();j++)
-        facenodes[edge_t(face[j],face[(j+1)%face.size()])].insert(i);
-    }
-    //  cerr << "dual_graph::test planarity\n";
-    for(map<edge_t,set<int> >::const_iterator fs(facenodes.begin());fs!=facenodes.end();fs++){
-      const edge_t&   e(fs->first);
-      const set<int>& connects(fs->second);
-      if(connects.size() != 2)
-        fprintf(stderr,"Edge (%d,%d) connects %d faces: Graph is not planar.\n",e.first,e.second,int(connects.size()));
-    }
-
-    // Insert edge between each pair of faces that share an edge
-    //  cerr << "dual_graph::construct graph\n";
-    set<edge_t> dual_edges;
-    for(edge_t e:edges){
-      const set<int>& adjacent_faces(facenodes[e]);
-      for(set<int>::const_iterator f(adjacent_faces.begin()); f!= adjacent_faces.end(); f++){
-        set<int>::const_iterator g(f);
-        for(++g; g!= adjacent_faces.end(); g++)
-          dual_edges.insert(edge_t(*f,*g));
-      }
-    }
-    //fprintf(stderr,"%d nodes, and %d edges in dual graph.\n",int(dual.N), int(dual.edge_set.size()));
-
-    dual = Graph(dual_edges);
-
+  // Each directed edge uniquely identifies a face
+  vector<arc_t>            face_reps = compute_face_representations(Fmax);
+  unordered_map<arc_t,int> face_numbers(face_reps.size());
+  for(int i=0;i<face_reps.size();i++) face_numbers[face_reps[i]] = i;
   
-    // If original graph was planar with 2D layout, there's a corresponding layout for the dual graph
-    // (but it is not planar, because the outer face is placed in (0,0))
-    if(planar_layout && layout2d.size() == N){
-      //    cerr << "dual_graph::compute layout.\n";
-      dual.layout2d = vector<coord2d>(allfaces.size());
+  // cerr << "face_reps  = " << face_reps << ";\n";
+  // cerr << "face_reps' = " << get_keys(face_numbers) << ";\n";
+  // cerr << "face_nums  = " << get_values(face_numbers) << ";\n";
+  //    cerr << "faces      = " << compute_faces_oriented(Fmax) << ";\n";
+  
+  for(const auto &ei: face_numbers){
+    // e_f is minimal directed edge representation of face f, i_f is its face number.      
+    auto [e_f,i_f] = ei;
+    
+    // Now iterate along face f's directed edges in CCW order:
+    // This visits each face neighbour in CCW order.
+    node_t u=e_f.first, v=e_f.second, w=-1, i=0;
+    do {
+      // e_g is MDE-representation of opposite face along edge e_f
+      arc_t  e_g = get_face_representation({v,u},Fmax);
+      node_t i_g = face_numbers[e_g];
+      dual.insert_edge({i_f,i_g}); // NB: No need for successors, as we insert in oriented order
 
-      for(int i=0;i<allfaces.size();i++)
-        dual.layout2d[i] = allfaces[i].centroid(layout2d);
+      w = prev(v,u); u = v; v = w; // CCW node neighbour order + CCW face order
+      assert(++i <= Fmax);         // Face larger than Fmax or corrupted graph
+    } while (u != e_f.first);
+  }
+  assert(dual.is_consistently_oriented());
+  dual.is_oriented = true;
+    
+  if(planar_layout && layout2d.size() == N){
+    dual.layout2d = vector<coord2d>(face_numbers.size());
+
+    for(const auto &ei: face_numbers){
+      arc_t e_f = ei.first; node_t i_f = ei.second;
+      face_t f = get_face_oriented(e_f,Fmax);
+        
+      dual.layout2d[i_f] = f.centroid(layout2d);
     }
-    return dual;
-  }    
+  }
+
+  return dual;
 }
 
 // the dual of the LF, ie a Triangulation is returned
-PlanarGraph PlanarGraph::leapfrog_dual() const
+PlanarGraph& PlanarGraph::leapfrog_dual(PlanarGraph& lf) const
 {
   assert(is_oriented);
   vector<face_t> faces = compute_faces_oriented();
   size_t Nf = faces.size();  
 
-  PlanarGraph lf(Graph(N+Nf,true));
+  // PlanarGraph lf(Graph(N+Nf,true));
 
-  // Start with all the existing nodes
-  for(node_t u=0;u<N;u++) lf.neighbours[u] = neighbours[u];
-
+  // Start with the old graph
+  for(node_t u=0;u<N;u++){
+    const auto &nu = neighbours[u];
+    for(int j=0;j<nu.size();j++) lf.neighbours.insert_arc(u,nu[j]); 
+  }
+    
   // Now connect new face-center nodes in oriented order
   for(int i=0;i<Nf;i++){
     const face_t &f  = faces[i];
@@ -340,7 +280,7 @@ vector<face_t> PlanarGraph::compute_faces(unsigned int Nmax, bool planar_layout)
   for(const edge_t &e: edges){
     const node_t s = e.first, t = e.second;
     
-    const vector<node_t>& nt(neighbours[t]);
+    const auto& nt(neighbours[t]);
     
     for(unsigned int i=0;i<nt.size();i++)
       if(nt[i] != s) {
@@ -389,7 +329,7 @@ face_t PlanarGraph::get_face_layout_oriented(node_t s, node_t t) const
   node_t u = s, v = t;
   //    printf("%d->%d\n",e.first,e.second);
   while(v != s){
-    const vector<node_t>& ns(neighbours[v]);
+    const auto& ns(neighbours[v]);
 
 
     coord2d vu = layout2d[u]-layout2d[v];
@@ -654,7 +594,7 @@ face_t PlanarGraph::find_outer_face() const
   face_t outer_face;
   int i = 0;
   for(node_t t = u_farthest, u = u_farthest, v = -1; v != u_farthest && i <= N; i++){
-    const vector<node_t>& ns(neighbours[u]);
+    const auto& ns(neighbours[u]);
     double r = 0;
     for(int i=0;i<ns.size();i++)
       if(ns[i] != t && ns[i] != u && radii[ns[i]] > r){ r = radii[ns[i]]; v = ns[i]; }
