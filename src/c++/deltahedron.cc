@@ -639,76 +639,84 @@ static vector<int> matchSeedViaBFS(
         ep_adj[sv.id] = nbrs;
     }
 
-    // Try matching each precomputed degree-5 vertex with each ep degree-5 vertex
-    for (int start_p = 0; start_p < seed_N; start_p++) {
-        if ((int)precomp[start_p].size() != 5) continue;
+    // Try both orientations: the input graph may be either reflection
+    // of the planar embedding (Whitney's theorem: unique up to reflection).
+    for (int reflect = 0; reflect < 2; reflect++) {
+        if (reflect == 1) {
+            for (auto& kv : ep_adj)
+                reverse(kv.second.begin(), kv.second.end());
+        }
 
-        for (const auto& sv : ep.seed_state) {
-            if ((int)ep_adj[sv.id].size() != 5) continue;
+        for (int start_p = 0; start_p < seed_N; start_p++) {
+            if ((int)precomp[start_p].size() != 5) continue;
 
-            // Try all 5 rotations of the CW neighbor list
-            for (int rot = 0; rot < 5; rot++) {
-                vector<int> mapping(seed_N, -1);
-                bool valid = true;
+            for (const auto& sv : ep.seed_state) {
+                if ((int)ep_adj[sv.id].size() != 5) continue;
 
-                queue<int> q;
-                mapping[start_p] = sv.id;
-                q.push(start_p);
+                // Try all rotations of the neighbor list
+                int deg_start = (int)precomp[start_p].size();
+                for (int rot = 0; rot < deg_start; rot++) {
+                    vector<int> mapping(seed_N, -1);
+                    bool valid = true;
 
-                while (!q.empty() && valid) {
-                    int p_v = q.front(); q.pop();
-                    int ep_v = mapping[p_v];
-                    const auto& p_nbrs = precomp[p_v];
-                    const auto& e_nbrs = ep_adj[ep_v];
+                    queue<int> q;
+                    mapping[start_p] = sv.id;
+                    q.push(start_p);
 
-                    if (p_nbrs.size() != e_nbrs.size()) { valid = false; break; }
+                    while (!q.empty() && valid) {
+                        int p_v = q.front(); q.pop();
+                        int ep_v = mapping[p_v];
+                        const auto& p_nbrs = precomp[p_v];
+                        const auto& e_nbrs = ep_adj[ep_v];
 
-                    int offset = -1;
-                    if (p_v == start_p) {
-                        offset = rot;
-                    } else {
-                        for (int j = 0; j < (int)p_nbrs.size(); j++) {
-                            if (mapping[p_nbrs[j]] >= 0) {
-                                int target = mapping[p_nbrs[j]];
-                                for (int k = 0; k < (int)e_nbrs.size(); k++) {
-                                    if (e_nbrs[k] == target) {
-                                        offset = (k - j + (int)e_nbrs.size()) % (int)e_nbrs.size();
-                                        break;
+                        if (p_nbrs.size() != e_nbrs.size()) { valid = false; break; }
+
+                        int offset = -1;
+                        if (p_v == start_p) {
+                            offset = rot;
+                        } else {
+                            for (int j = 0; j < (int)p_nbrs.size(); j++) {
+                                if (mapping[p_nbrs[j]] >= 0) {
+                                    int target = mapping[p_nbrs[j]];
+                                    for (int k = 0; k < (int)e_nbrs.size(); k++) {
+                                        if (e_nbrs[k] == target) {
+                                            offset = (k - j + (int)e_nbrs.size()) % (int)e_nbrs.size();
+                                            break;
+                                        }
                                     }
+                                    break;
                                 }
+                            }
+                            if (offset < 0) { valid = false; break; }
+                        }
+
+                        int deg = (int)p_nbrs.size();
+                        for (int j = 0; j < deg; j++) {
+                            int p_nbr = p_nbrs[j];
+                            int e_nbr = e_nbrs[(j + offset) % deg];
+
+                            if (mapping[p_nbr] < 0) {
+                                mapping[p_nbr] = e_nbr;
+                                q.push(p_nbr);
+                            } else if (mapping[p_nbr] != e_nbr) {
+                                valid = false;
                                 break;
                             }
                         }
-                        if (offset < 0) { valid = false; break; }
                     }
 
-                    int deg = (int)p_nbrs.size();
-                    for (int j = 0; j < deg; j++) {
-                        int p_nbr = p_nbrs[j];
-                        int e_nbr = e_nbrs[(j + offset) % deg];
-
-                        if (mapping[p_nbr] < 0) {
-                            mapping[p_nbr] = e_nbr;
-                            q.push(p_nbr);
-                        } else if (mapping[p_nbr] != e_nbr) {
-                            valid = false;
-                            break;
-                        }
+                    if (valid) {
+                        bool complete = true;
+                        for (int i = 0; i < seed_N; i++)
+                            if (mapping[i] < 0) { complete = false; break; }
+                        if (complete) return mapping;
                     }
-                }
-
-                if (valid) {
-                    bool complete = true;
-                    for (int i = 0; i < seed_N; i++)
-                        if (mapping[i] < 0) { complete = false; break; }
-                    if (complete) return mapping;
                 }
             }
         }
     }
 
-    assert(false && "Failed to match seed vertices");
-    return {};
+    return {};  // No match found
 }
 
 // Load precomputed seed geometry into the points array, mapped to the
@@ -717,17 +725,56 @@ static void computeSeedGeometry(const ExtensionPath& ep, vector<coord3d>& points
     const auto& precomp_nbrs = seedNeighbours(ep.seed);
     const auto& precomp_pts = seedPoints(ep.seed);
 
-    // Match via BFS isomorphism (faster than spiral for these small graphs)
+    // Try BFS match against precomputed seed (fast path)
     vector<int> mapping = matchSeedViaBFS(precomp_nbrs, ep);
 
-    // Normalize to unit sphere (precomputed coords are at physical scale ~1.5 A)
-    double scale = 0;
-    for (const auto& p : precomp_pts)
-        scale = max(scale, p.norm());
+    if (!mapping.empty()) {
+        // Normalize to unit sphere (precomputed coords are at physical scale ~1.5 A)
+        double scale = 0;
+        for (const auto& p : precomp_pts)
+            scale = max(scale, p.norm());
 
-    for (int i = 0; i < (int)precomp_pts.size(); i++) {
-        points[mapping[i]] = precomp_pts[i] / scale;
+        for (int i = 0; i < (int)precomp_pts.size(); i++)
+            points[mapping[i]] = precomp_pts[i] / scale;
+        return;
     }
+
+    // Fallback: the ep's seed is a different isomer than the precomputed one.
+    // Build the seed graph from ep.seed_state and compute geometry from scratch.
+    int seed_N = (int)precomp_nbrs.size();
+    vector<int> ep_ids;
+    ep_ids.reserve(seed_N);
+    for (const auto& sv : ep.seed_state)
+        ep_ids.push_back(sv.id);
+    sort(ep_ids.begin(), ep_ids.end());
+
+    map<int, int> to_compact;
+    for (int i = 0; i < seed_N; i++)
+        to_compact[ep_ids[i]] = i;
+
+    neighbours_t compact_adj(seed_N);
+    for (const auto& sv : ep.seed_state) {
+        int ci = to_compact[sv.id];
+        uint8_t m = sv.active;
+        for (int p = 0; p < 6; p++)
+            if (m & (1 << p))
+                compact_adj[ci].push_back(to_compact[sv.nbr[p]]);
+    }
+
+    Graph seed_graph(compact_adj);
+    PlanarGraph pg(seed_graph);
+    vector<coord3d> seed_pts = pg.zero_order_geometry();
+
+    // Normalize to unit sphere
+    double scale = 0;
+    for (const auto& p : seed_pts)
+        scale = max(scale, p.norm());
+    for (auto& p : seed_pts)
+        p /= scale;
+
+    // Map compact indices back to ep vertex IDs
+    for (int i = 0; i < seed_N; i++)
+        points[ep_ids[i]] = seed_pts[i];
 }
 
 Deltahedron Deltahedron::fromExtensionPath(const ExtensionPath& ep) {

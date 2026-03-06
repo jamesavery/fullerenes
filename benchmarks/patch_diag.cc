@@ -14,7 +14,6 @@
 #include "fullerenes/deltahedron.hh"
 #include "fullerenes/polyhedron.hh"
 #include "fullerenes/buckinverse.hh"
-#include "fullerenes/layout2d.hh"
 #include <cstdio>
 #include <cmath>
 #include <vector>
@@ -32,50 +31,53 @@ static Graph makeNanotubeDual(int n_rings) {
     assert(n_rings >= 1);
     int N = 12 + 5 * n_rings;
 
+    // Vertex ID helpers (all indices mod 5)
     auto mod5 = [](int i) -> int { return ((i % 5) + 5) % 5; };
-    auto cn  = [&](int i) -> int { return 1 + mod5(i); };
-    auto rng = [&](int j, int i) -> int { return 6 + 5*j + mod5(i); };
-    auto cs  = [&](int i) -> int { return 6 + 5*n_rings + mod5(i); };
+    auto cn  = [&](int i) -> int { return 1 + mod5(i); };             // cap_N[i]
+    auto rng = [&](int j, int i) -> int { return 6 + 5*j + mod5(i); }; // ring_j[i]
+    auto cs  = [&](int i) -> int { return 6 + 5*n_rings + mod5(i); };  // cap_S[i]
     int pole_N = 0;
     int pole_S = 11 + 5*n_rings;
+    int last = n_rings - 1;
 
-    set<pair<int,int>> edges;
-    auto add = [&](int u, int v) {
-        int a = min(u,v), b = max(u,v);
-        edges.insert(make_pair(a, b));
-    };
-
-    for (int i = 0; i < 5; i++) add(pole_N, cn(i));
-    for (int i = 0; i < 5; i++) add(cn(i), cn((i+1)%5));
-    for (int i = 0; i < 5; i++) {
-        add(cn(i), rng(0, i));
-        add(cn(i), rng(0, (i+1)%5));
-    }
-    for (int j = 0; j < n_rings; j++)
-        for (int i = 0; i < 5; i++)
-            add(rng(j, i), rng(j, (i+1)%5));
-    for (int j = 0; j + 1 < n_rings; j++)
-        for (int i = 0; i < 5; i++) {
-            add(rng(j, i), rng(j+1, i));
-            add(rng(j, i), rng(j+1, (i+1)%5));
-        }
-    for (int i = 0; i < 5; i++) {
-        add(rng(n_rings-1, i), cs(i));
-        add(rng(n_rings-1, i), cs((i+1)%5));
-    }
-    for (int i = 0; i < 5; i++) add(cs(i), cs((i+1)%5));
-    for (int i = 0; i < 5; i++) add(pole_S, cs(i));
-
-    assert((int)edges.size() == 3 * N - 6);
-
+    // Build oriented adjacency lists directly (CCW as seen from outside).
     neighbours_t adj(N);
-    for (const auto& [u, v] : edges) {
-        adj[u].push_back(v);
-        adj[v].push_back(u);
+
+    // pole_N: CCW from outside = cn(0), cn(1), ..., cn(4)
+    for (int i = 0; i < 5; i++) adj[pole_N].push_back(cn(i));
+
+    // cn(i) (deg 5): CCW neighbors
+    for (int i = 0; i < 5; i++)
+        adj[cn(i)] = {pole_N, cn(i+1), rng(0, i+1), rng(0, i), cn(i-1)};
+
+    // rng(0, i): connects up to cn(i-1), cn(i) and down to next layer
+    if (n_rings == 1) {
+        for (int i = 0; i < 5; i++)
+            adj[rng(0, i)] = {cn(i-1), cn(i), rng(0, i+1), cs(i+1), cs(i), rng(0, i-1)};
+    } else {
+        for (int i = 0; i < 5; i++)
+            adj[rng(0, i)] = {cn(i-1), cn(i), rng(0, i+1), rng(1, i+1), rng(1, i), rng(0, i-1)};
     }
+
+    // Interior rings: rng(j, i) for 1 <= j <= last-1
+    for (int j = 1; j < last; j++)
+        for (int i = 0; i < 5; i++)
+            adj[rng(j, i)] = {rng(j-1, i-1), rng(j-1, i), rng(j, i+1), rng(j+1, i+1), rng(j+1, i), rng(j, i-1)};
+
+    // rng(last, i): connects down to cs
+    if (n_rings >= 2)
+        for (int i = 0; i < 5; i++)
+            adj[rng(last, i)] = {rng(last-1, i-1), rng(last-1, i), rng(last, i+1), cs(i+1), cs(i), rng(last, i-1)};
+
+    // cs(i) (deg 5): connected up to rng(last,i-1) and rng(last,i)
+    for (int i = 0; i < 5; i++)
+        adj[cs(i)] = {pole_S, cs(i-1), rng(last, i-1), rng(last, i), cs(i+1)};
+
+    // pole_S (deg 5): CCW from outside (below) = cs(4), cs(3), ..., cs(0)
+    for (int i = 4; i >= 0; i--) adj[pole_S].push_back(cs(i));
 
     Graph G(adj);
-    layout2d::planar_orient(G);
+    assert(G.is_consistently_oriented());
     return G;
 }
 
