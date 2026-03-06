@@ -118,12 +118,12 @@ struct QueueIterator
     //Converts the circular index to the index in the batch
     int batch_ix_(int index) const {  return (queue_.get().front_index() + index) % queue_.get().capacity(); } 
 
-    QueueIterator<T,K>(const ReferenceWrapper<const FullereneQueue<T,K>>& queue, int index) : index_(index), queue_(queue) {
+    QueueIterator(const ReferenceWrapper<const FullereneQueue<T,K>>& queue, int index) : index_(index), queue_(queue) {
         if (index < 0 || index > queue.get().size()) {throw OOR_ERROR(index, queue.get().size());}
     }
     
-    QueueIterator<T,K>(const QueueIterator<T,K> &other) = default;
-    QueueIterator<T,K> &operator=(const QueueIterator<T,K> &other) = default;
+    QueueIterator(const QueueIterator &other) = default;
+    QueueIterator &operator=(const QueueIterator &other) = default;
 
     constexpr inline Fullerene<T,K> operator*() const { return queue_.get()[batch_ix_(index_)]; }
     constexpr inline Fullerene<T,K> operator->() const { return queue_.get()[batch_ix_(index_)]; }
@@ -302,7 +302,7 @@ struct FullereneBatchView
     FullereneBatchView<T, K> &operator=(const FullereneBatchView<T, K> &other) = default;
     FullereneBatchView<T, K> &operator=(FullereneBatchView<T, K> &&other) = default;
 
-    bool operator==(const FullereneBatchView<T, K> &other) const {d_ == other.d_ && m_ == other.m_;}
+    bool operator==(const FullereneBatchView<T, K> &other) const { return d_ == other.d_ && m_ == other.m_; }
 
     FullereneBatchView(const FullereneBatchView<T, K> &other, size_t offset, int count) : 
         N_(other.N_), Nf_(other.Nf_),

@@ -15,10 +15,10 @@ struct FullereneDataMembers{
 
     FullereneDataMembers() = default;
     ~FullereneDataMembers() = default;
-    FullereneDataMembers<Container, T, K>(const FullereneDataMembers<Container, T, K> &other) = default;
-    FullereneDataMembers<Container, T, K>(FullereneDataMembers<Container, T, K> &&other) = default;
-    FullereneDataMembers<Container, T, K> &operator=(const FullereneDataMembers<Container, T, K> &other) = default;
-    FullereneDataMembers<Container, T, K> &operator=(FullereneDataMembers<Container, T, K> &&other) = default;
+    FullereneDataMembers(const FullereneDataMembers &other) = default;
+    FullereneDataMembers(FullereneDataMembers &&other) = default;
+    FullereneDataMembers &operator=(const FullereneDataMembers &other) = default;
+    FullereneDataMembers &operator=(FullereneDataMembers &&other) = default;
     bool operator==(const FullereneDataMembers<Container, T, K> &other) const {
         auto compute_equality = [](auto... args) { return ((args.first == args.second) && ...); };
         return compute_equality(std::make_pair(to_tuple(), other.to_tuple()));
@@ -56,10 +56,10 @@ struct FullereneMetaMembers{
     ~FullereneMetaMembers() = default;
     FullereneMetaMembers(Container<uint64_t> id, Container<K> iters, Container<StatusFlag> flags, Container<K> valid)
         : ID_(std::move(id)), iterations_(std::move(iters)), flags_(std::move(flags)), valid_indices_(std::move(valid)) {}
-    FullereneMetaMembers<Container, K>(const FullereneMetaMembers<Container, K> &other) = default;
-    FullereneMetaMembers<Container, K>(FullereneMetaMembers<Container, K> &&other) = default;
-    FullereneMetaMembers<Container, K> &operator=(const FullereneMetaMembers<Container, K> &other) = default;
-    FullereneMetaMembers<Container, K> &operator=(FullereneMetaMembers<Container, K> &&other) = default;
+    FullereneMetaMembers(const FullereneMetaMembers &other) = default;
+    FullereneMetaMembers(FullereneMetaMembers &&other) = default;
+    FullereneMetaMembers &operator=(const FullereneMetaMembers &other) = default;
+    FullereneMetaMembers &operator=(FullereneMetaMembers &&other) = default;
 
     bool operator==(const FullereneMetaMembers<Container, K> &other) const {
         auto compute_equality = [](auto... args) { return ((args.first == args.second) && ...); };
