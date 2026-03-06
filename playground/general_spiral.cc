@@ -59,7 +59,6 @@ int main(int ac, char **av)
 
   FullereneGraph fg(n, rspi_in, jumps);
   cout << "graph created" << endl;
-  fg.layout2d = fg.tutte_layout();
   cout << "layout created" << endl;
 
 //  cout << "fg = " << fg << endl;

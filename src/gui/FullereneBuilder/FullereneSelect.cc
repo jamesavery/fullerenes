@@ -56,7 +56,6 @@ vector<double> FullereneSelect::get_coordinates(int isomer, int opt_method, doub
   FullereneGraph g;
   if(has_db){
     g = IsomerDB::makeIsomer(db.N,db.entries[isomer]);
-    g.layout2d = g.tutte_layout();
   } else {
     // get generated graph
   }

@@ -574,7 +574,7 @@ static vector<int> matchSeedViaSpiralImpl(
     int seed_N = (int)precomp.size();
 
     // 1. Canonical spiral of precomputed seed graph
-    Triangulation T_pre(precomp, true);
+    Triangulation T_pre(precomp);
     vector<int> spiral_pre;
     jumplist_t jumps_pre;
     vector<vector<node_t>> perms_pre;
@@ -604,7 +604,7 @@ static vector<int> matchSeedViaSpiralImpl(
     }
 
     // 3. Canonical spiral of ep seed graph
-    Triangulation T_ep(compact_adj, true);
+    Triangulation T_ep(compact_adj);
     vector<int> spiral_ep;
     jumplist_t jumps_ep;
     vector<vector<node_t>> perms_ep;
@@ -770,7 +770,7 @@ Deltahedron Deltahedron::fromExtensionPath(const ExtensionPath& ep) {
             adj[remap[u]].push_back(remap[rd.V[u].nbr[__builtin_ctz(m)]]);
     }
 
-    return Deltahedron(Triangulation(adj, true), compact_points);
+    return Deltahedron(Triangulation(adj), compact_points);
 }
 
 // Helper: extract compact Deltahedron from ReducibleDual state + full points array.
@@ -796,7 +796,7 @@ static Deltahedron extractCompact(
             adj[remap[u]].push_back(remap[rd.V[u].nbr[__builtin_ctz(m)]]);
     }
 
-    return Deltahedron(Triangulation(adj, true), compact_pts);
+    return Deltahedron(Triangulation(adj), compact_pts);
 }
 
 // Helper: extract a small patch sub-Deltahedron containing only the vertices
@@ -870,7 +870,7 @@ static Deltahedron extractPatch(
     vector<coord3d> patch_pts(m);
     for (int v : patch_set) patch_pts[remap[v]] = points[v];
 
-    return Deltahedron(Triangulation(adj, true), patch_pts);
+    return Deltahedron(Triangulation(adj), patch_pts);
 }
 
 Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, int max_iter_per_step, FILE* log, StepCallback diag,

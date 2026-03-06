@@ -11,8 +11,6 @@ Polyhedron fullerene_dual_polyhedron(const Triangulation& dg)
   cout << "pg = " << pg << endl;
 
   FullereneGraph g(pg);
-  g.layout2d = g.tutte_layout();
-
   vector<coord3d> points = g.zero_order_geometry();
   points = g.optimized_geometry(points);
 
@@ -77,7 +75,6 @@ int main(int ac, char **av) {
 
  
   cout << "creating P from DY" << endl;
-  DY.layout2d = DY.tutte_layout();
   Polyhedron P = Polyhedron(DY,DY.zero_order_geometry(),6);
   cout << "created P from DY" << endl;
   cout << "P=" << P << endl;

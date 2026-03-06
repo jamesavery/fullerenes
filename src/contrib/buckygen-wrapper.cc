@@ -138,7 +138,7 @@ bool next_fullerene(const buckygen_queue& Q, Graph& G)
       for(int i=0; 6>i && (msg.neighbours[u*6+i] != -1); i++)
 	G.neighbours[u].push_back(msg.neighbours[u*6+i]);
     }
-    G.is_oriented = true; // Buckygen's e->next traversal preserves cyclic planar order.
+    // Buckygen's e->next traversal preserves cyclic planar order.
 
     return true;
   } else if(msg.mtype == WORKER_FINISHED) {	// No more graphs to generate
@@ -233,7 +233,7 @@ bool next_fullerene(const buckygen_queue& Q, Graph& G)
 	  for(int i=0; 6>i && (msg.neighbours[u*6+i] != -1); i++)
 	    G.neighbours[u].push_back(msg.neighbours[u*6+i]);
 	}
-	G.is_oriented = true; // Buckygen's e->next traversal preserves cyclic planar order.
+	// Buckygen's e->next traversal preserves cyclic planar order.
 
 	return true;
       } else if(msg.mtype == WORKER_FINISHED) {	 // A worker finished!

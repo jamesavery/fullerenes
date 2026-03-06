@@ -23,14 +23,9 @@ public:
   //  4. Spirals (constructor + all_spirals + canonical_spiral)
   //  5. Embed in 2D
   //  6. Embed in 3D
-  Triangulation(int N) : PlanarGraph(Graph(N,true)) {}
-  Triangulation(const Graph& g = Graph()) : PlanarGraph(g) { update(g.is_oriented); }
-  Triangulation(const Graph& g, bool already_oriented) : PlanarGraph(g) { update(already_oriented); }
-  Triangulation(const Graph& g, const vector<tri_t>& tris) : PlanarGraph(g), triangles(tris) { 
-    orient_triangulation(triangles);
-    orient_neighbours();
-  }
-  Triangulation(const neighbours_t& neighbours, bool already_oriented = true) : PlanarGraph(Graph(neighbours, already_oriented)) { update(already_oriented); }
+  Triangulation(int N) : PlanarGraph(Graph(N)) {}
+  Triangulation(const Graph& g = Graph()) : PlanarGraph(g) { update(); }
+  Triangulation(const neighbours_t& neighbours) : PlanarGraph(Graph(neighbours)) { update(); }
 
   Triangulation(const vector<int>& spiral_string, const jumplist_t& jumps = jumplist_t(), const bool best_effort=false); // and the opposite of 'best-effort' is 'fast and robust'
   Triangulation(const spiral_nomenclature &fsn): Triangulation(fsn.spiral.spiral_code, fsn.spiral.jumps, true){} // best_effort = true
@@ -57,9 +52,7 @@ public:
   
   pair<node_t,node_t> adjacent_tris(const arc_t &e) const;
 
-  vector<tri_t> compute_faces() const;          // Returns non-oriented triangles
   vector<tri_t> compute_faces_oriented() const; // Compute oriented triangles given oriented neighbours
-  void          orient_neighbours();		// Ensures that neighbours are ordered consistently
   
   //  Unfolding unfold() const;
   Triangulation GCtransform(unsigned k=1, unsigned l=0) const;
@@ -88,17 +81,9 @@ public:
 
   vector<node_t> vertex_numbers(vector<vector<node_t>> &perms, const vector<node_t> &loc) const;
   
-  void update(bool already_oriented=true) {
-    //    renumber(); // TODO!
-    if(count_edges() > 0){
-      if(already_oriented){
-        triangles = compute_faces_oriented();
-      }
-      else {
-        triangles = compute_faces();
-        orient_neighbours();
-      }
-    }
+  void update() {
+    if(count_edges() > 0)
+      triangles = compute_faces_oriented();
   }
 
   struct simple_geodesic {

@@ -771,7 +771,7 @@ Graph invertReduction(const Graph& g, const InvSite& site) {
         for (node_t nbr : adj[i])
             new_adj[old_to_new[i]].push_back(old_to_new[nbr]);
     }
-    return Graph(new_adj, true);
+    return Graph(new_adj);
 }
 
 // Apply reconnection for a straight reduction (L_0 and L_i).
@@ -911,7 +911,7 @@ Graph applyReduction(const Graph& g, const Reduction& red) {
             for (node_t nbr : adj[i])
                 new_adj[old_to_new[i]].push_back(old_to_new[nbr]);
         }
-        return Graph(new_adj, true);
+        return Graph(new_adj);
 
     } else if (kind.type == ExpKind::B_type) {
         // Bent reduction B_{i,j}
@@ -968,7 +968,7 @@ Graph applyReduction(const Graph& g, const Reduction& red) {
             for (node_t nbr : adj[i])
                 new_adj[old_to_new[i]].push_back(old_to_new[nbr]);
         }
-        return Graph(new_adj, true);
+        return Graph(new_adj);
 
     } else {
         assert(false && "F-type reductions not supported");
@@ -2168,7 +2168,7 @@ Graph ReducibleDual::toGraph() const {
         for (; m; m &= m - 1)
             adj[remap[u]].push_back(remap[V[u].nbr[__builtin_ctz(m)]]);
     }
-    return Graph(adj, true);
+    return Graph(adj);
 }
 
 Graph graphFromExtensionPath(const ExtensionPath& ep) {

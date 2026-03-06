@@ -294,7 +294,7 @@ vector<int> Symmetry::group_fixpoints(const vector<Permutation>& G) const {
 
 bool Symmetry::reverses_orientation(const Permutation& pi) const 
 {
-  Triangulation piG(neighbours,true);
+  Triangulation piG(neighbours);
 
   for(node_t u=0;u<N;u++){
     const vector<node_t>& nu(neighbours[u]);

@@ -61,11 +61,6 @@ int main(int ac, char **av)
     
     
     
-    // Polyhedron D(P.dual());    
-    // D.layout2d = D.tutte_layout();
-    // D.faces    = D.compute_faces(3,true);
-    // D.face_max = 3;
-    // D.optimize();
 
     
   }

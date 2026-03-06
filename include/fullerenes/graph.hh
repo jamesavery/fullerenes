@@ -35,24 +35,9 @@ using namespace std;
 struct Graph {
   int N;
   neighbours_t neighbours;
-  bool is_oriented;
-  
-  Graph(size_t N=0, bool is_oriented=false) : N(N), neighbours(N), is_oriented(is_oriented) {}
-  Graph(const set<edge_t>& edge_set) : is_oriented(false) {
-    update_from_edgeset(edge_set);
-  }
-  Graph(const neighbours_t& neighbours, bool is_oriented=false) : N(neighbours.size()), neighbours(neighbours), is_oriented(is_oriented) { }
-  Graph(const unsigned int N, const vector<int>& adjacency, bool is_oriented=false) : N(N), neighbours(N), is_oriented(is_oriented) {
-    assert(adjacency.size() == N*N);
-    set<edge_t> edge_set;
 
-    for(unsigned int i=0;i<N;i++)
-      for(unsigned int j=i+1;j<N;j++){
-	if(adjacency[i*N+j]) edge_set.insert(edge_t(i,j));
-      }
-
-    update_from_edgeset(edge_set);
-  }
+  Graph(size_t N=0) : N(N), neighbours(N) {}
+  Graph(const neighbours_t& neighbours) : N(neighbours.size()), neighbours(neighbours) { }
 
 
   bool insert_edge(const arc_t& e, const node_t suc_uv=-1, const node_t suc_vu=-1);
@@ -91,14 +76,12 @@ struct Graph {
   int hamiltonian_count() const;
   int hamiltonian_count(node_t current_node, vector<bool>& used_edges, vector<bool>& used_nodes, vector<node_t>& path, const vector<int>& distances) const;
 
-  coord2d centre2d(const vector<coord2d>& layout) const; 
-  coord3d centre3d(const vector<coord3d>& layout) const; 
-  void orient_neighbours(const vector<coord2d>& layout);
+  coord2d centre2d(const vector<coord2d>& layout) const;
+  coord3d centre3d(const vector<coord3d>& layout) const;
 
   int degree(node_t u) const;
-  int max_degree() const; 
+  int max_degree() const;
 
-  void update_from_edgeset(const set<edge_t>& edge_set); 
   vector<edge_t>  undirected_edges() const;
   vector<arc_t> directed_edges()   const;
 

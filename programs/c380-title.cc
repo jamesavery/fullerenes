@@ -81,8 +81,6 @@ int main(int ac, char **av)
        << "jumps = " << j << ";\n";
 
   printf("Computing planar layout\n");
-  w.graph.layout2d = w.graph.tutte_layout();
-  w.dual.layout2d  = w.dual.tutte_layout();
 
   vector<face_t> faces(w.graph.compute_faces_flat(6,true));
   vector<int> face_translate(F);
@@ -97,7 +95,6 @@ int main(int ac, char **av)
   if(halma_level > 0){
     g = g.halma_fullerene(halma_level ,true);
     printf("Computing planar layout of halma transform\n");
-    g.layout2d = g.tutte_layout();
   }
 
   string basename("polyhedron-"+to_string(g.N));

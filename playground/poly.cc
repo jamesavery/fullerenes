@@ -21,10 +21,9 @@ int main(int ac, char **av)
   
   FullereneGraph g(stdin);
   fprintf(stderr,"Constructing high order Halma fullerene.\n");
-  g.layout2d.clear();
   //  g = g.halma_fullerene(1);
   fprintf(stderr,"Constructing Tutte layout\n");
-  g.layout2d = g.tutte_layout();
+  vector<coord2d> layout = g.tutte_layout();
 
   fprintf(stderr,"Computing faces\n");
   vector<face_t> faces(g.compute_faces_flat(6));

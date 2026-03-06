@@ -660,7 +660,6 @@ FullereneForcefield new_fullereneforcefield(string name)
   FullereneGraph g = dual.dual_graph();
   
   // Compute initial geometry: First get 2D embedding of graph, then wrap around sphere
-  g.layout2d = g.tutte_layout();
   Polyhedron P0(g, g.zero_order_geometry());
 
   int N = g.N;

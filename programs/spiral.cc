@@ -2,6 +2,7 @@
 #include <fstream>
 #include "libgraph/cubicgraph.hh"
 #include "libgraph/fullerenegraph.hh"
+#include "fullerenes/layout2d.hh"
 
 #include <vector>
 
@@ -21,17 +22,17 @@ int main(int ac, char **av)
   cout << "Attempting to create graph from spiral indices " << rspi << endl;
  
   FullereneGraph g(N, rspi, jumps);
-  g.layout2d = g.tutte_layout();
+  vector<coord2d> g_layout = g.tutte_layout();
   PlanarGraph  dg(g.dual_graph(6));
-  dg.layout2d = dg.tutte_layout();
+  vector<coord2d> dg_layout = dg.tutte_layout();
 
   cout << "g = " << g << ";\n";
   cout << "dg = " << dg << ";\n";
 
   ofstream g_latex("output/spiral-g.tex"), dg_latex("output/spiral-dg.tex");
-  
-  g_latex  << g.to_latex(20,20,true,true,false,0,0,0xffffff) << endl;
-  dg_latex << dg.to_latex(20,20,false,true,false,0,0,0xffffff) << endl;
+
+  g_latex  << layout2d::to_latex(g,g_layout,20,20,true,true,false,0,0,0xffffff) << endl;
+  dg_latex << layout2d::to_latex(dg,dg_layout,20,20,false,true,false,0,0,0xffffff) << endl;
 
   g_latex.close(); 
   dg_latex.close();

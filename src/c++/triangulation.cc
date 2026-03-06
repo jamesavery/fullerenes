@@ -6,77 +6,8 @@
 pair<node_t,node_t> Triangulation::adjacent_tris(const arc_t& e) const
 {
   node_t u  = e.first, v = e.second;
-  node_t w1=-1, w2=-1;
-
-  if(is_oriented) {
-    w1 = next_on_face(u,v), w2 = next_on_face(v,u);
-  } else {
-    vector<node_t> ws;
-    auto is_in = [](const vector<node_t> &v, node_t x)
-      { return find(v.begin(),v.end(),x) != v.end(); };
-
-    for(node_t w: neighbours[u])
-      if(is_in(neighbours[w],u) && is_in(neighbours[w],v)) ws.push_back(w);
-
-    if(ws.size() != 2){
-      cerr <<  "Error in triangulation: Edge " << edge_t{u,v} << " is adjacent to "<<ws.size()<<" != 2 vertices.\n"
-           <<  "ws = " << ws << "+1;\n"
-           <<  "neighbours = " << neighbours << "+1;\n";
-      abort();
-    }
-    w1 = ws[0], w2 = ws[1];
-  }
-
+  node_t w1 = next_on_face(u,v), w2 = next_on_face(v,u);
   return make_pair(w1,w2);
-}
-
-vector<tri_t> Triangulation::compute_faces() const
-// Does not assume graph is oriented
-// Produces oriented triangles
-// TODO: Fails in the presence of separating triangles. Make sure spiral-windup produces oriented graph.
-{
-  if(is_oriented) return compute_faces_oriented();
-
-  unordered_set<tri_t> triangle_set;
-
-  for(node_t u=0;u<N;u++)
-    for(node_t v: neighbours[u]){
-      pair<node_t,node_t> ws(adjacent_tris({u,v}));
-
-      triangle_set.insert(tri_t{u,v,ws.first }.sorted());
-      triangle_set.insert(tri_t{u,v,ws.second}.sorted());
-    }
-
-
-  vector<tri_t> triangles(triangle_set.begin(),triangle_set.end());
-  orient_triangulation(triangles);
-
-  return triangles;
-}
-
-
-
-void Triangulation::orient_neighbours()
-{
-  map<arc_t,node_t> next;
-
-  for(int i=0;i<triangles.size();i++){
-    const tri_t& t(triangles[i]);
-    next[arc_t(t[0],t[1])] = t[2];
-    next[arc_t(t[1],t[2])] = t[0];
-    next[arc_t(t[2],t[0])] = t[1];
-  }
-  for(node_t u=0;u<N;u++){
-    int d = neighbours[u].size();
-
-    node_t v = neighbours[u][0];
-    for(int i=1;i<d;i++){
-      node_t w = next[arc_t(u,v)];
-      neighbours[u][i] = w;
-      v = w;
-    }
-  }
-  is_oriented = true;
 }
 
 vector<tri_t> Triangulation::compute_faces_oriented() const
@@ -135,7 +66,7 @@ void Triangulation::compute_lookup_tables(const PlanarGraph&            cubic_gr
   size_t Nc = 2*(N-2);		// This function assumes the triangulation is the dual of a cubic graph 
 
   assert(triangles.size() == Nc); // Make sure triangles array is initialized before calling
-  assert(is_oriented());	  // We don't bother with non-oriented surfaces
+  assert(is_consistently_oriented());	  // We don't bother with non-oriented surfaces
 
   if(Fmax<1) Fmax = max_degree(); // Calculate fmax
   
@@ -240,9 +171,7 @@ PlanarGraph Triangulation::dual_graph() const
     }
   }
   //  cerr << "A = " << A << endl;
-  Graph G(A,true);
-  // G must be consistently oriented, or something went wrong.
-  // assert(G.is_consistently_oriented());
+  Graph G(A);
   return PlanarGraph(G);
 };
 
@@ -436,8 +365,7 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
     remove_isolated_vertices();
   }
 
-  is_oriented = true;
-  update(is_oriented);
+  update();
 }
 
 
@@ -546,7 +474,7 @@ Triangulation Triangulation::halma_transform(int m, vector<map<edge_t,node_t>>* 
     } while(w != v);
   }
 
-  return Triangulation(neighbours, true);
+  return Triangulation(neighbours);
 }
 
 
@@ -1327,7 +1255,7 @@ vector<node_t> Triangulation::vertex_numbers(vector<vector<node_t>> &permutation
 // the resulting planar graph is oriented because the input is oriented und we only remove vertices
 PlanarGraph Triangulation::inverse_leapfrog_dual() const
 {
-  assert(is_oriented);
+  assert(is_consistently_oriented());
   PlanarGraph PG(*this);
   set<int> face_vertices, to_do_set;
 

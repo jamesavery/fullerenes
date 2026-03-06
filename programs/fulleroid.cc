@@ -72,15 +72,12 @@ bool extrude(Polyhedron& P, int p) // Requires that P is a triangulation.
     v4[i] = nHi[(ip+4)%6];
   }
 
-  // Derive new planar layout 
-  if(P.layout2d.size() == P.N){
-    P.layout2d.resize(P.N+5);
-    
-    // coord2d cm;
-    // for(int i=0;i<5;i++) cm += P.layout2d[Hi[i]]/5.;
-    // P.layout2d[p] = cm;
+  // Derive new planar layout
+  vector<coord2d> layout = P.tutte_layout();
+  if(layout.size() == P.N){
+    layout.resize(P.N+5);
 
-    for(int i=0;i<5;i++) P.layout2d[pi[i]] = (P.layout2d[Hi[i]]+P.layout2d[Hi[(i+1)%5]] + P.layout2d[p])/3.0;
+    for(int i=0;i<5;i++) layout[pi[i]] = (layout[Hi[i]]+layout[Hi[(i+1)%5]] + layout[p])/3.0;
   }
 
   // Derive new approximate geometry
@@ -106,7 +103,7 @@ bool extrude(Polyhedron& P, int p) // Requires that P is a triangulation.
 
   // TODO: Fix derived planar embedding instead
   //       My suspicion is that the problem arises from the outer face.
-  P.layout2d = P.tutte_layout();
+  layout = P.tutte_layout();
 
   // Update faces
   // TODO: Replace triangles directly instead of recomputing?
@@ -134,7 +131,7 @@ int main(int ac, char **av)
   
   int F = N/2+2;
   Triangulation dual(from_rspi(F,rspi));
-  dual.layout2d = dual.tutte_layout();
+  vector<coord2d> dual_layout = dual.tutte_layout();
 
   Polyhedron PD(dual,dual.zero_order_geometry()*coord3d(1.4,1.4,1.4));
 
@@ -196,7 +193,6 @@ int main(int ac, char **av)
 
   assert(PD.is_triangulation());
   //  PD.orient_neighbours();
-  //  PD.layout2d = PD.tutte_layout();
 
   fprintf(stderr,"Getting fulleroid as dual of dual, B.\n");
 

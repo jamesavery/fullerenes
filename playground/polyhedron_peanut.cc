@@ -19,8 +19,6 @@ int main(int ac, char **av)
   cout << "T created" << endl;
 
   CubicGraph g(PlanarGraph(T).dual_graph(3));
-  g.layout2d = g.tutte_layout();
-
   Polyhedron P0(g,g.zero_order_geometry(),6);
   cout << "P0 created" << endl;
 
@@ -58,7 +56,7 @@ int main(int ac, char **av)
 //   output << "P = " << P << ";\n";
 //
 //   Polyhedron D(P.dual(6,true));
-//   D.layout2d = D.tutte_layout();
+//   auto layout = D.tutte_layout();
 //   D.faces    = D.compute_faces_flat(3,true);
 //   D.face_max = 3;
 //   //   D.optimize();

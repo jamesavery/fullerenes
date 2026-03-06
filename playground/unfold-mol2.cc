@@ -13,7 +13,6 @@ int main(int ac, char **av)
   
   dual = dual.sort_nodes();
   
-  dual.layout2d = dual.tutte_layout();
   Unfolding uf(dual,true);
 
   ofstream output("output/C"+to_string(P.N)+"-unfold.m");

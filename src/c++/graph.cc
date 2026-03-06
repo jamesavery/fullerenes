@@ -159,7 +159,7 @@ bool Graph::is_consistently_oriented() const
 // TODO: Doesn't need to be planar and oriented, but is easier to write if it is. Make it work in general.
 bool Graph::has_separating_triangles() const
 {
-  assert(is_oriented);
+  assert(is_consistently_oriented());
 
   for(node_t u=0;u<N;u++){
     const vector<node_t> &nu(neighbours[u]);
@@ -441,30 +441,6 @@ int Graph::degree(node_t u) const {
   return neighbours[u].size(); 
 }
 
-void Graph::update_from_edgeset(const set<edge_t>& edge_set) 
-{
-  // Instantiate auxiliary data strutures: sparse adjacency matrix and edge existence map.
-  map<node_t,set<node_t> > ns;
-  //  fprintf(stderr,"Initializing edge map.\n");
-
-  // Update node count
-  N = 0;
-  for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
-    N = max(N,max(e->first,e->second)+1);
-  }
-
-  neighbours.resize(N);
-
-  for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
-    ns[e->first].insert(e->second);
-    ns[e->second].insert(e->first);
-  }
-
-  //  fprintf(stderr,"Initializing adjacencies\n");
-  for(int u=0;u<N;u++)
-    neighbours[u] = vector<node_t>(ns[u].begin(),ns[u].end());
-
-}
 
 vector<edge_t> Graph::undirected_edges() const {
   set<edge_t> edges;

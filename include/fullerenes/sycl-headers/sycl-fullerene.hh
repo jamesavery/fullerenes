@@ -85,7 +85,7 @@ struct Fullerene
                 points[i][j] = d_.X_cubic_[i][j];
             }
         }
-        return Polyhedron(PlanarGraph(Graph(neighbours,true)), points);
+        return Polyhedron(PlanarGraph(Graph(neighbours)), points);
     }
 
 
@@ -162,17 +162,17 @@ struct Fullerene
     }
 
     Fullerene<T, K> &operator=(const PlanarGraph &PG) {
-        *this = std::make_tuple(std::cref(PG.neighbours), std::cref(PG.layout2d));
+        *this = PG.neighbours;
         return *this;
     }
 
     Fullerene<T, K> &operator=(const FullereneGraph &FG) {
-        *this = std::make_tuple(std::cref(FG.neighbours), std::cref(FG.layout2d));
+        *this = FG.neighbours;
         return *this;
     }
 
     Fullerene<T, K> &operator=(const FullereneDual &FD) {
-        *this = std::make_tuple(std::cref(FD.neighbours), std::cref(FD.layout2d));
+        *this = FD.neighbours;
         return *this;
     }
 

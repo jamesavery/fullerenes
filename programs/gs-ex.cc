@@ -226,11 +226,12 @@ int main(int ac, char **av)
   output.flush();
 
   printf("Computing planar layout\n");
+  vector<coord2d> g_layout;
   if(Nex <= outer_faces.size()){
     g.outer_face = outer_faces[Nex-1]+(-1);
-    g.layout2d = g.tutte_layout(g.outer_face);
-  } else 
-    g.layout2d = g.tutte_layout();
+    g_layout = g.tutte_layout(g.outer_face);
+  } else
+    g_layout = g.tutte_layout();
 
   g.orient_neighbours();
 
@@ -238,7 +239,7 @@ int main(int ac, char **av)
   PlanarGraph dg(g.dual_graph(10,true));
 
   printf("Computing planar layour of dual\n");
-  dg.layout2d = dg.tutte_layout();
+  vector<coord2d> dg_layout = dg.tutte_layout();
 
   output << "g2d  = " << g << ";\n";
   output << "dg2d = " << dg << ";\n";  

@@ -3,6 +3,7 @@
 
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/polyhedron.hh"
+#include "fullerenes/layout2d.hh"
 
 
 double Polyhedron::diameter() const {
@@ -182,7 +183,7 @@ Polyhedron Polyhedron::incremental_convex_hull() const {
   }
 
   // 3.4 Assemble oriented PlanarGraph and face list
-  PlanarGraph g(Graph(nb, true));
+  PlanarGraph g{Graph(nb)};
   vector<face_t> faces;
   faces.reserve(output.size());
   for (const tri_t& t : output)
@@ -223,68 +224,34 @@ struct sort_ccw_coord3d {
 
 
 
-void Polyhedron::orient_neighbours()
+// Orient neighbours using planar_orient + 3D volume sign check.
+// This is a free-standing helper for Polyhedron construction from unoriented data.
+static void orient_polyhedron_neighbours(Polyhedron& P)
 {
-  
-  if(layout2d.size() != N)
-    layout2d = tutte_layout();
-  PlanarGraph::orient_neighbours();
+  // First get a consistent planar orientation
+  layout2d::planar_orient(P);
 
-  // TODO: Sort this out
-  //  else if(points.size() == N){
-  // Orient neighbours locally (CW or CCW depending on luck)
-  // for(node_t u=0;u<N;u++){
-  //   vector<node_t> &ns(neighbours[u]);
-  //   size_t degree = ns.size();
-      
-  //   int ns_index[degree];
-  //   for(int i=0;i<degree;i++) ns_index[i] = i;
-				     
-  //   vector<coord3d> neighbour_points(degree);
-  //   const coord3d &x0 = points[u];
-
-  //   for(int i=0;i<degree;i++) neighbour_points[i] = points[ns[i]] - x0;
-  //   sort_ccw_coord3d CCW(neighbour_points);
-
-  //   sort(ns_index,ns_index+degree,CCW);
-  //   vector<node_t> ns_sorted(degree);
-  //   for(int i=0;i<degree;i++) ns_sorted[i] = ns[ns_index[i]];
-  //   ns = ns_sorted;
-  // }
-
-
-  // // Choose that first node is correct, then flip to consistency
-  // // TODO: How? For now, cheat slowly.
-  // if(is_consistently_oriented())
-  //   is_oriented = true;
-  // else {
-  //   layout2d = tutte_layout();
-  //   PlanarGraph::orient_neighbours();
-  // }
-  //}
-  
-  // Calculate volume
+  // Check volume sign to ensure outward-pointing normals (CCW-on-outside convention)
   double V=0;
-  for(node_t u=0;u<N;u++){
-    const face_t nu(neighbours[u]);
-    const coord3d ux(points[u]);
+  for(node_t u=0;u<P.N;u++){
+    const face_t nu(P.neighbours[u]);
+    const coord3d ux(P.points[u]);
 
     for(int i=0;i<nu.size();i++){
-      Tri3D T(ux, points[nu[i]],points[nu[(i+1)%nu.size()]]);
+      Tri3D T(ux, P.points[nu[i]],P.points[nu[(i+1)%nu.size()]]);
       V += ((T.a).dot(T.n))*T.area()/T.n.norm();
     }
   }
 
   if(V<0){ // Calculated normals are pointing inwards - reverse order.
-    //    printf("Inverted normals - reversing neighbours lists.\n");
-    for(node_t u=0;u<N;u++) reverse(neighbours[u].begin(), neighbours[u].end());
+    for(node_t u=0;u<P.N;u++) reverse(P.neighbours[u].begin(), P.neighbours[u].end());
   }
 }
 
 Polyhedron::Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_, const int face_max_, const vector<face_t> faces_) : 
   PlanarGraph(G), face_max(face_max_), points(points_), faces(faces_)
 {
-  if(!is_oriented) orient_neighbours();
+  if(!is_consistently_oriented()) orient_polyhedron_neighbours(*this);
 
   //  for(node_t u=0;u<N;u++) points[u] = points_[u];
   
@@ -307,17 +274,18 @@ Polyhedron::Polyhedron(const vector<coord3d>& xs, double tolerance)
     }
   }
      
-  set<edge_t> edges;
+  neighbours_t nb(xs.size());
   for(int i=0;i<xs.size();i++){
     for(int j=i+1;j<xs.size();j++){
       double d = (xs[i]-xs[j]).norm();
       if(d <= bondlength*tolerance) {
-        edges.insert(edge_t(i,j));
+        nb[i].push_back(j);
+        nb[j].push_back(i);
       }
     }
   }
-  
-  (*this) = Polyhedron(PlanarGraph(edges), xs);
+
+  (*this) = Polyhedron(PlanarGraph(Graph(nb)), xs);
 }
 
 
@@ -402,10 +370,10 @@ Polyhedron Polyhedron::dual() const
 
 Polyhedron Polyhedron::leapfrog_dual() const 
 {
-  assert(is_oriented);
+  assert(is_consistently_oriented());
   size_t Nf = faces.size();
-  
-  Polyhedron Plf(Graph(N+Nf,true));
+
+  Polyhedron Plf(Graph(N+Nf));
   Plf.points.resize(N+Nf);
    
   // Start with all the existing nodes
@@ -449,9 +417,6 @@ Polyhedron Polyhedron::leapfrog_dual() const
 
 Polyhedron Polyhedron::fullerene_polyhedron(FullereneGraph G)
 {
-  if(G.layout2d.empty())
-    G.layout2d       = G.tutte_layout();
-  
   Polyhedron P(G,G.zero_order_geometry(),6);
   P.points = G.optimized_geometry(P.points);
 
@@ -488,7 +453,6 @@ bool Polyhedron::optimize(int opt_method, double ftol)
 
     // generate and optimize LF of initial polyhedron
     PlanarGraph LF = LFD.dual_graph();
-    LF.layout2d = LF.tutte_layout();
     Polyhedron P(LF,LF.zero_order_geometry());
     bool optimize_angles = true;
     bool opt_success = P.optimize_other(optimize_angles);

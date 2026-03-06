@@ -1,4 +1,5 @@
 #include "fullerenes/polyhedron.hh"
+#include "fullerenes/layout2d.hh"
 
 //////////////////////////// FORMAT MULTIPLEXING ////////////////////////////
 vector<string> Polyhedron::formats{{"ascii","planarcode","xyz","mol2","mathematica","latex","cc1","turbomole","gaussian","wavefront","spiral"}};
@@ -33,7 +34,6 @@ Polyhedron Polyhedron::from_file(FILE *file, string format)
       cerr << "Input format is '"<<format<<"'; must be one of: " << input_formats << " or " << PlanarGraph::input_formats << "\n";
       abort();
     } else {
-      G.layout2d = G.tutte_layout();
       Polyhedron P(G,G.zero_order_geometry(),6);
       P.optimize();
 
@@ -272,9 +272,10 @@ string Polyhedron::to_latex(bool show_dual, bool number_vertices, bool include_l
 
   if(show_dual){
     PlanarGraph dual(dual_graph(face_max));        // TODO: This breaks for everything else than fullerenes
+    vector<coord2d> dual_layout = dual.tutte_layout();
     s << "\\foreach \\place/\\name/\\lbl in {";
     for(node_t u=0;u<dual.N;u++){
-      const coord2d& xs(dual.layout2d[u]);
+      const coord2d& xs(dual_layout[u]);
       s << "{(" << xs.first << "," << xs.second << ")/v" << u << "/$" << u << "$}" << (u+1<dual.N? ", ":"}\n\t");
     }    
     s << "\\node[dualvertex] (\\name) at \\place {"<<(number_vertices?"\\lbl":"")<<"};\n";
@@ -306,7 +307,10 @@ string Polyhedron::to_povray(double w_cm, double h_cm,
   s << "#declare facecolour=color rgb <"<<((face_colour>>16)&0xff)/256.<<","<<((face_colour>>8)&0xff)/256.<<","<<(face_colour&0xff)/256.<<">;\n";
   s << "#declare faceopacity="<<face_opacity<<";\n\n";
 
-  s << PlanarGraph(*this).to_povray(w_cm,h_cm,line_colour,vertex_colour,line_width,vertex_diameter);
+  {
+    vector<coord2d> pov_layout = tutte_layout();
+    s << layout2d::to_povray(*this, pov_layout, w_cm,h_cm,line_colour,vertex_colour,line_width,vertex_diameter);
+  }
   s << "#declare layout3D=array["<<N<<"][3]" << points <<";\n\n";
 
   s << "#declare faces   =array["<<faces.size()<<"]["<<(face_max+1)<<"]{"; 
@@ -475,8 +479,10 @@ Polyhedron Polyhedron::from_mol2(FILE *file)
   P.N = G.N;
   P.neighbours = G.neighbours;
   P.points = points;
-  P.layout2d = P.tutte_layout();
-  P.orient_neighbours();
+  {
+    vector<coord2d> layout = P.tutte_layout();
+    layout2d::orient_neighbours(P, layout);
+  }
   P.faces = P.compute_faces();
   //  cout << "faces = " << P.faces << "\n";
   

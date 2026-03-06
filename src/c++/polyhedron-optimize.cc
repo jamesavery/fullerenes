@@ -301,7 +301,7 @@ bool Polyhedron::optimize_other(bool optimize_angles, map<edge_t, double> zero_v
   vector<double> zero_values_dihedral(N);
   if(is_cubic())
   {
-    orient_neighbours(); // CCW
+    assert(is_consistently_oriented()); // CCW
     const int fmax = 10; // maximum face size
 //          t   B   s
 //            \   /

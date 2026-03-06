@@ -23,7 +23,7 @@ inline Dir flipDir(Dir d) {
 // =====================================================================
 // Navigation primitives for fullerene dual graphs (degree 5-6 triangulations)
 // These wrap Graph::next/prev with buckygen-specific straight/turn operations.
-// All assume CW-ordered neighbour lists (is_oriented == true).
+// All assume consistently oriented neighbour lists (CCW-on-outside).
 // =====================================================================
 
 // Advance k positions CW from v around u's neighbour list.

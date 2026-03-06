@@ -1,5 +1,6 @@
 #include "libgraph/cubicgraph.hh"
 #include "libgraph/polyhedron.hh"
+#include "libgraph/layout2d.hh"
 
 int main()
 {
@@ -17,8 +18,8 @@ int main()
   fprintf(stderr,"Depths:\n");
   for(int i=0;i<g.N;i++) fprintf(stderr,"\t%d : %d (%d,%d,%d)\n",i+1,vertex_depth[i],g.neighbours[i][0]+1,g.neighbours[i][1]+1,g.neighbours[i][2]+1);   
 
-  g.layout2d = g.tutte_layout();
-  map<unsigned int, set<face_t> > facemap(g.compute_faces_oriented(g.layout2d));
+  vector<coord2d> layout = g.tutte_layout();
+  map<unsigned int, set<face_t> > facemap(g.compute_faces_oriented(layout));
 
   fprintf(stderr,"Faces:\n");
   for(unsigned int i=2;i<10;i++){
@@ -30,7 +31,7 @@ int main()
     }
   }
 
-  g.spherical_layout = g.spherical_projection(g.layout2d);
+  auto spherical_layout = layout2d::spherical_projection(g, layout);
 
   cout << g << endl;
 

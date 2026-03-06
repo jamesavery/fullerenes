@@ -317,7 +317,6 @@ int main(int ac, char **av)
   CubicGraph g(examples[index]);
   cout << "Cubic graph created" << endl;
   cout << g << endl;
-  g.layout2d = g.tutte_layout(0,-1,-1,4);
   cout << "gaudi-app: layout created" << endl;
 
   const int N = g.N;
@@ -325,7 +324,6 @@ int main(int ac, char **av)
 
 //   PlanarGraph dual(g.dual_graph(6));
 //   cout << "dual graph created" << endl;
-//   dual.layout2d = dual.tutte_layout();
 //   cout << "layout created" << endl;
 // 
 //   output << "g = "  << g << ";\n";
@@ -360,7 +358,6 @@ int main(int ac, char **av)
   cout << "multiplying with " << K << ", " << L << endl;
   cout << gct << endl;
 
-  gct.layout2d = gct.tutte_layout();
   Polyhedron P0 = Polyhedron(gct,gct.zero_order_geometry(),6);
 
   int finalN = N * (K*K + K*L + L*L);

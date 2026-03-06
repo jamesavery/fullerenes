@@ -9,10 +9,8 @@
 
 class FullereneGraph : public CubicGraph {
 public:
-  FullereneGraph(const Graph& g, const vector<coord2d>& layout = vector<coord2d>()) : CubicGraph(g,layout) { if(N>0) fullerene_check();  }
-  FullereneGraph(const PlanarGraph& g) : CubicGraph(g,g.layout2d) { if(N>0) fullerene_check(); }
-  FullereneGraph(const set<edge_t>& edges=set<edge_t>(), const vector<coord2d>& layout = vector<coord2d>()) 
-    : CubicGraph(Graph(edges),layout) { if(N>0) fullerene_check(); }
+  FullereneGraph(const Graph& g) : CubicGraph(g) { if(N>0) fullerene_check();  }
+  FullereneGraph(const PlanarGraph& g) : CubicGraph(g) { if(N>0) fullerene_check(); }
 
   FullereneGraph(const int N, const vector<int>& spiral_indices, const jumplist_t& jumps = jumplist_t()); 
   FullereneGraph(const spiral_nomenclature &fsn){
@@ -55,7 +53,7 @@ public:
       {9,7,17},  {12,1,8},   {11,2,12},  {13,10,19},
       {10,9,18}, {14,3,11},  {15,5,13},  {16,14,19},
       {17,6,15}, {18,8,16},  {19,12,17}, {15,11,18}
-    }, true));
+    }));
   }
 };
 

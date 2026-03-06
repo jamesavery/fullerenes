@@ -207,10 +207,6 @@ int main(int ac, char **av)
   // output << "P = " << P << ";\n";
 
   Polyhedron D(P.dual());
-  // D.layout2d = D.tutte_layout();
-  // D.faces    = D.compute_faces_flat(3,true);
-  // D.face_max = 3;
-  // //   D.optimize();
   // output << "PD = " << D << ";\n";
 
   Deltahedron DD{D,D.points};

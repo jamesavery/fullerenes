@@ -49,8 +49,6 @@ int main(int ac, char **av)
     FullereneGraph fg = FullereneGraph(i, input);
 
 //    cout << 0 << fg.neighbours[0][0] <<  fg.neighbours[0][1] << endl;
-    fg.layout2d = fg.tutte_layout(fg.neighbours[0][0],0, fg.neighbours[0][1]);
-    //fg.layout2d = fg.tutte_layout();
 //    cout << "fg: " << fg << endl;
 
     bool pentagon_start = false;

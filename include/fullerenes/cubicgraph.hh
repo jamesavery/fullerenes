@@ -19,7 +19,7 @@ struct CubicGraph : public PlanarGraph {
       }
   }
 
-  CubicGraph(const Graph& g, const vector<coord2d>& layout) : PlanarGraph(g,layout) {}
+  CubicGraph(const Graph& g) : PlanarGraph(g) {}
   CubicGraph(const int N, const vector<int>& spiral_string, const jumplist_t& jumps = jumplist_t());
   CubicGraph(const spiral_nomenclature &fsn);
 

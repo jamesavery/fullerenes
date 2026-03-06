@@ -133,7 +133,6 @@ TEST_P(FullereneTest, CopyAssignmentOperatorFromPolyhedron) {
     FullereneDual dual(G);
     dual.update();
     PlanarGraph PG = dual.dual_graph();
-    PG.layout2d = PG.tutte_layout();
     Polyhedron P(PG);
     P.points = P.zero_order_geometry();
     P.optimize();
