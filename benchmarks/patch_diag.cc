@@ -20,6 +20,7 @@
 #include <set>
 #include <string>
 #include <cassert>
+#include <chrono>
 
 using namespace std;
 using namespace buckinverse;
@@ -164,9 +165,24 @@ static void print_row(int step, const char* phase, const Deltahedron& D) {
 int main(int argc, char** argv) {
     if (argc < 3) {
         fprintf(stderr, "Usage:\n");
-        fprintf(stderr, "  %s N idx           — buckygen isomer (0-based index)\n", argv[0]);
-        fprintf(stderr, "  %s nanotube N      — (5,0) nanotube with N carbon atoms\n", argv[0]);
+        fprintf(stderr, "  %s N idx [--method CG|LBFGS|ST] [--step-tol T] [--final-tol T]\n", argv[0]);
+        fprintf(stderr, "  %s nanotube N [--method CG|LBFGS|ST] [--step-tol T] [--final-tol T]\n", argv[0]);
         return 1;
+    }
+
+    // Parse optional flags from end of argv
+    auto opt_method = OptMethod::CG;
+    double step_tol = 1e-3, final_tol = 1e-5;
+    for (int i = 3; i < argc; i++) {
+        if (!strcmp(argv[i], "--method") && i+1 < argc) {
+            i++;
+            if (!strcmp(argv[i], "LBFGS")) opt_method = OptMethod::LBFGS;
+            else if (!strcmp(argv[i], "ST")) opt_method = OptMethod::STEIHAUG;
+        } else if (!strcmp(argv[i], "--step-tol") && i+1 < argc) {
+            step_tol = atof(argv[++i]);
+        } else if (!strcmp(argv[i], "--final-tol") && i+1 < argc) {
+            final_tol = atof(argv[++i]);
+        }
     }
 
     Graph G;
@@ -220,7 +236,11 @@ int main(int argc, char** argv) {
     fprintf(stderr, "          cg = after full-graph CG relaxation\n\n");
     print_header();
 
-    Deltahedron D = Deltahedron::fromExtensionPathOptimized(ep, 0, stderr,
+    const char* method_name = opt_method == OptMethod::CG ? "CG" :
+                              opt_method == OptMethod::LBFGS ? "LBFGS" : "ST";
+    fprintf(stderr, "Method: %s, step_tol=%.0e, final_tol=%.0e\n\n", method_name, step_tol, final_tol);
+
+    Deltahedron D = Deltahedron::fromExtensionPathOptimized(ep, stderr,
         [&](int step, const char* phase, const Deltahedron& D_snap) {
             print_row(step, phase, D_snap);
 
@@ -234,8 +254,31 @@ int main(int argc, char** argv) {
                          label.c_str(), step, phase);
                 write_mol2(D_snap, path);
             }
-        });
+        },
+        opt_method, step_tol, final_tol);
 
     fprintf(stderr, "\nmol2 files in /tmp/%s_step*_{seed,patched,cg,final}.mol2\n", label.c_str());
+
+    // Primitive cost measurement: run each method for a fixed budget, measure time and eval counts.
+    fprintf(stderr, "\n=== Primitive cost ratios at N=%d ===\n", D.N);
+    for (auto m : {OptMethod::CG, OptMethod::LBFGS, OptMethod::STEIHAUG}) {
+        Deltahedron Dt = D;  // copy converged geometry
+        Dt.opt_method = m;
+        Dt.opt_k_flat = 0;
+        long long budget = 20LL * Dt.N * Dt.N;
+        auto t0 = chrono::high_resolution_clock::now();
+        Dt.optimize(Dt.points, 0, 1e-15, {}, budget);  // unreachable tol, run to budget
+        double ms = chrono::duration<double,milli>(chrono::high_resolution_clock::now() - t0).count();
+        long long work_new = (long long)Dt.n_energy_evals + 2LL * Dt.n_grad_evals + 7LL * Dt.n_hv_evals;
+        const char* mn = m == OptMethod::CG ? "CG" : m == OptMethod::LBFGS ? "LBFGS" : "ST";
+        fprintf(stderr, "  %6s: %6.0f ms, %d iters, n_E=%d n_G=%d n_Hv=%d  work=%lld\n"
+                        "          us/E=%.1f  us/G=%.1f  us/Hv=%.1f\n",
+                mn, ms, Dt.iterations_used, Dt.n_energy_evals, Dt.n_grad_evals, Dt.n_hv_evals,
+                work_new,
+                Dt.n_energy_evals > 0 ? ms * 1000.0 / Dt.n_energy_evals : 0.0,
+                Dt.n_grad_evals > 0 ? ms * 1000.0 / Dt.n_grad_evals : 0.0,
+                Dt.n_hv_evals > 0 ? ms * 1000.0 / Dt.n_hv_evals : 0.0);
+    }
+
     return 0;
 }

@@ -35,7 +35,9 @@ double Deltahedron::max_angle_relerr() const {
     for (int c = 0; c < 3; c++) {
       coord3d ea = points[t[(c+1)%3]] - points[t[c]];
       coord3d eb = points[t[(c+2)%3]] - points[t[c]];
-      double cos_th = ea.dot(eb) / (ea.norm() * eb.norm());
+      double na = ea.norm(), nb = eb.norm();
+      if (na < 1e-15 || nb < 1e-15) return 1.0;  // degenerate → max error
+      double cos_th = ea.dot(eb) / (na * nb);
       cos_th = max(-1.0, min(1.0, cos_th));
       double th = acos(cos_th);
       double re = fabs(th - target) / target;
@@ -874,9 +876,10 @@ static Deltahedron extractPatch(
     return Deltahedron(Triangulation(adj, true), patch_pts);
 }
 
-Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, int max_iter_per_step, FILE* log, StepCallback diag,
+Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, FILE* log, StepCallback diag,
                                                      OptMethod method, double step_tol, double final_tol, long long max_work_per_step,
-                                                     double step_angle_tol, double final_angle_tol) {
+                                                     double step_angle_tol, double final_angle_tol,
+                                                     OptMethod final_method) {
     int full_N = ep.full_N;
     vector<coord3d> points(full_N);
 
@@ -996,14 +999,13 @@ Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, int
         vector<int> full_remap;
         Deltahedron D = extractCompact(rd, full_N, points, full_remap);
 
-        int iter_budget = max_iter_per_step > 0 ? max_iter_per_step : 3*D.N;
         D.opt_k_flat = 0;  // skip E_flat in intermediate steps (final CG uses default)
         D.opt_method = method;
         // Log CG details for a few representative steps
         int n_steps = (int)ep.steps.size();
         bool log_this = log && (step_idx <= 2 || step_idx == n_steps/2 || step_idx >= n_steps - 2);
         if (log_this) D.opt_log = log;
-        D.optimize(D.points, 0, iter_budget, step_tol, {}, max_work_per_step, step_angle_tol);
+        D.optimize(D.points, 0, step_tol, {}, max_work_per_step, step_angle_tol);
         if (log_this) D.opt_log = nullptr;
         total_cg_iters += D.iterations_used;
         acc_energy += D.n_energy_evals;
@@ -1044,8 +1046,8 @@ Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, int
     if (diag) diag((int)ep.steps.size() + 1, "patched", D);
 
     D.opt_k_flat = 0;  // geometry is already 3D from seed expansion; E_flat fights equilateral
-    D.opt_method = method;
-    D.optimize(D.points, 0, 12*D.N, final_tol, {}, max_work_per_step, final_angle_tol);
+    D.opt_method = final_method;
+    D.optimize(D.points, 0, final_tol, {}, max_work_per_step, final_angle_tol);
     ms_final = chrono::duration<double,milli>(clk::now() - t_final).count();
 
     // Diagnostic: after final optimization
@@ -2170,8 +2172,9 @@ int Deltahedron::reflect_concave(vector<coord3d>& pts, double threshold,
   return count;
 }
 
-bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double target_L, int max_iter, double grad_tol,
-                           const vector<bool>& fixed, long long max_work, double angle_tol)
+bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double target_L,
+                           double grad_tol, const vector<bool>& fixed,
+                           long long max_work, double angle_tol)
 {
   assert((int)initial_geometry.size() == N);
   assert(fixed.empty() || (int)fixed.size() == N);
@@ -2201,7 +2204,6 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
   // Two-phase optimization:
   //   Phase 1: k_flat active — settle into flat/equilateral
   //   Phase 2: k_flat off — pure equilateral convergence
-  const int phase_budget = max_iter / 2;
   double k_flat = opt_k_flat;
   int phase = (k_flat > 0) ? 1 : 2;
   double phase1_grad_norm0 = 0;
@@ -2219,11 +2221,19 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
   n_grad_evals = 0;
   n_hv_evals = 0;
 
-  // Work budget: total_work = n_energy + N*n_grad + N*n_hv
+  // Work budget: total_work = n_energy + 2*n_grad + 7*n_hv
+  // All three primitives are O(Nv) per call with constant cost ratios.
+  // Empirical cost ratios measured at Nv=32,52,102 (consistent within 10%):
+  //   energy_eval : gradient_eval : hv_product ≈ 1 : 2 : 7
+  // Budget in units of "energy evaluations".  Default: 400*Nv^2.
+  // Each CG/LBFGS iteration costs ~17 energy evals (line search) + 1 gradient (=2),
+  // so ~19 work per iteration.  400*Nv^2/19 ≈ 21*Nv^2 iterations.
+  // Real wall time scales as budget * Nv (since each eval is O(Nv)).
+  if(max_work <= 0) max_work = 400LL * N * N;
+  const long long phase1_work_budget = max_work / 4;
   auto total_work_fn = [&]() -> long long {
-    return (long long)n_energy_evals + (long long)N * n_grad_evals + (long long)N * n_hv_evals;
+    return (long long)n_energy_evals + 2LL * n_grad_evals + 7LL * n_hv_evals;
   };
-  if(max_work > 0 && max_iter <= 0) max_iter = INT_MAX;
 
   auto compute_eg = [&](vector<coord3d>& grad) -> double {
     n_grad_evals++;
@@ -2264,10 +2274,12 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
   };
 
   // Phase transition logic (shared by all methods)
+  // Phase 1 ends when: work budget quarter exhausted, or gradient drops 100x.
   // Returns true if phase changed.
-  auto check_phase_transition = [&](int iter, int phase_start_iter, const vector<coord3d>& grad) -> bool {
-    if(phase != 1 || iter <= phase_start_iter || iter % 50 != 49) return false;
-    bool advance = (iter - phase_start_iter >= phase_budget);
+  long long phase1_work_start = 0;
+  auto check_phase_transition = [&](int iter, const vector<coord3d>& grad) -> bool {
+    if(phase != 1 || iter % 50 != 49) return false;
+    bool advance = (total_work_fn() - phase1_work_start >= phase1_work_budget);
     if(!advance && phase1_grad_norm0 > 0){
       double gn = vec_norm(grad);
       if(gn < phase1_grad_norm0 * 0.01) advance = true;
@@ -2300,7 +2312,8 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
     return alpha;
   };
 
-  const int log_interval = opt_log ? max(1, max_iter / 20) : 0;
+  // Log ~20 times over the work budget. Estimate iters from work/N (each iter ~ N work).
+  const int log_interval = opt_log ? max(1, (int)(max_work / (20LL * N))) : 0;
   const char* method_name = (opt_method == OptMethod::CG) ? "CG" :
                             (opt_method == OptMethod::LBFGS) ? "LBFGS" : "ST";
 
@@ -2313,7 +2326,14 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
             method_name, E, phase1_grad_norm0, L, edge_cv(), phase, grad_tol);
 
   bool converged = false;
-  int phase_start = 0;
+
+  // Stagnation detection for angle-based convergence: if energy hasn't
+  // decreased meaningfully for stag_window consecutive iterations, the
+  // optimizer is stuck at a local minimum and can't reduce angle error
+  // further.  Break to avoid burning the entire work budget.
+  const int stag_window = 50;
+  double stag_E_ref = E;   // energy at start of current window
+  int stag_count = 0;      // iterations since last meaningful decrease
 
   // ==================== CG ====================
   if(opt_method == OptMethod::CG){
@@ -2321,9 +2341,9 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
     for(int i = 0; i < N; i++) dir[i] = grad[i] * (-1.0);
     if(has_fixed) for(int i = 0; i < N; i++) if(fixed[i]) dir[i] = coord3d(0,0,0);
 
-    for(int iter = 0; iter < max_iter; iter++){
+    for(int iter = 0; ; iter++){
       iterations_used = iter + 1;
-      if(max_work > 0 && total_work_fn() >= max_work) break;
+      if(total_work_fn() >= max_work) break;
 
       // Periodic reflection
       bool reflected = false;
@@ -2335,8 +2355,7 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
       }
 
       // Phase transition
-      if(check_phase_transition(iter, phase_start, grad)){
-        phase_start = iter;
+      if(check_phase_transition(iter, grad)){
         E = compute_eg(grad);
         for(int i = 0; i < N; i++) dir[i] = grad[i] * (-1.0);
         if(has_fixed) for(int i = 0; i < N; i++) if(fixed[i]) dir[i] = coord3d(0,0,0);
@@ -2345,7 +2364,10 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
       // Convergence check
       double gmax = compute_gmax(grad);
       if(gmax < grad_tol){ converged = true; break; }
-      if(angle_tol > 0 && max_angle_relerr() < angle_tol && count_concave() == 0){ converged = true; break; }
+      if(angle_tol > 0){
+        if(max_angle_relerr() < angle_tol && count_concave() == 0){ converged = true; break; }
+        if(stag_count >= stag_window) break;
+      }
 
       // Ensure descent direction
       double slope = vec_dot(grad, dir);
@@ -2359,13 +2381,18 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
       for(int i = 0; i < N; i++) points[i] = points[i] + dir[i] * alpha;
 
       grad_old = grad;
+      double E_old = E;
       E = compute_eg(grad);
 
+      // Stagnation tracking
+      if(E_old - E > 1e-15 * max(1.0, fabs(E_old))){ stag_count = 0; stag_E_ref = E; }
+      else stag_count++;
+
       // Logging
-      if(log_interval > 0 && (iter % log_interval == 0 || iter == max_iter - 1))
-        fprintf(opt_log, "  CG %4d: E=%.6f |g|=%.4e gmax*L=%.4e a=%.3e cv=%.4f ph=%d%s\n",
-                iter, E, vec_norm(grad), compute_gmax(grad), alpha, edge_cv(), phase,
-                reflected ? " R" : "");
+      if(log_interval > 0 && iter % log_interval == 0)
+        fprintf(opt_log, "  CG %4d: E=%.6f |g|=%.4e gmax*L=%.4e a=%.3e cv=%.4f ang=%.2e ph=%d%s\n",
+                iter, E, vec_norm(grad), compute_gmax(grad), alpha, edge_cv(),
+                max_angle_relerr(), phase, reflected ? " R" : "");
 
       // Polak-Ribiere beta
       double gg_old = vec_dot(grad_old, grad_old);
@@ -2387,9 +2414,9 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
     deque<double> rho_hist;
     vector<coord3d> dir(N), x_trial(N), grad_old(N);
 
-    for(int iter = 0; iter < max_iter; iter++){
+    for(int iter = 0; ; iter++){
       iterations_used = iter + 1;
-      if(max_work > 0 && total_work_fn() >= max_work) break;
+      if(total_work_fn() >= max_work) break;
 
       // Periodic reflection
       bool reflected = false;
@@ -2403,8 +2430,7 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
       }
 
       // Phase transition
-      if(check_phase_transition(iter, phase_start, grad)){
-        phase_start = iter;
+      if(check_phase_transition(iter, grad)){
         E = compute_eg(grad);
         S.clear(); Y.clear(); rho_hist.clear();
       }
@@ -2412,7 +2438,10 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
       // Convergence check
       double gmax = compute_gmax(grad);
       if(gmax < grad_tol){ converged = true; break; }
-      if(angle_tol > 0 && max_angle_relerr() < angle_tol && count_concave() == 0){ converged = true; break; }
+      if(angle_tol > 0){
+        if(max_angle_relerr() < angle_tol && count_concave() == 0){ converged = true; break; }
+        if(stag_count >= stag_window) break;
+      }
 
       // Two-loop recursion to compute search direction
       dir = grad;  // q = grad
@@ -2456,7 +2485,12 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
       // Line search and update
       double alpha = line_search(E, grad, dir, x_trial);
       for(int i = 0; i < N; i++) points[i] = points[i] + dir[i] * alpha;
+      double E_old = E;
       E = compute_eg(grad);
+
+      // Stagnation tracking
+      if(E_old - E > 1e-15 * max(1.0, fabs(E_old))){ stag_count = 0; stag_E_ref = E; }
+      else stag_count++;
 
       // Update L-BFGS history: s = alpha*dir, y = grad - grad_old
       {
@@ -2475,10 +2509,10 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
       }
 
       // Logging
-      if(log_interval > 0 && (iter % log_interval == 0 || iter == max_iter - 1))
-        fprintf(opt_log, "  LB %4d: E=%.6f |g|=%.4e gmax*L=%.4e a=%.3e cv=%.4f ph=%d h=%d%s\n",
-                iter, E, vec_norm(grad), compute_gmax(grad), alpha, edge_cv(), phase,
-                (int)S.size(), reflected ? " R" : "");
+      if(log_interval > 0 && iter % log_interval == 0)
+        fprintf(opt_log, "  LB %4d: E=%.6f |g|=%.4e gmax*L=%.4e a=%.3e cv=%.4f ang=%.2e ph=%d h=%d%s\n",
+                iter, E, vec_norm(grad), compute_gmax(grad), alpha, edge_cv(),
+                max_angle_relerr(), phase, (int)S.size(), reflected ? " R" : "");
     }
   }
 
@@ -2491,9 +2525,9 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
     // Temp vectors for inner CG
     vector<coord3d> z(N), r_cg(N), d_cg(N), Hd(N), x_trial(N);
 
-    for(int iter = 0; iter < max_iter; iter++){
+    for(int iter = 0; ; iter++){
       iterations_used = iter + 1;
-      if(max_work > 0 && total_work_fn() >= max_work) break;
+      if(total_work_fn() >= max_work) break;
 
       // Periodic reflection
       bool reflected = false;
@@ -2505,8 +2539,7 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
       }
 
       // Phase transition
-      if(check_phase_transition(iter, phase_start, grad)){
-        phase_start = iter;
+      if(check_phase_transition(iter, grad)){
         E = compute_eg(grad);
         Delta = 0.5 * L;  // reset trust region on phase change
       }
@@ -2514,7 +2547,10 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
       // Convergence check
       double gmax = compute_gmax(grad);
       if(gmax < grad_tol){ converged = true; break; }
-      if(angle_tol > 0 && max_angle_relerr() < angle_tol && count_concave() == 0){ converged = true; break; }
+      if(angle_tol > 0){
+        if(max_angle_relerr() < angle_tol && count_concave() == 0){ converged = true; break; }
+        if(stag_count >= stag_window) break;
+      }
 
       // --- Steihaug CG to solve trust-region subproblem ---
       // Approximately solve: min_z  g^T z + 0.5 z^T H z,  ||z|| <= Delta
@@ -2612,19 +2648,24 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
       bool accepted = (rho > 0.1);
 
       if(accepted){
+        double E_old = E;
         points = x_trial;
         E = compute_eg(grad);
         if(rho > 0.75 && znorm > 0.5 * Delta) Delta = min(2.0 * Delta, Delta_max);
+        // Stagnation tracking
+        if(E_old - E > 1e-15 * max(1.0, fabs(E_old))){ stag_count = 0; stag_E_ref = E; }
+        else stag_count++;
       } else {
         Delta *= 0.25;
         if(Delta < 1e-14 * L) Delta = 1e-14 * L;
+        stag_count++;  // rejected step = no progress
       }
 
       // Logging
-      if(log_interval > 0 && (iter % log_interval == 0 || iter == max_iter - 1))
-        fprintf(opt_log, "  ST %4d: E=%.6f |g|=%.4e gmax*L=%.4e |z|=%.2e D=%.2e rho=%.2f in=%d ph=%d %s%s\n",
-                iter, E, vec_norm(grad), compute_gmax(grad), znorm, Delta, rho, inner_iters,
-                phase, accepted ? "acc" : "REJ", reflected ? " R" : "");
+      if(log_interval > 0 && iter % log_interval == 0)
+        fprintf(opt_log, "  ST %4d: E=%.6f |g|=%.4e gmax*L=%.4e |z|=%.2e D=%.2e rho=%.2f ang=%.2e in=%d ph=%d %s%s\n",
+                iter, E, vec_norm(grad), compute_gmax(grad), znorm, Delta, rho,
+                max_angle_relerr(), inner_iters, phase, accepted ? "acc" : "REJ", reflected ? " R" : "");
     }
   }
 
@@ -2635,9 +2676,46 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
             method_name, iterations_used, E, final_gmax_L, edge_cv(),
             converged ? "CONVERGED" : "budget");
 
-  // Post-optimization strict convexity cleanup
-  for(int pass = 0; pass < 3; pass++)
-    if(reflect_concave(points, 0, fixed) == 0) break;
+  // Post-optimization strict convexity cleanup.
+  // reflect_concave can disturb angle quality, so CG polish after reflecting.
+  {
+    int total_reflected = 0;
+    for(int pass = 0; pass < 3; pass++){
+      int n = reflect_concave(points, 0, fixed);
+      if(n == 0) break;
+      total_reflected += n;
+    }
+    if(total_reflected > 0){
+      // Reflection moved vertices — brief CG (Polak-Ribiere) polish to recover angle quality.
+      E = compute_eg(grad);
+      zero_fixed_grad(grad);
+      vector<coord3d> dir_r(N), grad_old_r(N), x_trial_r(N);
+      for(int i = 0; i < N; i++) dir_r[i] = grad[i] * (-1.0);
+      if(has_fixed) for(int i = 0; i < N; i++) if(fixed[i]) dir_r[i] = coord3d(0,0,0);
+      for(int iter = 0; iter < 50; iter++){
+        if(compute_gmax(grad) < grad_tol) break;
+        grad_old_r = grad;
+        double alpha = line_search(E, grad, dir_r, x_trial_r);
+        for(int i = 0; i < N; i++) points[i] = points[i] + dir_r[i] * alpha;
+        E = compute_eg(grad);
+        // Polak-Ribiere beta
+        double gg_old = vec_dot(grad_old_r, grad_old_r);
+        double beta = 0.0;
+        if(gg_old > 1e-30){
+          vector<coord3d> gdiff(N);
+          for(int i = 0; i < N; i++) gdiff[i] = grad[i] - grad_old_r[i];
+          beta = max(0.0, vec_dot(grad, gdiff) / gg_old);
+        }
+        for(int i = 0; i < N; i++) dir_r[i] = grad[i] * (-1.0) + dir_r[i] * beta;
+        if(has_fixed) for(int i = 0; i < N; i++) if(fixed[i]) dir_r[i] = coord3d(0,0,0);
+      }
+      // Final reflect pass in case CG polish re-introduced barely-concave vertices
+      reflect_concave(points, 0, fixed);
+      if(opt_log)
+        fprintf(opt_log, "  Post-reflect polish: reflected=%d ang=%.4e\n",
+                total_reflected, max_angle_relerr());
+    }
+  }
 
   final_angle_relerr = max_angle_relerr();
   final_n_concave = count_concave();

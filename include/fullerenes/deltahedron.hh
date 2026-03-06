@@ -37,20 +37,19 @@ public:
   // Uses tridiagonal Laplacian to place strip vertices at each step.
   static Deltahedron fromExtensionPath(const buckinverse::ExtensionPath& ep);
 
-  // Build from extension path with per-step CG optimization.
+  // Build from extension path with per-step optimization.
   // Same as fromExtensionPath, but calls optimize() after each expansion
   // step to relax geometry before the next strip is placed.
-  // max_iter_per_step: CG iterations per expansion step (default 200).
-  // max_iter_per_step: CG iterations per expansion step. 0 (default) = use 2*D.N.
-  // After all steps, runs a final 12*N optimization pass.
-  static Deltahedron fromExtensionPathOptimized(const buckinverse::ExtensionPath& ep, int max_iter_per_step = 0, FILE* log = nullptr,
+  // max_work_per_step: work budget per optimize() call. 0 = default (20*N^3).
+  static Deltahedron fromExtensionPathOptimized(const buckinverse::ExtensionPath& ep, FILE* log = nullptr,
                                                   StepCallback diag = nullptr,
                                                   OptMethod method = OptMethod::CG,
                                                   double step_tol = 1e-3,
                                                   double final_tol = 1e-5,
                                                   long long max_work_per_step = 0,
                                                   double step_angle_tol = 0,
-                                                  double final_angle_tol = 0);
+                                                  double final_angle_tol = 0,
+                                                  OptMethod final_method = OptMethod::CG);
 
   // Quality metrics
   double max_angle_relerr() const;  // max over face angles of |theta - pi/3| / (pi/3)
@@ -69,14 +68,16 @@ public:
   // Optimize geometry toward equilateral triangles.
   // Replaces this->points with optimized coordinates.
   // target_L: desired edge length (0 = compute from mean of initial edges).
-  // max_iter: maximum CG iterations (default 3000).
   // grad_tol: dimensionless convergence tolerance (default 1e-10).
   //           Convergence is declared when max_i(||g_i|| * L) < grad_tol,
   //           i.e. the largest per-vertex force in dimensionless units is
   //           below this threshold.  This is scale-invariant: the same
   //           tolerance gives the same geometric quality regardless of N or L.
-  // Returns true if converged.
-  bool optimize(const vector<coord3d>& initial_geometry, double target_L = 0, int max_iter = 3000, double grad_tol = 1e-10,
+  // max_work: work budget = n_energy + N*n_grad + N*n_hv. 0 = default (20*N^3).
+  // angle_tol: if > 0, converge when max_angle_relerr() < angle_tol and no concave vertices.
+  // Returns true if converged (vs budget exhaustion).
+  bool optimize(const vector<coord3d>& initial_geometry, double target_L = 0,
+                double grad_tol = 1e-10,
                 const vector<bool>& fixed = {},
                 long long max_work = 0,
                 double angle_tol = 0);

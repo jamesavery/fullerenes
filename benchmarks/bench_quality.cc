@@ -26,10 +26,11 @@ Quality measure(Deltahedron& D, OptMethod method, const vector<coord3d>& init_pt
   D.opt_k_flat = 0;
   D.points = init_pts;
   int Nv = D.N;
-  int max_iter = budget_mult * Nv;
+  // Convert iteration budget to work budget: each iter ~ N work (one gradient)
+  long long max_work = (long long)budget_mult * Nv * Nv;
 
   auto t0 = chrono::high_resolution_clock::now();
-  bool conv = D.optimize(D.points, 0, max_iter, 1e-10);
+  bool conv = D.optimize(D.points, 0, 1e-10, {}, max_work);
   double ms = chrono::duration<double,milli>(chrono::high_resolution_clock::now()-t0).count();
 
   auto edges = D.undirected_edges();
