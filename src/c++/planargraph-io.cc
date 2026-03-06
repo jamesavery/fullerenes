@@ -93,14 +93,15 @@ PlanarGraph PlanarGraph::read_hog_planarcode(FILE *file)
   N = read_int();
   if(N == 0){ number_length=2; N = read_int(); }
   
-  Graph g(N);
+  neighbours_t adj(N);
   for(node_t u=0; u<N && !feof(file); ++u){
     int v=0;
     do{
       v = read_int();
-      if(v!=0) g.neighbours[u].push_back(v-1); // In oriented order
+      if(v!=0) adj[u].push_back(v-1); // In oriented order
     } while(v!=0 && !feof(file));
   }
+  Graph g(adj);
   
   // Check graph. TODO: does this belong here?
   // for(node_t u=0;u<N;u++){

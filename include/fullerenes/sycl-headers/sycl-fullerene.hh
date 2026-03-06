@@ -55,16 +55,16 @@ struct Fullerene
     explicit operator Graph() const {
         ConditionFunctor cond(StatusEnum::FULLERENEGRAPH_PREPARED);
         bool is_cubic = cond(m_.flags_.get());
-        Graph G(neighbours_t(is_cubic ? N_ : Nf_));
         auto A = is_cubic ? d_.A_cubic_.template as_span<K>() : d_.A_dual_.template as_span<K>();
         auto count = is_cubic ? N_ : Nf_;
+        neighbours_t adj(count);
         for (size_t i = 0; i < count; i++) {
             auto degree = is_cubic ? 3 : d_.deg_[i];
             for (size_t j = 0; j < degree; j++) {
-                G.neighbours[i].push_back(A[i * (is_cubic ? 3 : 6) + j]);
+                adj[i].push_back(A[i * (is_cubic ? 3 : 6) + j]);
             }
         }
-        return G;
+        return Graph(adj);
     }
     
     explicit operator Polyhedron() const {

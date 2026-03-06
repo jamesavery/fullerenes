@@ -430,6 +430,11 @@ vector<int> Graph::multiple_source_shortest_paths(const vector<node_t>& sources,
 }
 
 
+void Graph::flip_all_orientations()
+{
+  for(node_t u=0;u<N;u++) reverse(neighbours[u].begin(), neighbours[u].end());
+}
+
 int Graph::max_degree() const
 {
   int max_d = 0;

@@ -26,6 +26,7 @@
 #include <limits.h>
 #include <math.h>
 #include <assert.h>
+#include <span>
 
 using namespace std;
 #include "geometry.hh"
@@ -39,12 +40,14 @@ struct Graph {
   Graph(size_t N=0) : N(N), neighbours(N) {}
   Graph(const neighbours_t& neighbours) : N(neighbours.size()), neighbours(neighbours) { }
 
+  std::span<const node_t> nbrs(node_t u) const { return {neighbours[u].data(), neighbours[u].size()}; }
 
   bool insert_edge(const arc_t& e, const node_t suc_uv=-1, const node_t suc_vu=-1);
   bool remove_edge(const edge_t& e);
   bool edge_exists(const edge_t& e) const;
   void remove_isolated_vertices();
   void remove_vertices(set<int> &sv);
+  void flip_all_orientations();
 
   int  arc_ix(node_t u, node_t v) const;  
   node_t next(node_t u, node_t v) const;

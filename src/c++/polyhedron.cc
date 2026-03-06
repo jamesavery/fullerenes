@@ -244,7 +244,7 @@ static void orient_polyhedron_neighbours(Polyhedron& P)
   }
 
   if(V<0){ // Calculated normals are pointing inwards - reverse order.
-    for(node_t u=0;u<P.N;u++) reverse(P.neighbours[u].begin(), P.neighbours[u].end());
+    P.flip_all_orientations();
   }
 }
 
