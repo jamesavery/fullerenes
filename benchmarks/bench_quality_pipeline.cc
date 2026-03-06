@@ -73,10 +73,10 @@ Quality measure_pipeline(const ExtensionPath& ep, const Config& cfg,
   double ang_err_sum = 0, ang_ref_sum = 0;
   vector<double> angles;
   for(int v = 0; v < Nv; v++){
-    int deg = (int)D.neighbours[v].size();
+    int deg = (int)D.degree(v);
     for(int j = 0; j < deg; j++){
-      int a = D.neighbours[v][j];
-      int b = D.neighbours[v][(j+1)%deg];
+      int a = D.nbrs(v)[j];
+      int b = D.nbrs(v)[(j+1)%deg];
       coord3d ea = D.points[a] - D.points[v];
       coord3d eb = D.points[b] - D.points[v];
       double cos_th = ea.dot(eb) / (ea.norm() * eb.norm());
@@ -97,14 +97,14 @@ Quality measure_pipeline(const ExtensionPath& ep, const Config& cfg,
   double h_min = 1e30;
   int n_concave = 0;
   for(int v = 0; v < Nv; v++){
-    int deg = (int)D.neighbours[v].size();
+    int deg = (int)D.degree(v);
     coord3d centroid(0,0,0);
-    for(int nb : D.neighbours[v]) centroid = centroid + D.points[nb];
+    for(int nb : D.nbrs(v)) centroid = centroid + D.points[nb];
     centroid = centroid * (1.0 / deg);
     coord3d fan_normal(0,0,0);
     for(int j = 0; j < deg; j++){
-      coord3d e1 = D.points[D.neighbours[v][j]] - D.points[v];
-      coord3d e2 = D.points[D.neighbours[v][(j+1)%deg]] - D.points[v];
+      coord3d e1 = D.points[D.nbrs(v)[j]] - D.points[v];
+      coord3d e2 = D.points[D.nbrs(v)[(j+1)%deg]] - D.points[v];
       fan_normal = fan_normal + e1.cross(e2);
     }
     double nn = fan_normal.norm();

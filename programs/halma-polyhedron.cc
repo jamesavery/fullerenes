@@ -24,7 +24,7 @@ struct Deltahedron {
     
     for(node_t u=0;u<g.N;u++){
       coord3d x = points[u]*(1-q);
-      for(node_t v: g.neighbours[u]) x += points[v]*q/g.neighbours[u].size();
+      for(node_t v: g.nbrs(u)) x += points[v]*q/g.degree(u);
       new_points[u] = x;
     }
     points = new_points;

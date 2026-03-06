@@ -53,9 +53,9 @@ int main(int argc, char** argv) {
             host_accessor Deg_in_acc(Deg_in, write_only);
 
             for (int i = 0; i < T.N; i++) {
-                Deg_in_acc[i] = T.neighbours[i].size();
-                for (int j = 0; j < T.neighbours[i].size(); j++) {
-                    G_in_acc[i*6+j] = T.neighbours[i][j];
+                Deg_in_acc[i] = T.degree(i);
+                for (int j = 0; j < T.degree(i); j++) {
+                    G_in_acc[i*6+j] = T.nbrs(i)[j];
                 }            
             }
         }

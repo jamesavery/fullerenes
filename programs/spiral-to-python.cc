@@ -54,7 +54,7 @@ int main(int ac, char **av)
   
   for(node_t u=0;u<N;u++){
     for(int j=0;j<3;j++){
-      node_t v = g.neighbours[u][j];
+      node_t v = g.nbrs(u)[j];
       next_on_face[u][j] = g.next_on_face(u,v);
       prev_on_face[u][j] = g.prev_on_face(u,v);
       face_right[u][j]  = face_size(g,u,v);
@@ -66,7 +66,7 @@ int main(int ac, char **av)
 
   
   for(int f=0,p=0,h=0;f<Nf;f++){
-    int df = faces[f].size(), dd = t.neighbours[f].size();
+    int df = faces[f].size(), dd = t.degree(f);
     //    if(f<12) assert(dd==5); // NEJ! MUST BE IN SPIRAL ORDER, OR SYMMETRY CALC BREAKS
 
     if(df == 5) pentagons[p++] = faces[f];

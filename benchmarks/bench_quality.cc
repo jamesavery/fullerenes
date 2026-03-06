@@ -48,10 +48,10 @@ Quality measure(Deltahedron& D, OptMethod method, const vector<coord3d>& init_pt
   vector<double> angle_sums(Nv, 0.0);
 
   for(int v = 0; v < Nv; v++){
-    int deg = (int)D.neighbours[v].size();
+    int deg = (int)D.degree(v);
     for(int j = 0; j < deg; j++){
-      int a = D.neighbours[v][j];
-      int b = D.neighbours[v][(j+1)%deg];
+      int a = D.nbrs(v)[j];
+      int b = D.nbrs(v)[(j+1)%deg];
       coord3d ea = D.points[a] - D.points[v];
       coord3d eb = D.points[b] - D.points[v];
       double cos_th = ea.dot(eb) / (ea.norm() * eb.norm());
@@ -72,7 +72,7 @@ Quality measure(Deltahedron& D, OptMethod method, const vector<coord3d>& init_pt
   double K_err_sum = 0, K_ref_sum = 0, K_total = 0;
   vector<double> K_devs;
   for(int v = 0; v < Nv; v++){
-    int deg = (int)D.neighbours[v].size();
+    int deg = (int)D.degree(v);
     double K = 2.0 * M_PI - angle_sums[v];
     double K_target = 2.0 * M_PI - deg * M_PI / 3.0;
     K_total += K;
@@ -90,14 +90,14 @@ Quality measure(Deltahedron& D, OptMethod method, const vector<coord3d>& init_pt
   double h_min = 1e30;
   int n_concave = 0;
   for(int v = 0; v < Nv; v++){
-    int deg = (int)D.neighbours[v].size();
+    int deg = (int)D.degree(v);
     coord3d centroid(0,0,0);
-    for(int nb : D.neighbours[v]) centroid = centroid + D.points[nb];
+    for(int nb : D.nbrs(v)) centroid = centroid + D.points[nb];
     centroid = centroid * (1.0 / deg);
     coord3d fan_normal(0,0,0);
     for(int j = 0; j < deg; j++){
-      coord3d e1 = D.points[D.neighbours[v][j]] - D.points[v];
-      coord3d e2 = D.points[D.neighbours[v][(j+1)%deg]] - D.points[v];
+      coord3d e1 = D.points[D.nbrs(v)[j]] - D.points[v];
+      coord3d e2 = D.points[D.nbrs(v)[(j+1)%deg]] - D.points[v];
       fan_normal = fan_normal + e1.cross(e2);
     }
     double nn = fan_normal.norm();

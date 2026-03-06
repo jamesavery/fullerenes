@@ -22,15 +22,15 @@ Triangulation from_rspi(int F, const vector<int>& rspi, const PlanarGraph::jumpl
 
 bool extrude(Triangulation &T, int p)
 {
-  fprintf(stderr,"Supposedly degree 5 node %d has %d neighbours\n",p,int(T.neighbours[p].size()));
+  fprintf(stderr,"Supposedly degree 5 node %d has %d neighbours\n",p,int(T.degree(p)));
   // Insert 5 new pentagons p0,...,p4 surrounding p
 
   int Hi[5], v2[5], v3[5], v4[5];
   for(int i=0;i<5;i++){
-    Hi[i] = T.neighbours[p][i];
-    if(T.neighbours[Hi[i]].size() != 6) return false; // p is not valid patch replacement site.
+    Hi[i] = T.nbrs(p)[i];
+    if(T.degree(Hi[i]) != 6) return false; // p is not valid patch replacement site.
 
-    const vector<node_t> &nHi(T.neighbours[Hi[i]]);
+    auto nHi = T.nbrs(Hi[i]);
 
     int ip = 0; 
     for(;ip<nHi.size();ip++) if(nHi[ip] == p) break;
@@ -60,10 +60,10 @@ bool extrude(Polyhedron& P, int p) // Requires that P is a triangulation.
   int Hi[5], v2[5], v3[5], v4[5], pi[5];
   for(int i=0;i<5;i++){
     pi[i] = P.N+i;
-    Hi[i] = P.neighbours[p][i];
-    if(P.neighbours[Hi[i]].size() != 6) return false; // p is not valid patch replacement site.
+    Hi[i] = P.nbrs(p)[i];
+    if(P.degree(Hi[i]) != 6) return false; // p is not valid patch replacement site.
 
-    const vector<node_t> &nHi(P.neighbours[Hi[i]]);
+    auto nHi = P.nbrs(Hi[i]);
     int ip = 0; 
     for(;ip<nHi.size();ip++) if(nHi[ip] == p) break;
 

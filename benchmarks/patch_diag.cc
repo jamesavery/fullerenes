@@ -98,7 +98,7 @@ static QStats quality(const Deltahedron& D) {
     double sum = 0, sum2 = 0; int ne = 0;
     double lmin = 1e30, lmax = 0;
     for (int u = 0; u < D.N; u++)
-        for (int v : D.neighbours[u])
+        for (int v : D.nbrs(u))
             if (v > u) {
                 double l = (D.points[u] - D.points[v]).norm();
                 sum += l; sum2 += l*l; ne++;
@@ -122,15 +122,15 @@ static QStats quality(const Deltahedron& D) {
     // Convexity
     q.h_min = 1e30; q.n_concave = 0;
     for (int v = 0; v < D.N; v++) {
-        int d = (int)D.neighbours[v].size();
+        int d = (int)D.degree(v);
         if (d > 6) continue;
         coord3d cen(0,0,0);
-        for (int i = 0; i < d; i++) cen += D.points[D.neighbours[v][i]];
+        for (int i = 0; i < d; i++) cen += D.points[D.nbrs(v)[i]];
         cen /= (double)d;
         coord3d nf(0,0,0);
         for (int i = 0; i < d; i++) {
-            coord3d e1 = D.points[D.neighbours[v][i]] - D.points[v];
-            coord3d e2 = D.points[D.neighbours[v][(i+1)%d]] - D.points[v];
+            coord3d e1 = D.points[D.nbrs(v)[i]] - D.points[v];
+            coord3d e2 = D.points[D.nbrs(v)[(i+1)%d]] - D.points[v];
             nf += e1.cross(e2);
         }
         double nl = nf.norm();

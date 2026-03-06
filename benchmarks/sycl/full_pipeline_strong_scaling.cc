@@ -101,11 +101,11 @@ int main(int argc, char** argv) {
             if(!more) break;
             for (size_t j = 0; j < Nf; j++)
             {
-                for(size_t k = 0; k < G.neighbours[j].size(); k++)
+                for(size_t k = 0; k < G.degree(j); k++)
                 {
-                    acc_dual[isomer_idx*Nf + j][k] = G.neighbours[j][k];
+                    acc_dual[isomer_idx*Nf + j][k] = G.nbrs(j)[k];
                 } 
-                if(G.neighbours[j].size() == 5){
+                if(G.degree(j) == 5){
                     acc_dual[isomer_idx*Nf + j][5] = std::numeric_limits<node_t>::max();
                     acc_degs[isomer_idx*Nf + j] = 5;
                 } else {

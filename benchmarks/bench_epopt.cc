@@ -48,7 +48,7 @@ static IsomerStats compute_stats(const Deltahedron& D, int idx, int seed, int n_
     vector<double> edge_lens;
     edge_lens.reserve(D.N * 3);
     for (int u = 0; u < D.N; u++)
-        for (int v : D.neighbours[u])
+        for (int v : D.nbrs(u))
             if (v > u) edge_lens.push_back((D.points[u] - D.points[v]).norm());
     double sum = 0, sum2 = 0;
     for (double l : edge_lens) { sum += l; sum2 += l*l; }
@@ -63,15 +63,15 @@ static IsomerStats compute_stats(const Deltahedron& D, int idx, int seed, int n_
     s.h_min = INFINITY;
     s.n_concave = 0;
     for (int v = 0; v < D.N; v++) {
-        int d = (int)D.neighbours[v].size();
+        int d = (int)D.degree(v);
         if (d > 6) continue;
         coord3d centroid(0,0,0);
-        for (int i = 0; i < d; i++) centroid += D.points[D.neighbours[v][i]];
+        for (int i = 0; i < d; i++) centroid += D.points[D.nbrs(v)[i]];
         centroid /= (double)d;
         coord3d n_fan(0,0,0);
         for (int i = 0; i < d; i++) {
-            coord3d e1 = D.points[D.neighbours[v][i]] - D.points[v];
-            coord3d e2 = D.points[D.neighbours[v][(i+1)%d]] - D.points[v];
+            coord3d e1 = D.points[D.nbrs(v)[i]] - D.points[v];
+            coord3d e2 = D.points[D.nbrs(v)[(i+1)%d]] - D.points[v];
             n_fan += e1.cross(e2);
         }
         double n_len = n_fan.norm();

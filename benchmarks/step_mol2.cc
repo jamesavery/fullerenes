@@ -21,19 +21,19 @@ static void write_mol2(const Deltahedron& D, const char* path) {
     if (!f) { fprintf(stderr, "Cannot open %s\n", path); return; }
     int ne = 0;
     for (int u = 0; u < D.N; u++)
-        for (int v : D.neighbours[u])
+        for (int v : D.nbrs(u))
             if (v > u) ne++;
     fprintf(f, "@<TRIPOS>MOLECULE\nDeltahedron\n%d %d 0 0 0\nSMALL\nNO_CHARGES\n\n", D.N, ne);
     fprintf(f, "@<TRIPOS>ATOM\n");
     for (int u = 0; u < D.N; u++) {
-        const char* type = ((int)D.neighbours[u].size() == 5) ? "N" : "C";
+        const char* type = ((int)D.degree(u) == 5) ? "N" : "C";
         fprintf(f, "%d %s%d %f %f %f %s 1 UNK 0\n",
                 u+1, type, u, D.points[u][0], D.points[u][1], D.points[u][2], type);
     }
     fprintf(f, "@<TRIPOS>BOND\n");
     int bid = 1;
     for (int u = 0; u < D.N; u++)
-        for (int v : D.neighbours[u])
+        for (int v : D.nbrs(u))
             if (v > u) fprintf(f, "%d %d %d 1\n", bid++, u+1, v+1);
     fclose(f);
 }
@@ -42,7 +42,7 @@ static void print_stats(const Deltahedron& D, const char* label) {
     double sum = 0, sum2 = 0; int ne = 0;
     double lmin = 1e30, lmax = 0;
     for (int u = 0; u < D.N; u++)
-        for (int v : D.neighbours[u])
+        for (int v : D.nbrs(u))
             if (v > u) {
                 double l = (D.points[u] - D.points[v]).norm();
                 sum += l; sum2 += l*l; ne++;
@@ -64,15 +64,15 @@ static void print_stats(const Deltahedron& D, const char* label) {
 
     double hmin = 1e30; int nconc = 0;
     for (int v = 0; v < D.N; v++) {
-        int d = (int)D.neighbours[v].size();
+        int d = (int)D.degree(v);
         if (d > 6) continue;
         coord3d cen(0,0,0);
-        for (int i = 0; i < d; i++) cen += D.points[D.neighbours[v][i]];
+        for (int i = 0; i < d; i++) cen += D.points[D.nbrs(v)[i]];
         cen /= (double)d;
         coord3d nf(0,0,0);
         for (int i = 0; i < d; i++) {
-            coord3d e1 = D.points[D.neighbours[v][i]] - D.points[v];
-            coord3d e2 = D.points[D.neighbours[v][(i+1)%d]] - D.points[v];
+            coord3d e1 = D.points[D.nbrs(v)[i]] - D.points[v];
+            coord3d e2 = D.points[D.nbrs(v)[(i+1)%d]] - D.points[v];
             nf += e1.cross(e2);
         }
         double nl = nf.norm();

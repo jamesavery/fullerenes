@@ -417,7 +417,7 @@ int main(int ac, char **av)
       face_relevant = false;
       for(int j=0; j<6; j++){
         for(int k=0; k<3; k++){
-          if(marked_nodes.find(P.neighbours[(*it)[j]][k]) != marked_nodes.end()){
+          if(marked_nodes.find(P.nbrs((*it)[j])[k]) != marked_nodes.end()){
             face_relevant = true;
           }    
         }

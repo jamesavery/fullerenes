@@ -354,7 +354,7 @@ matrix<double> self_distances(const Triangulation &G, const vector<node_t> &node
 matrix<clustering::distance_t> pentagon_graph_distance(const Triangulation &G)
 {
   vector<int> pentagon_indices(12);
-  for(int u=0, i=0;u<G.N;u++) if(G.neighbours[u].size() == 5) pentagon_indices[i++] = u;
+  for(int u=0, i=0;u<G.N;u++) if(G.degree(u) == 5) pentagon_indices[i++] = u;
 
   auto D = G.all_pairs_shortest_paths(pentagon_indices);
   for(int i=0;i<D.m*D.n;i++) D[i] *= D[i];
@@ -365,7 +365,7 @@ matrix<clustering::distance_t> pentagon_graph_distance(const Triangulation &G)
 matrix<int> pentagon_surface_distance(const Triangulation& G)
 {
   vector<int> pentagon_indices(12);
-  for(int u=0, i=0;u<G.N;u++) if(G.neighbours[u].size() == 5) pentagon_indices[i++] = u;
+  for(int u=0, i=0;u<G.N;u++) if(G.degree(u) == 5) pentagon_indices[i++] = u;
 								
   auto Hsqr = G.simple_square_surface_distances(pentagon_indices,true);
   cerr << "Hsqr = " << Hsqr << ";\n";  
@@ -378,7 +378,7 @@ matrix<int> pentagon_surface_distance(const Triangulation& G)
 auto pentagon_geodesics(const Triangulation& G)
 {
   vector<int> pentagon_indices(12);
-  for(int u=0, i=0;u<G.N;u++) if(G.neighbours[u].size() == 5) pentagon_indices[i++] = u;
+  for(int u=0, i=0;u<G.N;u++) if(G.degree(u) == 5) pentagon_indices[i++] = u;
 								
   return G.simple_geodesics(pentagon_indices,true);
 }
@@ -416,7 +416,7 @@ vector< pair<arc_t,float> > crossings(const Triangulation& dG, const node_t u, c
   int Nruns = quad_runs.size();
 
   // No matter what, we start in node u. 
-  node_t q = u, r = dG.neighbours[u][geo.axis];
+  node_t q = u, r = dG.nbrs(u)[geo.axis];
   result.push_back({{q,r},0});
   
   // Deal with degenerate case first

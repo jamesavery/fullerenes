@@ -12,7 +12,7 @@
 pair<int,int> middle_hexagon(const Triangulation &dual)
 {
   vector<int> pentagons(12);
-  for(node_t u=0,p=0;u<dual.N;u++) if(dual.neighbours[u].size()==5) pentagons[p++] = u;
+  for(node_t u=0,p=0;u<dual.N;u++) if(dual.degree(u)==5) pentagons[p++] = u;
   
   matrix<int> D(12, dual.N);
   for(node_t p=0;p<12;p++)
@@ -109,7 +109,7 @@ int main(int ac, char **av)
     
       for(int j=0;j<3;j++){
 	size_t index = i*N*3 + u*3 + j;
-	node_t v = Ps[i].neighbours[u][j];
+	node_t v = Ps[i].nbrs(u)[j];
 	neighbours[index]   = v;
 	next_on_face[index] = Ps[i].next_on_face(u,v);
 	prev_on_face[index] = Ps[i].prev_on_face(u,v);
@@ -125,7 +125,7 @@ int main(int ac, char **av)
     triangles[i] = Ts[i].compute_faces_oriented();
 
     for(node_t f=0,npent=0,nhex=0;f<Nfaces;f++){
-      auto nf = Ts[i].neighbours[f];
+      auto nf = Ts[i].nbrs(f);
 
      
       for(int j=0;j<nf.size();j++){
@@ -170,7 +170,7 @@ int main(int ac, char **av)
     for(int j=0;j<Ts.size();j++){
       int u_max, mx;
       tie(u_max,mx) = middle_hexagon(Tlf[j]);
-      arc_t first_arc = {u_max, Tlf[j].neighbours[u_max][0]};    
+      arc_t first_arc = {u_max, Tlf[j].nbrs(u_max)[0]};    
       
       Unfolding uf(Tlf[j],first_arc);
       Arcs[j]   = get_keys(uf.arc_coords);

@@ -11,7 +11,7 @@
 Triangulation reverse(const Triangulation& G)
 {
   Triangulation Greversed = G;
-  for(node_t u=0;u<G.N;u++) reverse(Greversed.neighbours[u].begin(),Greversed.neighbours[u].end());
+  for(node_t u=0;u<G.N;u++) reverse(Greversed.nbrs(u).begin(),Greversed.nbrs(u).end());
 
   return Greversed;
 }

@@ -41,7 +41,7 @@ public:
 
 int incident_edge(const Graph &G, node_t u, node_t v)
 {
-  for(int i=0;i<G.degree(v);i++) if(G.neighbours[v][i] == u) return i;
+  for(int i=0;i<G.degree(v);i++) if(G.nbrs(v)[i] == u) return i;
   return -1;			// Not a neighbour
 }
 
