@@ -423,7 +423,6 @@ static Deltahedron make_C44_deltahedron(int idx) {
   // Reconstruct triangulation and fullerene graph from spiral
   Triangulation T(spiral);
   FullereneGraph G = T.dual_graph();
-  G.layout2d = G.tutte_layout();
   // scalerad * 1.5 = average cubic edge length.
   // Want cubic edge ~ target_L / sqrt(3) = 1.45 Angstrom.
   double scalerad = target_L / (1.5 * sqrt(3.0));
@@ -1102,8 +1101,6 @@ TEST(C44DeltahedronTest, Optimize_AllC44) {
 // the deltahedron optimizer can handle a poor initial geometry.
 static Deltahedron make_deltahedron_from_db(int N, const IsomerDB::Entry& entry) {
   FullereneGraph G = IsomerDB::makeIsomer(N, entry);
-  if(G.layout2d.empty())
-    G.layout2d = G.tutte_layout();
   // scalerad * 1.5 = average cubic edge length.
   // Want cubic edge ~ target_L / sqrt(3) = 1.45 Angstrom.
   double scalerad = target_L / (1.5 * sqrt(3.0));

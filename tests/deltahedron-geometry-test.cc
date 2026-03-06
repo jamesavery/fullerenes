@@ -12,6 +12,7 @@
 #include "fullerenes/polyhedron.hh"
 #include "fullerenes/isomerdb.hh"
 #include "fullerenes/triangulation.hh"
+#include "fullerenes/layout2d.hh"
 #include <cmath>
 #include <map>
 #include <set>
@@ -817,9 +818,10 @@ static Graph makeNanotubeDual(int n_rings) {
         adj[v].push_back(u);
     }
 
-    // Use Triangulation constructor to orient the neighbour lists
-    Triangulation T(adj, false);  // already_oriented=false → computes faces + orients
-    return static_cast<const Graph&>(T);
+    // Orient the graph using planar embedding
+    Graph G(adj);
+    layout2d::planar_orient(G);
+    return G;
 }
 
 // =====================================================================
@@ -830,7 +832,7 @@ TEST(DeltahedronGeometry, NanotubeBuilderVerify) {
     // n_rings=1 should be C30 (the seed itself)
     Graph G1 = makeNanotubeDual(1);
     EXPECT_EQ(G1.N, 17) << "n_rings=1 should give C30 dual (17 vertices)";
-    EXPECT_TRUE(G1.is_oriented) << "Should be oriented";
+    EXPECT_TRUE(G1.is_consistently_oriented()) << "Should be oriented";
 
     // Verify it's a valid triangulation
     Triangulation T1(G1);
@@ -1432,7 +1434,6 @@ TEST(ExtPathConvexity, C60_Ih) {
     // --- Exact pentakis dodecahedron from traditional pipeline ---
     // IsomerDB → FullereneGraph → Tutte layout → zero_order_geometry → Polyhedron → dual
     FullereneGraph FG = IsomerDB::makeIsomer(60, db.entries[1811]);
-    FG.layout2d = FG.tutte_layout();
     static const double target_L = sqrt(3.0) * 1.45;
     double scalerad = target_L / (1.5 * sqrt(3.0));
     vector<coord3d> pts = FG.zero_order_geometry(scalerad);

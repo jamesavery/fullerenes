@@ -40,7 +40,6 @@ int main(int ac, char **av)
     s << output_dir + "/C"<<N << "-" << i;
     cerr << s.str() << endl;
     FullereneGraph g = T.dual_graph();
-    g.layout2d = g.tutte_layout();
     Polyhedron P0(g,g.zero_order_geometry(),6);    
     Polyhedron::to_file(P0,s.str()+"-P0.mol2");
       

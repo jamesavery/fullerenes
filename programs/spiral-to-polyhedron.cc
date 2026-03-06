@@ -15,7 +15,6 @@ int main(int ac, char **av)
   string spiral_name = av[1];
   spiral_nomenclature fsn(spiral_name);
   FullereneGraph g(fsn);
-  g.layout2d = g.tutte_layout();
   auto X = g.zero_order_geometry();
   Polyhedron P(g,X);
   P.optimize();

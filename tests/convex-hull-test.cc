@@ -8,7 +8,6 @@ TEST(ConvexHull, C20IsOriented) {
   Polyhedron P = Polyhedron::C20();
   Polyhedron CH = P.convex_hull();
 
-  EXPECT_TRUE(CH.is_oriented);
   EXPECT_TRUE(CH.is_consistently_oriented());
   EXPECT_EQ(CH.N, P.N);
 }
@@ -26,7 +25,6 @@ TEST(ConvexHull, IcosahedronIsOriented) {
   Polyhedron ico = Polyhedron::C20().dual();
   Polyhedron CH = ico.convex_hull();
 
-  EXPECT_TRUE(CH.is_oriented);
   EXPECT_TRUE(CH.is_consistently_oriented());
   EXPECT_EQ(CH.N, ico.N);
   EXPECT_GT(CH.volume(), 0);

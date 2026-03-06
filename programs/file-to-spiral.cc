@@ -15,8 +15,6 @@ int main(int ac, char **av)
 
   Polyhedron P = Polyhedron::from_file(av[1]);
   PlanarGraph dual =  static_cast<PlanarGraph>(P).dual_graph();
-  dual.layout2d = dual.tutte_layout();
-  
   cout << "dual = " << dual << endl;
 
   assert(dual.is_triangulation());

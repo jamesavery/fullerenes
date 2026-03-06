@@ -34,7 +34,6 @@ int main(int ac, char **av)
     for(int i=0;i<12;i++) rspi[i]--;
 
     FullereneGraph G(N,rspi);
-    G.layout2d = G.tutte_layout();
 
     cout << G.count_perfect_matchings() << endl;
   } 

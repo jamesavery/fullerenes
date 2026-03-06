@@ -70,7 +70,7 @@ int main(int argc, char** argv){
                     auto T3 = high_resolution_clock::now(); T_polys[l] += T3 - T2;
 
 
-                P.layout2d  = P.tutte_layout();
+                {auto tutte_layout = P.tutte_layout();}
                     auto T4 = high_resolution_clock::now(); T_tuttes[l] += T4 - T3;
                 P.points    = P.zero_order_geometry();
                     auto T5 = high_resolution_clock::now(); T_X0s[l] += T5 - T4;

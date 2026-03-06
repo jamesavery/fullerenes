@@ -47,7 +47,7 @@ TEST(BuckinversePhase1, Seeds) {
         EXPECT_TRUE(allDegreesValid(c20)) << "C20 all degrees 5-6";
         EXPECT_EQ(countDeg5(c20), 12) << "C20 has 12 degree-5 vertices (all)";
         EXPECT_TRUE(isValidTriangulation(c20)) << "C20 is a valid triangulation";
-        EXPECT_TRUE(c20.is_oriented) << "C20 is oriented";
+        EXPECT_TRUE(c20.is_consistently_oriented()) << "C20 is oriented";
         EXPECT_EQ(identifySeed(c20), SeedType::C20) << "C20 identified as C20";
     }
 
@@ -58,7 +58,7 @@ TEST(BuckinversePhase1, Seeds) {
         EXPECT_TRUE(allDegreesValid(c28)) << "C28 all degrees 5-6";
         EXPECT_EQ(countDeg5(c28), 12) << "C28 has 12 degree-5 vertices";
         EXPECT_TRUE(isValidTriangulation(c28)) << "C28 is a valid triangulation";
-        EXPECT_TRUE(c28.is_oriented) << "C28 is oriented";
+        EXPECT_TRUE(c28.is_consistently_oriented()) << "C28 is oriented";
         EXPECT_EQ(identifySeed(c28), SeedType::C28) << "C28 identified as C28";
     }
 
@@ -69,7 +69,7 @@ TEST(BuckinversePhase1, Seeds) {
         EXPECT_TRUE(allDegreesValid(c30)) << "C30 all degrees 5-6";
         EXPECT_EQ(countDeg5(c30), 12) << "C30 has 12 degree-5 vertices";
         EXPECT_TRUE(isValidTriangulation(c30)) << "C30 is a valid triangulation";
-        EXPECT_TRUE(c30.is_oriented) << "C30 is oriented";
+        EXPECT_TRUE(c30.is_consistently_oriented()) << "C30 is oriented";
         EXPECT_EQ(identifySeed(c30), SeedType::C30) << "C30 identified as C30";
     }
 }

@@ -77,7 +77,6 @@ int main(int ac, char **av)
     stringstream s(filename);
     
     FullereneGraph g = T.dual_graph();
-    g.layout2d = g.tutte_layout();
     Polyhedron P0(g,g.zero_order_geometry(),6);
     P0s.push_back(P0);    
       
@@ -123,7 +122,7 @@ int main(int ac, char **av)
     //    vector<face_t> faces = Ps[i].compute_faces_oriented();
     vector<face_t> faces = Ts[i].cubic_faces();
 
-    triangles[i] = Ts[i].compute_faces();
+    triangles[i] = Ts[i].compute_faces_oriented();
 
     for(node_t f=0,npent=0,nhex=0;f<Nfaces;f++){
       auto nf = Ts[i].neighbours[f];

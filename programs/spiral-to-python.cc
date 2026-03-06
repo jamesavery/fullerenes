@@ -39,7 +39,7 @@ int main(int ac, char **av)
   
   
   PlanarGraph   g = t.dual_graph();
-  g.layout2d = g.tutte_layout();
+  vector<coord2d> tutte = g.tutte_layout();
   Polyhedron P0(g,g.zero_order_geometry());
   Polyhedron P = P0;
   P.optimize();
@@ -110,7 +110,7 @@ int main(int ac, char **av)
   cerr << "face_right   = array(" << face_right << ");\n\n"; 
   cerr << "points_start = array(" << P0.points << ");\n\n";
   cerr << "points_opt   = array(" << P.points << ");\n\n";   
-  cerr << "tutte_layout = array(" << g.layout2d << ");\n\n";
+  cerr << "tutte_layout = array(" << tutte << ");\n\n";
   cerr << "# Dual graph and its faces\n";
   cerr << "dual_neighbours   = " << t.neighbours << ";\n\n";
   //  cerr << "next_on_tri       = array(" << next_on_tri << ");\n\n";  

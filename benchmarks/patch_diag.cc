@@ -14,6 +14,7 @@
 #include "fullerenes/deltahedron.hh"
 #include "fullerenes/polyhedron.hh"
 #include "fullerenes/buckinverse.hh"
+#include "fullerenes/layout2d.hh"
 #include <cstdio>
 #include <cmath>
 #include <vector>
@@ -73,8 +74,9 @@ static Graph makeNanotubeDual(int n_rings) {
         adj[v].push_back(u);
     }
 
-    Triangulation T(adj, false);
-    return static_cast<const Graph&>(T);
+    Graph G(adj);
+    layout2d::planar_orient(G);
+    return G;
 }
 
 // =====================================================================

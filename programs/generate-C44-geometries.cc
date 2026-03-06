@@ -66,8 +66,6 @@ int main(int ac, char **av)
 
     // Build fullerene graph and optimize geometry
     FullereneGraph G = dualG.dual_graph();
-    G.layout2d = G.tutte_layout();
-
     vector<coord3d> points = G.zero_order_geometry();
     {
       SuppressStdout quiet;
