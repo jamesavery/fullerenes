@@ -593,7 +593,7 @@ static vector<int> matchSeedViaSpiralImpl(
         to_compact[ep_ids[i]] = i;
 
     // Build compact adjacency
-    neighbours_t compact_adj(seed_N);
+    neighbours_t compact_adj(seed_N, GRAPH_DMAX);
     for (const auto& sv : ep.seed_state) {
         int ci = to_compact[sv.id];
         uint8_t m = sv.active;
@@ -752,7 +752,7 @@ static void computeSeedGeometry(const ExtensionPath& ep, vector<coord3d>& points
     for (int i = 0; i < seed_N; i++)
         to_compact[ep_ids[i]] = i;
 
-    neighbours_t compact_adj(seed_N);
+    neighbours_t compact_adj(seed_N, GRAPH_DMAX);
     for (const auto& sv : ep.seed_state) {
         int ci = to_compact[sv.id];
         uint8_t m = sv.active;
@@ -807,7 +807,7 @@ Deltahedron Deltahedron::fromExtensionPath(const ExtensionPath& ep) {
     for (int u = 0; u < full_N; u++)
         if (rd.alive(u)) remap[u] = id++;
 
-    neighbours_t adj(id);
+    neighbours_t adj(id, GRAPH_DMAX);
     vector<coord3d> compact_points(id);
     for (int u = 0; u < full_N; u++) {
         if (!rd.alive(u)) continue;
@@ -833,7 +833,7 @@ static Deltahedron extractCompact(
     for (int u = 0; u < full_N; u++)
         if (rd.alive(u)) remap[u] = id++;
 
-    neighbours_t adj(id);
+    neighbours_t adj(id, GRAPH_DMAX);
     vector<coord3d> compact_pts(id);
     for (int u = 0; u < full_N; u++) {
         if (!rd.alive(u)) continue;
@@ -888,7 +888,7 @@ static Deltahedron extractPatch(
     int m = id;
 
     // 4. Build adjacency for the sub-graph (only edges within patch)
-    neighbours_t adj(m);
+    neighbours_t adj(m, GRAPH_DMAX);
     for (int u : patch_set) {
         uint8_t mask = rd.V[u].active;
         for (; mask; mask &= mask - 1) {

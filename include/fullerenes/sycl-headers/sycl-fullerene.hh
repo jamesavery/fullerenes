@@ -57,7 +57,7 @@ struct Fullerene
         bool is_cubic = cond(m_.flags_.get());
         auto A = is_cubic ? d_.A_cubic_.template as_span<K>() : d_.A_dual_.template as_span<K>();
         auto count = is_cubic ? N_ : Nf_;
-        neighbours_t adj(count);
+        neighbours_t adj(count, GRAPH_DMAX);
         for (size_t i = 0; i < count; i++) {
             auto degree = is_cubic ? 3 : d_.deg_[i];
             for (size_t j = 0; j < degree; j++) {
@@ -77,7 +77,7 @@ struct Fullerene
         Polyhedron P;
         using points_t = decltype(P.points);
         points_t points(N_);
-        neighbours_t neighbours(N_);
+        neighbours_t neighbours(N_, GRAPH_DMAX);
         auto& A = d_.A_cubic_;
         for (size_t i = 0; i < N_; i++) {
             for (size_t j = 0; j < 3; j++) {

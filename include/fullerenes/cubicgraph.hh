@@ -17,9 +17,12 @@ struct CubicGraph : public PlanarGraph {
         fprintf(stderr,"Graph not cubic: deg(%d) = %d\n",u,int(neighbours[u].size()));
         abort();
       }
+    if(N > 0) neighbours = neighbours.restride(3);
   }
 
-  CubicGraph(const Graph& g) : PlanarGraph(g) {}
+  CubicGraph(const Graph& g) : PlanarGraph(g) {
+    if(N > 0) neighbours = neighbours.restride(3);
+  }
   CubicGraph(const int N, const vector<int>& spiral_string, const jumplist_t& jumps = jumplist_t());
   CubicGraph(const spiral_nomenclature &fsn);
 

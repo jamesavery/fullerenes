@@ -172,7 +172,7 @@ Polyhedron Polyhedron::incremental_convex_hull() const {
   // 3.3 Build oriented neighbour lists by fan traversal.
   //     For vertex u, follow arc_next[(u, v)] around the fan.
   //     This produces CCW order (outward normals).
-  neighbours_t nb(M);
+  neighbours_t nb(M, GRAPH_DMAX);
   for (node_t u = 0; u < M; u++) {
     node_t v = first_neighbour[u];
     node_t v0 = v;
@@ -274,7 +274,7 @@ Polyhedron::Polyhedron(const vector<coord3d>& xs, double tolerance)
     }
   }
      
-  neighbours_t nb(xs.size());
+  neighbours_t nb(xs.size(), GRAPH_DMAX);
   for(int i=0;i<xs.size();i++){
     for(int j=i+1;j<xs.size();j++){
       double d = (xs[i]-xs[j]).norm();

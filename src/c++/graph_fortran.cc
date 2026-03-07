@@ -7,7 +7,7 @@
 // Adjacency matrices have no orientation info, so we use planar_orient
 // to compute a correct planar embedding.
 static PlanarGraph oriented_graph_from_adjacency(int Nmax, int N, const int *adjacency) {
-  neighbours_t nb(N);
+  neighbours_t nb(N, GRAPH_DMAX);
   for(int i=0;i<N;i++)
     for(int j=i+1;j<N;j++)
       if(adjacency[i*Nmax+j]) {

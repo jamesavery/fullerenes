@@ -17,7 +17,7 @@ FullereneGraph get_fg(int N) {
 }
 
 // ---------------------------------------------------------------------------
-// DenseGraph: verify Graph::neighbours (which IS a DenseGraph<10>) is correct
+// DenseGraph: verify Graph::neighbours (which IS a DenseGraph with dmax=10) is correct
 // ---------------------------------------------------------------------------
 
 class DenseFromGraph : public ::testing::TestWithParam<int> {};
@@ -26,7 +26,7 @@ TEST_P(DenseFromGraph, CubicGraphCorrect) {
     int N = GetParam();
     FullereneGraph FG = get_fg(N);
 
-    // FG.neighbours is now DenseGraph<GRAPH_DMAX>
+    // FG.neighbours is now DenseGraph with dmax=3 (cubic restride)
     EXPECT_EQ(FG.neighbours.size(), N);
     for (int v = 0; v < N; ++v) {
         EXPECT_EQ(FG.neighbours.degree(v), 3);
@@ -55,7 +55,7 @@ INSTANTIATE_TEST_SUITE_P(Sizes, DenseFromGraph, ::testing::Values(20, 60, 80));
 // ---------------------------------------------------------------------------
 
 TEST(DenseMutation, PushBack) {
-    S::DenseGraph<3> g(4);
+    S::DenseGraph<> g(4, 3);
 
     g.push_back(0, 1);
     g.push_back(0, 2);
@@ -69,7 +69,7 @@ TEST(DenseMutation, PushBack) {
 }
 
 TEST(DenseMutation, InsertAt) {
-    S::DenseGraph<4> g(1);
+    S::DenseGraph<> g(1, 4);
 
     g.push_back(0, 1);
     g.push_back(0, 3);
@@ -83,7 +83,7 @@ TEST(DenseMutation, InsertAt) {
 }
 
 TEST(DenseMutation, EraseAt) {
-    S::DenseGraph<4> g(1);
+    S::DenseGraph<> g(1, 4);
 
     g.push_back(0, 1);
     g.push_back(0, 2);
@@ -97,7 +97,7 @@ TEST(DenseMutation, EraseAt) {
 }
 
 TEST(DenseMutation, Find) {
-    S::DenseGraph<3> g(1);
+    S::DenseGraph<> g(1, 3);
 
     g.push_back(0, 5);
     g.push_back(0, 10);
@@ -110,7 +110,7 @@ TEST(DenseMutation, Find) {
 }
 
 TEST(DenseMutation, RowProxy) {
-    S::DenseGraph<3> g(2);
+    S::DenseGraph<> g(2, 3);
 
     // RowProxy push_back
     g[0].push_back(1);
@@ -141,7 +141,7 @@ TEST_P(FreezeTest, CubicGraphRoundTrip) {
     int N = GetParam();
     FullereneGraph FG = get_fg(N);
 
-    // FG.neighbours is DenseGraph<GRAPH_DMAX>; freeze it to CSR
+    // FG.neighbours is DenseGraph with dmax=3; freeze it to CSR
     auto csr = S::freeze(FG.neighbours);
 
     EXPECT_EQ(csr.N, N);
@@ -182,7 +182,7 @@ TEST_P(ThawTest, CubicFreezeThawRoundTrip) {
     FullereneGraph FG = get_fg(N);
 
     auto csr = S::freeze(FG.neighbours);
-    auto dense2 = S::thaw<3>(csr);
+    auto dense2 = S::thaw(csr, 3);
 
     EXPECT_EQ(int(dense2.Nv), N);
     for (int v = 0; v < N; ++v) {
@@ -200,7 +200,7 @@ TEST_P(ThawTest, DualFreezeThawRoundTrip) {
     PlanarGraph dual = FG.dual_graph();
 
     auto csr = S::freeze(dual.neighbours);
-    auto dense2 = S::thaw<6>(csr);
+    auto dense2 = S::thaw(csr, 6);
 
     EXPECT_EQ(int(dense2.Nv), dual.N);
     for (int v = 0; v < dual.N; ++v) {

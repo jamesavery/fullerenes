@@ -21,7 +21,7 @@ typedef int node_t;
 
 #include "dense_graph.hh"
 constexpr int GRAPH_DMAX = 10;
-using neighbours_t = Spanify::DenseGraph<GRAPH_DMAX, node_t>;
+using neighbours_t = Spanify::DenseGraph<node_t>;
 typedef vector< bool > edges_t;
 
 template <typename S, typename T> ostream& operator<<(ostream& s, const pair<S,T>& p);

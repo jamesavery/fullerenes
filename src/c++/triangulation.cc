@@ -464,7 +464,7 @@ Triangulation Triangulation::halma_transform(int m, vector<map<edge_t,node_t>>* 
   }
 
   // Build CW neighbour lists by chaining next_on_face.
-  neighbours_t neighbours(N_new);
+  neighbours_t neighbours(N_new, GRAPH_DMAX);
   for(node_t u = 0; u < N_new; u++){
     node_t v = first_nb[u];
     node_t w = v;
@@ -1166,7 +1166,7 @@ Triangulation Triangulation::sort_nodes() const
     oldname[u_new] = u_old;
   }
 
-  neighbours_t new_neighbours(N);
+  neighbours_t new_neighbours(N, GRAPH_DMAX);
   for(int u=0;u<N;u++)
     for(int i=0;i<degree(u);i++)
       new_neighbours[newname[u]].push_back(newname[nbrs(u)[i]]);

@@ -37,7 +37,7 @@ struct Graph {
   int N;
   neighbours_t neighbours;
 
-  Graph(size_t N=0) : N(N), neighbours(N) {}
+  Graph(size_t N=0) : N(N), neighbours(N, GRAPH_DMAX) {}
   Graph(const neighbours_t& neighbours) : N(neighbours.size()), neighbours(neighbours) { }
 
   std::span<const node_t> nbrs(node_t u) const { return neighbours.nbrs(u); }
