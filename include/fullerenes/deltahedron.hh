@@ -49,7 +49,8 @@ public:
                                                   long long max_work_per_step = 0,
                                                   double step_angle_tol = 0,
                                                   double final_angle_tol = 0,
-                                                  OptMethod final_method = OptMethod::CG);
+                                                  OptMethod final_method = OptMethod::CG,
+                                                  double patch_grad_tol = 1e-10);
 
   // Quality metrics
   double max_angle_relerr() const;  // max over face angles of |theta - pi/3| / (pi/3)

@@ -244,6 +244,78 @@ static void solveCyclicTridiag5(vector<coord3d>& rhs) {
     for (int i = 0; i < 5; i++) rhs[i] = b[i];
 }
 
+// For F-ring expansion: translate + rotate tp-side to make room for the new ring.
+// In an equilateral antiprism, consecutive rings are separated by height h along
+// the axis AND rotated by pi/5 (36 degrees). Before this call, path and tp are
+// adjacent rings. After, they're separated by 2h with 2*(pi/5) rotation, so the
+// strip placed at the midpoint has correct edge lengths to both sides.
+static void shiftForFRing(const ReducibleDual& rd, const ExtensionStep& step,
+                          vector<coord3d>& points) {
+    const auto& path = step.path;  // ring that stays in place
+    const auto& tp = step.tp;      // outer vertices that get shifted
+
+    // Compute axis: path centroid -> tp centroid
+    coord3d c_path(0,0,0), c_tp(0,0,0);
+    for (int i = 0; i < 5; i++) {
+        c_path += points[path[i]];
+        c_tp   += points[tp[i]];
+    }
+    c_path = c_path / 5.0;
+    c_tp   = c_tp   / 5.0;
+
+    coord3d shift = c_tp - c_path;  // one ring spacing along axis
+    double h = shift.norm();
+    coord3d axis = shift / h;       // unit axis direction
+
+    // Determine rotation direction from existing geometry.
+    // In the antiprism, tp[0] connects to path[0] and path[1] (or path[4]).
+    // The bisector of path[0]/path[1] should be near tp[0]'s current angle.
+    // After inserting a ring, tp needs to rotate by another pi/5 in the same
+    // direction that path->tp already rotates.
+    // Detect direction: project path[0] and tp[0] onto the plane perpendicular
+    // to axis, compute the signed angle from path[0] to tp[0].
+    coord3d r_p0 = points[path[0]] - c_path;
+    r_p0 = r_p0 - axis * r_p0.dot(axis);  // radial component
+    coord3d r_t0 = points[tp[0]] - c_tp;
+    r_t0 = r_t0 - axis * r_t0.dot(axis);  // radial component
+    // Signed angle from r_p0 to r_t0 around axis
+    double cross_z = (r_p0.cross(r_t0)).dot(axis);
+    double theta = (cross_z > 0) ? -M_PI / 5.0 : M_PI / 5.0;  // rotate FURTHER in same direction
+    double ct = cos(theta), st = sin(theta);
+
+    // BFS from tp vertices to find all vertices on the tp-side.
+    // Stop at path vertices (they form the boundary and don't move).
+    set<int> path_set(path.begin(), path.end());
+    set<int> visited;
+    queue<int> q;
+    for (int v : tp) {
+        if (!visited.count(v)) {
+            visited.insert(v);
+            q.push(v);
+        }
+    }
+    while (!q.empty()) {
+        int u = q.front(); q.pop();
+        for (int slot = 0; slot < ReducibleDual::D_MAX; slot++) {
+            if (!(rd.V[u].active & (1 << slot))) continue;
+            int nb = rd.V[u].nbr[slot];
+            if (path_set.count(nb) || visited.count(nb)) continue;
+            visited.insert(nb);
+            q.push(nb);
+        }
+    }
+
+    // Apply translation + rotation (Rodrigues' formula) to all tp-side vertices.
+    // Rotation center is c_tp (rotate around axis through tp centroid), then shift.
+    for (int v : visited) {
+        // Rotate around axis through c_tp by theta
+        coord3d p = points[v] - c_tp;
+        coord3d p_rot = p * ct + axis.cross(p) * st + axis * axis.dot(p) * (1 - ct);
+        // Translate by one ring spacing
+        points[v] = c_tp + p_rot + shift;
+    }
+}
+
 // Compute strip vertex coordinates for one expansion step.
 // points[] is indexed by ReducibleDual vertex IDs (full graph numbering).
 // TODO: Cleanup (cleaner code, factor into higher-level abstractions  + add clearer descriptions of the method).
@@ -453,18 +525,18 @@ static const neighbours_t C20_seed_neighbours = {
     {9, 7, 4, 1, 10}
 };
 static const vector<coord3d> C20_seed_points = {
-    {-1.166968544300538e+00, -8.833420725694727e-01, -7.550764378709098e-01},
-    {-4.336347350479605e-01, -1.416065749126212e+00, 7.203946333542167e-01},
-    {4.903421527455298e-01, -1.385121171636910e+00, -7.438099299798976e-01},
-    {1.545645795507564e-02, 1.407807989188461e-02, -1.646757705195113e+00},
-    {-1.479569901277310e+00, -3.599142029230822e-02, 7.223755901917346e-01},
-    {-1.202015638761476e+00, 8.478869660586799e-01, -7.406045616538722e-01},
-    {4.336352872061797e-01, 1.416065471679303e+00, -7.203950152649671e-01},
-    {-4.903422681984767e-01, 1.385120809704024e+00, 7.438101271351236e-01},
-    {1.479569795174217e+00, 3.599103708487350e-02, -7.223758222997361e-01},
-    {1.166968569761731e+00, 8.833421297215243e-01, 7.550759932463559e-01},
-    {1.202015986893285e+00, -8.478857583613777e-01, 7.406053704820970e-01},
-    {-1.545716215025896e-02, -1.407832215400697e-02, 1.646757757854968e+00}
+    {-7.08588823223712971e-01, -5.36369371716198806e-01, -4.58486006315860395e-01},
+    {-2.63305120431595041e-01, -8.59841516687480545e-01, 4.37427275138782212e-01},
+    {2.97738250992196696e-01, -8.41051885497480334e-01, -4.51645105251351542e-01},
+    {9.38550249517450946e-03, 8.54836290281664989e-03, -9.99919236306042403e-01},
+    {-8.98401741631351780e-01, -2.18538989986770127e-02, 4.38630093623971318e-01},
+    {-7.29869668249228720e-01, 5.14840562074550201e-01, -4.49698904060023441e-01},
+    {2.63305120431593931e-01, 8.59841516687480989e-01, -4.37427275138781824e-01},
+    {-2.97738250992197417e-01, 8.41051885497480889e-01, 4.51645105251350709e-01},
+    {8.98401741631351780e-01, 2.18538989986784421e-02, -4.38630093623970596e-01},
+    {7.08588823223713082e-01, 5.36369371716198140e-01, 4.58486006315860617e-01},
+    {7.29869668249228165e-01, -5.14840562074551311e-01, 4.49698904060022442e-01},
+    {-9.38550249517353975e-03, -8.54836290281626304e-03, 9.99919236306042736e-01}
 };
 
 // C28 dual (Td): 16 vertices, 12 deg-5 + 4 deg-6
@@ -487,22 +559,22 @@ static const neighbours_t C28_seed_neighbours = {
     {13, 10, 7, 3, 4, 14}
 };
 static const vector<coord3d> C28_seed_points = {
-    {-9.405871929312047e-01, -1.591437541535750e+00, -6.424042055924868e-01},
-    {-1.052186933899916e+00, 8.221058471004183e-03, -1.847241739500054e+00},
-    {-2.100705949588757e+00, 1.371615510463313e-02, -3.253969728510948e-01},
-    {-1.573984731240869e+00, -8.826169230448901e-01, 1.123777687025010e+00},
-    {2.049663394302654e-02, -1.816781750144524e+00, 1.103578219245478e+00},
-    {4.865624763842553e-01, -8.933243418540859e-01, -1.866649081554954e+00},
-    {1.032443532675570e+00, -1.822129193467265e+00, -3.650576037518890e-01},
-    {-1.562563067140939e+00, 9.008049711206201e-01, 1.125262888656033e+00},
-    {-9.201960031842845e-01, 1.604356014272783e+00, -6.399226210993696e-01},
-    {4.978435493587666e-01, 8.901454619450764e-01, -1.865261867604557e+00},
-    {4.360413802100851e-02, 1.814635206188322e+00, 1.106524177648666e+00},
-    {1.055595166598490e+00, 1.809286918474982e+00, -3.620881547467743e-01},
-    {1.837068606500722e+00, -1.122787591788580e-02, -6.747295752041378e-01},
-    {1.582280767772851e+00, 9.130387113224273e-01, 1.087163432326433e+00},
-    {1.570643194380010e+00, -9.349496985618820e-01, 1.085463797982192e+00},
-    {2.369060856185360e-02, -1.729409781154545e-03, 1.956994082833905e+00}
+    {3.34261161509050497e-01, -1.63608600073426391e+00, 1.46018963749153186e-01},
+    {1.12114359230029703e+00, -1.10236932111558161e+00, -4.45486668492173443e-01},
+    {7.72128376690640161e-01, -6.23262654666507099e-01, -1.39551906183534102e+00},
+    {-3.39369586004024670e-01, -5.48090254453619141e-01, -1.28221523958660777e+00},
+    {-4.20658530314941270e-01, -8.94700466192063892e-01, -2.20532690226496852e-01},
+    {-2.74654620369771785e-01, -1.04803812254568718e+00, 8.79052135236750409e-01},
+    {6.60115089027072499e-01, -6.07977804813272571e-01, 4.47231716409980551e-01},
+    {1.95501520122909694e-01, -1.47531034525772098e+00, -9.53441502794699414e-01},
+    {2.83252171975811096e-01, 3.81672051566855852e-01, -1.32464833702157248e+00},
+    {8.91710597131574856e-01, -6.58364910568587109e-03, -4.68522048021769888e-01},
+    {3.94355331258453290e-01, 9.93890241770606364e-01, -3.93648153055207339e-01},
+    {8.00289010343711915e-01, 5.00215199814869060e-01, 5.25818631607869458e-01},
+    {4.56949224383211006e-02, -1.59385214877641561e-02, 1.17241701193989933e+00},
+    {-2.76110774878330190e-01, 8.05949691469507123e-01, 4.83318161599257334e-01},
+    {-8.44848972266442844e-01, -1.58317454188156764e-01, 5.08657885380037755e-01},
+    {-3.93953111470164208e-01, 2.00700090168516948e-01, -4.51402369252568603e-01}
 };
 
 // C30 dual (D5h): 17 vertices, 12 deg-5 + 5 deg-6
@@ -526,23 +598,23 @@ static const neighbours_t C30_seed_neighbours = {
     {14, 10, 8, 5, 15}
 };
 static const vector<coord3d> C30_seed_points = {
-    {-1.559070459063749e+00, -1.068747933944833e+00, -1.879973982189866e+00},
-    {-4.682161425554466e-01, -2.046776877036546e+00, -9.492046811648749e-01},
-    {1.532096024990294e-01, -9.070467001411456e-01, -2.112729254739929e+00},
-    {-8.625543883353577e-01, 5.089098250300979e-01, -2.075384368963578e+00},
-    {-1.868119958019254e+00, -1.335183568767094e+00, -1.929375039951397e-01},
-    {-2.037636619568821e-01, -1.492201823618911e+00, 1.017290557863881e+00},
-    {1.325606589502483e+00, -1.163536525491193e+00, -4.378322309024945e-01},
-    {1.023052451276474e+00, 7.730257842827236e-01, -1.287868315997610e+00},
-    {-1.451572499786121e+00, 2.413203433573819e-01, 1.066446125811059e+00},
-    {-6.933261514500439e-01, 1.641274678779233e+00, -3.581780451280046e-01},
-    {-5.135808727388225e-02, 1.654043304436030e+00, 1.603517492377413e+00},
-    {-2.111865666607679e+00, 2.443439039860929e-01, -8.890610449743985e-01},
-    {1.194817677758050e+00, 1.926052064891783e+00, 4.155148946807128e-01},
-    {2.215295968842247e+00, 5.135870518177549e-01, 3.722701229064814e-01},
-    {1.559076114414663e+00, 1.068846066695498e+00, 1.880080905318174e+00},
-    {1.599833943239003e+00, -6.313650866734757e-01, 1.533561078157907e+00},
-    {1.989553219992953e-01, 7.347900093475675e-02, 2.294516632610892e+00}
+    {-5.84787895500947119e-01, -4.00918129916895627e-01, -7.05184461461710876e-01},
+    {-1.25581455441115430e-01, -8.05923823815222096e-01, -3.14079386022112106e-01},
+    {1.32211672555218540e-01, -3.29799539673337860e-01, -7.98549938197729126e-01},
+    {-2.92175720934314598e-01, 2.59671810981700280e-01, -7.81750720323426074e-01},
+    {-7.09293764098534729e-01, -5.10713463629080766e-01, 2.13909964515144029e-03},
+    {-6.92430546345066400e-02, -5.07452121425790992e-01, 3.45923624716787614e-01},
+    {4.50835906935334596e-01, -3.95641167383027959e-01, -1.48929415089563449e-01},
+    {3.47874988529713769e-01, 2.62933153184990498e-01, -4.37966195251790036e-01},
+    {-4.93630448124039667e-01, 8.20192292292472175e-02, 3.62722842591090389e-01},
+    {-2.35837320127705918e-01, 5.58143513371131550e-01, -1.21747709584526562e-01},
+    {-8.94170733034767712e-02, 6.43423563408358934e-01, 5.84759028601800401e-01},
+    {-8.12254682504155667e-01, 1.47860856938937107e-01, -2.86897680517075149e-01},
+    {4.30661888266364479e-01, 7.55234517451122134e-01, 8.99059887954494347e-02},
+    {8.55049281755898005e-01, 1.65763166796083800e-01, 7.31067709211465494e-02},
+    {5.84787924532465420e-01, 4.00919172707515981e-01, 7.05185720414510220e-01},
+    {5.97256153759563868e-01, -3.10361117345800575e-01, 5.57577323096763555e-01},
+    {1.35438451021443352e-02, -1.51507571596593664e-02, 8.73795808764026960e-01}
 };
 
 // Get precomputed seed data by type
@@ -879,7 +951,7 @@ static Deltahedron extractPatch(
 Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, FILE* log, StepCallback diag,
                                                      OptMethod method, double step_tol, double final_tol, long long max_work_per_step,
                                                      double step_angle_tol, double final_angle_tol,
-                                                     OptMethod final_method) {
+                                                     OptMethod final_method, double patch_grad_tol) {
     int full_N = ep.full_N;
     vector<coord3d> points(full_N);
 
@@ -916,15 +988,35 @@ Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, FIL
     for (const auto& step : ep.steps) {
         auto ts = clk::now();
 
-        // a. Place strip vertices (quad centroid initial guess)
+        // a. Place strip vertices
+        if (step.kind.type == ExpKind::F_type)
+            shiftForFRing(rd, step, points);  // shift tp-side to make room
         computeStripCoords(step, points);
 
         // b. Expand topology + enforce outward convexity
         rd.expand(step);
-        liftStripToSurface(step, rd, points);
+        if (step.kind.type != ExpKind::F_type)
+            liftStripToSurface(step, rd, points);
 
         auto t_place = clk::now();
         ms_place += chrono::duration<double,milli>(t_place - ts).count();
+
+        // F-ring placement is exact — skip reflect, patch, and CG.
+        if (step.kind.type == ExpKind::F_type) {
+            if (diag) {
+                vector<int> diag_remap;
+                Deltahedron D_diag = extractCompact(rd, full_N, points, diag_remap);
+                diag(step_idx + 1, "placed", D_diag);
+                diag(step_idx + 1, "reflected", D_diag);
+                diag(step_idx + 1, "patched", D_diag);
+                diag(step_idx + 1, "cg", D_diag);
+            }
+            if (log)
+                fprintf(log, "  step %2d: N=%3d F-ring (exact placement, no optimization)\n",
+                        step_idx, (int)(rd.N()));
+            step_idx++;
+            continue;
+        }
 
         // Diagnostic: after strip placement + lift
         if (diag) {
@@ -976,7 +1068,7 @@ Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, FIL
 
         // e. Trust-region optimize on patch only (strip + path + tp free)
         patch.opt_log = log;
-        patch.optimize_patch(patch.points, free_mask, interior_mask);
+        patch.optimize_patch(patch.points, free_mask, interior_mask, 0, 150, patch_grad_tol);
         patch.opt_log = nullptr;
         total_patch_iters += patch.iterations_used;
 
@@ -1959,8 +2051,7 @@ bool Deltahedron::optimize_patch(const vector<coord3d>& initial_geometry,
 
   vector<coord3d> grad(N);
   vector<double> gf(ndof);
-  double E_prev = 1e30;
-  int stall_count = 0;
+  int consec_rejects = 0;
 
   // Trust region parameters
   double Delta_max = L;          // max trust region radius
@@ -1977,11 +2068,9 @@ bool Deltahedron::optimize_patch(const vector<coord3d>& initial_geometry,
     gnorm = sqrt(gnorm);
     if(gnorm < grad_tol) return true;
 
-    // Trust region stall detection: exit if Delta has shrunk to near-zero
-    if(Delta < 1e-12 * L){
-      stall_count++;
-      if(stall_count >= 3) return false;
-    } else stall_count = 0;
+    // Trust region stall detection: 5 consecutive rejected steps means
+    // we've hit a gradient floor and can't make further progress.
+    if(consec_rejects >= 5) return false;
 
     // Assemble exact analytical Hessian
     vector<vector<double>> H(ndof, vector<double>(ndof, 0.0));
@@ -2115,6 +2204,7 @@ bool Deltahedron::optimize_patch(const vector<coord3d>& initial_geometry,
     bool accepted = (rho > 0.1) && convex;
     const char* tr_action;
     if(accepted){
+      consec_rejects = 0;
       for(int k = 0; k < nfree; k++)
         for(int c = 0; c < 3; c++)
           points[free_idx[k]][c] = x_trial[free_idx[k]][c];
@@ -2125,6 +2215,7 @@ bool Deltahedron::optimize_patch(const vector<coord3d>& initial_geometry,
         tr_action = "keep";
       }
     } else {
+      consec_rejects++;
       Delta *= 0.25;
       if(Delta < 1e-14 * L) Delta = 1e-14 * L;
       tr_action = convex ? "shrink" : "conv-shrink";

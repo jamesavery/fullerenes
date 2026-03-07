@@ -11,6 +11,7 @@
 #include "fullerenes/deltahedron.hh"
 #include "fullerenes/buckinverse.hh"
 #include "fullerenes/isomerdb.hh"
+#include "fullerenes/stats.hh"
 #include <chrono>
 #include <cmath>
 #include <fstream>
@@ -44,17 +45,14 @@ static IsomerStats compute_stats(const Deltahedron& D, int idx, int seed, int n_
     s.seed = seed;
     s.n_steps = n_steps;
 
-    // Edge lengths: CV and max relative error
+    // Edge lengths
     vector<double> edge_lens;
     edge_lens.reserve(D.N * 3);
     for (int u = 0; u < D.N; u++)
         for (int v : D.neighbours[u])
             if (v > u) edge_lens.push_back((D.points[u] - D.points[v]).norm());
-    double sum = 0, sum2 = 0;
-    for (double l : edge_lens) { sum += l; sum2 += l*l; }
-    int ne = (int)edge_lens.size();
-    double L_mean = sum / ne;
-    s.edge_cv = sqrt(max(0.0, sum2/ne - L_mean*L_mean)) / L_mean;
+    s.edge_cv = cv_twopass(edge_lens);
+    double L_mean = accumulate(edge_lens.begin(), edge_lens.end(), 0.0) / edge_lens.size();
     s.edge_relerr_max = 0;
     for (double l : edge_lens)
         s.edge_relerr_max = max(s.edge_relerr_max, fabs(l - L_mean) / L_mean);
@@ -82,17 +80,17 @@ static IsomerStats compute_stats(const Deltahedron& D, int idx, int seed, int n_
     }
 
     // Triangle angles
+    vector<double> angles;
     s.ang_min = 180; s.ang_max = 0;
-    double asum = 0, asum2 = 0; int na = 0;
     for (const auto& tri : D.triangles)
         for (int c = 0; c < 3; c++) {
             coord3d va = D.points[tri[(c+1)%3]] - D.points[tri[c]];
             coord3d vb = D.points[tri[(c+2)%3]] - D.points[tri[c]];
             double ang = coord3d::angle(va, vb) * 180.0 / M_PI;
-            asum += ang; asum2 += ang*ang; na++;
+            angles.push_back(ang);
             s.ang_min = min(s.ang_min, ang); s.ang_max = max(s.ang_max, ang);
         }
-    s.ang_std = sqrt(max(0.0, asum2/na - (asum/na)*(asum/na)));
+    s.ang_std = stddev_twopass(angles);
     s.ang_relerr_max = max(60.0 - s.ang_min, s.ang_max - 60.0) / 60.0;
 
     return s;
@@ -151,24 +149,18 @@ static void write_json(const char* path, int N, int total_isomers, int stride,
     int dual_N = N/2 + 2;
 
     // Summary statistics
-    double ms_sum = 0, ms_sum2 = 0;
     double iters_sum = 0;
-    double ecv_sum = 0, ecv_sum2 = 0, ecv_max = 0;
-    double ermax_max = 0;
+    double ecv_max = 0, ermax_max = 0;
     double hmin_min = INFINITY;
     int concave_total = 0, concave_isomers = 0;
     double amin_min = 180, amax_max = 0;
-    double astd_sum = 0, astd_sum2 = 0, astd_max = 0;
-    double armax_max = 0;
-    double gmax_sum = 0, gmax_sum2 = 0, gmax_max = 0;
+    double astd_max = 0, armax_max = 0;
+    double gmax_max = 0;
     int converged_count = 0;
-    int n_bad_edge = 0;
-    int n_bad_ang = 0;
+    int n_bad_edge = 0, n_bad_ang = 0;
 
     for (const auto& s : stats) {
-        ms_sum += s.ms; ms_sum2 += s.ms * s.ms;
         iters_sum += s.iters;
-        ecv_sum += s.edge_cv; ecv_sum2 += s.edge_cv * s.edge_cv;
         ecv_max = max(ecv_max, s.edge_cv);
         ermax_max = max(ermax_max, s.edge_relerr_max);
         if (s.h_min < hmin_min) hmin_min = s.h_min;
@@ -176,10 +168,8 @@ static void write_json(const char* path, int N, int total_isomers, int stride,
         concave_total += s.n_concave;
         amin_min = min(amin_min, s.ang_min);
         amax_max = max(amax_max, s.ang_max);
-        astd_sum += s.ang_std; astd_sum2 += s.ang_std * s.ang_std;
         astd_max = max(astd_max, s.ang_std);
         armax_max = max(armax_max, s.ang_relerr_max);
-        gmax_sum += s.gmax_L; gmax_sum2 += s.gmax_L * s.gmax_L;
         gmax_max = max(gmax_max, s.gmax_L);
         if (s.converged) converged_count++;
         if (s.edge_relerr_max > 0.01) n_bad_edge++;
@@ -187,14 +177,14 @@ static void write_json(const char* path, int N, int total_isomers, int stride,
     }
 
     int actual_M = (int)stats.size();
-    double ms_mean = actual_M > 0 ? ms_sum / actual_M : 0;
-    double ms_std = actual_M > 0 ? sqrt(max(0.0, ms_sum2/actual_M - ms_mean*ms_mean)) : 0;
-    double ecv_mean = actual_M > 0 ? ecv_sum / actual_M : 0;
-    double ecv_std = actual_M > 0 ? sqrt(max(0.0, ecv_sum2/actual_M - ecv_mean*ecv_mean)) : 0;
-    double astd_mean = actual_M > 0 ? astd_sum / actual_M : 0;
-    double astd_std = actual_M > 0 ? sqrt(max(0.0, astd_sum2/actual_M - astd_mean*astd_mean)) : 0;
-    double gmax_mean = actual_M > 0 ? gmax_sum / actual_M : 0;
-    double gmax_std = actual_M > 0 ? sqrt(max(0.0, gmax_sum2/actual_M - gmax_mean*gmax_mean)) : 0;
+    auto ms_mean  = actual_M > 0 ? accumulate(stats.begin(), stats.end(), 0.0, [](double a, const IsomerStats& s){ return a + s.ms; }) / actual_M : 0.0;
+    auto ecv_mean = actual_M > 0 ? accumulate(stats.begin(), stats.end(), 0.0, [](double a, const IsomerStats& s){ return a + s.edge_cv; }) / actual_M : 0.0;
+    auto astd_mean= actual_M > 0 ? accumulate(stats.begin(), stats.end(), 0.0, [](double a, const IsomerStats& s){ return a + s.ang_std; }) / actual_M : 0.0;
+    auto gmax_mean= actual_M > 0 ? accumulate(stats.begin(), stats.end(), 0.0, [](double a, const IsomerStats& s){ return a + s.gmax_L; }) / actual_M : 0.0;
+    double ms_std   = stddev_twopass(actual_M, [&](int i){ return stats[i].ms; });
+    double ecv_std  = stddev_twopass(actual_M, [&](int i){ return stats[i].edge_cv; });
+    double astd_std = stddev_twopass(actual_M, [&](int i){ return stats[i].ang_std; });
+    double gmax_std = stddev_twopass(actual_M, [&](int i){ return stats[i].gmax_L; });
     double iters_per_vertex = actual_M > 0 ? iters_sum / ((double)dual_N * actual_M) : 0;
 
     fprintf(f, "{\n");

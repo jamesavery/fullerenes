@@ -12,6 +12,7 @@
 #include "fullerenes/polyhedron.hh"
 #include "fullerenes/isomerdb.hh"
 #include "fullerenes/triangulation.hh"
+#include "fullerenes/stats.hh"
 #include <cmath>
 #include <map>
 #include <set>
@@ -1091,35 +1092,25 @@ struct ConvexityStats {
         s.iters = D.iterations_used;
 
         // Edge lengths
-        double sum = 0, sum2 = 0;
-        int ne = 0;
+        vector<double> edge_lens;
         for (int u = 0; u < D.N; u++)
             for (int v : D.neighbours[u])
-                if (v > u) {
-                    double l = (D.points[u] - D.points[v]).norm();
-                    sum += l; sum2 += l*l; ne++;
-                }
-        double L_mean = sum / ne;
-        double L_var = sum2/ne - L_mean*L_mean;
-        s.L_cv = (L_mean > 0) ? sqrt(max(0.0, L_var)) / L_mean : 0;
+                if (v > u) edge_lens.push_back((D.points[u] - D.points[v]).norm());
+        s.L_cv = cv_twopass(edge_lens);
 
         // Triangle angles
-        double asum = 0, asum2 = 0;
-        int na = 0;
+        vector<double> angles;
         s.ang_min = 180; s.ang_max = 0;
-        for (const auto& tri : D.triangles) {
+        for (const auto& tri : D.triangles)
             for (int c = 0; c < 3; c++) {
                 coord3d va = D.points[tri[(c+1)%3]] - D.points[tri[c]];
                 coord3d vb = D.points[tri[(c+2)%3]] - D.points[tri[c]];
                 double ang = coord3d::angle(va, vb) * 180.0 / M_PI;
-                asum += ang; asum2 += ang*ang;
+                angles.push_back(ang);
                 s.ang_min = min(s.ang_min, ang);
                 s.ang_max = max(s.ang_max, ang);
-                na++;
             }
-        }
-        double ang_mean = asum / na;
-        s.ang_std = sqrt(max(0.0, asum2/na - ang_mean*ang_mean));
+        s.ang_std = stddev_twopass(angles);
 
         // Convexity
         s.h_min = min_convexity_height(D);
@@ -1365,24 +1356,24 @@ static void test_extpath_convexity_size(int N) {
         int nd = count_orientation_defects(D);
 
         // Edge CV
-        double sum = 0, sum2 = 0; int ne = 0;
+        vector<double> edge_lens;
         for (int u = 0; u < D.N; u++)
             for (int v : D.neighbours[u])
-                if (v > u) { double l = (D.points[u] - D.points[v]).norm(); sum += l; sum2 += l*l; ne++; }
-        double L_mean = sum / ne;
-        double cv = sqrt(max(0.0, sum2/ne - L_mean*L_mean)) / L_mean;
+                if (v > u) edge_lens.push_back((D.points[u] - D.points[v]).norm());
+        double cv = cv_twopass(edge_lens);
 
         // Triangle angles
-        double ang_min = 180, ang_max = 0, asum = 0, asum2 = 0; int na = 0;
+        vector<double> angles;
+        double ang_min = 180, ang_max = 0;
         for (const auto& tri : D.triangles)
             for (int c = 0; c < 3; c++) {
                 coord3d va = D.points[tri[(c+1)%3]] - D.points[tri[c]];
                 coord3d vb = D.points[tri[(c+2)%3]] - D.points[tri[c]];
                 double ang = coord3d::angle(va, vb) * 180.0 / M_PI;
-                asum += ang; asum2 += ang*ang; na++;
+                angles.push_back(ang);
                 ang_min = min(ang_min, ang); ang_max = max(ang_max, ang);
             }
-        double ang_std = sqrt(max(0.0, asum2/na - (asum/na)*(asum/na)));
+        double ang_std = stddev_twopass(angles);
 
         worst_h = min(worst_h, h);
         worst_cv = max(worst_cv, cv);
@@ -1395,7 +1386,7 @@ static void test_extpath_convexity_size(int N) {
     }
     BuckyGen::stop(Q);
 
-    fprintf(stderr, "  C%-3d %5d isomers  L_cv=%8.5f  h_min=%+8.4f  ang=[%.2f,%.2f] std=%.3f  concave=%d  odef=%d\n",
+    fprintf(stderr, "  C%-3d %5d isomers  L_cv=%9.2e  h_min=%+8.4f  ang=[%.2f,%.2f] std=%.2e  concave=%d  odef=%d\n",
            N, idx, worst_cv, worst_h, worst_ang_min, worst_ang_max, worst_ang_std,
            n_concave, n_defects);
 
@@ -1561,9 +1552,9 @@ TEST(ExtPathConvexity, C60_Ih) {
 
 TEST(ExtPathConvexity, NanotubeSeries) {
     fprintf(stderr, "\n  (5,0) nanotube series via ExtPath (N iters/step):\n");
-    fprintf(stderr, "  %6s %5s %5s | %8s %8s %7s %7s %7s %4s %4s %8s\n",
+    fprintf(stderr, "  %6s %5s %5s | %9s %8s %7s %7s %9s %4s %4s %8s\n",
             "C_N", "N_dv", "steps", "L_cv", "h_min", "ang_min", "ang_max", "ang_std", "conc", "odef", "ms");
-    fprintf(stderr, "  %s\n", string(90, '-').c_str());
+    fprintf(stderr, "  %s\n", string(92, '-').c_str());
 
     for (int n_rings : {2, 3, 5, 8, 10, 15, 20, 30, 48}) {
         int N_ful = 20 + 10 * n_rings;
@@ -1588,26 +1579,25 @@ TEST(ExtPathConvexity, NanotubeSeries) {
         int nc = (int)concave_vertices(D).size();
         int nd = count_orientation_defects(D);
 
-        double sum = 0, sum2 = 0; int ne = 0;
+        vector<double> edge_lens;
         for (int u = 0; u < D.N; u++)
             for (int v : D.neighbours[u])
-                if (v > u) { double l = (D.points[u] - D.points[v]).norm(); sum += l; sum2 += l*l; ne++; }
-        double L_mean = sum / ne;
-        double cv = sqrt(max(0.0, sum2/ne - L_mean*L_mean)) / L_mean;
+                if (v > u) edge_lens.push_back((D.points[u] - D.points[v]).norm());
+        double cv = cv_twopass(edge_lens);
 
-        // Triangle angles
-        double ang_min = 180, ang_max = 0, asum = 0, asum2 = 0; int na = 0;
+        vector<double> angles;
+        double ang_min = 180, ang_max = 0;
         for (const auto& tri : D.triangles)
             for (int c = 0; c < 3; c++) {
                 coord3d va = D.points[tri[(c+1)%3]] - D.points[tri[c]];
                 coord3d vb = D.points[tri[(c+2)%3]] - D.points[tri[c]];
                 double ang = coord3d::angle(va, vb) * 180.0 / M_PI;
-                asum += ang; asum2 += ang*ang; na++;
+                angles.push_back(ang);
                 ang_min = min(ang_min, ang); ang_max = max(ang_max, ang);
             }
-        double ang_std = sqrt(max(0.0, asum2/na - (asum/na)*(asum/na)));
+        double ang_std = stddev_twopass(angles);
 
-        fprintf(stderr, "  C%-4d %5d %5zu | %8.5f %+8.4f %7.2f %7.2f %7.3f %4d %4d %8.0f\n",
+        fprintf(stderr, "  C%-4d %5d %5zu | %9.2e %+8.4f %7.2f %7.2f %9.2e %4d %4d %8.0f\n",
                N_ful, N_dv, ep.steps.size(), cv, h, ang_min, ang_max, ang_std, nc, nd, ms);
 
         EXPECT_EQ(nd, 0) << "C" << N_ful << " nanotube: orientation defects";
@@ -1634,9 +1624,9 @@ TEST(ExtPathConvexity, GCSeries) {
     ico.optimize(ico.points);
 
     fprintf(stderr, "\n  GC fullerenes via ExtPath (N iters/step):\n");
-    fprintf(stderr, "  %-10s %6s %5s %5s | %8s %8s %7s %7s %7s %4s %4s %8s\n",
+    fprintf(stderr, "  %-10s %6s %5s %5s | %9s %8s %7s %7s %9s %4s %4s %8s\n",
             "source", "C_N", "N_dv", "steps", "L_cv", "h_min", "ang_min", "ang_max", "ang_std", "conc", "odef", "ms");
-    fprintf(stderr, "  %s\n", string(100, '-').c_str());
+    fprintf(stderr, "  %s\n", string(102, '-').c_str());
 
     // Icosahedral GC(k,0) series
     for (int k : {2, 3, 5, 7}) {
@@ -1662,26 +1652,25 @@ TEST(ExtPathConvexity, GCSeries) {
         int nc = (int)concave_vertices(D).size();
         int nd = count_orientation_defects(D);
 
-        double sum = 0, sum2 = 0; int ne = 0;
+        vector<double> edge_lens;
         for (int u = 0; u < D.N; u++)
             for (int v : D.neighbours[u])
-                if (v > u) { double l = (D.points[u] - D.points[v]).norm(); sum += l; sum2 += l*l; ne++; }
-        double L_mean = sum / ne;
-        double cv = sqrt(max(0.0, sum2/ne - L_mean*L_mean)) / L_mean;
+                if (v > u) edge_lens.push_back((D.points[u] - D.points[v]).norm());
+        double cv = cv_twopass(edge_lens);
 
-        // Triangle angles
-        double ang_min = 180, ang_max = 0, asum = 0, asum2 = 0; int na = 0;
+        vector<double> angles;
+        double ang_min = 180, ang_max = 0;
         for (const auto& tri : D.triangles)
             for (int c = 0; c < 3; c++) {
                 coord3d va = D.points[tri[(c+1)%3]] - D.points[tri[c]];
                 coord3d vb = D.points[tri[(c+2)%3]] - D.points[tri[c]];
                 double ang = coord3d::angle(va, vb) * 180.0 / M_PI;
-                asum += ang; asum2 += ang*ang; na++;
+                angles.push_back(ang);
                 ang_min = min(ang_min, ang); ang_max = max(ang_max, ang);
             }
-        double ang_std = sqrt(max(0.0, asum2/na - (asum/na)*(asum/na)));
+        double ang_std = stddev_twopass(angles);
 
-        fprintf(stderr, "  GC(%d,0)    C%-4d %5d %5zu | %8.5f %+8.4f %7.2f %7.2f %7.3f %4d %4d %8.0f\n",
+        fprintf(stderr, "  GC(%d,0)    C%-4d %5d %5zu | %9.2e %+8.4f %7.2f %7.2f %9.2e %4d %4d %8.0f\n",
                k, N_ful, N_dv, ep.steps.size(), cv, h, ang_min, ang_max, ang_std, nc, nd, ms);
 
         EXPECT_EQ(nd, 0) << "GC(" << k << ",0) orientation defects";
@@ -1722,26 +1711,26 @@ TEST(ExtPathConvexity, GCSeries) {
         int nc = (int)concave_vertices(D).size();
         int nd = count_orientation_defects(D);
 
-        double sum = 0, sum2 = 0; int ne = 0;
+        vector<double> edge_lens;
         for (int u = 0; u < D.N; u++)
             for (int v : D.neighbours[u])
-                if (v > u) { double l = (D.points[u] - D.points[v]).norm(); sum += l; sum2 += l*l; ne++; }
-        double L_mean = sum / ne;
-        double cv = sqrt(max(0.0, sum2/ne - L_mean*L_mean)) / L_mean;
+                if (v > u) edge_lens.push_back((D.points[u] - D.points[v]).norm());
+        double cv = cv_twopass(edge_lens);
 
         // Triangle angles
-        double ang_min = 180, ang_max = 0, asum = 0, asum2 = 0; int na = 0;
+        vector<double> angles;
+        double ang_min = 180, ang_max = 0;
         for (const auto& tri : D.triangles)
             for (int c = 0; c < 3; c++) {
                 coord3d va = D.points[tri[(c+1)%3]] - D.points[tri[c]];
                 coord3d vb = D.points[tri[(c+2)%3]] - D.points[tri[c]];
                 double ang = coord3d::angle(va, vb) * 180.0 / M_PI;
-                asum += ang; asum2 += ang*ang; na++;
+                angles.push_back(ang);
                 ang_min = min(ang_min, ang); ang_max = max(ang_max, ang);
             }
-        double ang_std = sqrt(max(0.0, asum2/na - (asum/na)*(asum/na)));
+        double ang_std = stddev_twopass(angles);
 
-        fprintf(stderr, "  C%d+GC(2) C%-4d %5d %5zu | %8.5f %+8.4f %7.2f %7.2f %7.3f %4d %4d %8.0f\n",
+        fprintf(stderr, "  C%d+GC(2) C%-4d %5d %5zu | %9.2e %+8.4f %7.2f %7.2f %9.2e %4d %4d %8.0f\n",
                baseN, gc_N_ful, gc_N_dv, ep_gc.steps.size(), cv, h, ang_min, ang_max, ang_std, nc, nd, ms);
 
         EXPECT_EQ(nd, 0) << "C" << baseN << "+GC(2,0) orientation defects";
