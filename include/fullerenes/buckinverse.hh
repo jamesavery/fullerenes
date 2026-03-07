@@ -31,7 +31,7 @@ inline node_t advanceCW(const Graph& g, node_t u, node_t v, int k) {
     int pos = g.arc_ix(u, v);
     assert(pos >= 0 && "v must be a neighbour of u");
     int d = g.degree(u);
-    return g.neighbours[u][((pos + k) % d + d) % d];
+    return g.nbrs(u)[((pos + k) % d + d) % d];
 }
 
 // Straight-ahead through u when entering from `from`.

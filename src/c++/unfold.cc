@@ -79,7 +79,7 @@ void Unfolding::unfold(const Triangulation& T, arc_t first_arc)
   
   // 1. Place first triangle.
   // If no first arc is given, take first arc emanating from node 0
-  if(first_arc==arc_t{0,0}) first_arc = {0,T.neighbours[0][0]};
+  if(first_arc==arc_t{0,0}) first_arc = {0,T.nbrs(0)[0]};
 
   place_triangle(first_arc,zero,veci);
 

@@ -83,7 +83,7 @@ struct Polyhedron : public PlanarGraph {
 
   friend ostream& operator<<(ostream& s, const Polyhedron& P){
     vector<node_t> reachable_points;
-    for(node_t u=0;u<P.N;u++) if(P.neighbours[u].size()!=0) reachable_points.push_back(u);
+    for(node_t u=0;u<P.N;u++) if(P.degree(u)!=0) reachable_points.push_back(u);
     s << "{" << (reachable_points+1) << ", " << P.points << ", " << (vector<vector<int> >(P.faces.begin(),P.faces.end())+1) << ", " << static_cast<Graph>(P) << "}";
     return s;
   }

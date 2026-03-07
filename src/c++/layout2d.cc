@@ -25,7 +25,7 @@ bool planar_orient(Graph& G)
   // Find a face of the graph using BFS shortest cycle through an edge.
   // For 3-connected planar graphs, the shortest cycle through any edge
   // is a face boundary.
-  node_t s = 0, t = G.neighbours[s][0];
+  node_t s = 0, t = G.nbrs(s)[0];
   face_t face = G.shortest_cycle({s, t}, N);
   if(face.empty()) return false;
 
@@ -96,7 +96,7 @@ face_t find_outer_face(const PlanarGraph& G, const vector<coord2d>& layout)
   face_t outer_face;
   int i = 0;
   for(node_t t = u_farthest, u = u_farthest, v = -1; v != u_farthest && i <= G.N; i++){
-    const vector<node_t>& ns(G.neighbours[u]);
+    auto ns = G.nbrs(u);
     double r = 0;
     for(int i=0;i<ns.size();i++)
       if(ns[i] != t && ns[i] != u && radii[ns[i]] > r){ r = radii[ns[i]]; v = ns[i]; }
@@ -302,7 +302,7 @@ string to_povray(const PlanarGraph& G, const vector<coord2d>& layout,
   s << "#declare nodediameter="<<vertex_diameter/10.<<";\n\n";
 
   vector<int> degrees(G.N);
-  for(node_t u=0;u<G.N;u++) degrees[u] = G.neighbours[u].size();
+  for(node_t u=0;u<G.N;u++) degrees[u] = G.degree(u);
   s << "#declare vertexdegree=array["<<G.N<<"]" << degrees << ";\n";
 
   if(layout.size() == G.N){

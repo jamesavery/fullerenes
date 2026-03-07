@@ -197,7 +197,7 @@ vector<Permutation> Symmetry::permutation_representation() const
 
   for(node_t u=0;u<N;u++){
     if(degree(u) == S0[0])
-      for(const node_t &v: neighbours[u]){
+      for(const node_t &v: nbrs(u)){
 	if(degree(v) == S0[1]){
 	  vector<int> spiral,permutation;
 	  jumplist_t  jumps;
@@ -297,7 +297,7 @@ bool Symmetry::reverses_orientation(const Permutation& pi) const
   Triangulation piG(neighbours);
 
   for(node_t u=0;u<N;u++){
-    const vector<node_t>& nu(neighbours[u]);
+    auto nu = nbrs(u);
     for(int i=0;i<nu.size();i++) piG.neighbours[pi[u]][i] = pi[nu[i]];
   }
   if(piG.next(0,1) == 2) return false;

@@ -98,9 +98,9 @@ double polyhedron_pot(const gsl_vector* coordinates, void* parameters)
 //        C   u   A
 //            |
 //            r
-      node_t r = P.neighbours[u][0];
-      node_t s = P.neighbours[u][1];
-      node_t t = P.neighbours[u][2];
+      node_t r = P.nbrs(u)[0];
+      node_t s = P.nbrs(u)[1];
+      node_t t = P.nbrs(u)[2];
 
       const double ax = gsl_vector_get(coordinates, 3*u    );
       const double ay = gsl_vector_get(coordinates, 3*u + 1);
@@ -117,7 +117,7 @@ double polyhedron_pot(const gsl_vector* coordinates, void* parameters)
 
       const double dihedral_abcd = coord3d::dihedral(coord3d(bx,by,bz) - coord3d(ax,ay,az), coord3d(cx,cy,cz) - coord3d(ax,ay,az), coord3d(dx,dy,dz) - coord3d(ax,ay,az));
       potential_energy += 0.5 * force_constants_dihedral[u] * pow(dihedral_abcd - zero_values_dihedral[u],2);
-    
+
 //      cout << "value: " << dihedral_abcd << ", " << zero_values_dihedral[u] << ", " << u << endl;
     }
   }
@@ -213,9 +213,9 @@ void polyhedron_grad(const gsl_vector* coordinates, void* parameters, gsl_vector
 //            |
 //            r
 
-      node_t r = P.neighbours[u][0];
-      node_t s = P.neighbours[u][1];
-      node_t t = P.neighbours[u][2];
+      node_t r = P.nbrs(u)[0];
+      node_t s = P.nbrs(u)[1];
+      node_t t = P.nbrs(u)[2];
 
       const double ax = gsl_vector_get(coordinates, 3*u    );
       const double ay = gsl_vector_get(coordinates, 3*u + 1);
@@ -309,9 +309,9 @@ bool Polyhedron::optimize_other(bool optimize_angles, map<edge_t, double> zero_v
 //              |
 //              r
     for(node_t u=0; u<N; ++u){
-      node_t r = neighbours[u][0];
-      node_t s = neighbours[u][1];
-      node_t t = neighbours[u][2];
+      node_t r = nbrs(u)[0];
+      node_t s = nbrs(u)[1];
+      node_t t = nbrs(u)[2];
       // face sizes
       int lA = shortest_cycle({r,u,s},fmax).size();
       int lB = shortest_cycle({s,u,t},fmax).size();

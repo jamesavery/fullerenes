@@ -157,8 +157,8 @@ class CubicPair {
     for(const auto &t: T.triangles) triangle_id.insert(t.sorted());
   
     for(node_t u=0;u<T.N;u++){
-      const auto& nu = T.neighbours[u];
-      DtoC[u].resize(nu.size()); 
+      auto nu = T.nbrs(u);
+      DtoC[u].resize(nu.size());
 
       // For each directed edge v->u
       for(size_t i=0;i<nu.size();i++){

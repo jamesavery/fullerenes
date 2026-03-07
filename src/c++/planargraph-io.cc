@@ -182,7 +182,7 @@ bool PlanarGraph::to_planarcode(const PlanarGraph &G, FILE *file)
   write_int(G.N);
 
   for(uint16_t u=0;u<G.N;u++){
-    for(uint16_t v: G.neighbours[u])
+    for(uint16_t v: G.nbrs(u))
       write_int(v);
     write_int(0);
   }

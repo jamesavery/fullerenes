@@ -234,7 +234,7 @@ static void orient_polyhedron_neighbours(Polyhedron& P)
   // Check volume sign to ensure outward-pointing normals (CCW-on-outside convention)
   double V=0;
   for(node_t u=0;u<P.N;u++){
-    const face_t nu(P.neighbours[u]);
+    auto nu = P.nbrs(u);
     const coord3d ux(P.points[u]);
 
     for(int i=0;i<nu.size();i++){

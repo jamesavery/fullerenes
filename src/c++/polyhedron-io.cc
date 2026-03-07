@@ -133,7 +133,7 @@ bool Polyhedron::to_gaussian(const Polyhedron &P, FILE *file, string header)  {
 
   // Connectivity section
   for(node_t u=0; u<P.N;u++){
-    auto nu = P.neighbours[u];
+    auto nu = P.nbrs(u);
     for(auto v: nu) fprintf(file,"%d %d B\n",u+1, v+1);
   }
 
@@ -197,7 +197,7 @@ bool Polyhedron::to_mol2(const Polyhedron &P, FILE *file)
   fprintf(file,"@<TRIPOS>BOND\r\n");
   int i = 1;
   for(node_t u=0;u<P.N;u++){
-    for(node_t v: P.neighbours[u])
+    for(node_t v: P.nbrs(u))
       if(v>=u)
 	fprintf(file,"%d\t %d\t %d\t un\r\n",i++,u+1,v+1);
   }
@@ -215,7 +215,7 @@ bool Polyhedron::to_cc1(const Polyhedron &P, FILE *file)
     const coord3d p         = P.points[u];
     
     fprintf(file,"C\t %d\t %f\t %f\t %f\t %d", u+1,p[0],p[1],p[2],weird_constant);
-    for(node_t v: P.neighbours[u])
+    for(node_t v: P.nbrs(u))
       fprintf(file,"\t%d",v);
     fprintf(file,"\r\n");
   }

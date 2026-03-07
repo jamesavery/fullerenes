@@ -114,7 +114,7 @@ void adjacency_matrix_(const graph_ptr *g, const int *outer_dim, int *adjacency)
   memset(adjacency,0,N*N*sizeof(int));
 
   for(node_t u=0;u<G.N;u++){
-    const vector<node_t> &ns(G.neighbours[u]);
+    auto ns = G.nbrs(u);
     for(unsigned int i=0;i<ns.size();i++)
       adjacency[u*N+ns[i]] = 1;
   }
@@ -196,7 +196,7 @@ void delete_polyhedron_(polyhedron_ptr *P){ delete *P; }
 // The Fortran call to dual_graph() assumes that g is either a fullerene
 // or a fullerene dual.
 graph_ptr dual_graph_(const graph_ptr *g){
-  bool is_fullerene = (*g)->neighbours[0].size() == 3;
+  bool is_fullerene = (*g)->degree(0) == 3;
   graph_ptr pg = new PlanarGraph((*g)->dual_graph(is_fullerene? 6 : 3));
   return pg;
 }

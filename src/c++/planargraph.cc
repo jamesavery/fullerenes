@@ -63,7 +63,7 @@ PlanarGraph PlanarGraph::enveloping_triangulation(const construction_scheme_t &s
 
 bool PlanarGraph::is_cubic() const {
   for(node_t u=0;u<N;u++)
-    if(neighbours[u].size() != 3)
+    if(degree(u) != 3)
       return false;
   return true;
 }
@@ -133,7 +133,7 @@ bool PlanarGraph::is_a_fullerene(bool verbose) const {
 // 'true'.
 bool PlanarGraph::is_cut_vertex(const node_t v) const {
   // Requires oriented (sorted) neighbours of v (direction doesn't matter)
-  const vector<node_t> &nv = neighbours[v];
+  auto nv = nbrs(v);
   const int n_neighbours = nv.size();
   if(n_neighbours < 2) return false;
 
@@ -491,7 +491,7 @@ vector<coord3d> PlanarGraph::zero_order_geometry(double scalerad) const
   // Scale spherical projection
   double Ravg = 0;
   for(node_t u=0;u<N;u++)
-    for(int i=0;i<3;i++) Ravg += (coordinates[u]-coordinates[neighbours[u][i]]).norm();
+    for(int i=0;i<3;i++) Ravg += (coordinates[u]-coordinates[nbrs(u)[i]]).norm();
   Ravg /= (3.0*N);
 
   coordinates *= scalerad*1.5/Ravg;
@@ -532,7 +532,7 @@ vector<arc_t> PlanarGraph::compute_face_representations(int Fmax) const
   unordered_set<arc_t> faces(2*count_edges());
   
   for(node_t u=0;u<N;u++)
-    for(node_t v: neighbours[u]){
+    for(node_t v: nbrs(u)){
       // For each directed edge, find the representative edge of the specified face
       // and assign an identifier
       faces.insert(get_face_representation({u,v},Fmax));
