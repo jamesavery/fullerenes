@@ -47,3 +47,7 @@ add_test(NAME orientation-test COMMAND orientation-test)
 add_executable(csr-test csr-test.cc)
 target_link_libraries(csr-test fullerenes GTest::GTest GTest::Main)
 add_test(NAME csr-test COMMAND csr-test)
+
+add_executable(dense-graph-test dense-graph-test.cc)
+target_link_libraries(dense-graph-test fullerenes GTest::GTest GTest::Main)
+add_test(NAME dense-graph-test COMMAND dense-graph-test)

@@ -1,0 +1,156 @@
+#pragma once
+
+#include <vector>
+#include <span>
+#include <cstdint>
+#include <cassert>
+#include <algorithm>
+
+#include "planar_csr.hh"
+
+namespace Spanify {
+
+// ---------------------------------------------------------------------------
+// DenseGraph: fixed-stride flat array representation for oriented planar graphs.
+//
+// Each vertex has Dmax slots; a degree counter tracks how many are filled.
+// Supports O(Dmax) insert/remove at arbitrary cyclic positions.
+//
+// Template parameters:
+//   Dmax — maximum degree per vertex (3 for cubic, 6 for fullerene duals, etc.)
+//   K    — index type: int32_t (CPU), uint16_t (GPU)
+// ---------------------------------------------------------------------------
+template<int Dmax, typename K = int32_t>
+struct DenseGraph {
+    K Nv = 0;
+    std::vector<K> values;         // [Nv * Dmax] — neighbor IDs, row-major
+    std::vector<uint8_t> deg;      // [Nv] — current degree of each vertex
+
+    DenseGraph() = default;
+
+    explicit DenseGraph(K Nv) : Nv(Nv), values(Nv * Dmax, K(-1)), deg(Nv, 0) {}
+
+    std::span<const K> nbrs(K u) const {
+        return {values.data() + u * Dmax, deg[u]};
+    }
+
+    std::span<K> nbrs_mut(K u) {
+        return {values.data() + u * Dmax, deg[u]};
+    }
+
+    int degree(K u) const { return deg[u]; }
+
+    // Append v to end of u's neighbour list. O(1).
+    void push_back(K u, K v) {
+        assert(deg[u] < Dmax);
+        values[u * Dmax + deg[u]] = v;
+        deg[u]++;
+    }
+
+    // Insert v at position pos in u's neighbour list (shifting later entries). O(Dmax).
+    void insert_at(K u, K v, int pos) {
+        assert(deg[u] < Dmax);
+        K* row = values.data() + u * Dmax;
+        int d = deg[u];
+        for (int i = d; i > pos; --i)
+            row[i] = row[i-1];
+        row[pos] = v;
+        deg[u]++;
+    }
+
+    // Remove entry at position pos in u's neighbour list (shifting later entries). O(Dmax).
+    void erase_at(K u, int pos) {
+        K* row = values.data() + u * Dmax;
+        int d = deg[u];
+        for (int i = pos; i < d - 1; ++i)
+            row[i] = row[i+1];
+        row[d-1] = K(-1);
+        deg[u]--;
+    }
+
+    // Find position of v in u's neighbour list. Returns -1 if not found.
+    int find(K u, K v) const {
+        const K* row = values.data() + u * Dmax;
+        for (int i = 0; i < deg[u]; ++i)
+            if (row[i] == v) return i;
+        return -1;
+    }
+};
+
+// Convenience aliases
+using DenseCubic         = DenseGraph<3>;
+using DenseTriangulation = DenseGraph<6>;
+using DenseFulleroid     = DenseGraph<10>;
+
+// ---------------------------------------------------------------------------
+// Conversion: Dense -> CSR (freeze). O(N).
+// ---------------------------------------------------------------------------
+template<int Dmax, typename K>
+PlanarCSR<Owned, K> freeze(const DenseGraph<Dmax, K>& g) {
+    PlanarCSR<Owned, K> csr;
+    csr.N = g.Nv;
+    csr.offsets.resize(g.Nv + 1);
+    csr.offsets[0] = 0;
+    for (K v = 0; v < g.Nv; ++v)
+        csr.offsets[v+1] = csr.offsets[v] + K(g.deg[v]);
+    csr.n_arcs = csr.offsets[g.Nv];
+
+    csr.values.resize(csr.n_arcs);
+    for (K v = 0; v < g.Nv; ++v) {
+        K base = csr.offsets[v];
+        for (int i = 0; i < g.deg[v]; ++i)
+            csr.values[base + i] = g.values[v * Dmax + i];
+    }
+
+    csr.twin = compute_twin(csr.N, csr.offsets, csr.values);
+    return csr;
+}
+
+// ---------------------------------------------------------------------------
+// Conversion: CSR -> Dense (thaw). O(N).
+// Caller must choose Dmax large enough for the graph's maximum degree.
+// ---------------------------------------------------------------------------
+template<int Dmax, typename K>
+DenseGraph<Dmax, K> thaw(const PlanarCSR<Owned, K>& csr) {
+    DenseGraph<Dmax, K> g(csr.N);
+    for (K v = 0; v < csr.N; ++v) {
+        K d = csr.offsets[v+1] - csr.offsets[v];
+        assert(d <= Dmax);
+        g.deg[v] = uint8_t(d);
+        for (K i = 0; i < d; ++i)
+            g.values[v * Dmax + i] = csr.values[csr.offsets[v] + i];
+    }
+    return g;
+}
+
+// ---------------------------------------------------------------------------
+// Conversion: neighbours_t -> Dense. O(N).
+// ---------------------------------------------------------------------------
+template<int Dmax, typename K = int32_t>
+DenseGraph<Dmax, K> dense_from_neighbours(int N_verts,
+                                           const std::vector<std::vector<int>>& neighbours) {
+    DenseGraph<Dmax, K> g{K(N_verts)};
+    for (int v = 0; v < N_verts; ++v) {
+        assert(int(neighbours[v].size()) <= Dmax);
+        g.deg[v] = uint8_t(neighbours[v].size());
+        for (int i = 0; i < int(neighbours[v].size()); ++i)
+            g.values[v * Dmax + i] = K(neighbours[v][i]);
+    }
+    return g;
+}
+
+// ---------------------------------------------------------------------------
+// Conversion: Dense -> neighbours_t. O(N).
+// ---------------------------------------------------------------------------
+template<int Dmax, typename K>
+std::vector<std::vector<int>> to_neighbours(const DenseGraph<Dmax, K>& g) {
+    std::vector<std::vector<int>> adj(g.Nv);
+    for (K v = 0; v < g.Nv; ++v) {
+        adj[v].resize(g.deg[v]);
+        for (int i = 0; i < g.deg[v]; ++i)
+            adj[v][i] = int(g.values[v * Dmax + i]);
+    }
+    return adj;
+}
+
+} // namespace Spanify
