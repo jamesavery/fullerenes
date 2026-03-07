@@ -441,7 +441,7 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
 }
 
 
-Triangulation Triangulation::GCtransform(const unsigned k, const unsigned l) const
+Triangulation Triangulation::GCtransform(unsigned k, unsigned l) const
 {
   if(l==0) return halma_transform(k-1);
 

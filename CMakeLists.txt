@@ -12,8 +12,13 @@ set(FULLERENE_DATABASE_PATH ${CMAKE_SOURCE_DIR}/database/ CACHE PATH "Path to fu
 set(FORTRAN_NMAX 5000 CACHE STRING "Maximum vertex count for Fortran routines using statically allocated memory")
 
 set(BLA_VENDOR Intel10_64lp_seq)
-find_package(BLAS)
-find_package(LAPACK)
+find_package(BLAS QUIET)
+find_package(LAPACK QUIET)
+if(NOT BLAS_FOUND OR NOT LAPACK_FOUND)
+  unset(BLA_VENDOR)
+  find_package(BLAS REQUIRED)
+  find_package(LAPACK REQUIRED)
+endif()
 find_package(GSL)
 find_package(GTest REQUIRED)
 find_library(TBB_LIB tbb)
@@ -74,6 +79,8 @@ if(ENABLE_SYCL)
 
   if(CMAKE_CUDA_COMPILER)
     set(SYCL_DEFAULT_TARGET "NVIDIA")
+  elseif(APPLE)
+    set(SYCL_DEFAULT_TARGET "X86")
   else()
     set(SYCL_DEFAULT_TARGET "AMD")
   endif()
@@ -118,7 +125,15 @@ if(ENABLE_SYCL)
     separate_arguments(SYCL_EXTRA_FLAGS_LIST UNIX_COMMAND "${SYCL_EXTRA_FLAGS}")
     list(APPEND SYCL_FLAGS ${SYCL_EXTRA_FLAGS_LIST})
   endif()
-  set(SYCL_RUNTIME_LIBS sycl)
+  # AdaptiveCpp runtime: try acpp-rt first (brew/modern), fall back to sycl (DPC++)
+  find_library(ACPP_RT_LIB NAMES acpp-rt hipSYCL-rt sycl
+    HINTS ${ADAPTIVECPP_ROOT}/lib ENV ADAPTIVECPP_ROOT ENV ACPP_ROOT
+  )
+  if(ACPP_RT_LIB)
+    set(SYCL_RUNTIME_LIBS ${ACPP_RT_LIB})
+  else()
+    set(SYCL_RUNTIME_LIBS sycl)
+  endif()
   if(TBB_LIB)
     list(APPEND SYCL_RUNTIME_LIBS ${TBB_LIB})
   endif()
@@ -164,12 +179,12 @@ if(DEFINED ENV{CRAYPE_VERSION})
   message("Cray compiler environment detected")
   set(CMAKE_Fortran_FLAGS "-fPIC -O3")
 else()
- set(CMAKE_Fortran_FLAGS "-fPIC -cpp -O3 -m64 -mcmodel=medium")
+ set(CMAKE_Fortran_FLAGS "-fPIC -cpp -O3 -m64 -mcmodel=small")
 endif()
 
 # C++ compiler flags
 
-set(CMAKE_CXX_FLAGS "-fPIC -O3 -m64 -pthread -fopenmp")
+set(CMAKE_CXX_FLAGS "-fPIC -O3 -m64 -pthread")
 
 configure_file(
   ${CMAKE_SOURCE_DIR}/include/fullerenes/config.hh.in

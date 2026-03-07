@@ -120,7 +120,7 @@ unsigned int gcd(unsigned int a, unsigned int b)
 
 // Actually works for all cubic graphs -- perhaps stick it there instead
 // works for all CG, but here we know, the maximum ring size is 6
-FullereneGraph FullereneGraph::GCtransform(const unsigned k, const unsigned l, const bool do_layout) const
+FullereneGraph FullereneGraph::GCtransform(unsigned k, unsigned l) const
 {
   assert(layout2d.size()==N);// FIXME remove
   Triangulation t(dual_graph(6));

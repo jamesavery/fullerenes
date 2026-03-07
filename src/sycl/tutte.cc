@@ -5,7 +5,7 @@
 #include <iterator>
 #include <type_traits>
 #include <algorithm>
-#include <execution>
+#include <fullerenes/sycl-headers/execution-compat.hh>
 #include <numeric>
 #include <fullerenes/kernel-headers/tutte-functor.hh>
 #include "kernel.cc"
@@ -32,9 +32,9 @@ SyclEvent tutte_isomer_impl( SyclQueue& Q,
     auto cubic_neighbours = fullerene.d_.A_cubic_;
 
     Q.wait();
-    std::fill(std::execution::par_unseq, fixed.begin(), fixed.end(), false);
-    std::fill(std::execution::par_unseq, xys.begin(), xys.begin() + N, std::array<T,2>{0,0});
-    std::fill(std::execution::par_unseq, newxys.begin(), newxys.begin() + N, std::array<T,2>{0,0});
+    std::fill(FULLERENE_PAR_UNSEQ fixed.begin(), fixed.end(), false);
+    std::fill(FULLERENE_PAR_UNSEQ xys.begin(), xys.begin() + N, std::array<T,2>{0,0});
+    std::fill(FULLERENE_PAR_UNSEQ newxys.begin(), newxys.begin() + N, std::array<T,2>{0,0});
 
     Q->submit([&](handler& h) { h.parallel_for<TutteKernel_1<T,K>> ( config1.isomer_nd_range(6) , [=](nd_item<1> nditem){
             auto tid = nditem.get_global_linear_id();
@@ -47,11 +47,11 @@ SyclEvent tutte_isomer_impl( SyclQueue& Q,
     });});
 
     Q.wait();
-    std::copy(std::execution::par_unseq, xys.subspan(0,N).begin(), xys.subspan(0,N).end(), newxys.begin());
+    std::copy(FULLERENE_PAR_UNSEQ xys.subspan(0,N).begin(), xys.subspan(0,N).end(), newxys.begin());
 
     for (size_t i = 0; i < N*10; i++){
         Q.wait();
-        std::transform(std::execution::par_unseq, cubic_neighbours.template as_span<std::array<K,3>>().begin(), cubic_neighbours.template as_span<std::array<K,3>>().end(), xys.begin(), newxys.begin(), [=](auto& ns, auto& xy){
+        std::transform(FULLERENE_PAR_UNSEQ cubic_neighbours.template as_span<std::array<K,3>>().begin(), cubic_neighbours.template as_span<std::array<K,3>>().end(), xys.begin(), newxys.begin(), [=](auto& ns, auto& xy){
             auto idx = &xy - &xys[0];
             std::array<T,2> neighbour_sum = {0,0};
             for (int j = 0; j < 3; j++) neighbour_sum += xys[ns[j]];
@@ -72,14 +72,14 @@ SyclEvent tutte_isomer_impl( SyclQueue& Q,
 
         if (i%N == 0){
             Q.wait();
-            T max_diff = std::transform_reduce(std::execution::par_unseq, xys.begin(), xys.end(), newxys.begin(), T(0), [](T a, T b){ return std::max(a, b); }, [&](auto& old_xys, auto& new_xys){return norm(old_xys - new_xys);});
+            T max_diff = std::transform_reduce(FULLERENE_PAR_UNSEQ xys.begin(), xys.end(), newxys.begin(), T(0), [](T a, T b){ return std::max(a, b); }, [&](auto& old_xys, auto& new_xys){return norm(old_xys - new_xys);});
             if (max_diff <= 10*std::numeric_limits<T>::epsilon()) {
                 fullerene.m_.flags_.get().set(StatusEnum::CONVERGED_2D);
                 break;
             }
         }
         Q.wait();
-        std::copy(std::execution::par_unseq, newxys.subspan(0,N).begin(), newxys.subspan(0,N).end(), xys.begin());
+        std::copy(FULLERENE_PAR_UNSEQ newxys.subspan(0,N).begin(), newxys.subspan(0,N).end(), xys.begin());
     }
     return Q.get_event();
 }

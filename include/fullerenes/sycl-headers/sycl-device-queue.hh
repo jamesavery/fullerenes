@@ -68,10 +68,6 @@ struct Device{
         }
     }
 
-    inline static std::vector<Device> cpus_ =         get_devices(DeviceType::CPU);
-    inline static std::vector<Device> gpus_ =         get_devices(DeviceType::GPU);
-    inline static std::vector<Device> accelerators_ = get_devices(DeviceType::ACCELERATOR);
-
     std::string get_name() const;
     std::string get_vendor() const;
     size_t get_property(DeviceProperty property) const;

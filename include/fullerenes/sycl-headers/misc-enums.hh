@@ -5,11 +5,6 @@
 #define INT_TYPEDEFS(K) static_assert(std::is_integral<K>::value, "K must be integral type"); typedef std::array<K,3> node3; typedef std::array<K,2> node2; typedef K node_t; typedef std::array<K,6> node6;
 #define TEMPLATE_TYPEDEFS(T,K) FLOAT_TYPEDEFS(T) INT_TYPEDEFS(K)
 
-using uint8_t = unsigned char;
-using uint16_t = unsigned short;
-using uint32_t = unsigned int;
-using uint64_t = unsigned long;
-
 enum ForcefieldType : uint8_t {WIRZ, PEDERSEN, FLATNESS_ENABLED, FLAT_BOND, BOND, ANGLE, DIH, ANGLE_M, ANGLE_P, DIH_A, DIH_M, DIH_P};
 
 enum class EigensolveMode 

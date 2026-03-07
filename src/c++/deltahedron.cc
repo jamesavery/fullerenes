@@ -80,10 +80,9 @@ void Deltahedron::smooth(double q) {
   points = new_points;
 }
 
-Deltahedron Deltahedron::halma_transform(unsigned k) const {
+Deltahedron Deltahedron::halma_transform(int m) const {
     // Halma path: direct subdivision via face grids, preserves node IDs
-    int m = k - 1;
-    int n = k;  // = m+1
+    int n = m + 1;  // = k in GC(k,0) terminology
 
     vector<map<edge_t,node_t>> face_grids;
     Triangulation T_new = Triangulation::halma_transform(m, &face_grids);
@@ -108,7 +107,7 @@ Deltahedron Deltahedron::halma_transform(unsigned k) const {
 }
 
 Deltahedron Deltahedron::GCtransform(unsigned k, unsigned l) const {
-  if(l==0 || k==0) return halma_transform(max(k,l));
+  if(l==0 || k==0) return halma_transform(max(k,l) - 1);
 
   // General (k,l) path: unfold to Eisenstein plane, scale, fold back.
   // Then assign 3D coordinates via barycentric interpolation within

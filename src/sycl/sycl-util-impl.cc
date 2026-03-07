@@ -8,7 +8,7 @@
 #include <limits>
 #include <cstdint>
 #include <complex>
-#include <execution>
+#include <fullerenes/sycl-headers/execution-compat.hh>
 #include "coord3d.cc"
 
 #ifndef DEVICE_CAST
@@ -318,7 +318,7 @@ if(dst_batch.N_ != src_batch.N_ || src_batch.Nf_ != dst_batch.Nf_) throw std::ru
     int_t init = 0;
     Q.wait();
     std::transform_exclusive_scan(
-        std::execution::par_unseq,
+        FULLERENE_PAR_UNSEQ
         flags.begin(),
         flags.end(),
         indices.begin(),

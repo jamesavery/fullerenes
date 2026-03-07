@@ -13,6 +13,7 @@ set(SYCL_EXECUTABLES
   to-polyhedron
   forcefield-functor-test
   sycl-vector-test
+  sycl-smoke-test
   mdspan-test
 )
 
@@ -20,7 +21,7 @@ foreach(EXECUTABLE ${SYCL_EXECUTABLES})
   add_executable(${EXECUTABLE} ${EXECUTABLE}.cc)  
   target_compile_options(${EXECUTABLE} PRIVATE ${SYCL_FLAGS})
   target_link_options(${EXECUTABLE} PRIVATE ${SYCL_FLAGS})
-  target_link_libraries(${EXECUTABLE} PRIVATE ${SYCL_FULLERENE_LIBS} ${SYCL_RUNTIME_LIBS} fullerenes ${GTEST_LIBRARIES})
+  target_link_libraries(${EXECUTABLE} PRIVATE ${SYCL_FULLERENE_LIBS} ${SYCL_RUNTIME_LIBS} fullerenes GTest::GTest GTest::Main)
   if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     target_compile_options(${EXECUTABLE} PRIVATE -fpermissive)
   endif()
@@ -33,4 +34,5 @@ add_test(NAME fullerene-queue-test COMMAND fullerene-queue-test)
 add_test(NAME condition-functor-test COMMAND condition-functor-test)
 add_test(NAME tutte-functor-test COMMAND tutte-functor-test)
 add_test(NAME eigen-functor-test COMMAND eigen-functor-test)
+add_test(NAME sycl-smoke-test COMMAND sycl-smoke-test)
 add_test(NAME mdspan-test COMMAND mdspan-test)

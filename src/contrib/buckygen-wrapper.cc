@@ -5,6 +5,7 @@
 #include <signal.h>
 #include <assert.h>
 #include <unistd.h>
+#include <signal.h>
 
 #include "fullerenes/graph.hh"
 #include "fullerenes/auxiliary.hh"
@@ -44,7 +45,7 @@ void signal_finished(const buckygen_queue& Q)
 void stop(const buckygen_queue& Q)
 {
   pid_t gid = getpid();
-  sighandler_t old_handler = signal(SIGTERM,SIG_IGN); // Protect ourselves while we kill our children
+  auto old_handler = signal(SIGTERM,SIG_IGN); // Protect ourselves while we kill our children
   killpg(gid,SIGTERM);
   signal(SIGTERM,old_handler);                        // Restore normalcy.
   msgctl(Q.qid,IPC_RMID,0);			      // Kill the Sys-V IPC queue
@@ -251,7 +252,7 @@ bool next_fullerene(const buckygen_queue& Q, Graph& G)
 
   void buckyherd_queue::stop_all() const {
     pid_t gid = getpid();
-    sighandler_t old_handler = signal(SIGTERM,SIG_IGN); // Protect ourselves while we kill our children
+    auto old_handler = signal(SIGTERM,SIG_IGN); // Protect ourselves while we kill our children
     killpg(gid,SIGTERM);
     signal(SIGTERM,old_handler);                        // Restore normalcy.
     msgctl(qid,IPC_RMID,0);			      // Kill the Sys-V IPC queue    
