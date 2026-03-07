@@ -43,7 +43,7 @@ bool planar_orient(Graph& G)
 void orient_neighbours(Graph& G, const vector<coord2d>& layout)
 {
   for(node_t u=0;u<G.N;u++){
-    vector<node_t>& ns(G.neighbours[u]);
+    auto ns = G.neighbours[u];
     sort_ccw_point CCW(layout,layout[u]);
     sort(ns.begin(), ns.end(), CCW);
     // CCW sort matches the codebase convention:

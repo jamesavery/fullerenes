@@ -35,15 +35,15 @@ public:
   unordered_map<arc_t,arc_t> arc_translation() const;
   
   size_t max_degree() const {
-    size_t max_degree = 0;
-    for(auto &nu: neighbours) max_degree = std::max(max_degree, nu.size());
-    return max_degree;
+    size_t max_deg = 0;
+    for(node_t u=0; u<N; u++) max_deg = std::max(max_deg, (size_t)neighbours.degree(u));
+    return max_deg;
   }
 
   vector<uint8_t> n_degrees() const {
-    vector<uint8_t> n_degrees(max_degree(),0);
-    for(auto &nu: neighbours) n_degrees[nu.size()-1]++;
-    return n_degrees;
+    vector<uint8_t> nd(max_degree(),0);
+    for(node_t u=0; u<N; u++) nd[neighbours.degree(u)-1]++;
+    return nd;
   }
   
   // takes a triangulation, and returns a dual of the inverse leapfrog

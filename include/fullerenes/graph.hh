@@ -40,7 +40,7 @@ struct Graph {
   Graph(size_t N=0) : N(N), neighbours(N) {}
   Graph(const neighbours_t& neighbours) : N(neighbours.size()), neighbours(neighbours) { }
 
-  std::span<const node_t> nbrs(node_t u) const { return {neighbours[u].data(), neighbours[u].size()}; }
+  std::span<const node_t> nbrs(node_t u) const { return neighbours.nbrs(u); }
 
   bool insert_edge(const arc_t& e, const node_t suc_uv=-1, const node_t suc_vu=-1);
   bool remove_edge(const edge_t& e);

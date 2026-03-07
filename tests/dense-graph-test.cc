@@ -17,46 +17,38 @@ FullereneGraph get_fg(int N) {
 }
 
 // ---------------------------------------------------------------------------
-// DenseGraph from neighbours_t
+// DenseGraph: verify Graph::neighbours (which IS a DenseGraph<10>) is correct
 // ---------------------------------------------------------------------------
 
-class DenseFromNeighbours : public ::testing::TestWithParam<int> {};
+class DenseFromGraph : public ::testing::TestWithParam<int> {};
 
-TEST_P(DenseFromNeighbours, CubicGraphMatchesOriginal) {
+TEST_P(DenseFromGraph, CubicGraphCorrect) {
     int N = GetParam();
     FullereneGraph FG = get_fg(N);
 
-    auto dense = S::dense_from_neighbours<3>(FG.N, FG.neighbours);
-
-    EXPECT_EQ(dense.Nv, N);
+    // FG.neighbours is now DenseGraph<GRAPH_DMAX>
+    EXPECT_EQ(FG.neighbours.size(), N);
     for (int v = 0; v < N; ++v) {
-        EXPECT_EQ(dense.degree(v), 3);
-        auto nbs = dense.nbrs(v);
-        auto old_nbs = FG.nbrs(v);
-        ASSERT_EQ(int(nbs.size()), int(old_nbs.size()));
-        for (int j = 0; j < int(nbs.size()); ++j)
-            EXPECT_EQ(int(nbs[j]), old_nbs[j]);
+        EXPECT_EQ(FG.neighbours.degree(v), 3);
+        auto nbs = FG.nbrs(v);
+        EXPECT_EQ(int(nbs.size()), 3);
     }
 }
 
-TEST_P(DenseFromNeighbours, DualGraphMatchesOriginal) {
+TEST_P(DenseFromGraph, DualGraphCorrect) {
     int N = GetParam();
     FullereneGraph FG = get_fg(N);
     PlanarGraph dual = FG.dual_graph();
 
-    auto dense = S::dense_from_neighbours<6>(dual.N, dual.neighbours);
-
-    EXPECT_EQ(dense.Nv, N / 2 + 2);
+    EXPECT_EQ(dual.neighbours.size(), N / 2 + 2);
     for (int v = 0; v < dual.N; ++v) {
-        auto nbs = dense.nbrs(v);
-        auto old_nbs = dual.nbrs(v);
-        ASSERT_EQ(int(nbs.size()), int(old_nbs.size()));
-        for (int j = 0; j < int(nbs.size()); ++j)
-            EXPECT_EQ(int(nbs[j]), old_nbs[j]);
+        int d = dual.neighbours.degree(v);
+        EXPECT_GE(d, 5);
+        EXPECT_LE(d, 6);
     }
 }
 
-INSTANTIATE_TEST_SUITE_P(Sizes, DenseFromNeighbours, ::testing::Values(20, 60, 80));
+INSTANTIATE_TEST_SUITE_P(Sizes, DenseFromGraph, ::testing::Values(20, 60, 80));
 
 // ---------------------------------------------------------------------------
 // DenseGraph mutation operations
@@ -117,6 +109,28 @@ TEST(DenseMutation, Find) {
     EXPECT_EQ(g.find(0, 99), -1);
 }
 
+TEST(DenseMutation, RowProxy) {
+    S::DenseGraph<3> g(2);
+
+    // RowProxy push_back
+    g[0].push_back(1);
+    g[0].push_back(2);
+    g[0].push_back(3);
+    EXPECT_EQ(g[0].size(), 3);
+    EXPECT_EQ(g[0][0], 1);
+    EXPECT_EQ(g[0][1], 2);
+
+    // RowProxy operator=
+    g[1] = {10, 20, 30};
+    EXPECT_EQ(g[1].size(), 3);
+    EXPECT_EQ(g[1][2], 30);
+
+    // RowProxy convert to vector
+    std::vector<int> v = g[0];
+    EXPECT_EQ(v.size(), 3u);
+    EXPECT_EQ(v[0], 1);
+}
+
 // ---------------------------------------------------------------------------
 // freeze: Dense -> CSR
 // ---------------------------------------------------------------------------
@@ -127,14 +141,13 @@ TEST_P(FreezeTest, CubicGraphRoundTrip) {
     int N = GetParam();
     FullereneGraph FG = get_fg(N);
 
-    auto dense = S::dense_from_neighbours<3>(FG.N, FG.neighbours);
-    auto csr = S::freeze(dense);
+    // FG.neighbours is DenseGraph<GRAPH_DMAX>; freeze it to CSR
+    auto csr = S::freeze(FG.neighbours);
 
     EXPECT_EQ(csr.N, N);
     EXPECT_EQ(csr.n_arcs, 3 * N);
     EXPECT_TRUE(S::validate(S::as_view(csr)));
 
-    // Check CSR neighbours match original
     for (int v = 0; v < N; ++v) {
         auto nbs = S::neighbours(S::as_view(csr), v);
         auto old_nbs = FG.nbrs(v);
@@ -149,8 +162,7 @@ TEST_P(FreezeTest, DualGraphRoundTrip) {
     FullereneGraph FG = get_fg(N);
     PlanarGraph dual = FG.dual_graph();
 
-    auto dense = S::dense_from_neighbours<6>(dual.N, dual.neighbours);
-    auto csr = S::freeze(dense);
+    auto csr = S::freeze(dual.neighbours);
 
     EXPECT_EQ(csr.N, dual.N);
     EXPECT_EQ(csr.n_arcs, 3 * N);
@@ -169,17 +181,15 @@ TEST_P(ThawTest, CubicFreezeThawRoundTrip) {
     int N = GetParam();
     FullereneGraph FG = get_fg(N);
 
-    // neighbours -> Dense -> CSR -> Dense
-    auto dense1 = S::dense_from_neighbours<3>(FG.N, FG.neighbours);
-    auto csr = S::freeze(dense1);
+    auto csr = S::freeze(FG.neighbours);
     auto dense2 = S::thaw<3>(csr);
 
-    EXPECT_EQ(dense2.Nv, dense1.Nv);
+    EXPECT_EQ(int(dense2.Nv), N);
     for (int v = 0; v < N; ++v) {
-        EXPECT_EQ(dense2.degree(v), dense1.degree(v));
-        auto nbs1 = dense1.nbrs(v);
+        EXPECT_EQ(dense2.degree(v), FG.degree(v));
+        auto nbs1 = FG.nbrs(v);
         auto nbs2 = dense2.nbrs(v);
-        for (int j = 0; j < dense1.degree(v); ++j)
+        for (int j = 0; j < FG.degree(v); ++j)
             EXPECT_EQ(nbs2[j], nbs1[j]);
     }
 }
@@ -189,16 +199,15 @@ TEST_P(ThawTest, DualFreezeThawRoundTrip) {
     FullereneGraph FG = get_fg(N);
     PlanarGraph dual = FG.dual_graph();
 
-    auto dense1 = S::dense_from_neighbours<6>(dual.N, dual.neighbours);
-    auto csr = S::freeze(dense1);
+    auto csr = S::freeze(dual.neighbours);
     auto dense2 = S::thaw<6>(csr);
 
-    EXPECT_EQ(dense2.Nv, dense1.Nv);
+    EXPECT_EQ(int(dense2.Nv), dual.N);
     for (int v = 0; v < dual.N; ++v) {
-        EXPECT_EQ(dense2.degree(v), dense1.degree(v));
-        auto nbs1 = dense1.nbrs(v);
+        EXPECT_EQ(dense2.degree(v), dual.degree(v));
+        auto nbs1 = dual.nbrs(v);
         auto nbs2 = dense2.nbrs(v);
-        for (int j = 0; j < dense1.degree(v); ++j)
+        for (int j = 0; j < dual.degree(v); ++j)
             EXPECT_EQ(nbs2[j], nbs1[j]);
     }
 }
@@ -206,24 +215,24 @@ TEST_P(ThawTest, DualFreezeThawRoundTrip) {
 INSTANTIATE_TEST_SUITE_P(Sizes, ThawTest, ::testing::Values(20, 60, 80));
 
 // ---------------------------------------------------------------------------
-// neighbours_t round-trip: neighbours -> Dense -> neighbours
+// to_vectors round-trip
 // ---------------------------------------------------------------------------
 
-class NeighboursRoundTrip : public ::testing::TestWithParam<int> {};
+class ToVectorsRoundTrip : public ::testing::TestWithParam<int> {};
 
-TEST_P(NeighboursRoundTrip, CubicGraph) {
+TEST_P(ToVectorsRoundTrip, CubicGraph) {
     int N = GetParam();
     FullereneGraph FG = get_fg(N);
 
-    auto dense = S::dense_from_neighbours<3>(FG.N, FG.neighbours);
-    auto adj = S::to_neighbours(dense);
+    auto adj = FG.neighbours.to_vectors();
 
     ASSERT_EQ(int(adj.size()), N);
     for (int v = 0; v < N; ++v) {
-        ASSERT_EQ(adj[v].size(), FG.neighbours[v].size());
+        auto nbs = FG.nbrs(v);
+        ASSERT_EQ(int(adj[v].size()), int(nbs.size()));
         for (int j = 0; j < int(adj[v].size()); ++j)
-            EXPECT_EQ(adj[v][j], FG.neighbours[v][j]);
+            EXPECT_EQ(adj[v][j], nbs[j]);
     }
 }
 
-INSTANTIATE_TEST_SUITE_P(Sizes, NeighboursRoundTrip, ::testing::Values(20, 60, 80));
+INSTANTIATE_TEST_SUITE_P(Sizes, ToVectorsRoundTrip, ::testing::Values(20, 60, 80));

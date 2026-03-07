@@ -17,9 +17,9 @@
 
 namespace S = Spanify;  // Short alias — no 'using namespace' to avoid collision with ::Graph
 
-// Helper: build a CSRGraph from an existing old-style Graph object
+// Helper: build a CSRGraph from an existing Graph object
 S::CSRGraph csr_from_graph(const ::Graph& G) {
-    return S::from_neighbours(G.N, G.neighbours);
+    return S::freeze(G.neighbours);
 }
 
 // Helper: get a fullerene graph for testing. Uses readPDB (never readBinary/getIsomer).

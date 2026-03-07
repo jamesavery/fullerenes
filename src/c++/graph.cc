@@ -7,12 +7,12 @@ char LIST_CLOSE=']';
 bool Graph::remove_edge(const edge_t& e)
 {
   node_t u = e.first, v = e.second;
-  vector<node_t> &nu(neighbours[u]), &nv(neighbours[v]);
-
   bool value = false;
 
-  for(int i=0;i<nu.size();i++) if(nu[i] == v){ nu.erase(nu.begin()+i); value = true; break; }
-  for(int i=0;i<nv.size();i++) if(nv[i] == u){ nv.erase(nv.begin()+i); value = true; break; }
+  int pos_uv = neighbours.find(u, v);
+  if(pos_uv >= 0){ neighbours.erase_at(u, pos_uv); value = true; }
+  int pos_vu = neighbours.find(v, u);
+  if(pos_vu >= 0){ neighbours.erase_at(v, pos_vu); value = true; }
 
   return value;
 }
@@ -27,25 +27,30 @@ bool Graph::insert_edge(const arc_t& e, const node_t suc_uv, const node_t suc_vu
   const node_t u = e.first, v = e.second;
 
   assert(u>=0 && v>=0);
-  vector<node_t> &nu(neighbours[u]), &nv(neighbours[v]);
+  int oldsize_u = neighbours.degree(u), oldsize_v = neighbours.degree(v);
 
-  size_t oldsize[2] = {nu.size(),nv.size()};
-  
-  vector<node_t>::iterator pos_uv = suc_uv<0? nu.end() : find(nu.begin(),nu.end(),suc_uv);
-  vector<node_t>::iterator pos_vu = suc_vu<0? nv.end() : find(nv.begin(),nv.end(),suc_vu);
+  if(suc_uv < 0) neighbours.push_back(u, v);
+  else {
+    int pos = neighbours.find(u, suc_uv);
+    neighbours.insert_at(u, v, pos >= 0 ? pos : neighbours.degree(u));
+  }
 
-  nu.insert(pos_uv,v);
-  if(u!=v) nv.insert(pos_vu,u);
-  
-  assert(nu.size() == oldsize[0]+1 && nv.size() == oldsize[1]+1);
+  if(u != v){
+    if(suc_vu < 0) neighbours.push_back(v, u);
+    else {
+      int pos = neighbours.find(v, suc_vu);
+      neighbours.insert_at(v, u, pos >= 0 ? pos : neighbours.degree(v));
+    }
+  }
+
+  assert(neighbours.degree(u) == oldsize_u+1 && neighbours.degree(v) == oldsize_v+1);
 
   return false;
 }
 
 bool Graph::edge_exists(const edge_t& e) const
 {
-  const vector<node_t> &nu(neighbours[e.first]);
-  return find(nu.begin(),nu.end(),e.second) != nu.end();
+  return neighbours.find(e.first, e.second) >= 0;
 }
 
 // remove all vertices without edges from graph
@@ -88,10 +93,7 @@ void Graph::remove_vertices(set<int> &sv){
 
 int  Graph::arc_ix(node_t u, node_t v) const
 {
-  const vector<node_t>& nu(neighbours[u]);
-  for(int j=0;j<nu.size(); j++)
-    if(nu[j] == v) return j; 
-  return -1;            // u-v is not an edge in a triangulation  
+  return neighbours.find(u, v);
 }
 
 // Successor to v in oriented neigbhours of u
@@ -162,8 +164,8 @@ bool Graph::has_separating_triangles() const
   assert(is_consistently_oriented());
 
   for(node_t u=0;u<N;u++){
-    const vector<node_t> &nu(neighbours[u]);
-    
+    auto nu = neighbours[u];
+
     for(int i=0;i<nu.size();i++){
       node_t t = nu[i];
       node_t v = prev(u,t), w = next(u,t); // edges: u--t, u--v, u--w
@@ -177,9 +179,9 @@ bool Graph::has_separating_triangles() const
 bool Graph::adjacency_is_symmetric() const
 {
   for(node_t u=0;u<N;u++){
-    const vector<node_t> &nu = neighbours[u];
+    auto nu = neighbours[u];
     for(int i=0;i<nu.size();i++){
-      const vector<node_t> &nv = neighbours[nu[i]];
+      auto nv = neighbours[nu[i]];
 
       bool symmetric = false;
       for(int j=0;j<nv.size();j++) if(nv[j] == u) symmetric = true;
@@ -438,12 +440,12 @@ void Graph::flip_all_orientations()
 int Graph::max_degree() const
 {
   int max_d = 0;
-  for(node_t u=0;u<N;u++) if(neighbours[u].size() > max_d) max_d = neighbours[u].size();
+  for(node_t u=0;u<N;u++) if(neighbours.degree(u) > max_d) max_d = neighbours.degree(u);
   return max_d;
 }
 
-int Graph::degree(node_t u) const { 
-  return neighbours[u].size(); 
+int Graph::degree(node_t u) const {
+  return neighbours.degree(u);
 }
 
 

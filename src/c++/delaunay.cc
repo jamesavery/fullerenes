@@ -285,7 +285,7 @@ vector<edge_t> FulleroidDelaunay::triangulate_hole(const vector<node_t>& hole, c
     insert_edge(edge_t(a,c),b,d,new_distances[i]);
     triangle_edges.push_back(edge_t(a,c));
 
-    debug << "neighbours = " << (neighbours+1) << ";\n";
+    debug << "neighbours = " << (neighbours.to_vectors()+1) << ";\n";
     //    debug << "lengths    = " << edge_lengths << ";\n";
   }
   return triangle_edges;
