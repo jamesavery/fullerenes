@@ -10,7 +10,7 @@ public:
   mutable face_t outer_face;
   typedef spiral_nomenclature::construction_scheme_t construction_scheme_t;
 
-  PlanarGraph() {}
+  explicit PlanarGraph(size_t N=0, int dmax=6) : Graph(N, dmax) {}
   PlanarGraph(const PlanarGraph& g) : Graph(g) {  }
   PlanarGraph(const Graph& g) : Graph(g) {}
   PlanarGraph(const spiral_nomenclature &fsn);

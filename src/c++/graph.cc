@@ -63,7 +63,7 @@ void Graph::remove_isolated_vertices(){
       new_id[u] = u_new++;
 
   int N_new = u_new;
-  Graph g(N_new);
+  Graph g(N_new, neighbours.dmax);
   // cerr << "n new: " << N_new << endl;
   for(int u=0; u<N; u++)
     for(int v: neighbours[u])

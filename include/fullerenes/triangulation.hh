@@ -23,7 +23,7 @@ public:
   //  4. Spirals (constructor + all_spirals + canonical_spiral)
   //  5. Embed in 2D
   //  6. Embed in 3D
-  Triangulation(int N) : PlanarGraph(Graph(N)) {}
+  Triangulation(int N) : PlanarGraph(N, 6) {}
   Triangulation(const Graph& g = Graph()) : PlanarGraph(g) { update(); }
   Triangulation(const neighbours_t& neighbours) : PlanarGraph(Graph(neighbours)) { update(); }
 
