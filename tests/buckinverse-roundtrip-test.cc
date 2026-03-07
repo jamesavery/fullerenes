@@ -15,7 +15,7 @@ static bool graphsExact(const Graph& a, const Graph& b) {
     for (int u = 0; u < a.N; u++) {
         if (a.degree(u) != b.degree(u)) return false;
         for (int j = 0; j < a.degree(u); j++)
-            if (a.neighbours[u][j] != b.neighbours[u][j]) return false;
+            if (a.nbrs(u)[j] != b.nbrs(u)[j]) return false;
     }
     return true;
 }
@@ -28,10 +28,10 @@ static bool graphsCW(const Graph& a, const Graph& b) {
         if (b.degree(u) != d) return false;
         int off = -1;
         for (int k = 0; k < d; k++)
-            if (b.neighbours[u][k] == a.neighbours[u][0]) { off = k; break; }
+            if (b.nbrs(u)[k] == a.nbrs(u)[0]) { off = k; break; }
         if (off < 0) return false;
         for (int j = 0; j < d; j++)
-            if (a.neighbours[u][j] != b.neighbours[u][(off + j) % d]) return false;
+            if (a.nbrs(u)[j] != b.nbrs(u)[(off + j) % d]) return false;
     }
     return true;
 }

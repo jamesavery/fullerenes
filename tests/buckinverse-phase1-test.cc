@@ -85,7 +85,7 @@ TEST(BuckinversePhase1, Navigation) {
     for (int v = 0; v < c20.N; ++v) {
         EXPECT_EQ(c20.degree(v), 5) << "C20 vertex " << v << " degree 5";
 
-        node_t nb0 = c20.neighbours[v][0];
+        node_t nb0 = c20.nbrs(v)[0];
         EXPECT_EQ(advanceCW(c20, v, nb0, 0), nb0)
             << "advanceCW(v," << nb0 << ",0) == " << nb0;
 
@@ -102,7 +102,7 @@ TEST(BuckinversePhase1, Navigation) {
     // Test straightAhead on C20 (all degree-5).
     {
         node_t u = 0;
-        node_t v = c20.neighbours[u][0];
+        node_t v = c20.nbrs(u)[0];
         EXPECT_EQ(straightAhead(c20, Dir::DRight, v, u), advanceCW(c20, v, u, 3))
             << "straightAhead DRight at deg-5 == advance 3";
         EXPECT_EQ(straightAhead(c20, Dir::DLeft, v, u), advanceCW(c20, v, u, 2))
@@ -112,7 +112,7 @@ TEST(BuckinversePhase1, Navigation) {
     // Test sideNbr
     {
         node_t u = 0;
-        node_t v = c20.neighbours[u][0];
+        node_t v = c20.nbrs(u)[0];
         EXPECT_EQ(sideNbr(c20, Dir::DRight, u, v), c20.prev(u, v))
             << "sideNbr DRight == prev";
         EXPECT_EQ(sideNbr(c20, Dir::DLeft, u, v), c20.next(u, v))
@@ -127,7 +127,7 @@ TEST(BuckinversePhase1, Navigation) {
             if (c28.degree(v) == 6) { v6 = v; break; }
         ASSERT_GE(v6, 0) << "C28 has a degree-6 vertex";
 
-        node_t nb = c28.neighbours[v6][0];
+        node_t nb = c28.nbrs(v6)[0];
         EXPECT_EQ(straightAhead(c28, Dir::DRight, v6, nb), advanceCW(c28, v6, nb, 3))
             << "straightAhead DRight at deg-6 == advance 3";
         EXPECT_EQ(straightAhead(c28, Dir::DLeft, v6, nb), advanceCW(c28, v6, nb, 3))
@@ -153,7 +153,7 @@ TEST(BuckinversePhase1, Paths) {
     int valid_L0_count = 0;
     for (node_t u : d5) {
         for (int ni = 0; ni < c28.degree(u); ++ni) {
-            node_t v = c28.neighbours[u][ni];
+            node_t v = c28.nbrs(u)[ni];
             for (Dir d : {Dir::DRight, Dir::DLeft}) {
                 auto pi = computeStraightPath(c28, u, v, d, 3);
                 if (pi.valid) {
@@ -174,7 +174,7 @@ TEST(BuckinversePhase1, Paths) {
     int valid_L1_count = 0;
     for (node_t u : d5) {
         for (int ni = 0; ni < c28.degree(u); ++ni) {
-            node_t v = c28.neighbours[u][ni];
+            node_t v = c28.nbrs(u)[ni];
             for (Dir d : {Dir::DRight, Dir::DLeft}) {
                 auto pi = computeStraightPath(c28, u, v, d, 4);
                 if (pi.valid) {
@@ -191,7 +191,7 @@ TEST(BuckinversePhase1, Paths) {
     int valid_B00_count = 0;
     for (node_t u : d5) {
         for (int ni = 0; ni < c28.degree(u); ++ni) {
-            node_t v = c28.neighbours[u][ni];
+            node_t v = c28.nbrs(u)[ni];
             for (Dir d : {Dir::DRight, Dir::DLeft}) {
                 auto pi = computeBentZeroPath(c28, u, v, d);
                 if (pi.valid) {
@@ -223,7 +223,7 @@ TEST(BuckinversePhase1, NavigationConsistency) {
     auto c28 = makeSeedC28();
 
     for (int u = 0; u < c28.N; ++u) {
-        for (node_t v : c28.neighbours[u]) {
+        for (node_t v : c28.nbrs(u)) {
             for (Dir d : {Dir::DRight, Dir::DLeft}) {
                 node_t sa = straightAhead(c28, d, u, v);
                 EXPECT_GE(sa, 0);

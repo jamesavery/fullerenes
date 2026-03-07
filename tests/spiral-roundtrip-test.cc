@@ -50,7 +50,7 @@ static void check_fullerene_dual(const Triangulation& T) {
 
   int deg5 = 0, deg6 = 0, other = 0;
   for(int u = 0; u < Nf; u++) {
-    int d = T.neighbours[u].size();
+    int d = T.degree(u);
     if(d == 5) deg5++;
     else if(d == 6) deg6++;
     else other++;
@@ -117,8 +117,8 @@ TEST(SpiralRoundtrip, PermutationIsomorphism) {
     // For each node i in G', its neighbour list should be
     // {inv_perm[v] : v in G.neighbours[perm[i]]} in cyclic order.
     for(int u = 0; u < N; u++) {
-      const vector<node_t>& gprime_nb = Gprime.neighbours[u];
-      const vector<node_t>& g_nb = G.neighbours[perm[u]];
+      auto gprime_nb = Gprime.nbrs(u);
+      auto g_nb = G.nbrs(perm[u]);
 
       ASSERT_EQ(gprime_nb.size(), g_nb.size())
         << "Degree mismatch at G'-node " << u << " (G-node " << perm[u] << ")";
@@ -132,8 +132,8 @@ TEST(SpiralRoundtrip, PermutationIsomorphism) {
       // the windup always builds CW. So the round-trip may invert orientation.
       vector<node_t> relabeled_rev(relabeled.rbegin(), relabeled.rend());
 
-      EXPECT_TRUE(is_cyclic_rotation(gprime_nb, relabeled) ||
-                  is_cyclic_rotation(gprime_nb, relabeled_rev))
+      EXPECT_TRUE(is_cyclic_rotation(vector<node_t>(gprime_nb.begin(), gprime_nb.end()), relabeled) ||
+                  is_cyclic_rotation(vector<node_t>(gprime_nb.begin(), gprime_nb.end()), relabeled_rev))
         << "Neighbour list mismatch at G'-node " << u << " (G-node " << perm[u] << ")";
     }
   }
@@ -179,8 +179,8 @@ TEST(SpiralRoundtrip, PermutationIsomorphismCW) {
 
     // Verify G' = inv_perm(G) with EXACT cyclic match (orientation preserved):
     for(int u = 0; u < N; u++) {
-      const vector<node_t>& gprime_nb = Gprime.neighbours[u];
-      const vector<node_t>& g_nb = G.neighbours[perm[u]];
+      auto gprime_nb = Gprime.nbrs(u);
+      auto g_nb = G.nbrs(perm[u]);
 
       ASSERT_EQ(gprime_nb.size(), g_nb.size())
         << "Degree mismatch at G'-node " << u << " (G-node " << perm[u] << ")";
@@ -191,7 +191,7 @@ TEST(SpiralRoundtrip, PermutationIsomorphismCW) {
         relabeled[j] = inv_perm[g_nb[j]];
 
       // CW_only ensures orientation is preserved — exact cyclic match required
-      EXPECT_TRUE(is_cyclic_rotation(gprime_nb, relabeled))
+      EXPECT_TRUE(is_cyclic_rotation(vector<node_t>(gprime_nb.begin(), gprime_nb.end()), relabeled))
         << "Neighbour list mismatch at G'-node " << u << " (G-node " << perm[u] << ")";
     }
   }

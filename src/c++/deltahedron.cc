@@ -48,14 +48,14 @@ double Deltahedron::max_angle_relerr() const {
 int Deltahedron::count_concave() const {
   int n_concave = 0;
   for (int v = 0; v < N; v++) {
-    int deg = (int)neighbours[v].size();
+    int deg = degree(v);
     coord3d centroid(0,0,0);
-    for (int nb : neighbours[v]) centroid = centroid + points[nb];
+    for (int nb : nbrs(v)) centroid = centroid + points[nb];
     centroid = centroid * (1.0 / deg);
     coord3d fan_normal(0,0,0);
     for (int j = 0; j < deg; j++) {
-      coord3d e1 = points[neighbours[v][j]] - points[v];
-      coord3d e2 = points[neighbours[v][(j+1)%deg]] - points[v];
+      coord3d e1 = points[nbrs(v)[j]] - points[v];
+      coord3d e2 = points[nbrs(v)[(j+1)%deg]] - points[v];
       fan_normal = fan_normal + e1.cross(e2);
     }
     double nn = fan_normal.norm();
@@ -71,8 +71,8 @@ void Deltahedron::smooth(double q) {
   vector<coord3d> new_points(N);
   for(node_t u = 0; u < N; u++){
     coord3d avg;
-    for(node_t v : neighbours[u]) avg += points[v];
-    avg /= neighbours[u].size();
+    for(node_t v : nbrs(u)) avg += points[v];
+    avg /= degree(u);
     new_points[u] = points[u]*(1.0-q) + avg*q;
   }
   points = new_points;
@@ -1237,7 +1237,7 @@ static double deltahedron_energy_and_gradient(
   // E_curv = (k_curv/2) * Sum_v (K(v) - K_target(v))^2
   //        = (k_curv/2) * Sum_v (deg(v)*pi/3 - angle_sum(v))^2
   for(int v = 0; v < N; v++){
-    int d = (int)D.neighbours[v].size();
+    int d = D.degree(v);
     double angle_sum = 0.0;
 
     // Compute angle sum (and store derivatives if needed)
@@ -1245,8 +1245,8 @@ static double deltahedron_energy_and_gradient(
     if(grad){ da_list.resize(d); dc_list.resize(d); }
 
     for(int i = 0; i < d; i++){
-      int ni   = D.neighbours[v][i];
-      int ni1  = D.neighbours[v][(i+1) % d];
+      int ni   = D.nbrs(v)[i];
+      int ni1  = D.nbrs(v)[(i+1) % d];
       coord3d va = x[ni]  - x[v];
       coord3d vc = x[ni1] - x[v];
 
@@ -1263,8 +1263,8 @@ static double deltahedron_energy_and_gradient(
       // dev = target_sum - angle_sum, so d(dev)/d(...) = -d(angle_sum)/d(...)
       double w = -k_curv * dev;  // negative because dev = target - sum
       for(int i = 0; i < d; i++){
-        int ni  = D.neighbours[v][i];
-        int ni1 = D.neighbours[v][(i+1) % d];
+        int ni  = D.nbrs(v)[i];
+        int ni1 = D.nbrs(v)[(i+1) % d];
 
         (*grad)[ni]  += da_list[i] * w;
         (*grad)[ni1] += dc_list[i] * w;
@@ -1280,15 +1280,15 @@ static double deltahedron_energy_and_gradient(
   // E_flat = (k_flat/2) * Sum_v lambda_0(v)
   if(k_flat > 0){
     for(int v = 0; v < N; v++){
-      int d = (int)D.neighbours[v].size();
+      int d = D.degree(v);
       if(d > 6) continue;
 
       // 1. Compute face centroids and their mean
       vector<coord3d> fc(d);
       coord3d c_bar(0,0,0);
       for(int i = 0; i < d; i++){
-        int ni  = D.neighbours[v][i];
-        int ni1 = D.neighbours[v][(i+1) % d];
+        int ni  = D.nbrs(v)[i];
+        int ni1 = D.nbrs(v)[(i+1) % d];
         fc[i] = (x[v] + x[ni] + x[ni1]) / 3.0;
         c_bar += fc[i];
       }
@@ -1328,7 +1328,7 @@ static double deltahedron_energy_and_gradient(
           int jprev = (j + d - 1) % d;
           coord3d fj    = n * fc[j].dot(n)    - fc[j]    * ratio;
           coord3d fjpre = n * fc[jprev].dot(n) - fc[jprev] * ratio;
-          (*grad)[D.neighbours[v][j]] += (fj + fjpre) * (scale / 3.0);
+          (*grad)[D.nbrs(v)[j]] += (fj + fjpre) * (scale / 3.0);
         }
       }
     }
@@ -1344,20 +1344,20 @@ static double deltahedron_energy_and_gradient(
   if(k_conv > 0){
     const double sigma = 0.2 * L;  // transition width ~ 20% of edge length
     for(int v = 0; v < N; v++){
-      int d = (int)D.neighbours[v].size();
+      int d = D.degree(v);
       if(d > 6) continue;
       if(!conv_mask.empty() && !conv_mask[v]) continue;  // skip truncated boundary verts
 
       // Neighbor centroid
       coord3d centroid(0,0,0);
-      for(int i = 0; i < d; i++) centroid += x[D.neighbours[v][i]];
+      for(int i = 0; i < d; i++) centroid += x[D.nbrs(v)[i]];
       centroid /= (double)d;
 
       // Fan normal (unnormalized, outward for convex)
       coord3d N_fan(0,0,0);
       for(int i = 0; i < d; i++){
-        coord3d e1 = x[D.neighbours[v][i]] - x[v];
-        coord3d e2 = x[D.neighbours[v][(i+1)%d]] - x[v];
+        coord3d e1 = x[D.nbrs(v)[i]] - x[v];
+        coord3d e2 = x[D.nbrs(v)[(i+1)%d]] - x[v];
         N_fan += e1.cross(e2);
       }
       double N_len = N_fan.norm();
@@ -1395,11 +1395,11 @@ static double deltahedron_energy_and_gradient(
         // where r_perp = (x[v] - centroid) - h*n_hat, e_k = x[n_k] - x[v]
         coord3d r_perp = (x[v] - centroid) - n_hat * h;
         for(int j = 0; j < d; j++){
-          coord3d ej_prev = x[D.neighbours[v][(j+d-1)%d]] - x[v];
-          coord3d ej_next = x[D.neighbours[v][(j+1)%d]]   - x[v];
+          coord3d ej_prev = x[D.nbrs(v)[(j+d-1)%d]] - x[v];
+          coord3d ej_next = x[D.nbrs(v)[(j+1)%d]]   - x[v];
           coord3d dhdx_nj = n_hat * (-1.0/d)
                           + r_perp.cross(ej_prev - ej_next) / N_len;
-          (*grad)[D.neighbours[v][j]] += dhdx_nj * dEdh;
+          (*grad)[D.nbrs(v)[j]] += dhdx_nj * dEdh;
         }
       }
     }
@@ -1539,14 +1539,14 @@ static void deltahedron_hv_product(
   // but summed per-vertex (over the fan of angles at v) instead of per-triangle.
   if(k_curv > 0){
     for(int vertex = 0; vertex < N; vertex++){
-      int deg = (int)D.neighbours[vertex].size();
+      int deg = D.degree(vertex);
 
       // First pass: compute angle sum, derivatives, and curvature deviation
       double angle_sum = 0;
       vector<coord3d> da_list(deg), dc_list(deg);
       for(int i = 0; i < deg; i++){
-        int ni  = D.neighbours[vertex][i];
-        int ni1 = D.neighbours[vertex][(i+1) % deg];
+        int ni  = D.nbrs(vertex)[i];
+        int ni1 = D.nbrs(vertex)[(i+1) % deg];
         coord3d va = x[ni] - x[vertex], vc = x[ni1] - x[vertex];
         angle_sum += coord3d::angle(va, vc);
         coord3d::dangle(va, vc, da_list[i], dc_list[i]);
@@ -1576,16 +1576,16 @@ static void deltahedron_hv_product(
       // Compute dK . v = sum_i [ da_i . v[ni] + dc_i . v[ni1] - (da_i + dc_i) . v[vertex] ]
       double dK_dot_v = 0;
       for(int i = 0; i < deg; i++){
-        int ni  = D.neighbours[vertex][i];
-        int ni1 = D.neighbours[vertex][(i+1) % deg];
+        int ni  = D.nbrs(vertex)[i];
+        int ni1 = D.nbrs(vertex)[(i+1) % deg];
         dK_dot_v += da_list[i].dot(v[ni] - v[vertex]) + dc_list[i].dot(v[ni1] - v[vertex]);
       }
 
       // Scatter: Hv += k_curv * dK_dot_v * dK
       double w = k_curv * dK_dot_v;
       for(int i = 0; i < deg; i++){
-        int ni  = D.neighbours[vertex][i];
-        int ni1 = D.neighbours[vertex][(i+1) % deg];
+        int ni  = D.nbrs(vertex)[i];
+        int ni1 = D.nbrs(vertex)[(i+1) % deg];
         Hv[ni]     = Hv[ni]     + da_list[i] * w;
         Hv[ni1]    = Hv[ni1]    + dc_list[i] * w;
         Hv[vertex] = Hv[vertex] - (da_list[i] + dc_list[i]) * w;
@@ -1598,8 +1598,8 @@ static void deltahedron_hv_product(
         double w2 = -k_curv * dev;  // negative because dev = target - sum, d(dev)/d(angle) = -1
 
         for(int i = 0; i < deg; i++){
-          int ni  = D.neighbours[vertex][i];
-          int ni1 = D.neighbours[vertex][(i+1) % deg];
+          int ni  = D.nbrs(vertex)[i];
+          int ni1 = D.nbrs(vertex)[(i+1) % deg];
           int b = vertex;
 
           coord3d va = x[ni] - x[b], vc = x[ni1] - x[b];
@@ -1684,16 +1684,16 @@ static bool check_convexity(const Deltahedron& D, const vector<coord3d>& x,
 {
   for(int v = 0; v < D.N; v++){
     if(!free_mask[v]) continue;
-    int d = (int)D.neighbours[v].size();
+    int d = D.degree(v);
 
     coord3d centroid(0,0,0);
-    for(int j = 0; j < d; j++) centroid += x[D.neighbours[v][j]];
+    for(int j = 0; j < d; j++) centroid += x[D.nbrs(v)[j]];
     centroid /= (double)d;
 
     coord3d n_fan(0,0,0);
     for(int j = 0; j < d; j++){
-      coord3d e1 = x[D.neighbours[v][j]] - x[v];
-      coord3d e2 = x[D.neighbours[v][(j+1)%d]] - x[v];
+      coord3d e1 = x[D.nbrs(v)[j]] - x[v];
+      coord3d e2 = x[D.nbrs(v)[(j+1)%d]] - x[v];
       n_fan += e1.cross(e2);
     }
     double n_len = n_fan.norm();
@@ -1834,18 +1834,18 @@ static void assemble_patch_hessian(
     using Mx = matrix3d;  // shorthand
 
     for(int v = 0; v < D.N; v++){
-      int d = (int)D.neighbours[v].size();
+      int d = D.degree(v);
       if(d > 6) continue;
       if(!conv_mask.empty() && !conv_mask[v]) continue;
 
       coord3d centroid(0,0,0);
-      for(int i = 0; i < d; i++) centroid += x[D.neighbours[v][i]];
+      for(int i = 0; i < d; i++) centroid += x[D.nbrs(v)[i]];
       centroid /= (double)d;
 
       coord3d N_fan(0,0,0);
       for(int i = 0; i < d; i++){
-        coord3d e1 = x[D.neighbours[v][i]] - x[v];
-        coord3d e2 = x[D.neighbours[v][(i+1)%d]] - x[v];
+        coord3d e1 = x[D.nbrs(v)[i]] - x[v];
+        coord3d e2 = x[D.nbrs(v)[(i+1)%d]] - x[v];
         N_fan += e1.cross(e2);
       }
       double N_len = N_fan.norm();
@@ -1878,9 +1878,9 @@ static void assemble_patch_hessian(
       };
       vector<NbrData> nb(d);
       for(int j = 0; j < d; j++){
-        nb[j].id = D.neighbours[v][j];
-        coord3d ej_prev = x[D.neighbours[v][(j+d-1)%d]] - x[v];
-        coord3d ej_next = x[D.neighbours[v][(j+1)%d]]   - x[v];
+        nb[j].id = D.nbrs(v)[j];
+        coord3d ej_prev = x[D.nbrs(v)[(j+d-1)%d]] - x[v];
+        coord3d ej_next = x[D.nbrs(v)[(j+1)%d]]   - x[v];
         nb[j].De  = ej_prev - ej_next;
         nb[j].g   = n_hat * (-1.0/d) + r_perp.cross(nb[j].De) / N_len;
         nb[j].w   = r_perp.cross(nb[j].De) / N_len;
@@ -2190,17 +2190,17 @@ int Deltahedron::reflect_concave(vector<coord3d>& pts, double threshold,
   int count = 0;
   for(int v = 0; v < N; v++){
     if(has_fixed && fixed[v]) continue;
-    int d = (int)neighbours[v].size();
+    int d = degree(v);
     if(d > 6) continue;
 
     coord3d centroid(0,0,0);
-    for(int j = 0; j < d; j++) centroid += pts[neighbours[v][j]];
+    for(int j = 0; j < d; j++) centroid += pts[nbrs(v)[j]];
     centroid /= (double)d;
 
     coord3d n_fan(0,0,0);
     for(int j = 0; j < d; j++){
-      coord3d e1 = pts[neighbours[v][j]] - pts[v];
-      coord3d e2 = pts[neighbours[v][(j+1)%d]] - pts[v];
+      coord3d e1 = pts[nbrs(v)[j]] - pts[v];
+      coord3d e2 = pts[nbrs(v)[(j+1)%d]] - pts[v];
       n_fan += e1.cross(e2);
     }
     double n_len = n_fan.norm();

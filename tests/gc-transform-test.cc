@@ -46,7 +46,7 @@ static void check_fullerene_dual(const Triangulation& T) {
   // 3) Degree constraint: exactly 12 degree-5 vertices, rest degree-6
   int deg5 = 0, deg6 = 0, other = 0;
   for(int u = 0; u < Nf; u++) {
-    int d = T.neighbours[u].size();
+    int d = T.degree(u);
     if(d == 5) deg5++;
     else if(d == 6) deg6++;
     else other++;

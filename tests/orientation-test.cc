@@ -9,7 +9,7 @@ using namespace std;
 static Graph to_unoriented(const Graph& G) {
   neighbours_t nb(G.N);
   for(node_t u = 0; u < G.N; u++)
-    for(node_t v : G.neighbours[u])
+    for(node_t v : G.nbrs(u))
       if(u < v) {
         nb[u].push_back(v);
         nb[v].push_back(u);
@@ -22,10 +22,10 @@ static bool same_edges(const Graph& A, const Graph& B) {
   if(A.N != B.N) return false;
   set<edge_t> ea, eb;
   for(node_t u = 0; u < A.N; u++)
-    for(node_t v : A.neighbours[u])
+    for(node_t v : A.nbrs(u))
       if(u < v) ea.insert({u,v});
   for(node_t u = 0; u < B.N; u++)
-    for(node_t v : B.neighbours[u])
+    for(node_t v : B.nbrs(u))
       if(u < v) eb.insert({u,v});
   return ea == eb;
 }
@@ -34,8 +34,8 @@ static bool same_edges(const Graph& A, const Graph& B) {
 static bool same_orientation(const Graph& A, const Graph& B) {
   if(A.N != B.N) return false;
   for(node_t u = 0; u < A.N; u++) {
-    const auto& na = A.neighbours[u];
-    const auto& nb_list = B.neighbours[u];
+    auto na = A.nbrs(u);
+    auto nb_list = B.nbrs(u);
     int deg = na.size();
     if((int)nb_list.size() != deg) return false;
     int offset = -1;
@@ -242,7 +242,7 @@ TEST_F(OrientationTest, AdjacencyMatrixPlanarOrient) {
     int N = G.N;
     vector<int> adj(N * N, 0);
     for(node_t u = 0; u < N; u++)
-      for(node_t v : G.neighbours[u])
+      for(node_t v : G.nbrs(u))
         adj[u * N + v] = 1;
 
     // Reconstruct from adjacency matrix (loses orientation)

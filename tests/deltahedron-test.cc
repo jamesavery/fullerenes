@@ -154,7 +154,7 @@ TEST_F(DeltahedronTest, GC_2_0_TopologyMatchesHalma) {
   EXPECT_EQ(result.N, topo.N);
   EXPECT_EQ(result.triangles.size(), topo.triangles.size());
   for(int u = 0; u < result.N; u++){
-    EXPECT_EQ(result.neighbours[u].size(), topo.neighbours[u].size())
+    EXPECT_EQ(result.degree(u), topo.degree(u))
       << "degree mismatch at node " << u;
   }
 }
@@ -194,10 +194,10 @@ TEST_F(DeltahedronTest, GC_3_0_FaceInteriorHarmonicProperty) {
   for(int u = 0; u < D.N; u++){
     if(!is_face_interior[u]) continue;
     n_tested++;
-    ASSERT_EQ((int)D.neighbours[u].size(), 6) << "face-interior vertex " << u << " should have degree 6";
+    ASSERT_EQ(D.degree(u), 6) << "face-interior vertex " << u << " should have degree 6";
 
     coord3d avg;
-    for(int v : D.neighbours[u]) avg += D.points[v];
+    for(int v : D.nbrs(u)) avg += D.points[v];
     avg /= 6.0;
 
     for(int d = 0; d < 3; d++){
@@ -230,8 +230,8 @@ TEST_F(DeltahedronTest, GC_5_0_FaceInteriorHarmonicProperty) {
     n_tested++;
 
     coord3d avg;
-    for(int v : D.neighbours[u]) avg += D.points[v];
-    avg /= D.neighbours[u].size();
+    for(int v : D.nbrs(u)) avg += D.points[v];
+    avg /= D.degree(u);
 
     for(int d = 0; d < 3; d++){
       EXPECT_NEAR(avg[d], D.points[u][d], 1e-12)
@@ -800,20 +800,20 @@ struct OptStats {
 static double min_convexity_height(const Deltahedron& D) {
   double min_h = INFINITY;
   for(int v = 0; v < D.N; v++){
-    int d = (int)D.neighbours[v].size();
+    int d = D.degree(v);
     if(d > 6) continue;
     bool all_low = true;
     for(int i = 0; i < d; i++)
-      if((int)D.neighbours[D.neighbours[v][i]].size() > 6){ all_low = false; break; }
+      if(D.degree(D.nbrs(v)[i]) > 6){ all_low = false; break; }
     if(!all_low) continue;
 
     coord3d centroid(0,0,0);
-    for(int i = 0; i < d; i++) centroid += D.points[D.neighbours[v][i]];
+    for(int i = 0; i < d; i++) centroid += D.points[D.nbrs(v)[i]];
     centroid /= (double)d;
     coord3d n_fan(0,0,0);
     for(int i = 0; i < d; i++){
-      coord3d e1 = D.points[D.neighbours[v][i]] - D.points[v];
-      coord3d e2 = D.points[D.neighbours[v][(i+1)%d]] - D.points[v];
+      coord3d e1 = D.points[D.nbrs(v)[i]] - D.points[v];
+      coord3d e2 = D.points[D.nbrs(v)[(i+1)%d]] - D.points[v];
       n_fan += e1.cross(e2);
     }
     double n_len = n_fan.norm();
@@ -827,26 +827,26 @@ static double min_convexity_height(const Deltahedron& D) {
 // Check that all deg<=6 vertices (with all deg<=6 neighbors) are convex.
 static void check_convexity(const Deltahedron& D, double tol = 1e-6) {
   for(int v = 0; v < D.N; v++){
-    int d = (int)D.neighbours[v].size();
+    int d = D.degree(v);
     if(d > 6) continue;
 
     // Skip if any neighbor has deg > 6
     bool all_low = true;
     for(int i = 0; i < d; i++)
-      if((int)D.neighbours[D.neighbours[v][i]].size() > 6){ all_low = false; break; }
+      if(D.degree(D.nbrs(v)[i]) > 6){ all_low = false; break; }
     if(!all_low) continue;
 
     // Neighbor centroid
     coord3d centroid(0,0,0);
     for(int i = 0; i < d; i++)
-      centroid += D.points[D.neighbours[v][i]];
+      centroid += D.points[D.nbrs(v)[i]];
     centroid /= (double)d;
 
     // Average outward normal from triangle fan
     coord3d n_fan(0,0,0);
     for(int i = 0; i < d; i++){
-      int ni  = D.neighbours[v][i];
-      int ni1 = D.neighbours[v][(i+1) % d];
+      int ni  = D.nbrs(v)[i];
+      int ni1 = D.nbrs(v)[(i+1) % d];
       coord3d e1 = D.points[ni]  - D.points[v];
       coord3d e2 = D.points[ni1] - D.points[v];
       n_fan += e1.cross(e2);
@@ -980,20 +980,20 @@ TEST_F(DeltahedronTest, Optimize_PerturbedIcosahedron) {
 static vector<double> vertex_convexity_heights(const Deltahedron& D) {
   vector<double> heights(D.N, NAN);
   for(int v = 0; v < D.N; v++){
-    int d = (int)D.neighbours[v].size();
+    int d = D.degree(v);
     if(d > 6) continue;
     bool all_low = true;
     for(int i = 0; i < d; i++)
-      if((int)D.neighbours[D.neighbours[v][i]].size() > 6){ all_low = false; break; }
+      if(D.degree(D.nbrs(v)[i]) > 6){ all_low = false; break; }
     if(!all_low) continue;
 
     coord3d centroid(0,0,0);
-    for(int i = 0; i < d; i++) centroid += D.points[D.neighbours[v][i]];
+    for(int i = 0; i < d; i++) centroid += D.points[D.nbrs(v)[i]];
     centroid /= (double)d;
     coord3d n_fan(0,0,0);
     for(int i = 0; i < d; i++){
-      coord3d e1 = D.points[D.neighbours[v][i]] - D.points[v];
-      coord3d e2 = D.points[D.neighbours[v][(i+1)%d]] - D.points[v];
+      coord3d e1 = D.points[D.nbrs(v)[i]] - D.points[v];
+      coord3d e2 = D.points[D.nbrs(v)[(i+1)%d]] - D.points[v];
       n_fan += e1.cross(e2);
     }
     double n_len = n_fan.norm();
@@ -1014,7 +1014,7 @@ static void dump_geometry(const Deltahedron& D, const string& filename) {
   for(int v = 0; v < D.N; v++){
     fprintf(f, "%.12f %.12f %.12f %d %.12f\n",
             D.points[v][0], D.points[v][1], D.points[v][2],
-            (int)D.neighbours[v].size(), std::isnan(h[v]) ? 999.0 : h[v]);
+            D.degree(v), std::isnan(h[v]) ? 999.0 : h[v]);
   }
   // Triangles: v0 v1 v2
   for(const auto& tri : D.triangles)
@@ -1332,7 +1332,7 @@ TEST(OptimizeTest, C60_IPR) {
   int n5 = 0, n6 = 0;
   for(int v = 0; v < D.N; v++){
     double r = (D.points[v] - cm).norm();
-    if((int)D.neighbours[v].size() == 5){ r5_sum += r; n5++; }
+    if(D.degree(v) == 5){ r5_sum += r; n5++; }
     else                                 { r6_sum += r; n6++; }
   }
   ASSERT_EQ(n5, 12);

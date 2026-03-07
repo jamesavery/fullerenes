@@ -112,7 +112,7 @@ static IsomerGeometry analyzeGeometry(const Deltahedron& D) {
     // Collect edge lengths
     vector<double> edges;
     for (int u = 0; u < D.N; u++)
-        for (int v : D.neighbours[u])
+        for (int v : D.nbrs(u))
             if (v > u) edges.push_back((D.points[u] - D.points[v]).norm());
     g.edge = computeStats(edges, exp_edge);
 
@@ -255,7 +255,7 @@ static void processIsomer(const Deltahedron& D, AccumulatedStats& acc) {
         }
     }
     for (int u = 0; u < D.N; u++)
-        for (int v : D.neighbours[u])
+        for (int v : D.nbrs(u))
             if (v > u && (D.points[u] - D.points[v]).norm() < 1e-10) {
                 acc.coincident++;
                 return;
@@ -560,7 +560,7 @@ struct EdgeStats {
         EdgeStats s{};
         vector<double> lens;
         for (int u = 0; u < D.N; u++)
-            for (int v : D.neighbours[u])
+            for (int v : D.nbrs(u))
                 if (v > u) lens.push_back((D.points[u] - D.points[v]).norm());
         s.mean = 0;
         for (double l : lens) s.mean += l;
@@ -984,21 +984,21 @@ TEST(DeltahedronGeometry, NanotubeGeometry) {
 static double min_convexity_height(const Deltahedron& D) {
     double min_h = INFINITY;
     for (int v = 0; v < D.N; v++) {
-        int d = (int)D.neighbours[v].size();
+        int d = D.degree(v);
         if (d > 6) continue;
         bool all_low = true;
         for (int i = 0; i < d; i++)
-            if ((int)D.neighbours[D.neighbours[v][i]].size() > 6) { all_low = false; break; }
+            if (D.degree(D.nbrs(v)[i]) > 6) { all_low = false; break; }
         if (!all_low) continue;
 
         coord3d centroid(0,0,0);
-        for (int i = 0; i < d; i++) centroid += D.points[D.neighbours[v][i]];
+        for (int i = 0; i < d; i++) centroid += D.points[D.nbrs(v)[i]];
         centroid /= (double)d;
 
         coord3d n_fan(0,0,0);
         for (int i = 0; i < d; i++) {
-            coord3d e1 = D.points[D.neighbours[v][i]] - D.points[v];
-            coord3d e2 = D.points[D.neighbours[v][(i+1)%d]] - D.points[v];
+            coord3d e1 = D.points[D.nbrs(v)[i]] - D.points[v];
+            coord3d e2 = D.points[D.nbrs(v)[(i+1)%d]] - D.points[v];
             n_fan += e1.cross(e2);
         }
         double n_len = n_fan.norm();
@@ -1013,21 +1013,21 @@ static double min_convexity_height(const Deltahedron& D) {
 static vector<int> concave_vertices(const Deltahedron& D, double tol = 1e-6) {
     vector<int> result;
     for (int v = 0; v < D.N; v++) {
-        int d = (int)D.neighbours[v].size();
+        int d = D.degree(v);
         if (d > 6) continue;
         bool all_low = true;
         for (int i = 0; i < d; i++)
-            if ((int)D.neighbours[D.neighbours[v][i]].size() > 6) { all_low = false; break; }
+            if (D.degree(D.nbrs(v)[i]) > 6) { all_low = false; break; }
         if (!all_low) continue;
 
         coord3d centroid(0,0,0);
-        for (int i = 0; i < d; i++) centroid += D.points[D.neighbours[v][i]];
+        for (int i = 0; i < d; i++) centroid += D.points[D.nbrs(v)[i]];
         centroid /= (double)d;
 
         coord3d n_fan(0,0,0);
         for (int i = 0; i < d; i++) {
-            coord3d e1 = D.points[D.neighbours[v][i]] - D.points[v];
-            coord3d e2 = D.points[D.neighbours[v][(i+1)%d]] - D.points[v];
+            coord3d e1 = D.points[D.nbrs(v)[i]] - D.points[v];
+            coord3d e2 = D.points[D.nbrs(v)[(i+1)%d]] - D.points[v];
             n_fan += e1.cross(e2);
         }
         double n_len = n_fan.norm();
@@ -1100,7 +1100,7 @@ struct ConvexityStats {
         double sum = 0, sum2 = 0;
         int ne = 0;
         for (int u = 0; u < D.N; u++)
-            for (int v : D.neighbours[u])
+            for (int v : D.nbrs(u))
                 if (v > u) {
                     double l = (D.points[u] - D.points[v]).norm();
                     sum += l; sum2 += l*l; ne++;
@@ -1373,7 +1373,7 @@ static void test_extpath_convexity_size(int N) {
         // Edge CV
         double sum = 0, sum2 = 0; int ne = 0;
         for (int u = 0; u < D.N; u++)
-            for (int v : D.neighbours[u])
+            for (int v : D.nbrs(u))
                 if (v > u) { double l = (D.points[u] - D.points[v]).norm(); sum += l; sum2 += l*l; ne++; }
         double L_mean = sum / ne;
         double cv = sqrt(max(0.0, sum2/ne - L_mean*L_mean)) / L_mean;
@@ -1450,7 +1450,7 @@ TEST(ExtPathConvexity, C60_Ih) {
     {
         vector<double> lens;
         for (int u = 0; u < D_exact.N; u++)
-            for (int v : D_exact.neighbours[u])
+            for (int v : D_exact.nbrs(u))
                 if (v > u) lens.push_back((D_exact.points[u] - D_exact.points[v]).norm());
         sort(lens.begin(), lens.end());
         double L_min = lens.front(), L_max = lens.back();
@@ -1483,7 +1483,7 @@ TEST(ExtPathConvexity, C60_Ih) {
     {
         vector<double> lens;
         for (int u = 0; u < D.N; u++)
-            for (int v : D.neighbours[u])
+            for (int v : D.nbrs(u))
                 if (v > u) lens.push_back((D.points[u] - D.points[v]).norm());
         sort(lens.begin(), lens.end());
         double L_min = lens.front(), L_max = lens.back();
@@ -1538,7 +1538,7 @@ TEST(ExtPathConvexity, C60_Ih) {
         // Sorted edge lengths (rotation-invariant comparison)
         vector<double> e_exact;
         for (int u = 0; u < D_exact.N; u++)
-            for (int v : D_exact.neighbours[u])
+            for (int v : D_exact.nbrs(u))
                 if (v > u) e_exact.push_back((D_exact.points[u] - D_exact.points[v]).norm());
         sort(e_exact.begin(), e_exact.end());
 
@@ -1595,7 +1595,7 @@ TEST(ExtPathConvexity, NanotubeSeries) {
 
         double sum = 0, sum2 = 0; int ne = 0;
         for (int u = 0; u < D.N; u++)
-            for (int v : D.neighbours[u])
+            for (int v : D.nbrs(u))
                 if (v > u) { double l = (D.points[u] - D.points[v]).norm(); sum += l; sum2 += l*l; ne++; }
         double L_mean = sum / ne;
         double cv = sqrt(max(0.0, sum2/ne - L_mean*L_mean)) / L_mean;
@@ -1669,7 +1669,7 @@ TEST(ExtPathConvexity, GCSeries) {
 
         double sum = 0, sum2 = 0; int ne = 0;
         for (int u = 0; u < D.N; u++)
-            for (int v : D.neighbours[u])
+            for (int v : D.nbrs(u))
                 if (v > u) { double l = (D.points[u] - D.points[v]).norm(); sum += l; sum2 += l*l; ne++; }
         double L_mean = sum / ne;
         double cv = sqrt(max(0.0, sum2/ne - L_mean*L_mean)) / L_mean;
@@ -1729,7 +1729,7 @@ TEST(ExtPathConvexity, GCSeries) {
 
         double sum = 0, sum2 = 0; int ne = 0;
         for (int u = 0; u < D.N; u++)
-            for (int v : D.neighbours[u])
+            for (int v : D.nbrs(u))
                 if (v > u) { double l = (D.points[u] - D.points[v]).norm(); sum += l; sum2 += l*l; ne++; }
         double L_mean = sum / ne;
         double cv = sqrt(max(0.0, sum2/ne - L_mean*L_mean)) / L_mean;
