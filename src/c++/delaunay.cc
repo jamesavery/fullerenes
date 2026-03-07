@@ -134,9 +134,42 @@ bool FulleroidDelaunay::flip_edge(node_t u, node_t v)
   // Guard: no multi-edge
   if (edge_exists(edge_t(B, D))) return false;
 
+  // Guard: diamond must be convex (total angle < π at both u and v).
+  // A non-convex diamond creates overlapping triangles with wrong geometry.
+  {
+    double e_uv = get_length(u, v);
+    double a_uB = get_length(u, B), a_vB = get_length(v, B);
+    double a_uD = get_length(u, D), a_vD = get_length(v, D);
+
+    // Angle at u in triangle (u, B, v)
+    double cos1 = (e_uv*e_uv + a_uB*a_uB - a_vB*a_vB) / (2.0 * e_uv * a_uB);
+    // Angle at u in triangle (u, v, D)
+    double cos2 = (e_uv*e_uv + a_uD*a_uD - a_vD*a_vD) / (2.0 * e_uv * a_uD);
+    // Diamond angle at u: reject if sum of angles >= π (non-convex).
+    // sin(a+b) = sin(a)cos(b) + cos(a)sin(b). Non-convex iff sin(a+b) <= 0.
+    cos1 = std::max(-1.0, std::min(1.0, cos1));
+    cos2 = std::max(-1.0, std::min(1.0, cos2));
+    double sin1 = sqrt(std::max(0.0, 1.0 - cos1*cos1));
+    double sin2 = sqrt(std::max(0.0, 1.0 - cos2*cos2));
+    double sin_total_u = sin1*cos2 + cos1*sin2;
+    if (sin_total_u <= 1e-12) return false;  // angle at u >= π
+
+    // Angle at v in triangle (v, B, u)
+    double cos3 = (e_uv*e_uv + a_vB*a_vB - a_uB*a_uB) / (2.0 * e_uv * a_vB);
+    // Angle at v in triangle (v, D, u)
+    double cos4 = (e_uv*e_uv + a_vD*a_vD - a_uD*a_uD) / (2.0 * e_uv * a_vD);
+    cos3 = std::max(-1.0, std::min(1.0, cos3));
+    cos4 = std::max(-1.0, std::min(1.0, cos4));
+    double sin3 = sqrt(std::max(0.0, 1.0 - cos3*cos3));
+    double sin4 = sqrt(std::max(0.0, 1.0 - cos4*cos4));
+    double sin_total_v = sin3*cos4 + cos3*sin4;
+    if (sin_total_v <= 1e-12) return false;  // angle at v >= π
+  }
+
   // Compute new edge length
   double f = flipped_edge_length(u, v);
-  if (!std::isfinite(f) || f <= 0) return false;
+  if (!std::isfinite(f) || f <= 0)
+    return false;
 
   // Topological flip.
   //
@@ -232,156 +265,193 @@ bool FulleroidDelaunay::is_delaunay() const
 // Vertex removal
 // ============================================================================
 
-vector<coord2d> FulleroidDelaunay::layout_fan(node_t v) const
-{
-  // Lay out the fan of triangles around v in 2D.
-  // Place v at origin, neighbours[v][0] along positive x-axis.
-  // For each subsequent neighbor, accumulate the angle at v.
-
-  const auto& nbrs = neighbours[v];
-  int k = nbrs.size();
-  vector<coord2d> pos(k);
-
-  double d0 = get_length(v, nbrs[0]);
-  pos[0] = coord2d(d0, 0);
-
-  double angle_acc = 0;
-
-  for (int i = 1; i < k; i++) {
-    // Angle at v in triangle (v, nbrs[i-1], nbrs[i]).
-    // Sides: a = length(nbrs[i-1], nbrs[i])  (opposite v)
-    //        b = length(v, nbrs[i-1])
-    //        c = length(v, nbrs[i])
-    double a = get_length(nbrs[i-1], nbrs[i]);
-    double b = get_length(v, nbrs[i-1]);
-    double c = get_length(v, nbrs[i]);
-
-    assert(a > 0 && b > 0 && c > 0);
-
-    // cos(theta) at v by law of cosines
-    double cos_theta = (b*b + c*c - a*a) / (2.0 * b * c);
-    cos_theta = std::max(-1.0, std::min(1.0, cos_theta));
-    double theta = acos(cos_theta);
-
-    angle_acc += theta;
-
-    pos[i] = coord2d(c * cos(angle_acc), c * sin(angle_acc));
-  }
-
-  return pos;
-}
-
 void FulleroidDelaunay::remove_flat_vertex(node_t v)
 {
-  vector<node_t> hole(neighbours[v]);
-  int k = hole.size();
-  assert(k >= 3);
+  // Reduce v's degree to 3 via edge flips, then remove.
+  // If stuck at degree 4 (all diamonds degenerate), use direct star retriangulation.
 
-  // 1. Lay out the fan in 2D to get distances between hole vertices.
-  vector<coord2d> fan_pos = layout_fan(v);
+  const int max_outer = 20;
+  for (int outer = 0; (int)neighbours[v].size() > 3; outer++) {
+    if (outer >= max_outer) break;
 
-  // 2. Find a starting vertex for the fan triangulation that is NOT already
-  //    connected to non-adjacent hole vertices (to avoid multi-edges).
-  int start = -1;
-  for (int attempt = 0; attempt < k; attempt++) {
-    bool ok = true;
-    for (int i = 2; i < k - 1; i++) {
-      int idx = (attempt + i) % k;
-      if (edge_exists(edge_t(hole[attempt], hole[idx]))) {
-        ok = false;
-        break;
-      }
-    }
-    if (ok) { start = attempt; break; }
-  }
+    // Phase 1: try direct incident flips and blocker+incident combos.
+    {
+      bool made_progress = true;
+      while (made_progress && (int)neighbours[v].size() > 3) {
+        made_progress = false;
 
-  if (start == -1) {
-    // Fallback: shouldn't happen for reasonable triangulations
-    start = 0;
-  }
+        vector<node_t> nbrs(neighbours[v]);
+        for (node_t u : nbrs) {
+          if (flip_edge(v, u)) { made_progress = true; break; }
+        }
+        if (made_progress) continue;
 
-  // Rotate hole and fan positions to start at the chosen vertex.
-  if (start > 0) {
-    std::rotate(hole.begin(), hole.begin() + start, hole.end());
-    std::rotate(fan_pos.begin(), fan_pos.begin() + start, fan_pos.end());
-  }
-
-  // 3. Compute fan edge distances: from hole[0] to hole[i].
-  vector<double> fan_distances(k);
-  for (int i = 0; i < k; i++) {
-    double dx = fan_pos[0].first - fan_pos[i].first;
-    double dy = fan_pos[0].second - fan_pos[i].second;
-    fan_distances[i] = sqrt(dx*dx + dy*dy);
-  }
-
-  // 4. Remove all edges from v.
-  for (int i = 0; i < k; i++) {
-    Graph::remove_edge(edge_t(v, hole[i]));
-    set_length(v, hole[i], 0);
-  }
-
-  // 5. Remove v from the graph (it must be the last vertex).
-  assert(v == N - 1);
-  neighbours.pop_back();
-  N--;
-
-  // 6. Fan-triangulate the hole from hole[0].
-  //    Add edges: hole[0]-hole[2], hole[0]-hole[3], ..., hole[0]-hole[k-2].
-  //
-  //    For each new edge (hole[0], hole[i]):
-  //      In neighbours[hole[0]]: hole[i] goes before hole[k-1]
-  //      In neighbours[hole[i]]: hole[0] goes before hole[i-1]
-  //
-  //    This creates CCW triangles:
-  //      (hole[0], hole[1], hole[2]), (hole[0], hole[2], hole[3]), ...
-  //
-  vector<edge_t> new_edges;
-  for (int i = 2; i < k - 1; i++) {
-    Graph::insert_edge(arc_t(hole[0], hole[i]), hole[k-1], hole[i-1]);
-    set_length(hole[0], hole[i], fan_distances[i]);
-    new_edges.push_back(edge_t(hole[0], hole[i]));
-  }
-
-  // 7. Locally Delaunayify: check all hole edges (new fan + boundary).
-  map<edge_t, bool> in_stack;
-  stack<edge_t> S;
-
-  for (auto& e : new_edges) {
-    S.push(e);
-    in_stack[e] = true;
-  }
-  for (int i = 0; i < k; i++) {
-    edge_t e(hole[i], hole[(i+1) % k]);
-    if (!in_stack[e]) {
-      S.push(e);
-      in_stack[e] = true;
-    }
-  }
-
-  while (!S.empty()) {
-    edge_t e = S.top(); S.pop();
-    in_stack[e] = false;
-
-    node_t a = e.first, b = e.second;
-    if (!edge_exists(e)) continue;
-
-    if (!is_delaunay_edge(a, b)) {
-      node_t B = next(b, a);
-      node_t D = next(a, b);
-
-      if (flip_edge(a, b)) {
-        edge_t boundary[4] = {
-          edge_t(a, B), edge_t(B, b), edge_t(b, D), edge_t(D, a)
-        };
-        for (auto& ec : boundary) {
-          if (!in_stack[ec]) {
-            S.push(ec);
-            in_stack[ec] = true;
+        nbrs = vector<node_t>(neighbours[v]);
+        for (node_t u : nbrs) {
+          node_t B = next(u, v);
+          node_t D = next(v, u);
+          if (B == D) continue;
+          if (edge_exists(edge_t(B, D)) && flip_edge(B, D)) {
+            if (flip_edge(v, u)) { made_progress = true; break; }
           }
         }
       }
+      if ((int)neighbours[v].size() <= 3) break;
+    }
+
+    // If stuck at degree 4, use direct star retriangulation.
+    if ((int)neighbours[v].size() == 4) break;
+
+    // Phase 2: flip a cross-edge to change local geometry, then retry.
+    {
+      vector<node_t> nbrs(neighbours[v]);
+      int k = nbrs.size();
+      bool cross_ok = false;
+      for (int i = 0; i < k; i++) {
+        node_t a = nbrs[i];
+        node_t b = nbrs[(i + 1) % k];
+        if (flip_edge(a, b)) {
+          cross_ok = true;
+          bool any = true;
+          while (any) {
+            any = false;
+            vector<node_t> cur(neighbours[v]);
+            for (node_t u : cur) {
+              if (flip_edge(v, u)) { any = true; break; }
+            }
+          }
+          break;
+        }
+      }
+      if (!cross_ok) {
+        flip_to_delaunay();
+      }
     }
   }
+
+  int deg = (int)neighbours[v].size();
+
+  if (deg == 4) {
+    // Direct star retriangulation for the degree-4 stuck case.
+    //
+    // Unfold the 4 triangles around v into a flat polygon (cone angle = 2π),
+    // compute both quad diagonal lengths from the 2D layout, pick a valid one,
+    // and replace v with that single diagonal edge.
+    //
+    //   Before:          After (diagonal A-C):
+    //     A                  A
+    //    /|\                / \    .
+    //   B-v-D     →       B   D
+    //    \|/                \ /
+    //     C                  C
+
+    node_t nb[4] = {neighbours[v][0], neighbours[v][1], neighbours[v][2], neighbours[v][3]};
+
+    // Edge lengths from v to each neighbor and between consecutive neighbors.
+    double lv[4], lx[4];
+    for (int i = 0; i < 4; i++) {
+      lv[i] = get_length(v, nb[i]);
+      lx[i] = get_length(nb[i], nb[(i + 1) % 4]);
+    }
+
+    // Unfold: place v at origin, nb[0] along +x axis.
+    double px[4], py[4];
+    px[0] = lv[0]; py[0] = 0;
+    double cum_angle = 0;
+    for (int i = 1; i < 4; i++) {
+      double a = lx[i - 1];  // side opposite v
+      double b = lv[i - 1];  // from v to prev neighbor
+      double c = lv[i];      // from v to current neighbor
+      double cos_v = (b*b + c*c - a*a) / (2.0 * b * c);
+      cos_v = std::max(-1.0, std::min(1.0, cos_v));
+      cum_angle += acos(cos_v);
+      px[i] = c * cos(cum_angle);
+      py[i] = c * sin(cum_angle);
+    }
+
+    // Compute both diagonal lengths.
+    double dx02 = px[0] - px[2], dy02 = py[0] - py[2];
+    double len02 = sqrt(dx02*dx02 + dy02*dy02);  // nb[0]-nb[2]
+    double dx13 = px[1] - px[3], dy13 = py[1] - py[3];
+    double len13 = sqrt(dx13*dx13 + dy13*dy13);  // nb[1]-nb[3]
+
+    // Check which diagonals are topologically valid (no multi-edge).
+    bool can02 = !edge_exists(edge_t(nb[0], nb[2])) && len02 > 1e-15;
+    bool can13 = !edge_exists(edge_t(nb[1], nb[3])) && len13 > 1e-15;
+
+    // Check geometric validity: diagonal must be interior to the quad.
+    // Points on opposite sides of the diagonal line ⟹ valid.
+    auto cross2d = [](double ax, double ay, double bx, double by) {
+      return ax * by - ay * bx;
+    };
+    if (can02) {
+      double s1 = cross2d(px[2]-px[0], py[2]-py[0], px[1]-px[0], py[1]-py[0]);
+      double s3 = cross2d(px[2]-px[0], py[2]-py[0], px[3]-px[0], py[3]-py[0]);
+      if (s1 * s3 >= 0) can02 = false;
+    }
+    if (can13) {
+      double s0 = cross2d(px[3]-px[1], py[3]-py[1], px[0]-px[1], py[0]-py[1]);
+      double s2 = cross2d(px[3]-px[1], py[3]-py[1], px[2]-px[1], py[2]-py[1]);
+      if (s0 * s2 >= 0) can13 = false;
+    }
+
+    assert((can02 || can13) && "remove_deg4: neither diagonal is valid");
+
+    // Choose the Delaunay diagonal: the one where cot-sum >= 0 in the
+    // resulting two triangles.  Fall back to whichever is valid.
+    bool use02 = can02;
+    if (can02 && can13) {
+      // Pick the one with smaller circumradius ratio (more Delaunay).
+      // Simple heuristic: pick the shorter diagonal.
+      use02 = (len02 <= len13);
+    }
+
+    // Save neighbor list, then remove v's 4 edges.
+    for (int i = 0; i < 4; i++)
+      set_length(v, nb[i], 0);
+    // Remove in reverse to keep indices stable (v is last vertex).
+    for (int i = 3; i >= 0; i--)
+      Graph::remove_edge(edge_t(v, nb[i]));
+
+    // After removing v's edges, neighbor lists become:
+    //   nb[0]: ..., nb[1], nb[3], ...   (v was between nb[1] and nb[3])
+    //   nb[1]: ..., nb[2], nb[0], ...
+    //   nb[2]: ..., nb[3], nb[1], ...
+    //   nb[3]: ..., nb[0], nb[2], ...
+    //
+    // For diagonal nb[0]-nb[2]: insert_edge(arc_t(nb[0],nb[2]), nb[3], nb[1])
+    // For diagonal nb[1]-nb[3]: insert_edge(arc_t(nb[1],nb[3]), nb[0], nb[2])
+
+    if (use02) {
+      Graph::insert_edge(arc_t(nb[0], nb[2]), nb[3], nb[1]);
+      set_length(nb[0], nb[2], len02);
+    } else {
+      Graph::insert_edge(arc_t(nb[1], nb[3]), nb[0], nb[2]);
+      set_length(nb[1], nb[3], len13);
+    }
+
+    // Remove v from the graph.
+    assert(v == N - 1);
+    assert(neighbours[v].empty());
+    neighbours.pop_back();
+    N--;
+    return;
+  }
+
+  // v has degree 3. The three surrounding triangles collapse into one.
+  assert(deg == 3);
+  node_t a = neighbours[v][0], b = neighbours[v][1], c = neighbours[v][2];
+
+  set_length(v, a, 0);
+  set_length(v, b, 0);
+  set_length(v, c, 0);
+  Graph::remove_edge(edge_t(v, a));
+  Graph::remove_edge(edge_t(v, b));
+  Graph::remove_edge(edge_t(v, c));
+
+  assert(v == N - 1);
+  neighbours.pop_back();
+  N--;
 }
 
 void FulleroidDelaunay::remove_flat_vertices()
@@ -391,13 +461,12 @@ void FulleroidDelaunay::remove_flat_vertices()
   for (node_t v = 0; v < N; v++)
     original_degrees[v] = neighbours[v].size();
 
-  // Remove flat vertices from the back.
+  // Remove flat vertices from the back, with local Delaunay flipping
+  // after each removal to keep the triangulation close to Delaunay.
   while (N > 0 && original_degrees[N - 1] == 6) {
     remove_flat_vertex(N - 1);
+    flip_to_delaunay();
   }
-
-  // Final global Delaunay sweep for correctness.
-  flip_to_delaunay();
 }
 
 // ============================================================================

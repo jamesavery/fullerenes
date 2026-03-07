@@ -11,9 +11,10 @@
 // the piecewise-flat surface manifold, using only the combinatorial structure and
 // the implicit equilateral metric -- no 3D embedding required.
 //
-// Algorithm: incrementally remove flat (degree-6) vertices from the back,
-// re-triangulating each hole via fan triangulation + local Delaunay flipping.
-// A final global Delaunay sweep ensures correctness.
+// Algorithm: incrementally remove flat (degree-6) vertices by reducing their
+// degree to 3 via local edge flips, then trivially removing them. Each edge
+// flip computes the new edge length from the local diamond geometry.
+// Delaunay flipping after each removal keeps the triangulation close to Delaunay.
 //
 // References:
 //   Fisher, Springborn, Schroder, Bobenko. "An Algorithm for the Construction
@@ -69,13 +70,8 @@ public:
 
   // --- Vertex removal ---
 
-  // Lay out the fan of triangles around vertex v in 2D coordinates.
-  // Places v at the origin; neighbours[v][0] along the positive x-axis.
-  // Returns 2D positions for each neighbor of v (in CCW order).
-  vector<coord2d> layout_fan(node_t v) const;
-
-  // Remove flat vertex v: remove it and all its edges, fan-triangulate
-  // the resulting hole, then locally Delaunayify.
+  // Remove flat vertex v: reduce its degree to 3 via edge flips,
+  // then remove it (the remaining triangle has correct edge lengths).
   void remove_flat_vertex(node_t v);
 
   // Remove all flat (originally degree-6) vertices.
