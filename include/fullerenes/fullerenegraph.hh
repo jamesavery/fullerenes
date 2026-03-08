@@ -47,13 +47,13 @@ public:
 
   static FullereneGraph C20() {
     // CW-oriented neighbour lists for dodecahedral C20, obtained from buckygen
-    return FullereneGraph(Graph(neighbours_t{
+    return FullereneGraph(Graph{
       {1,4,7},   {2,0,9},    {3,1,10},   {4,2,13},
       {5,0,3},   {6,4,14},   {7,5,16},   {8,0,6},
       {9,7,17},  {12,1,8},   {11,2,12},  {13,10,19},
       {10,9,18}, {14,3,11},  {15,5,13},  {16,14,19},
       {17,6,15}, {18,8,16},  {19,12,17}, {15,11,18}
-    }));
+    });
   }
 };
 

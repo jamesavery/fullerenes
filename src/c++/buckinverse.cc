@@ -765,7 +765,7 @@ Graph invertReduction(const Graph& g, const InvSite& site) {
         if (!stripSet.count(i)) old_to_new[i] = new_id++;
 
     int new_N = g.N - numStrip;
-    neighbours_t new_adj(new_N, GRAPH_DMAX);
+    Graph new_adj(new_N, GRAPH_DMAX);
     for (int i = 0; i < g.N; ++i) {
         if (old_to_new[i] < 0) continue;
         for (node_t nbr : adj[i])
@@ -905,7 +905,7 @@ Graph applyReduction(const Graph& g, const Reduction& red) {
             if (!stripSet.count(i)) old_to_new[i] = new_id++;
 
         int new_N = g.N - numStrip;
-        neighbours_t new_adj(new_N, GRAPH_DMAX);
+        Graph new_adj(new_N, GRAPH_DMAX);
         for (int i = 0; i < g.N; ++i) {
             if (old_to_new[i] < 0) continue;
             for (node_t nbr : adj[i])
@@ -962,7 +962,7 @@ Graph applyReduction(const Graph& g, const Reduction& red) {
             if (!stripSet.count(i)) old_to_new[i] = new_id++;
 
         int new_N = g.N - numStrip;
-        neighbours_t new_adj(new_N, GRAPH_DMAX);
+        Graph new_adj(new_N, GRAPH_DMAX);
         for (int i = 0; i < g.N; ++i) {
             if (old_to_new[i] < 0) continue;
             for (node_t nbr : adj[i])
@@ -2161,7 +2161,7 @@ Graph ReducibleDual::toGraph() const {
     for (int u = 0; u < (int)V.size(); u++)
         if (alive(u)) remap[u] = id++;
 
-    neighbours_t adj(id, GRAPH_DMAX);
+    Graph adj(id, GRAPH_DMAX);
     for (int u = 0; u < (int)V.size(); u++) {
         if (!alive(u)) continue;
         uint8_t m = V[u].active;

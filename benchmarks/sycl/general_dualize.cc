@@ -76,7 +76,7 @@ int main(int argc, char** argv) {
         PlanarGraph Gref = T.dual_graph();
         auto ElapsedRefMicro = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - T0).count();
 
-        neighbours_t neighbours((T.N-2)*2, GRAPH_DMAX);
+        Graph neighbours((T.N-2)*2, GRAPH_DMAX);
         {
             host_accessor G_out_acc(G_out, read_only);
             host_accessor Deg_out_acc(Deg_out, read_only);
@@ -110,7 +110,7 @@ int main(int argc, char** argv) {
         PlanarGraph Gref2 = Gref.dual_graph();
         auto ElapsedRefMicro2 = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - T2).count();
 
-        neighbours_t neighbours2(T.N);
+        Graph neighbours2(T.N);
         {
             host_accessor G_in_acc(G_in, read_only);
             host_accessor Deg_in_acc(Deg_in, read_only);

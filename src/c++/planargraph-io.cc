@@ -93,7 +93,7 @@ PlanarGraph PlanarGraph::read_hog_planarcode(FILE *file)
   N = read_int();
   if(N == 0){ number_length=2; N = read_int(); }
   
-  neighbours_t adj(N, GRAPH_DMAX);
+  Graph adj(N, GRAPH_DMAX);
   for(node_t u=0; u<N && !feof(file); ++u){
     int v=0;
     do{

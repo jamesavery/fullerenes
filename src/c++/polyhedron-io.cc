@@ -476,7 +476,7 @@ Polyhedron Polyhedron::from_mol2(FILE *file)
   }
 
   Polyhedron P;
-  static_cast<neighbours_t&>(P) = static_cast<const neighbours_t&>(G);
+  static_cast<Graph&>(P) = static_cast<const Graph&>(G);
   P.points = std::move(points);
   {
     vector<coord2d> layout = P.tutte_layout();

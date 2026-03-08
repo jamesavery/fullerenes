@@ -7,7 +7,7 @@ using namespace std;
 
 // Build an unoriented graph by extracting undirected edges and rebuilding neighbour lists.
 static Graph to_unoriented(const Graph& G) {
-  neighbours_t nb(G.N, GRAPH_DMAX);
+  Graph nb(G.N, GRAPH_DMAX);
   for(node_t u = 0; u < G.N; u++)
     for(node_t v : G.nbrs(u))
       if(u < v) {
@@ -246,7 +246,7 @@ TEST_F(OrientationTest, AdjacencyMatrixPlanarOrient) {
         adj[u * N + v] = 1;
 
     // Reconstruct from adjacency matrix (loses orientation)
-    neighbours_t nb(N, GRAPH_DMAX);
+    Graph nb(N, GRAPH_DMAX);
     for(int i = 0; i < N; i++)
       for(int j = i + 1; j < N; j++)
         if(adj[i * N + j]) {

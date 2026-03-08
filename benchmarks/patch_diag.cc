@@ -41,7 +41,7 @@ static Graph makeNanotubeDual(int n_rings) {
     int last = n_rings - 1;
 
     // Build oriented adjacency lists directly (CCW as seen from outside).
-    neighbours_t adj(N, GRAPH_DMAX);
+    Graph adj(N, GRAPH_DMAX);
 
     // pole_N: CCW from outside = cn(0), cn(1), ..., cn(4)
     for (int i = 0; i < 5; i++) adj.push_back(pole_N, cn(i));

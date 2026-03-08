@@ -439,7 +439,7 @@ static void liftStripToSurface(const ExtensionStep& step,
 // =====================================================================
 
 // C20 dual (icosahedron): 12 vertices, all degree-5
-static const neighbours_t C20_seed_neighbours = {
+static const Graph C20_seed_neighbours = {
     {5, 3, 2, 1, 4},
     {11, 4, 0, 2, 10},
     {10, 1, 0, 3, 8},
@@ -469,7 +469,7 @@ static const vector<coord3d> C20_seed_points = {
 };
 
 // C28 dual (Td): 16 vertices, 12 deg-5 + 4 deg-6
-static const neighbours_t C28_seed_neighbours = {
+static const Graph C28_seed_neighbours = {
     {6, 4, 3, 2, 1, 5},
     {9, 5, 0, 2, 8},
     {8, 1, 0, 3, 7},
@@ -507,7 +507,7 @@ static const vector<coord3d> C28_seed_points = {
 };
 
 // C30 dual (D5h): 17 vertices, 12 deg-5 + 5 deg-6
-static const neighbours_t C30_seed_neighbours = {
+static const Graph C30_seed_neighbours = {
     {11, 3, 2, 1, 4},
     {5, 4, 0, 2, 6},
     {6, 1, 0, 3, 7},
@@ -547,7 +547,7 @@ static const vector<coord3d> C30_seed_points = {
 };
 
 // Get precomputed seed data by type
-static const neighbours_t& seedNeighbours(buckinverse::SeedType s) {
+static const Graph& seedNeighbours(buckinverse::SeedType s) {
     switch (s) {
         case buckinverse::SeedType::C20: return C20_seed_neighbours;
         case buckinverse::SeedType::C28: return C28_seed_neighbours;
@@ -597,7 +597,7 @@ static vector<int> matchSeedViaSpiralImpl(
         to_compact[ep_ids[i]] = i;
 
     // Build compact adjacency
-    neighbours_t compact_adj(seed_N, GRAPH_DMAX);
+    Graph compact_adj(seed_N, GRAPH_DMAX);
     for (const auto& sv : ep.seed_state) {
         int ci = to_compact[sv.id];
         uint8_t m = sv.active;
@@ -756,7 +756,7 @@ static void computeSeedGeometry(const ExtensionPath& ep, vector<coord3d>& points
     for (int i = 0; i < seed_N; i++)
         to_compact[ep_ids[i]] = i;
 
-    neighbours_t compact_adj(seed_N, GRAPH_DMAX);
+    Graph compact_adj(seed_N, GRAPH_DMAX);
     for (const auto& sv : ep.seed_state) {
         int ci = to_compact[sv.id];
         uint8_t m = sv.active;
@@ -811,7 +811,7 @@ Deltahedron Deltahedron::fromExtensionPath(const ExtensionPath& ep) {
     for (int u = 0; u < full_N; u++)
         if (rd.alive(u)) remap[u] = id++;
 
-    neighbours_t adj(id, GRAPH_DMAX);
+    Graph adj(id, GRAPH_DMAX);
     vector<coord3d> compact_points(id);
     for (int u = 0; u < full_N; u++) {
         if (!rd.alive(u)) continue;
@@ -837,7 +837,7 @@ static Deltahedron extractCompact(
     for (int u = 0; u < full_N; u++)
         if (rd.alive(u)) remap[u] = id++;
 
-    neighbours_t adj(id, GRAPH_DMAX);
+    Graph adj(id, GRAPH_DMAX);
     vector<coord3d> compact_pts(id);
     for (int u = 0; u < full_N; u++) {
         if (!rd.alive(u)) continue;
@@ -892,7 +892,7 @@ static Deltahedron extractPatch(
     int m = id;
 
     // 4. Build adjacency for the sub-graph (only edges within patch)
-    neighbours_t adj(m, GRAPH_DMAX);
+    Graph adj(m, GRAPH_DMAX);
     for (int u : patch_set) {
         uint8_t mask = rd.V[u].active;
         for (; mask; mask &= mask - 1) {

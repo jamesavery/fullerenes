@@ -10,7 +10,7 @@ using namespace std;
 
 static const vector<int> C20_rspi = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
 
-static const neighbours_t C20_fg_neighbours = {
+static const Graph C20_fg_neighbours = {
     {4, 12, 1},
     {0, 10, 2},
     {1, 8, 3},
@@ -33,7 +33,7 @@ static const neighbours_t C20_fg_neighbours = {
     {13, 16, 18}
 };
 
-static const neighbours_t C20_dual_neighbours = {
+static const Graph C20_dual_neighbours = {
     {5, 3, 2, 1, 4},
     {11, 4, 0, 2, 10},
     {10, 1, 0, 3, 8},
@@ -106,7 +106,7 @@ static const vector<coord3d> C20_dual_points = {
 
 static const vector<int> C28_rspi = {0, 1, 2, 4, 6, 8, 9, 10, 11, 12, 13, 14};
 
-static const neighbours_t C28_fg_neighbours = {
+static const Graph C28_fg_neighbours = {
     {4, 13, 1},
     {0, 10, 2},
     {1, 8, 3},
@@ -137,7 +137,7 @@ static const neighbours_t C28_fg_neighbours = {
     {20, 23, 26}
 };
 
-static const neighbours_t C28_dual_neighbours = {
+static const Graph C28_dual_neighbours = {
     {6, 4, 3, 2, 1, 5},
     {9, 5, 0, 2, 8},
     {8, 1, 0, 3, 7},
@@ -230,7 +230,7 @@ static const vector<coord3d> C28_dual_points = {
 
 static const vector<int> C30_rspi = {0, 1, 2, 3, 4, 5, 11, 12, 13, 14, 15, 16};
 
-static const neighbours_t C30_fg_neighbours = {
+static const Graph C30_fg_neighbours = {
     {4, 12, 1},
     {0, 10, 2},
     {1, 8, 3},
@@ -263,7 +263,7 @@ static const neighbours_t C30_fg_neighbours = {
     {23, 26, 28}
 };
 
-static const neighbours_t C30_dual_neighbours = {
+static const Graph C30_dual_neighbours = {
     {11, 3, 2, 1, 4},
     {5, 4, 0, 2, 6},
     {6, 1, 0, 3, 7},

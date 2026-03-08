@@ -154,7 +154,7 @@ PlanarGraph Triangulation::dual_graph() const
   }
   for(int i=0;i<tris.size();i++) tri_numbers.insert(tris[i].sorted());
 
-  neighbours_t A(tris.size(),vector<node_t>(3));
+  Graph A(Spanify::OwnedDenseGraph<node_t>(tris.size(), vector<node_t>(3)));
 
   for(node_t U=0;U<tris.size();U++){
     const tri_t& t(tris[U]);
@@ -467,7 +467,7 @@ Triangulation Triangulation::halma_transform(int m, vector<map<edge_t,node_t>>* 
   }
 
   // Build CW neighbour lists by chaining next_on_face.
-  neighbours_t neighbours(N_new, GRAPH_DMAX);
+  Graph neighbours(N_new, GRAPH_DMAX);
   for(node_t u = 0; u < N_new; u++){
     node_t v = first_nb[u];
     node_t w = v;
@@ -1169,7 +1169,7 @@ Triangulation Triangulation::sort_nodes() const
     oldname[u_new] = u_old;
   }
 
-  neighbours_t new_neighbours(N, GRAPH_DMAX);
+  Graph new_neighbours(N, GRAPH_DMAX);
   for(int u=0;u<N;u++)
     for(int i=0;i<degree(u);i++)
       new_neighbours.push_back(newname[u], newname[nbrs(u)[i]]);

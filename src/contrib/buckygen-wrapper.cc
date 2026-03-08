@@ -130,7 +130,7 @@ bool next_fullerene(const buckygen_queue& Q, Graph& G)
     fprintf(stderr,"In BuckyGen::next_fullerene: %s\n",strerror(errno));
     return false;
   } else if(msg.mtype == GRAPH_READY) {	// Completed graph
-    neighbours_t adj(Q.Nvertices, GRAPH_DMAX);
+    Graph adj(Q.Nvertices, GRAPH_DMAX);
     for(int u=0;u<Q.Nvertices;u++)
       for(int i=0; 6>i && (msg.neighbours[u*6+i] != -1); i++)
 	adj.push_back(u, msg.neighbours[u*6+i]);
@@ -222,7 +222,7 @@ bool next_fullerene(const buckygen_queue& Q, Graph& G)
 	fprintf(stderr,"In BuckyHerd::next_fullerene: %s\n",strerror(errno));
 	return false;
       } else if(msg.mtype == GRAPH_READY) {	// Completed graph
-	neighbours_t adj(H.Nvertices, GRAPH_DMAX);
+	Graph adj(H.Nvertices, GRAPH_DMAX);
 	for(int u=0;u<H.Nvertices;u++)
 	  for(int i=0; 6>i && (msg.neighbours[u*6+i] != -1); i++)
 	    adj.push_back(u, msg.neighbours[u*6+i]);

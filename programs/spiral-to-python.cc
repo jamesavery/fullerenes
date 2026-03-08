@@ -47,9 +47,9 @@ int main(int ac, char **av)
   int N = g.N, Nf = t.N;
   
   vector<face_t> pentagons(12), hexagons(Nf-12);
-  neighbours_t next_on_face(N,vector<node_t>(3));
-  neighbours_t prev_on_face(N,vector<node_t>(3));
-  neighbours_t face_right(N,vector<node_t>(3));
+  Graph next_on_face(Spanify::OwnedDenseGraph<node_t>(N, vector<node_t>(3)));
+  Graph prev_on_face(Spanify::OwnedDenseGraph<node_t>(N, vector<node_t>(3)));
+  Graph face_right(Spanify::OwnedDenseGraph<node_t>(N, vector<node_t>(3)));
 
   
   for(node_t u=0;u<N;u++){

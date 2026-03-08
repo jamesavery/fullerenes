@@ -774,7 +774,7 @@ static Graph makeNanotubeDual(int n_rings) {
     // Edges from ring j down to ring j+1: rng(j,i)—rng(j+1,i) and rng(j,i)—rng(j+1,i+1).
     // Same pattern for cn→rng(0) and rng(last)→cs.
 
-    neighbours_t adj(N, GRAPH_DMAX);
+    Graph adj(N, GRAPH_DMAX);
 
     // pole_N: CCW from outside = cn(0), cn(1), ..., cn(4)
     for (int i = 0; i < 5; i++) adj.push_back(pole_N, cn(i));

@@ -312,6 +312,21 @@ std::ostream& operator<<(std::ostream& s, const DenseGraph<K>& g) {
 }
 
 // ---------------------------------------------------------------------------
+// Free-function restride: works on any DenseGraph view. O(N*dmax).
+// ---------------------------------------------------------------------------
+template<typename K>
+OwnedDenseGraph<K> restride(const DenseGraph<K>& src, int new_dmax) {
+    OwnedDenseGraph<K> g(src.N, new_dmax);
+    for (K v = 0; v < src.N; ++v) {
+        assert(src.deg[v] <= new_dmax);
+        g.deg[v] = src.deg[v];
+        for (int i = 0; i < src.deg[v]; ++i)
+            g.values[v * new_dmax + i] = src.values[v * src.dmax + i];
+    }
+    return g;
+}
+
+// ---------------------------------------------------------------------------
 // Conversion: Dense -> CSR (freeze). O(N).
 // ---------------------------------------------------------------------------
 template<typename K>

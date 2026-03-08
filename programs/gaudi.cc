@@ -22,7 +22,7 @@ using namespace std;
 Graph cube()
 {
   const int N = 8;
-  neighbours_t neighbours(N,vector<node_t>(3));
+  Graph neighbours(Spanify::OwnedDenseGraph<node_t>(N, vector<node_t>(3)));
 
   for(int i=0; i<4; i++){
     neighbours[i][0] = (i+1)%4;
@@ -40,7 +40,7 @@ Graph cube()
 Graph tetraeder()
 {
   const int N = 4;
-  neighbours_t neighbours(N,vector<node_t>(3));
+  Graph neighbours(Spanify::OwnedDenseGraph<node_t>(N, vector<node_t>(3)));
 
   for(int i=0; i<4; i++){
     neighbours[i][0] = (i+1)%4;
@@ -55,7 +55,7 @@ Graph tetraeder()
 Graph oct_2()
 {
   const int N = 8;
-  neighbours_t neighbours(N,vector<node_t>(3));
+  Graph neighbours(Spanify::OwnedDenseGraph<node_t>(N, vector<node_t>(3)));
 
   neighbours[0][0] = 1;
   neighbours[0][1] = 4;
@@ -142,7 +142,7 @@ Graph c32_6(){
 Graph c18_1()
 {
   const int N = 18;
-  neighbours_t neighbours(N,vector<node_t>(3));
+  Graph neighbours(Spanify::OwnedDenseGraph<node_t>(N, vector<node_t>(3)));
 
   neighbours[0][0] = 1;
   neighbours[0][1] = 2;
@@ -278,7 +278,7 @@ Graph c48_8(){
 Graph c12_prism()
 {
   const int N = 12;
-  neighbours_t neighbours(N,vector<node_t>(3));
+  Graph neighbours(Spanify::OwnedDenseGraph<node_t>(N, vector<node_t>(3)));
 
   for(int i=0; i<6; i++){
     neighbours[i][0] = (i+1)%6;
