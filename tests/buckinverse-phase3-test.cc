@@ -176,7 +176,7 @@ TEST(BuckinversePhase3, ReduceToSeed) {
             }
 
             if (success) {
-                Triangulation t(current.neighbours);
+                Triangulation t(static_cast<const neighbours_t&>(current));
                 SeedType seed = identifySeed(t);
                 if (seed == SeedType::NotASeed) {
                     auto sites = allInvSites(current, 5);
@@ -191,7 +191,7 @@ TEST(BuckinversePhase3, ReduceToSeed) {
                                 }
                             }
                         }
-                        t = Triangulation(current.neighbours);
+                        t = Triangulation(static_cast<const neighbours_t&>(current));
                         seed = identifySeed(t);
                     }
                 }

@@ -13,7 +13,7 @@ void fill(FullereneBatch<T,K>& B, int mytask_id = 0, int ntasks = 1) {
   BuckyGen::buckygen_queue BuckyQ = BuckyGen::start(N,false, false, mytask_id, ntasks);
   Graph G;
 
-  G.neighbours = neighbours_t(Nf, std::vector<node_t>(6,-1));
+  static_cast<neighbours_t&>(G) = neighbours_t(Nf, std::vector<node_t>(6,-1));
   G.N = Nf;
   int num_generated = 0;
   for (int i = 0; i < N_graphs; ++i) {

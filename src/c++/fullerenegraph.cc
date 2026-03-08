@@ -115,7 +115,7 @@ vector<coord3d> FullereneGraph::zero_order_geometry(double scalerad) const
   // Scale spherical projection
   double Ravg = 0;
   for(node_t u=0;u<N;u++)
-    for(int i=0;i<3;i++) Ravg += (coordinates[u]-coordinates[neighbours[u][i]]).norm();
+    for(int i=0;i<3;i++) Ravg += (coordinates[u]-coordinates[(*this)[u][i]]).norm();
   Ravg /= (3.0*N);
 
   coordinates *= scalerad*1.5/Ravg;

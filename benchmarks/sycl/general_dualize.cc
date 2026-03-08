@@ -136,7 +136,7 @@ int main(int argc, char** argv) {
     /* 
     
     BuckyGen::next_fullerene(BQ, Gr);
-    std::cout << "Gr has " << Gr.neighbours.size() << " vertices" << std::endl;
+    std::cout << "Gr has " << Gr.size() << " vertices" << std::endl;
  */
     //BuckyGen::buckygen_queue BQ = BuckyGen::start(20, false, false);
     pid_t pid = fork();

@@ -27,8 +27,8 @@ vector<tri_t> Triangulation::compute_faces_oriented() const
         node_t w = next_on_face(u,v);
 	if(w==-1){
 	  printf("next_on_face(%d,%d) = prev(%d,%d) = -1\n",u,v,v,u);
-	  printf("\tneighbours[%d] = ",u); for(auto x: neighbours[u]) cout << x << ' '; cout << endl;
-	  printf("\tneighbours[%d] = ",v); for(auto x: neighbours[v]) cout << x << ' '; cout << endl;	  
+	  printf("\tneighbours[%d] = ",u); for(auto x: (*this)[u]) cout << x << ' '; cout << endl;
+	  printf("\tneighbours[%d] = ",v); for(auto x: (*this)[v]) cout << x << ' '; cout << endl;	  
 	  assert(w != -1);
 	}
         //Is This Condition necessary? 
@@ -90,8 +90,8 @@ void Triangulation::compute_lookup_tables(const PlanarGraph&            cubic_gr
 	if((wa<0) || (wb<0)){
 	  printf("next_on_face(%d,%d) = prev(%d,%d) = -1\n",u,v,v,u);
 	  printf("next_on_face(%d,%d) = prev(%d,%d) = -1\n",v,u,u,v);
-	  printf("\tneighbours[%d] = ",u); for(auto x: neighbours[u]) cout << x << ' '; cout << endl;
-	  printf("\tneighbours[%d] = ",v); for(auto x: neighbours[v]) cout << x << ' '; cout << endl;	  
+	  printf("\tneighbours[%d] = ",u); for(auto x: (*this)[u]) cout << x << ' '; cout << endl;
+	  printf("\tneighbours[%d] = ",v); for(auto x: (*this)[v]) cout << x << ' '; cout << endl;	  
 	  assert((wa<0) || (wb<0));
 	}
 
@@ -1263,7 +1263,7 @@ PlanarGraph Triangulation::inverse_leapfrog_dual() const
   set<int> face_vertices, to_do_set;
 
   // find all vertices with degree < 6 (one could additionally find the vertices with odd degree)
-  for(int v=0; v<neighbours.size(); v++){
+  for(int v=0; v<size(); v++){
     if(degree(v) < 6){
       face_vertices.insert(v);
       to_do_set.insert(v);
@@ -1328,7 +1328,7 @@ vector<general_spiral> FullereneDual::isomer_search(const Triangulation::predica
   }
   BuckyGen::stop(Q);
 
-  if(verbose_level>0) fprintf(stderr,"Generated %ld %d-vertex graphs.\n",i,int(g.neighbours.size()));
+  if(verbose_level>0) fprintf(stderr,"Generated %ld %d-vertex graphs.\n",i,int(g.size()));
   
   return spirals; 
 }

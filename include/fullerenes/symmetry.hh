@@ -79,7 +79,7 @@ public:
   
   void initialize(){
     for(node_t u=0;u<N;u++){
-      auto nu = neighbours[u];
+      auto nu = (*this)[u];
       for(int i=0;i<nu.size();i++){
 	const node_t v = nu[i];
 	arc_id.insert({u,v});

@@ -33,11 +33,11 @@ int main(int ac, char **av)
 
     i++;
     if(i%100000 == 0) fprintf(stderr,"Reached isomer %ld\n",i);
-    //      G = Triangulation(G.neighbours,true);
+    //      G = Triangulation(static_cast<const neighbours_t&>(G),true);
     //      FullereneDual(G).get_rspi(rspi,jumps,true,true);
 
     FullereneDual FG(G);
-    //    cout << FG.neighbours << "\n";
+    //    cout << static_cast<const neighbours_t&>(FG) << "\n";
     FullereneGraph F = FG.dual();
     //    dual = G.dual_graph();
     //G.update_from_neighbours();
@@ -49,7 +49,7 @@ int main(int ac, char **av)
   }
   BuckyGen::stop(Q);
 
-  fprintf(stderr,"Generated %ld graphs (%d,%d)\n",i,int(G.neighbours.size()),int(dual.neighbours.size()));
+  fprintf(stderr,"Generated %ld graphs (%d,%d)\n",i,int(G.size()),int(dual.size()));
   
   return 0;
 }

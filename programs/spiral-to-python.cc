@@ -102,7 +102,7 @@ int main(int ac, char **av)
   cerr << "equivalent_faces = " << S.equivalence_classes(S.G) << ";\n";
   //  cerr << "equivalent_edges = " << S.equivalence_classes(S.Gedge) << ";\n";    // TODO: Needs to be arcs in correct order
   cerr << "# Cubic graph, its faces, 3D embedding, and 2D Tutte-embedding\n";
-  cerr << "cubic_neighbours  = array(" << g.neighbours << ");\n\n";
+  cerr << "cubic_neighbours  = array(" << static_cast<const neighbours_t&>(g) << ");\n\n";
   cerr << "pentagons    = array(" << pentagons  << ");\n\n"; // TODO
   cerr << "hexagons     = array(" << hexagons   << ");\n\n"; // TODO
   cerr << "next_on_face = array(" << next_on_face << ");\n\n";
@@ -112,7 +112,7 @@ int main(int ac, char **av)
   cerr << "points_opt   = array(" << P.points << ");\n\n";   
   cerr << "tutte_layout = array(" << tutte << ");\n\n";
   cerr << "# Dual graph and its faces\n";
-  cerr << "dual_neighbours   = " << t.neighbours << ";\n\n";
+  cerr << "dual_neighbours   = " << static_cast<const neighbours_t&>(t) << ";\n\n";
   //  cerr << "next_on_tri       = array(" << next_on_tri << ");\n\n";  
   cerr << "triangles         = array(" << t.triangles() << ");\n\n";
   cerr << "dual_points     = array(" << dual_coords << ");\n\n";  

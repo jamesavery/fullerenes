@@ -140,7 +140,7 @@ int main(int ac, char **av)
 
   Triangulation g(name);
 
-  node_t u = 0, v = g.neighbours[u][0], w = g.next_on_face(u,v);
+  node_t u = 0, v = g[u][0], w = g.next_on_face(u,v);
   spiral(g,{u,v,w});
   //  cout << "g = " << g << ";\n";
 }

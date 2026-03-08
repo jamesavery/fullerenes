@@ -198,7 +198,7 @@ vector<arc_t> FulleroidDelaunay::delaunayify_hole(const vector<edge_t>& edges)
       if(!mark[{C,D}]){ S.push(arc_t({C,D})); mark[{C,D}] = true; }
       if(!mark[{D,A}]){ S.push(arc_t({D,A})); mark[{D,A}] = true; }
 
-      new_edges.erase(find(new_edges.begin(),new_edges.end(), arc_t(A,C)));
+      new_edges.erase(std::find(new_edges.begin(),new_edges.end(), arc_t(A,C)));
       new_edges.push_back(arc_t(B,D));
       
       flips++;
@@ -225,11 +225,11 @@ void FulleroidDelaunay::align_hole(vector<node_t>& hole) const
 {
   bool done = false;
   while(!done){ // Rotate hole until hole[0] is connected only to hole[-1] and hole[1].
-    auto n0 = neighbours[hole[0]];
+    auto n0 = (*this)[hole[0]];
     done = true;
 
     for(int i=2; i< hole.size()-1; i++)
-      if(find(n0.begin(), n0.end(), hole[i]) != n0.end()){
+      if(std::find(n0.begin(), n0.end(), hole[i]) != n0.end()){
         hole.push_back(hole[0]);
         hole.erase(hole.begin());
         done = false;
@@ -285,7 +285,7 @@ vector<edge_t> FulleroidDelaunay::triangulate_hole(const vector<node_t>& hole, c
     insert_edge(edge_t(a,c),b,d,new_distances[i]);
     triangle_edges.push_back(edge_t(a,c));
 
-    debug << "neighbours = " << (neighbours.to_vectors()+1) << ";\n";
+    debug << "neighbours = " << (to_vectors()+1) << ";\n";
     //    debug << "lengths    = " << edge_lengths << ";\n";
   }
   return triangle_edges;
@@ -296,7 +296,7 @@ void FulleroidDelaunay::remove_flat_vertex(node_t v)
   Debug debug("Delaunay",Debug::INFO1);
 
   debug << "(*begin remove flat vertex*)" << endl;
-  vector<node_t> hole(neighbours[v].begin(), neighbours[v].end());
+  vector<node_t> hole((*this)[v].begin(), (*this)[v].end());
   debug << "hole=" << (hole+1) << "\n";
 
   // check if hole[0] is already connected to any of the other hole-nodes in
@@ -312,7 +312,7 @@ void FulleroidDelaunay::remove_flat_vertex(node_t v)
   for(int i=0; i<hole.size(); i++)
     remove_edge(edge_t(v,hole[i]));
 
-  neighbours.pop_back();
+  pop_back();
   N--;
 
   //triangulate hole
@@ -334,21 +334,21 @@ void FulleroidDelaunay::remove_flat_vertices()
   // end. Procedure incrementally removes vertices from the back until 
   // reaching a vertex that was not of degree 6 in the initial graph.
 
-  debug << "neighbours=" << neighbours << ";\n";
-  debug << "neighbourssize=" << neighbours.size() << ";\n";
+  debug << "neighbours=" << static_cast<const neighbours_t&>(*this) << ";\n";
+  debug << "neighbourssize=" << size() << ";\n";
 
   vector<int> original_degrees(N);
-  for(node_t v=0;v<N;v++) original_degrees[v] = neighbours[v].size();
+  for(node_t v=0;v<N;v++) original_degrees[v] = (*this)[v].size();
 
   int i=1;
-  node_t v = neighbours.size()-1;
+  node_t v = size()-1;
   while(original_degrees[v] == 6){
     assert(edge_lengths_are_symmetric());
     debug << "(* removing node " << (v+1) << " *)\n";
     MathematicaDebug::channel_stream["Delaunay"]->flush();
     remove_flat_vertex(v);
     debug << "g["<<(i++)<<"] = " << *this << ";\n";
-    v = neighbours.size()-1;
+    v = size()-1;
     MathematicaDebug::channel_stream["Delaunay"]->flush();
   }
 

@@ -409,7 +409,7 @@ int main(int ac, char **av)
       face_relevant = false;
       for(int j=0; j<6; j++){
         for(int k=0; k<3; k++){
-          if(marked_nodes.find(P.neighbours[(*it)[j]][k]) != marked_nodes.end()){
+          if(marked_nodes.find(P[(*it)[j]][k]) != marked_nodes.end()){
             face_relevant = true;
           }    
         }
@@ -465,23 +465,23 @@ int main(int ac, char **av)
     //cout << "edge to zap: " << *it << endl;
     edge_t to_zap(*it);
     //cout << "edge to zap: " << to_zap << endl;
-    //vector<int>& n1 = P.neighbours[it->first];
-    //vector<int>& n2 = P.neighbours[it->second];
+    //vector<int>& n1 = P[it->first];
+    //vector<int>& n2 = P[it->second];
     //cout << n1 << ", " << n2 <<  endl;
     P.remove_edge(to_zap);
-    //cout << "neighbours : " << P.neighbours << endl;
+    //cout << "neighbours : " << static_cast<const neighbours_t&>(P) << endl;
     //cout << n1 << ", " << n2 <<  endl;
     P.N += 2;
-    P.neighbours.resize(P.N);
-    //cout << "neighbours : " << P.neighbours << endl;
+    P.resize(P.N);
+    //cout << "neighbours : " << static_cast<const neighbours_t&>(P) << endl;
     //cout << "trying to insert : " << edge_t(to_zap.first,P.N-2) << edge_t(to_zap.second,P.N-1) << edge_t(P.N-2,P.N-1) << endl;
-    P.neighbours.push_back(to_zap.first, P.N-2);
-    P.neighbours.push_back(P.N-2, to_zap.first);
-    P.neighbours.push_back(to_zap.second, P.N-1);
-    P.neighbours.push_back(P.N-1, to_zap.second);
-    P.neighbours.push_back(P.N-2, P.N-1);
-    P.neighbours.push_back(P.N-1, P.N-2);
-    //cout << "neighbours : " << P.neighbours << endl;
+    P.push_back(to_zap.first, P.N-2);
+    P.push_back(P.N-2, to_zap.first);
+    P.push_back(to_zap.second, P.N-1);
+    P.push_back(P.N-1, to_zap.second);
+    P.push_back(P.N-2, P.N-1);
+    P.push_back(P.N-1, P.N-2);
+    //cout << "neighbours : " << static_cast<const neighbours_t&>(P) << endl;
     
     const coord3d c1=P.points[it->first];
     const coord3d c2=P.points[it->second];
@@ -492,7 +492,7 @@ int main(int ac, char **av)
     //cout << "new point connected to c1: " << c1 + dc*(long_edge_single/long_edge_total) << endl;
     //cout << "new point connected to c2: " << c2 - dc*(long_edge_single/long_edge_total) << endl;
     //cout << "size: " << P.points.size() << endl;
-    //cout << "neighbours : " << P.neighbours << endl;
+    //cout << "neighbours : " << static_cast<const neighbours_t&>(P) << endl;
     //cout << "-----" << endl;
   }
 

@@ -273,7 +273,7 @@ matrix<double> self_distances(const Triangulation &G, const vector<node_t> &node
       node_T U = nodes_inverse[u];
 
       // We want to explore all triangular slices with (1,0) along each edge of u
-      for(int axis=0;axis<neighbours[u].size();axis++){
+      for(int axis=0;axis<G[u].size();axis++){
 	int a = 0, b = 1, c = 1, d = M[U];
 
 	// The simple geodesics correspond to the coprime pairs (a,b), a>=b.
@@ -319,7 +319,7 @@ matrix<double> self_distances(const Triangulation &G, const vector<node_t> &node
     }
     
   for(node_t u: nodes){
-    for(int i=0;i<neighbours[u].size();i++){
+    for(int i=0;i<G[u].size();i++){
       node_t U  = nodes_inverse[u];
 
       for(int a=1; a<M[U]; a++){	
@@ -541,7 +541,7 @@ int main(int ac, char **argv)
       
       ofstream output_file("output/geodesics.m");
       LIST_OPEN = '{'; LIST_CLOSE = '}';
-      output_file << "neighbours = " << dP.neighbours << "+1;\n"
+      output_file << "neighbours = " << static_cast<const neighbours_t&>(dP) << "+1;\n"
       		  << "faces      = " << dP.faces      << "+1;\n"
 		  << "points     = " << dP.points     << ";\n";
 

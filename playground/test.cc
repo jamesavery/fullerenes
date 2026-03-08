@@ -8,7 +8,7 @@ int main()
 
   fprintf(stderr,"%d vertices and %d = %d edges\n",g.N,int(g.edge_set.size()),g.N*3/2);
 
-  vector<node_t> cycle(g.shortest_cycle(0,g.neighbours[0][0],6));
+  vector<node_t> cycle(g.shortest_cycle(0,g[0][0],6));
   fprintf(stderr,"Outer face cycle: ");
   for(int i=0;i<cycle.size();i++)
     fprintf(stderr,"%d ",cycle[i]+1);
@@ -16,7 +16,7 @@ int main()
 
   vector<unsigned int> vertex_depth(g.multiple_source_shortest_paths(cycle,vector<bool>(g.N*(g.N-1)/2),vector<bool>(g.N)));
   fprintf(stderr,"Depths:\n");
-  for(int i=0;i<g.N;i++) fprintf(stderr,"\t%d : %d (%d,%d,%d)\n",i+1,vertex_depth[i],g.neighbours[i][0]+1,g.neighbours[i][1]+1,g.neighbours[i][2]+1);   
+  for(int i=0;i<g.N;i++) fprintf(stderr,"\t%d : %d (%d,%d,%d)\n",i+1,vertex_depth[i],g[i][0]+1,g[i][1]+1,g[i][2]+1);
 
   vector<coord2d> layout = g.tutte_layout();
   map<unsigned int, set<face_t> > facemap(g.compute_faces_oriented(layout));

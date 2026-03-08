@@ -91,7 +91,7 @@ bool Polyhedron::to_file(const Polyhedron &G, string filename)
 
 ////////////////////////////// OUTPUT ROUTINES //////////////////////////////
 bool Polyhedron::to_ascii(const Polyhedron &P, FILE *file)  {
-  string s = LIST_OPEN + to_string(P.neighbours) + "," + to_string(P.points) + "," + to_string(P.faces) + LIST_CLOSE;
+  string s = LIST_OPEN + to_string(static_cast<const neighbours_t&>(P)) + "," + to_string(P.points) + "," + to_string(P.faces) + LIST_CLOSE;
   fputs(s.c_str(),file);
   return ferror(file) == 0;
 }
@@ -475,9 +475,8 @@ Polyhedron Polyhedron::from_mol2(FILE *file)
     //    cerr << "Edge " << i << " of " << Nedges << ": Read line "<< line <<endl;
   }
 
-  Polyhedron P;  
-  P.N = G.N;
-  P.neighbours = G.neighbours;
+  Polyhedron P;
+  static_cast<neighbours_t&>(P) = static_cast<const neighbours_t&>(G);
   P.points = points;
   {
     vector<coord2d> layout = P.tutte_layout();

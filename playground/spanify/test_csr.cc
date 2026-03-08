@@ -19,7 +19,7 @@ namespace S = Spanify;  // Short alias — no 'using namespace' to avoid collisi
 
 // Helper: build a CSRGraph from an existing old-style Graph object
 S::CSRGraph csr_from_graph(const ::Graph& G) {
-    return S::from_neighbours(G.N, G.neighbours);
+    return S::from_neighbours(G.N, static_cast<const neighbours_t&>(G));
 }
 
 // Helper: get a fullerene graph for testing. Uses readPDB (never readBinary/getIsomer).
@@ -91,9 +91,9 @@ TEST_P(CSRNavigation, NeighboursMatch) {
 
     for (int v = 0; v < N; ++v) {
         auto nbs = S::neighbours(view, v);
-        ASSERT_EQ(int(nbs.size()), int(FG.neighbours[v].size()));
+        ASSERT_EQ(int(nbs.size()), int(FG[v].size()));
         for (int j = 0; j < int(nbs.size()); ++j)
-            EXPECT_EQ(int(nbs[j]), FG.neighbours[v][j]);
+            EXPECT_EQ(int(nbs[j]), FG[v][j]);
     }
 }
 
@@ -105,7 +105,7 @@ TEST_P(CSRNavigation, NextPrevMatch) {
     auto view = S::as_view(csr);
 
     for (int u = 0; u < N; ++u) {
-        for (int v : FG.neighbours[u]) {
+        for (int v : FG[u]) {
             EXPECT_EQ(int(S::next(view, u, v)), FG.next(u, v))
                 << "next(" << u << ", " << v << ") mismatch";
             EXPECT_EQ(int(S::prev(view, u, v)), FG.prev(u, v))
@@ -122,7 +122,7 @@ TEST_P(CSRNavigation, NextOnFaceMatch) {
     auto view = S::as_view(csr);
 
     for (int u = 0; u < N; ++u) {
-        for (int v : FG.neighbours[u]) {
+        for (int v : FG[u]) {
             EXPECT_EQ(int(S::next_on_face(view, u, v)), FG.next_on_face(u, v))
                 << "next_on_face(" << u << ", " << v << ") mismatch";
         }
@@ -139,9 +139,9 @@ TEST_P(CSRNavigation, DualNeighboursMatch) {
 
     for (int v = 0; v < dual.N; ++v) {
         auto nbs = S::neighbours(view, v);
-        ASSERT_EQ(int(nbs.size()), int(dual.neighbours[v].size()));
+        ASSERT_EQ(int(nbs.size()), int(dual[v].size()));
         for (int j = 0; j < int(nbs.size()); ++j)
-            EXPECT_EQ(int(nbs[j]), dual.neighbours[v][j]);
+            EXPECT_EQ(int(nbs[j]), dual[v][j]);
     }
 }
 
@@ -154,7 +154,7 @@ TEST_P(CSRNavigation, DualNextPrevMatch) {
     auto view = S::as_view(csr);
 
     for (int u = 0; u < dual.N; ++u) {
-        for (int v : dual.neighbours[u]) {
+        for (int v : dual[u]) {
             EXPECT_EQ(int(S::next(view, u, v)), dual.next(u, v))
                 << "dual next(" << u << ", " << v << ") mismatch";
             EXPECT_EQ(int(S::prev(view, u, v)), dual.prev(u, v))
@@ -343,7 +343,7 @@ TEST(CSRBuilderTest, BuildC20FromEdges) {
 
     S::CSRBuilder<int32_t> builder(20);
     for (int u = 0; u < 20; ++u)
-        for (int v : FG.neighbours[u])
+        for (int v : FG[u])
             builder.add_arc(u, v);
 
     auto csr = builder.freeze();
@@ -354,8 +354,8 @@ TEST(CSRBuilderTest, BuildC20FromEdges) {
     auto view = S::as_view(csr);
     for (int v = 0; v < 20; ++v) {
         auto nbs = S::neighbours(view, v);
-        ASSERT_EQ(int(nbs.size()), int(FG.neighbours[v].size()));
+        ASSERT_EQ(int(nbs.size()), int(FG[v].size()));
         for (int j = 0; j < int(nbs.size()); ++j)
-            EXPECT_EQ(int(nbs[j]), FG.neighbours[v][j]);
+            EXPECT_EQ(int(nbs[j]), FG[v][j]);
     }
 }

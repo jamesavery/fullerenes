@@ -28,7 +28,7 @@ int test_all(int N)
 
     // --- Single-triple spiral extraction ---
     {
-      node_t u = 0, v = T.neighbours[u][0], w = T.next(u, v);
+      node_t u = 0, v = T[u][0], w = T.next(u, v);
       vector<int> spiral;
       jumplist_t jumps;
       vector<node_t> perm;
@@ -93,7 +93,7 @@ int test_all(int N)
 
         // Check permutation preserves adjacency
         for(int u = 0; u < T.N; u++)
-          for(node_t v : T.neighbours[u])
+          for(node_t v : T[u])
             if(T.arc_ix(perms[i][u], perms[i][v]) < 0){
               fprintf(stderr, "  SYMMETRY FAIL (perm %zu breaks adj %d->%d => %d->%d): N=%d #%d\n",
                       i, u, v, perms[i][u], perms[i][v], N, count);

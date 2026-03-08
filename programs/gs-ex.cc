@@ -254,7 +254,7 @@ int main(int ac, char **av)
   
   bool dual_is_triangulation = true, graph_is_cubic = true;
   for(auto &f: dfaces) if(f.size() != 3) dual_is_triangulation = false;
-  for(auto &n: g.neighbours) if(n.size() != 3) graph_is_cubic = false;
+  for(int u=0; u<g.N; u++) if(g.degree(u) != 3) graph_is_cubic = false;
 
   if(graph_is_cubic != dual_is_triangulation){
     fprintf(stderr,"Graph is %scubic, but dual is %striangulation.\n",

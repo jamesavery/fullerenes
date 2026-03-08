@@ -157,27 +157,27 @@ struct Fullerene
     }
 
     Fullerene<T, K> &operator=(const Graph &G) {
-        *this = G.neighbours;
+        *this = static_cast<const neighbours_t&>(G);
         return *this;
     }
 
     Fullerene<T, K> &operator=(const PlanarGraph &PG) {
-        *this = PG.neighbours;
+        *this = static_cast<const neighbours_t&>(PG);
         return *this;
     }
 
     Fullerene<T, K> &operator=(const FullereneGraph &FG) {
-        *this = FG.neighbours;
+        *this = static_cast<const neighbours_t&>(FG);
         return *this;
     }
 
     Fullerene<T, K> &operator=(const FullereneDual &FD) {
-        *this = FD.neighbours;
+        *this = static_cast<const neighbours_t&>(FD);
         return *this;
     }
 
     Fullerene<T, K> &operator=(const Polyhedron &P) {
-        *this = P.neighbours;
+        *this = static_cast<const neighbours_t&>(P);
         auto is_cubic = P.points.size() == N_;
         auto dst_ptr = is_cubic ? d_.X_cubic_.data() : d_.X_dual_.data();
         if constexpr (std::is_same_v<decltype(d_.X_cubic_[0]), decltype(P.points[0])>) {
@@ -202,21 +202,21 @@ struct Fullerene
 
     Fullerene<T, K>& operator=(const std::tuple<std::reference_wrapper<const Graph>, size_t>& Graph_and_ID){
         auto& [G, ID] = Graph_and_ID;
-        *this = G.get().neighbours;
+        *this = static_cast<const neighbours_t&>(G.get());
         m_.ID_.get() = ID;
         return *this;
     }
 
     Fullerene<T, K>& operator=(const std::tuple<std::reference_wrapper<const PlanarGraph>, size_t>& PlanarGraph_and_ID){
         auto& [PG, ID] = PlanarGraph_and_ID;
-        *this = PG.get().neighbours;
+        *this = static_cast<const neighbours_t&>(PG.get());
         m_.ID_.get() = ID;
         return *this;
     }
 
     Fullerene<T, K>& operator=(const std::tuple<std::reference_wrapper<const FullereneGraph>, size_t>& FullereneGraph_and_ID){
         auto& [FG, ID] = FullereneGraph_and_ID;
-        *this = FG.get().neighbours;
+        *this = static_cast<const neighbours_t&>(FG.get());
         m_.ID_.get() = ID;
         return *this;
     }

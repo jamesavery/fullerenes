@@ -41,7 +41,7 @@ int main(int ac, char **av)
     Triangulation::jumplist_t jumps;
     
     i++;
-    G = Triangulation(G.neighbours,true);
+    G = Triangulation(static_cast<const neighbours_t&>(G),true);
     bool spiral_OK = G.get_spiral(spiral,jumps,false,false);
     if(!spiral_OK){
       vector<int> rspi2(12);
@@ -61,7 +61,7 @@ int main(int ac, char **av)
     fwrite(rspi,12,1,output);
 
   }
-  printf("Generated %d graphs (%d,%d)\n",i,int(G.neighbours.size()),int(dual.neighbours.size()));
+  printf("Generated %d graphs (%d,%d)\n",i,int(G.size()),int(dual.size()));
   fclose(output);
   
   return 0;

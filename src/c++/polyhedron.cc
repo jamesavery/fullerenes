@@ -375,7 +375,7 @@ Polyhedron Polyhedron::leapfrog_dual() const
    
   // Start with all the existing nodes
   for(node_t u=0;u<N;u++){
-    Plf.neighbours.assign_row(u, neighbours[u]);
+    Plf.assign_row(u, (*this)[u]);
     Plf.points[u]     = points[u];
   }
 
@@ -441,8 +441,9 @@ bool Polyhedron::optimize(int opt_method, double ftol)
     // inverse_tranges for faster lookup:
     // indices in 'triangles' at which there are triangles containing this vertex
     vector<vector<int>> inverse_triangle_list(LFD.N);
-    for (int i=0; i<LFD.triangles().size(); i++){
-      const tri_t& tri = LFD.triangles()[i];
+    auto lfd_tris = LFD.triangles();
+    for (int i=0; i<(int)lfd_tris.size(); i++){
+      const tri_t& tri = lfd_tris[i];
       inverse_triangle_list[tri[0]].push_back(i);
       inverse_triangle_list[tri[1]].push_back(i);
       inverse_triangle_list[tri[2]].push_back(i);

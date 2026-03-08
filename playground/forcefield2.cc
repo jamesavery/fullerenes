@@ -673,10 +673,10 @@ FullereneForcefield new_fullereneforcefield(string name)
 
   for(node_t a=0;a<N;a++){
     for(int j=0;j<3;j++){
-      node_t b = g.neighbours[a][j];
+      node_t b = g[a][j];
 
       X[a][j] = P0.points[a][j];
-      neighbours  [a*3+j] = g.neighbours[a][j];
+      neighbours  [a*3+j] = g[a][j];
       next_on_face[a*3+j] = g.next_on_face(a,b);
       prev_on_face[a*3+j] = g.prev_on_face(a,b);
       face_right  [a*3+j] = face_size(g,a,b);

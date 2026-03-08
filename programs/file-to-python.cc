@@ -35,7 +35,7 @@ int main(int ac, char **av)
   cerr << "Nf = " << P.faces.size() << ";\n\n";  
   cerr << "spiral       = array(" << spiral << ")\n\n";
   cerr << "spiral_jumps = array(" << jumps << ");\n\n";
-  cerr << "neighbours   = array(" << P.neighbours << ").reshape(1,N,3);\n\n";
+  cerr << "neighbours   = array(" << static_cast<const neighbours_t&>(P) << ").reshape(1,N,3);\n\n";
   cerr << "pentagons    = array(" << pentagons << ").reshape(1,12,5);\n\n";      
   cerr << "hexagons     = array(" << hexagons  << ").reshape(1,Nf-12,6);\n\n";
   cerr << "points_opt   = array(" << P.points     << ").reshape(1,N,3);\n\n";

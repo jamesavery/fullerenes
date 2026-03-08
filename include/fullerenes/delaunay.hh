@@ -12,7 +12,7 @@ public:
   FulleroidDelaunay(const Triangulation& T) : Triangulation(T.sort_nodes()), edge_lengths(N,N,0)
   {
     for(node_t u=0;u<N;u++)
-      for(node_t v: neighbours[u])
+      for(node_t v: (*this)[u])
 	edge_lengths(u,v) = 1;
   }
 

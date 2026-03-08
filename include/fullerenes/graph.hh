@@ -33,14 +33,11 @@ using namespace std;
 #include "auxiliary.hh"
 #include "matrix.hh"
 
-struct Graph {
-  int N;
-  neighbours_t neighbours;
+struct Graph : neighbours_t {
+  // N, dmax, operator[], nbrs, degree, push_back, etc. inherited from neighbours_t (DenseGraph)
 
-  Graph(size_t N=0, int dmax=GRAPH_DMAX) : N(N), neighbours(N, dmax) {}
-  Graph(const neighbours_t& neighbours) : N(neighbours.size()), neighbours(neighbours) { }
-
-  std::span<const node_t> nbrs(node_t u) const { return neighbours.nbrs(u); }
+  Graph(size_t N=0, int dmax=GRAPH_DMAX) : neighbours_t(node_t(N), dmax) {}
+  Graph(const neighbours_t& nbrs) : neighbours_t(nbrs) {}
 
   bool insert_edge(const arc_t& e, const node_t suc_uv=-1, const node_t suc_vu=-1);
   bool remove_edge(const edge_t& e);
@@ -49,7 +46,7 @@ struct Graph {
   void remove_vertices(set<int> &sv);
   void flip_all_orientations();
 
-  int  arc_ix(node_t u, node_t v) const;  
+  int  arc_ix(node_t u, node_t v) const;
   node_t next(node_t u, node_t v) const;
   node_t prev(node_t u, node_t v) const;
   node_t next_on_face(node_t u, node_t v) const;
@@ -66,14 +63,14 @@ struct Graph {
 				       const unsigned int max_depth = INT_MAX) const;
   matrix<int> all_pairs_shortest_paths(const unsigned int max_depth = INT_MAX) const;
   vector<vector<node_t> > connected_components() const;
-  
+
   // Find shortest cycle of the form s->...->s
   vector<node_t> shortest_cycle(node_t s, const int max_depth) const;
   // Find shortest cycle of the form s->t->r->...->s
   vector<node_t> shortest_cycle(const vector<node_t> &prefix, const int max_depth) const;
   vector<int> multiple_source_shortest_paths(const vector<node_t>& sources, const unsigned int max_depth=INT_MAX) const;
 
-  // vector<int> multiple_source_shortest_paths(const vector<node_t>& sources, const vector<bool>& used_edges, 
+  // vector<int> multiple_source_shortest_paths(const vector<node_t>& sources, const vector<bool>& used_edges,
   //						      const vector<bool>& used_nodes, const unsigned int max_depth=INT_MAX) const;
 
   int hamiltonian_count() const;
@@ -82,14 +79,13 @@ struct Graph {
   coord2d centre2d(const vector<coord2d>& layout) const;
   coord3d centre3d(const vector<coord3d>& layout) const;
 
-  int degree(node_t u) const;
   int max_degree() const;
 
   vector<edge_t>  undirected_edges() const;
   vector<arc_t> directed_edges()   const;
 
   size_t count_edges() const;
-  
+
   friend ostream& operator<<(ostream& s, const Graph& g);
 };
 

@@ -415,7 +415,7 @@ void edge_list_(const graph_ptr *g, int *edges, int *length)
 // Assumes k-regular graph, since fortran handles non-flat data structures poorly.
 void adjacency_list_(const fullerene_graph_ptr *g, const int *k, int *neighbours)
 {
-  const neighbours_t& ns((*g)->neighbours);
+  const neighbours_t& ns(**g);
   
   for(node_t u=0;u<ns.size();u++)
     for(int i=0;i<*k;i++)

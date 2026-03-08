@@ -720,7 +720,7 @@ Graph invertReduction(const Graph& g, const InvSite& site) {
 
     // Copy adjacency lists
     adj_t adj(g.N);
-    for (int i = 0; i < g.N; ++i) adj[i].assign(g.neighbours[i].begin(), g.neighbours[i].end());
+    for (int i = 0; i < g.N; ++i) adj[i].assign(g[i].begin(), g[i].end());
 
     if (site.kind.type == ExpKind::L_type) {
         if (!reconnectStraight(adj, path, strip, tp))
@@ -883,7 +883,7 @@ Graph applyReduction(const Graph& g, const Reduction& red) {
 
         // Copy adjacency and reconnect
         adj_t adj(g.N);
-        for (int i = 0; i < g.N; ++i) adj[i].assign(g.neighbours[i].begin(), g.neighbours[i].end());
+        for (int i = 0; i < g.N; ++i) adj[i].assign(g[i].begin(), g[i].end());
         if (!reconnectStraight(adj, path, strip, tp))
             return Graph();
 
@@ -941,7 +941,7 @@ Graph applyReduction(const Graph& g, const Reduction& red) {
 
         // Copy adjacency and reconnect
         adj_t adj(g.N);
-        for (int i = 0; i < g.N; ++i) adj[i].assign(g.neighbours[i].begin(), g.neighbours[i].end());
+        for (int i = 0; i < g.N; ++i) adj[i].assign(g[i].begin(), g[i].end());
         if (!reconnectBent(adj, path, strip, tp, bentPos, bentLen))
             return Graph();
 

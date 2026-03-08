@@ -106,7 +106,7 @@ node_t end_of_the_line(const Triangulation& G, node_t u0, int i, int a, int b)
 
   // Square one
   q = u0; 			// (0,0)
-  r = G.neighbours[u0][i];	// (1,0)
+  r = G[u0][i];	// (1,0)
   s = G.nextCCW(arc_t(q,r));	// (0,1)
   t = G.nextCCW(arc_t(s,r));	// (1,1)
 
@@ -137,7 +137,7 @@ matrix<int> semisimple_distances(const matrix<int>& Hinit, const Triangulation& 
   for(int i=0;i<H.size();i++) H[i] *= H[i]; // Work with square distances, so that all distances are integers.
 
   for(node_t u=0;u<G.N;u++)
-    for(int i=0;i<G.neighbours[u].size();i++){
+    for(int i=0;i<G[u].size();i++){
 
       // Note: All Eisenstein numbers of the form (a,0) or (0,b) yield same lengths
       //       as graph distance, and are hence covered by initial step. So start from 1.

@@ -38,8 +38,7 @@ int main(int argc, char** argv){
             T_polys(N_runs,chrono::nanoseconds(0));
         
         auto Nf = N /2 + 2;
-        G.neighbours = neighbours_t(Nf, std::vector<node_t>(6));
-        G.N = Nf;
+        static_cast<neighbours_t&>(G) = neighbours_t(Nf, std::vector<node_t>(6));
 
         auto path = "isomerspace_samples/dual_layout_" + to_string(N) + "_seed_42";
         ifstream isomer_sample(path,std::ios::binary);
@@ -56,10 +55,10 @@ int main(int argc, char** argv){
         for (int l = 0; l < N_runs; l++){
             for (int i = 0; i < N_samples; ++i){
                 for (size_t j = 0; j < Nf; j++){
-                    G.neighbours.clear_row(j);
+                    G.clear_row(j);
                     for (size_t k = 0; k < 6; k++) {
                         auto u = input_buffer[id_subset[i]*Nf*6 + j*6 +k];
-                        if(u != UINT16_MAX) G.neighbours.push_back(j, u);
+                        if(u != UINT16_MAX) G.push_back(j, u);
                     }
                 }
                     auto T1 = high_resolution_clock::now(); 

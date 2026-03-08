@@ -295,11 +295,11 @@ vector<int> Symmetry::group_fixpoints(const vector<Permutation>& G) const {
 
 bool Symmetry::reverses_orientation(const Permutation& pi) const 
 {
-  Triangulation piG(neighbours);
+  Triangulation piG(static_cast<const neighbours_t&>(*this));
 
   for(node_t u=0;u<N;u++){
     auto nu = nbrs(u);
-    for(int i=0;i<nu.size();i++) piG.neighbours[pi[u]][i] = pi[nu[i]];
+    for(int i=0;i<nu.size();i++) piG[pi[u]][i] = pi[nu[i]];
   }
   if(piG.next(0,1) == 2) return false;
   if(piG.prev(0,1) != 2){
@@ -309,8 +309,8 @@ bool Symmetry::reverses_orientation(const Permutation& pi) const
     fprintf(stderr,"pi(G).next(0,1) == {%d,%d} (CW,CCW)\n",
 	    piG.prev(0,1),
 	    piG.next(0,1));
-    cout << "pi(G).neighbours[0] = "; for(auto x: piG.neighbours[0]) cout << x << ' '; cout << ";\n";
-    cout << "pi(G).neighbours[1] = "; for(auto x: piG.neighbours[1]) cout << x << ' '; cout << ";\n";
+    cout << "pi(G).neighbours[0] = "; for(auto x: piG[0]) cout << x << ' '; cout << ";\n";
+    cout << "pi(G).neighbours[1] = "; for(auto x: piG[1]) cout << x << ' '; cout << ";\n";
     abort();
   }
   return true;

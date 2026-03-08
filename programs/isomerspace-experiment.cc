@@ -248,7 +248,7 @@ int main(int ac, char **argv)
 
   Graph G;
   auto Nf = N / 2 + 2;
-  G.neighbours = neighbours_t(Nf, std::vector<node_t>(6));
+  static_cast<neighbours_t&>(G) = neighbours_t(Nf, std::vector<node_t>(6));
   G.N = Nf;
 
   constexpr real_t carbon_mass = 1.9944733e-26 /*kg*/, aangstrom_length = 1e-10 /*m*/;
@@ -672,7 +672,7 @@ int main(int ac, char **argv)
     const size_t N = device_graph.size() / 3;
     Graph G(N, true);
     for (node_t u = 0; u < N; u++)
-      G.neighbours.assign_row(u, {device_graph[3 * u], device_graph[3 * u + 1], device_graph[3 * u + 2]});
+      G.assign_row(u, {device_graph[3 * u], device_graph[3 * u + 1], device_graph[3 * u + 2]});
     return G;
   };
 

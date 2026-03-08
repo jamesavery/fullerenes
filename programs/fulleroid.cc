@@ -43,10 +43,10 @@ bool extrude(Triangulation &T, int p)
   for(int i=0;i<5;i++) {
     int pi = T.N + i, pim1 = T.N + ((i+4) % 5), pip1 = T.N + ((i+1)%5);
 
-    T.neighbours.push_back(vector<int>({p,pim1,Hi[i],Hi[(i+1)%5],pip1})); // Neighbour list of pi
-    T.neighbours.assign_row(Hi[i], {pi,pim1,Hi[(i+4)%5],v2[i],v3[i],v4[i],Hi[(i+1)%5]});  // Neighbour list of Hi
+    T.push_back(vector<int>({p,pim1,Hi[i],Hi[(i+1)%5],pip1})); // Neighbour list of pi
+    T.assign_row(Hi[i], {pi,pim1,Hi[(i+4)%5],v2[i],v3[i],v4[i],Hi[(i+1)%5]});  // Neighbour list of Hi
   }
-  T.neighbours.assign_row(p, {T.N,T.N+1,T.N+2,T.N+3,T.N+4}); // neighbours(p) = {p0,...,p4}
+  T.assign_row(p, {T.N,T.N+1,T.N+2,T.N+3,T.N+4}); // neighbours(p) = {p0,...,p4}
   T.N += 5;
 
   return true;
@@ -93,10 +93,10 @@ bool extrude(Polyhedron& P, int p) // Requires that P is a triangulation.
 
   // Update graph
   for(int i=0;i<5;i++) {
-    P.neighbours.push_back(vector<int>({p,pi[(i+4)%5],Hi[i],Hi[(i+1)%5],pi[(i+1)%5]})); // Neighbour list of pi
-    P.neighbours.assign_row(Hi[i], {pi[i],pi[(i+4)%5],Hi[(i+4)%5],v2[i],v3[i],v4[i],Hi[(i+1)%5]});  // Neighbour list of Hi
+    P.push_back(vector<int>({p,pi[(i+4)%5],Hi[i],Hi[(i+1)%5],pi[(i+1)%5]})); // Neighbour list of pi
+    P.assign_row(Hi[i], {pi[i],pi[(i+4)%5],Hi[(i+4)%5],v2[i],v3[i],v4[i],Hi[(i+1)%5]});  // Neighbour list of Hi
   }
-  P.neighbours.assign_row(p, {pi[0],pi[1],pi[2],pi[3],pi[4]});
+  P.assign_row(p, {pi[0],pi[1],pi[2],pi[3],pi[4]});
   P.N += 5;
 
   P.update_from_neighbours();

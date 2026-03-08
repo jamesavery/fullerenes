@@ -14,7 +14,7 @@ vector<coord2d> PlanarGraph::tutte_layout(node_t s, node_t t, node_t r, unsigned
     return vector<coord2d>(); // -> empty layout
 
   if(s<0) s = 0;
-  if(t<0) t = neighbours[s][0];
+  if(t<0) t = (*this)[s][0];
 
   face_t outer_face;
   if(is_consistently_oriented()){
@@ -76,8 +76,8 @@ vector<coord2d> PlanarGraph::tutte_layout_direct(const face_t& outer_face, const
     memset(Afull,0,N*N*sizeof(double));
     for(node_t u=0;u<N;u++){
       Afull[u*(N+1)] = 1.0;
-      for(int i=0;i<neighbours[u].size();i++){
-        const node_t& v(neighbours[u][i]);
+      for(int i=0;i<(*this)[u].size();i++){
+        const node_t& v((*this)[u][i]);
         Afull[u*N+v] = -1.0L/3.0;
       }
     }
@@ -220,7 +220,7 @@ vector<coord2d> PlanarGraph::tutte_layout_iterative(const face_t& outer_face, co
       if(fixed[u]){
         newxys[u] = xys[u];
       } else {
-        auto ns = neighbours[u];
+        auto ns = (*this)[u];
         coord2d neighbour_sum(0.0);
         
         for(int i=0;i<ns.size();i++) neighbour_sum += xys[ns[i]];

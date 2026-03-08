@@ -34,13 +34,13 @@ public:
   
   size_t max_degree() const {
     size_t max_deg = 0;
-    for(node_t u=0; u<N; u++) max_deg = std::max(max_deg, (size_t)neighbours.degree(u));
+    for(node_t u=0; u<N; u++) max_deg = std::max(max_deg, (size_t)degree(u));
     return max_deg;
   }
 
   vector<uint8_t> n_degrees() const {
     vector<uint8_t> nd(max_degree(),0);
-    for(node_t u=0; u<N; u++) nd[neighbours.degree(u)-1]++;
+    for(node_t u=0; u<N; u++) nd[degree(u)-1]++;
     return nd;
   }
   

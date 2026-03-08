@@ -194,7 +194,7 @@ bool PlanarGraph::to_ascii(const PlanarGraph &G, FILE *file)
 {
   // Neighbour list is unique representation of graph that preserves orientation.
   // N is length of list.
-  string s = to_string(G.neighbours);
+  string s = to_string(static_cast<const neighbours_t&>(G));
   fputs(s.c_str(),file);
 
   return ferror(file) == 0;

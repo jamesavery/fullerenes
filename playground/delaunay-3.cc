@@ -80,7 +80,7 @@ int main(int ac, char **av)
 
   {
     node_t v = M-1;
-    vector<node_t> hole(DY.neighbours[v]);
+    vector<node_t> hole(DY[v]);
     int n = hole.size();
 
     cout << "hole = " << hole << ";\n";
@@ -96,7 +96,7 @@ int main(int ac, char **av)
 
 
     output << "g0 = " << DY << ";\n";
-    cout   << "degree"<<(v+1)<<" = " << DY.neighbours[v].size();
+    cout   << "degree"<<(v+1)<<" = " << DY[v].size();
     DY.remove_flat_vertex(v);
     output << "g1 = " << DY << ";\n";
     //    Debug::channel_verbosity["Delaunay"] = Debug::WARNING;
@@ -104,9 +104,9 @@ int main(int ac, char **av)
     while(v>12){
       v--;
 
-      vector<node_t> hole(DY.neighbours[v]);
+      vector<node_t> hole(DY[v]);
       int n = hole.size();
-      cout << "degree"<<(v+1)<<" = " << DY.neighbours[v].size() <<";\n";
+      cout << "degree"<<(v+1)<<" = " << DY[v].size() <<";\n";
       cout << "hole = " << hole << ";\n";
 
       vector<double> angles(n);

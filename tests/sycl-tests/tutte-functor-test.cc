@@ -51,7 +51,7 @@ protected:
     void SetUp() override {
         BuckyGen::next_fullerene(BQ, G);
         Triangulation C21888(spiral_nomenclature("C21888-[3300,3494,4574,4792,8540,8740,9990,10096,10295,10395,10491,10942]-fullerene"));
-        bigbatch.push_back(Graph(C21888.neighbours, true), 0);
+        bigbatch.push_back(Graph(static_cast<const neighbours_t&>(C21888), true), 0);
         batch.push_back(G, 0);
         batch.push_back(G, 1);
     }

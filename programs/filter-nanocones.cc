@@ -48,7 +48,7 @@ int incident_edge(const Graph &G, node_t u, node_t v)
 Triangulation reverse(const Triangulation &G)
 {
   Triangulation Gr = G;
-  for(node_t u=0;u<G.N;u++) std::reverse(Gr.neighbours[u].begin(),Gr.neighbours[u].end());
+  for(node_t u=0;u<G.N;u++) std::reverse(Gr[u].begin(),Gr[u].end());
   return Gr;
 }
 

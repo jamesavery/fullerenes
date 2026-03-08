@@ -101,7 +101,7 @@ int main(int ac, char **av)
   
   output.close();
 
-  cout << "graph  = "<<g.neighbours << "\n";
+  cout << "graph  = "<<static_cast<const neighbours_t&>(g) << "\n";
   cout << "faces  = "<<P.compute_faces()<<"\n";  
   cout << "P0 = "<<P0.points << "\n";
   cout << "P  = "<<P.points << "\n";  
