@@ -1,6 +1,7 @@
 #pragma once
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/geometry.hh"
+#include "fullerenes/span_vector.hh"
 #include <functional>
 
 class Polyhedron;  // forward declaration
@@ -16,8 +17,7 @@ public:
   // Phases: "seed", "placed", "reflected", "patched", "cg", "final".
   // "patched" = after patch optimize, BEFORE full-graph CG (the key one).
   using StepCallback = std::function<void(int step, const char* phase, const Deltahedron& D)>;
-  std::span<coord3d> points;           // view -- always valid when N > 0
-  std::vector<coord3d> owned_points;   // owned storage (empty when viewing external data)
+  Spanify::SpanVector<coord3d> points;
   int iterations_used = 0;  // Set by optimize()
   double final_gmax_L = 0;  // Set by optimize(): max_i(||g_i||*L) at final iteration
   double final_angle_relerr = 0;  // Set by optimize(): max per-angle |theta-pi/3|/(pi/3)
@@ -29,75 +29,16 @@ public:
   double opt_k_flat = 2.0;  // E_flat coefficient for optimize(). Set to 0 to skip phase 1.
   OptMethod opt_method = OptMethod::CG;  // Optimization method for optimize()
 
-  void repoint_coords() { points = std::span<coord3d>(owned_points); }
-
-  void set_points(std::vector<coord3d> pts) {
-    owned_points = std::move(pts);
-    repoint_coords();
-  }
-
   // Constructors
   Deltahedron() = default;
   Deltahedron(const Triangulation& T, std::span<const coord3d> pts);
   Deltahedron(const Polyhedron& P);  // must be a triangulation
 
-  // Rule of 5 (span needs repointing after copy/move)
-  Deltahedron(const Deltahedron& D)
-    : Triangulation(D), owned_points(D.owned_points),
-      iterations_used(D.iterations_used), final_gmax_L(D.final_gmax_L),
-      final_angle_relerr(D.final_angle_relerr), final_n_concave(D.final_n_concave),
-      n_energy_evals(D.n_energy_evals), n_grad_evals(D.n_grad_evals),
-      n_hv_evals(D.n_hv_evals), opt_log(D.opt_log), opt_k_flat(D.opt_k_flat),
-      opt_method(D.opt_method) {
-    if (!owned_points.empty()) repoint_coords();
-    else points = D.points;
-  }
-  Deltahedron(Deltahedron&& D) noexcept
-    : Triangulation(std::move(D)), owned_points(std::move(D.owned_points)),
-      iterations_used(D.iterations_used), final_gmax_L(D.final_gmax_L),
-      final_angle_relerr(D.final_angle_relerr), final_n_concave(D.final_n_concave),
-      n_energy_evals(D.n_energy_evals), n_grad_evals(D.n_grad_evals),
-      n_hv_evals(D.n_hv_evals), opt_log(D.opt_log), opt_k_flat(D.opt_k_flat),
-      opt_method(D.opt_method) {
-    if (!owned_points.empty()) repoint_coords();
-    else points = D.points;
-    D.points = {};
-  }
-  Deltahedron& operator=(const Deltahedron& D) {
-    if (this != &D) {
-      Triangulation::operator=(D);
-      owned_points = D.owned_points;
-      iterations_used = D.iterations_used;
-      final_gmax_L = D.final_gmax_L;
-      final_angle_relerr = D.final_angle_relerr;
-      final_n_concave = D.final_n_concave;
-      n_energy_evals = D.n_energy_evals;
-      n_grad_evals = D.n_grad_evals;
-      n_hv_evals = D.n_hv_evals;
-      opt_log = D.opt_log; opt_k_flat = D.opt_k_flat;
-      opt_method = D.opt_method;
-      if (!owned_points.empty()) repoint_coords();
-      else points = D.points;
-    }
-    return *this;
-  }
-  Deltahedron& operator=(Deltahedron&& D) noexcept {
-    Triangulation::operator=(std::move(D));
-    owned_points = std::move(D.owned_points);
-    iterations_used = D.iterations_used;
-    final_gmax_L = D.final_gmax_L;
-    final_angle_relerr = D.final_angle_relerr;
-    final_n_concave = D.final_n_concave;
-    n_energy_evals = D.n_energy_evals;
-    n_grad_evals = D.n_grad_evals;
-    n_hv_evals = D.n_hv_evals;
-    opt_log = D.opt_log; opt_k_flat = D.opt_k_flat;
-    opt_method = D.opt_method;
-    if (!owned_points.empty()) repoint_coords();
-    else points = D.points;
-    D.points = {};
-    return *this;
-  }
+  // Rule of 5: defaulted (SpanVector handles its own copy/move)
+  Deltahedron(const Deltahedron&) = default;
+  Deltahedron(Deltahedron&&) noexcept = default;
+  Deltahedron& operator=(const Deltahedron&) = default;
+  Deltahedron& operator=(Deltahedron&&) noexcept = default;
 
   // Build from extension path with incremental geometry.
   // Uses tridiagonal Laplacian to place strip vertices at each step.

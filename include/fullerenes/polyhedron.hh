@@ -6,21 +6,14 @@
 
 #include "fullerenes/planargraph.hh"
 #include "fullerenes/fullerenegraph.hh"
+#include "fullerenes/span_vector.hh"
 
 using namespace std;
 
 struct Polyhedron : public PlanarGraph {
   int face_max = INT_MAX;
-  std::span<coord3d> points;           // view -- always valid when N > 0
-  std::vector<coord3d> owned_points;   // owned storage (empty when viewing external data)
+  Spanify::SpanVector<coord3d> points;
   vector<face_t> faces;
-
-  void repoint_coords() { points = std::span<coord3d>(owned_points); }
-
-  void set_points(std::vector<coord3d> pts) {
-    owned_points = std::move(pts);
-    repoint_coords();
-  }
 
   //---- Constructors ----//
   // Default constructor
@@ -38,40 +31,11 @@ struct Polyhedron : public PlanarGraph {
   // Create polyhedron from point collection, assuming shortest distance is approximate bond length
   Polyhedron(const vector<coord3d>& xs, double tolerance = 1.2);
 
-  // Rule of 5 (span needs repointing after copy/move)
-  Polyhedron(const Polyhedron& P)
-    : PlanarGraph(P), face_max(P.face_max), owned_points(P.owned_points), faces(P.faces) {
-    if (!owned_points.empty()) repoint_coords();
-    else points = P.points;
-  }
-  Polyhedron(Polyhedron&& P) noexcept
-    : PlanarGraph(std::move(P)), face_max(P.face_max),
-      owned_points(std::move(P.owned_points)), faces(std::move(P.faces)) {
-    if (!owned_points.empty()) repoint_coords();
-    else points = P.points;
-    P.points = {};
-  }
-  Polyhedron& operator=(const Polyhedron& P) {
-    if (this != &P) {
-      PlanarGraph::operator=(P);
-      face_max = P.face_max;
-      owned_points = P.owned_points;
-      faces = P.faces;
-      if (!owned_points.empty()) repoint_coords();
-      else points = P.points;
-    }
-    return *this;
-  }
-  Polyhedron& operator=(Polyhedron&& P) noexcept {
-    PlanarGraph::operator=(std::move(P));
-    face_max = P.face_max;
-    owned_points = std::move(P.owned_points);
-    faces = std::move(P.faces);
-    if (!owned_points.empty()) repoint_coords();
-    else points = P.points;
-    P.points = {};
-    return *this;
-  }
+  // Rule of 5: defaulted (SpanVector and PlanarGraph handle their own copy/move)
+  Polyhedron(const Polyhedron&) = default;
+  Polyhedron(Polyhedron&&) noexcept = default;
+  Polyhedron& operator=(const Polyhedron&) = default;
+  Polyhedron& operator=(Polyhedron&&) noexcept = default;
 
   double surface_area() const;
 
@@ -177,4 +141,3 @@ struct Polyhedron : public PlanarGraph {
 
   static double dodecahedron_points[20][3];
 };
-

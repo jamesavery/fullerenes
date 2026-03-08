@@ -59,8 +59,8 @@ int main(int ac, char **av)
   string basename("polyhedron-"+to_string(N));
   Polyhedron::to_file(P0,"output/"+basename+"-P0.mol2");
 
-  P0.set_points(g.zero_order_geometry());
-  P0.set_points(g.optimized_geometry(P0.points));
+  P0.points = g.zero_order_geometry();
+  P0.points = g.optimized_geometry(P0.points);
 
   Polyhedron P(P0);
   //  P.optimize();

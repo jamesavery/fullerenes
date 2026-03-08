@@ -24,7 +24,7 @@ struct Quality {
 Quality measure(Deltahedron& D, OptMethod method, const vector<coord3d>& init_pts, int budget_mult) {
   D.opt_method = method;
   D.opt_k_flat = 0;
-  D.set_points(vector<coord3d>(init_pts));
+  D.points = vector<coord3d>(init_pts);
   int Nv = D.N;
   int max_iter = budget_mult * Nv;
 

@@ -117,7 +117,7 @@ static IsomerGeometry analyzeGeometry(const Deltahedron& D) {
     g.edge = computeStats(edges, exp_edge);
 
     // Volume: mesh volume and convex hull volume via Polyhedron
-    Polyhedron P(static_cast<const PlanarGraph&>(D), D.points);
+    Polyhedron P(static_cast<const PlanarGraph&>(D), vector<coord3d>(D.points.begin(), D.points.end()));
     g.volume = P.volume();
     try {
         Polyhedron hull = P.convex_hull();

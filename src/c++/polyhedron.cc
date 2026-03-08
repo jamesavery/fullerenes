@@ -247,9 +247,8 @@ static void orient_polyhedron_neighbours(Polyhedron& P)
 }
 
 Polyhedron::Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_, const int face_max_, const vector<face_t> faces_) :
-  PlanarGraph(G), face_max(face_max_), owned_points(points_), faces(faces_)
+  PlanarGraph(G), face_max(face_max_), points(points_), faces(faces_)
 {
-  repoint_coords();
   if(!is_consistently_oriented()) orient_polyhedron_neighbours(*this);
 
   if(faces.size() == 0){
@@ -382,8 +381,8 @@ Polyhedron Polyhedron::leapfrog_dual() const
   size_t Nf = faces.size();
 
   Polyhedron Plf(Graph(N+Nf));
-  Plf.owned_points.resize(N+Nf);
-  Plf.repoint_coords();
+  Plf.points.owned.resize(N+Nf);
+  Plf.points.repoint();
    
   // Start with all the existing nodes
   for(node_t u=0;u<N;u++){
@@ -427,7 +426,7 @@ Polyhedron Polyhedron::leapfrog_dual() const
 Polyhedron Polyhedron::fullerene_polyhedron(FullereneGraph G)
 {
   Polyhedron P(G,G.zero_order_geometry(),6);
-  P.set_points(G.optimized_geometry(P.points));
+  P.points = G.optimized_geometry(P.points);
 
   P.move_to_origin();		// Center of mass at (0,0,0)
   P.align_with_axes();		// Align with principal axes
@@ -439,7 +438,7 @@ bool Polyhedron::optimize(int opt_method, double ftol)
 {
   if(is_a_fullerene()){
     FullereneGraph g(*this);
-    set_points(g.optimized_geometry(points,opt_method,ftol));
+    points = g.optimized_geometry(points,opt_method,ftol);
     return true;
   } if(is_cubic()) {
     bool optimize_angles = true;

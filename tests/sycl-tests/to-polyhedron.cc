@@ -10,7 +10,7 @@ int main() {
     BuckyGen::next_fullerene(BQ, G);
     PlanarGraph PG = G.dual_graph();
     Polyhedron P = Polyhedron(PG);
-    P.set_points(P.zero_order_geometry());
+    P.points = P.zero_order_geometry();
     std::cout.setstate(std::ios_base::failbit);
     P.optimize();
     std::cout.clear();

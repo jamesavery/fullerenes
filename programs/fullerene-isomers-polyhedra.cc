@@ -44,7 +44,7 @@ int main(int ac, char **av)
     Polyhedron::to_file(P0,s.str()+"-P0.mol2");
       
     Polyhedron P = P0;
-    P.set_points(g.optimized_geometry(P.points));
+    P.points = g.optimized_geometry(P.points);
     bool has_nans = false;
     for(auto p: P.points){
       if(std::isnan(p[0])||std::isnan(p[1])||std::isnan(p[1])) has_nans = true;

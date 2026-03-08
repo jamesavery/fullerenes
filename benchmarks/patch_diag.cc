@@ -143,7 +143,7 @@ static QStats quality(const Deltahedron& D) {
 }
 
 static void write_mol2(const Deltahedron& D, const string& path) {
-    Polyhedron P(static_cast<const PlanarGraph&>(D), D.points);
+    Polyhedron P(static_cast<const PlanarGraph&>(D), vector<coord3d>(D.points.begin(), D.points.end()));
     Polyhedron::to_file(P, path);
 }
 

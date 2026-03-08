@@ -10,17 +10,15 @@
 #include <chrono>
 
 Deltahedron::Deltahedron(const Triangulation& T, std::span<const coord3d> pts)
-  : Triangulation(T), owned_points(pts.begin(), pts.end())
+  : Triangulation(T), points(vector<coord3d>(pts.begin(), pts.end()))
 {
-  repoint_coords();
   assert((int)points.size() == N);
 }
 
 Deltahedron::Deltahedron(const Polyhedron& P)
   : Triangulation(static_cast<const Graph&>(P)),
-    owned_points(P.points.begin(), P.points.end())
+    points(vector<coord3d>(P.points.begin(), P.points.end()))
 {
-  repoint_coords();
   assert(P.is_triangulation());
 }
 
@@ -79,7 +77,7 @@ void Deltahedron::smooth(double q) {
     avg /= degree(u);
     new_points[u] = points[u]*(1.0-q) + avg*q;
   }
-  set_points(std::move(new_points));
+  points = std::move(new_points);
 }
 
 Deltahedron Deltahedron::halma_transform(int m) const {
@@ -1955,7 +1953,7 @@ bool Deltahedron::optimize_patch(std::span<const coord3d> initial_geometry,
 {
   assert((int)initial_geometry.size() == N);
   assert((int)free_mask.size() == N);
-  set_points(vector<coord3d>(initial_geometry.begin(), initial_geometry.end()));
+  points = vector<coord3d>(initial_geometry.begin(), initial_geometry.end());
 
   vector<edge_t> edges = undirected_edges();
 
@@ -2227,7 +2225,7 @@ bool Deltahedron::optimize(std::span<const coord3d> initial_geometry, double tar
 {
   assert((int)initial_geometry.size() == N);
   assert(fixed.empty() || (int)fixed.size() == N);
-  set_points(vector<coord3d>(initial_geometry.begin(), initial_geometry.end()));
+  points = vector<coord3d>(initial_geometry.begin(), initial_geometry.end());
   const bool has_fixed = !fixed.empty();
 
   // Cache edge list (avoid recomputing on every energy evaluation)
@@ -2664,7 +2662,7 @@ bool Deltahedron::optimize(std::span<const coord3d> initial_geometry, double tar
       bool accepted = (rho > 0.1);
 
       if(accepted){
-        set_points(x_trial);
+        points = x_trial;
         E = compute_eg(grad);
         if(rho > 0.75 && znorm > 0.5 * Delta) Delta = min(2.0 * Delta, Delta_max);
       } else {

@@ -45,7 +45,7 @@ int main(int ac, char **av)
   FullereneGraph cubic = G.dual_graph();
 
   Polyhedron P(cubic,cubic.zero_order_geometry(),6);
-  P.set_points(cubic.optimized_geometry(P.points));
+  P.points = cubic.optimized_geometry(P.points);
 
   tri_t T0 = {0,12,G.next(0,12)};
   

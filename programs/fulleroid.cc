@@ -82,8 +82,8 @@ bool extrude(Polyhedron& P, int p) // Requires that P is a triangulation.
 
   // Derive new approximate geometry
   if(P.points.size() == P.N){
-    P.owned_points.resize(P.N+5);
-    P.repoint_coords();
+    P.points.owned.resize(P.N+5);
+    P.points.repoint();
 
     for(int i=0;i<5;i++) P.points[pi[i]] = (P.points[Hi[i]]+P.points[Hi[(i+1)%5]] + P.points[p])/3.0;
   }
