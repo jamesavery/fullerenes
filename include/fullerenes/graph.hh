@@ -39,6 +39,11 @@ struct Graph : Spanify::DenseGraph<node_t> {
 
   Graph() = default;
 
+  // View: wrap existing adjacency memory (caller manages lifetime).
+  Graph(node_t N_, int dmax_, node_t* values_, uint8_t* deg_) {
+    N = N_; dmax = dmax_; values = values_; deg = deg_;
+  }
+
   // Allocating: N vertices, dmax stride, all degrees 0.
   Graph(size_t N_, int dmax_ = GRAPH_DMAX)
       : owned_values(N_ * dmax_, node_t(-1)), owned_deg(N_, 0) {
