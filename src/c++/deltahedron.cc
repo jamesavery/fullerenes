@@ -1390,25 +1390,19 @@ Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, FIL
             diag(step_idx + 1, "placed", D_diag);
         }
 
-        // c. Reflect concave free vertices on the full graph (before patch extraction).
+        // c. Reflect all concave vertices on the full graph (before patch extraction).
         //    This is O(N) and saves the optimizer from spending expensive iterations
-        //    fighting concavity from inverted strip vertices.
+        //    fighting concavity from inverted strip vertices or pre-existing concavities.
         {
-            set<int> free_set;
-            for (int v : step.strip) free_set.insert(v);
-            for (int v : step.path)  free_set.insert(v);
-            for (int v : step.tp)    free_set.insert(v);
-
             vector<int> refl_remap;
             Deltahedron D = extractCompact(rd, full_N, points, refl_remap);
 
-            // Build fixed mask: only free_set vertices may be reflected
-            vector<bool> refl_fixed(D.N, true);
-            for (int u : free_set)
-                if (refl_remap[u] >= 0) refl_fixed[refl_remap[u]] = false;
-
-            for (int pass = 0; pass < 3; pass++)
-                if (D.reflect_concave(D.points, 0, refl_fixed) == 0) break;
+            int pass;
+            for (pass = 0; pass < 20; pass++)
+                if (D.reflect_concave(D.points) == 0) break;
+            if (pass == 20)
+                fprintf(stderr, "WARNING: reflect_concave hit 20-pass limit at step %d (N=%d)\n",
+                        step_idx, D.N);
 
             // Copy reflected coords back to full array
             for (int u = 0; u < full_N; u++)
@@ -1454,23 +1448,41 @@ Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, FIL
             diag(step_idx + 1, "patched", D_diag);
         }
 
-        // g. Full-graph relaxation to release accumulated strain.
+        // g. Full-graph reflect-optimize loop.
+        //    Reflect first to start optimization in convex basin, then optimize
+        //    pure quality.  Loop until reflect finds nothing to fix.
         vector<int> full_remap;
         Deltahedron D = extractCompact(rd, full_N, points, full_remap);
 
         D.opt_k_flat = 0;  // skip E_flat in intermediate steps
-        D.opt_k_conv = 100.0;  // quadratic convexity penalty (margin=0)
+        D.opt_k_conv = 0;   // pure quality; reflect handles convexity
+        D.opt_skip_post_reflect = true;  // we handle reflect in the loop
         D.opt_method = method;
-        // Log details for a few representative steps
         int n_steps = (int)ep.steps.size();
         bool log_this = log && (step_idx <= 2 || step_idx == n_steps/2 || step_idx >= n_steps - 2);
-        if (log_this) D.opt_log = log;
-        D.optimize(D.points, 0, step_tol, {}, max_work_per_step, step_angle_tol);
-        if (log_this) D.opt_log = nullptr;
-        total_relax_iters += D.iterations_used;
-        acc_energy += D.n_energy_evals;
-        acc_grad += D.n_grad_evals;
-        acc_hv += D.n_hv_evals;
+
+        for(int round = 0; round < 10; round++){
+          // Reflect into convex basin
+          int n_refl = 0, pass;
+          for(pass = 0; pass < 20; pass++){
+            int n = D.reflect_concave(D.points);
+            if(n == 0) break;
+            n_refl += n;
+          }
+          if(pass == 20)
+            fprintf(stderr, "WARNING: reflect_concave hit 20-pass limit at step %d round %d (N=%d)\n",
+                    step_idx, round, D.N);
+          if(round > 0 && n_refl == 0) break;  // stable in convex basin
+
+          // Optimize pure quality
+          if (log_this) D.opt_log = log;
+          D.optimize(D.points, 0, step_tol, {}, max_work_per_step, step_angle_tol);
+          if (log_this) D.opt_log = nullptr;
+          total_relax_iters += D.iterations_used;
+          acc_energy += D.n_energy_evals;
+          acc_grad += D.n_grad_evals;
+          acc_hv += D.n_hv_evals;
+        }
 
         // h. Write optimized coordinates back to full array
         for (int u = 0; u < full_N; u++)
@@ -1508,51 +1520,66 @@ Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, FIL
 
     D.opt_k_flat = 0;  // geometry is already 3D from seed expansion; E_flat fights equilateral
 
-    // Two-phase final optimization:
-    // Phase 1: E_conv (margin=0, k=100) with final_method to get into convex basin.
-    //   With margin=0, E_conv=0 at any convex geometry — zero contamination.
-    //   Coarse tolerance only.
-    D.opt_k_conv = 100.0;
+    // Final reflect-optimize loop: reflect first to enter convex basin, then
+    // optimize pure quality.  Loop until reflect finds nothing to fix.
+    D.opt_k_conv = 0;
     D.opt_convex_constraint = false;
-    D.opt_skip_post_reflect = true;  // phase 2 handles convexity via constraint
+    D.opt_skip_post_reflect = true;  // we handle reflect in the loop
     D.opt_method = final_method;
-    if (log) D.opt_log = log;
-    D.optimize(D.points, 0, step_tol, {}, max_work_per_step, step_angle_tol);
-    D.opt_log = nullptr;
-    D.opt_skip_post_reflect = false;
+    int total_final_iters = 0;
 
-    if (diag) diag((int)ep.steps.size() + 1, "reflected", D);
+    for(int round = 0; round < 10; round++){
+      // Reflect into convex basin
+      int n_refl = 0, pass;
+      for(pass = 0; pass < 20; pass++){
+        int n = D.reflect_concave(D.points);
+        if(n == 0) break;
+        n_refl += n;
+      }
+      if(pass == 20)
+        fprintf(stderr, "WARNING: reflect_concave hit 20-pass limit in final round %d (N=%d)\n",
+                round, D.N);
+      if(round > 0 && n_refl == 0) break;  // stable in convex basin
 
-    // Phase 2: Constrained Steihaug with E_conv (exact Hv).
-    //   E_conv is quadratic, identically zero for h>=0 (no contamination
-    //   at convex vertices).  E_conv in both gradient AND Hv product — no mismatch.
-    //   Trust-region constraint rejects steps that make convex vertices concave.
-    //   E_conv pushes concave vertices (h<0) toward h=0.
-    //   No reflect before this phase: h<0 vertices from phase 1 are NOT
-    //   constrained (h_current<0 → free), but E_conv pushes them convex.
-    acc_energy += D.n_energy_evals;
-    acc_grad += D.n_grad_evals;
-    acc_hv += D.n_hv_evals;
-    int phase1_iters = D.iterations_used;
+      if(diag && round == 0) diag((int)ep.steps.size() + 1, "reflected", D);
 
-    D.opt_k_conv = 100.0;
+      // Optimize pure quality from convex starting point
+      if (log) D.opt_log = log;
+      D.optimize(D.points, 0, final_tol, {}, max_work_per_step, final_angle_tol);
+      D.opt_log = nullptr;
+      total_final_iters += D.iterations_used;
+      acc_energy += D.n_energy_evals;
+      acc_grad += D.n_grad_evals;
+      acc_hv += D.n_hv_evals;
+
+      if(log) fprintf(log, "  final round %d: reflected=%d, %d iters, ang=%.2e, conc=%d\n",
+                      round, n_refl, D.iterations_used, D.max_angle_relerr(), D.count_concave());
+    }
+
+    // Final constrained Steihaug polish: h>=0 trust region prevents regression
+    // to concave.  k_conv=0 so the Hessian is pure quality — the constraint
+    // is the only convexity mechanism.
     D.opt_convex_constraint = true;
-    D.opt_skip_post_reflect = true;
     D.opt_method = OptMethod::STEIHAUG;
     if (log) D.opt_log = log;
     D.optimize(D.points, 0, final_tol, {}, max_work_per_step, final_angle_tol);
     D.opt_log = nullptr;
-    D.opt_skip_post_reflect = false;
+    total_final_iters += D.iterations_used;
+    acc_energy += D.n_energy_evals;
+    acc_grad += D.n_grad_evals;
+    acc_hv += D.n_hv_evals;
+    D.opt_convex_constraint = false;
+
+    if(log) fprintf(log, "  final constrained: %d iters, ang=%.2e, conc=%d\n",
+                    D.iterations_used, D.max_angle_relerr(), D.count_concave());
+
+    D.iterations_used = total_final_iters;
     ms_final = chrono::duration<double,milli>(clk::now() - t_final).count();
-    D.iterations_used += phase1_iters;
 
     // Diagnostic: after final optimization
     if (diag) diag((int)ep.steps.size() + 1, "final", D);
 
-    // Accumulate eval counters from all per-step + final optimize calls
-    acc_energy += D.n_energy_evals;
-    acc_grad += D.n_grad_evals;
-    acc_hv += D.n_hv_evals;
+    // Set accumulated eval counters
     D.n_energy_evals = acc_energy;
     D.n_grad_evals = acc_grad;
     D.n_hv_evals = acc_hv;
@@ -2857,12 +2884,14 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
   // Skipped when opt_skip_post_reflect is set (caller will handle convexity).
   if(!opt_skip_post_reflect)
   {
-    int total_reflected = 0;
-    for(int pass = 0; pass < 3; pass++){
+    int total_reflected = 0, pass;
+    for(pass = 0; pass < 20; pass++){
       int n = reflect_concave(points, 0, fixed);
       if(n == 0) break;
       total_reflected += n;
     }
+    if(pass == 20)
+      fprintf(stderr, "WARNING: post-reflect hit 20-pass limit (N=%d)\n", N);
     if(total_reflected > 0){
       // Reflection moved vertices — brief CG (Polak-Ribiere) polish to recover angle quality.
       E = compute_eg(grad);
