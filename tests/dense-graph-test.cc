@@ -55,7 +55,7 @@ INSTANTIATE_TEST_SUITE_P(Sizes, DenseFromGraph, ::testing::Values(20, 60, 80));
 // ---------------------------------------------------------------------------
 
 TEST(DenseMutation, PushBack) {
-    S::DenseGraph<> g(4, 3);
+    S::OwnedDenseGraph<> g(4, 3);
 
     g.push_back(0, 1);
     g.push_back(0, 2);
@@ -69,7 +69,7 @@ TEST(DenseMutation, PushBack) {
 }
 
 TEST(DenseMutation, InsertAt) {
-    S::DenseGraph<> g(1, 4);
+    S::OwnedDenseGraph<> g(1, 4);
 
     g.push_back(0, 1);
     g.push_back(0, 3);
@@ -83,7 +83,7 @@ TEST(DenseMutation, InsertAt) {
 }
 
 TEST(DenseMutation, EraseAt) {
-    S::DenseGraph<> g(1, 4);
+    S::OwnedDenseGraph<> g(1, 4);
 
     g.push_back(0, 1);
     g.push_back(0, 2);
@@ -97,7 +97,7 @@ TEST(DenseMutation, EraseAt) {
 }
 
 TEST(DenseMutation, Find) {
-    S::DenseGraph<> g(1, 3);
+    S::OwnedDenseGraph<> g(1, 3);
 
     g.push_back(0, 5);
     g.push_back(0, 10);
@@ -110,7 +110,7 @@ TEST(DenseMutation, Find) {
 }
 
 TEST(DenseMutation, SpanAndAssign) {
-    S::DenseGraph<> g(2, 3);
+    S::OwnedDenseGraph<> g(2, 3);
 
     // push_back through graph method
     g.push_back(0, 1);

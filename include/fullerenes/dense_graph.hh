@@ -12,96 +12,56 @@
 
 namespace Spanify {
 
+template<typename K> struct OwnedDenseGraph;  // forward declaration
+
 // ---------------------------------------------------------------------------
-// DenseGraph: fixed-stride flat array representation for oriented planar graphs.
+// DenseGraph: non-owning view over fixed-stride flat adjacency data.
 //
 // Each vertex has dmax slots; a degree counter tracks how many are filled.
 // Supports O(dmax) insert/remove at arbitrary cyclic positions.
 //
 // operator[] returns a span over the row's active entries.
-// Structural mutations go through graph methods: push_back, assign_row, etc.
-//
-// dmax is a runtime parameter set at construction:
-//   - Auto-detected from data (brace-init, vector<vector>, fill constructors)
-//   - Explicit for empty graphs: DenseGraph(N, dmax)
-//   - CubicGraph uses dmax=3, Triangulation dmax=10, etc.
 //
 // Template parameter:
-//   K — index type: int32_t (CPU), uint16_t (GPU)
+//   K -- index type: int32_t (CPU), uint16_t (GPU)
 // ---------------------------------------------------------------------------
 template<typename K = int32_t>
 struct DenseGraph {
     K N = 0;
     int dmax = 0;
-    std::vector<K> values;         // [N * dmax] — neighbor IDs, row-major
-    std::vector<uint8_t> deg;      // [N] — current degree of each vertex
+    K* values = nullptr;         // [N * dmax] -- neighbor IDs, row-major
+    uint8_t* deg = nullptr;      // [N] -- current degree of each vertex
 
     // --- Constructors ---
 
     DenseGraph() = default;
 
-    // Explicit: N vertices, given stride, all empty.
-    explicit DenseGraph(K N, int dmax) : N(N), dmax(dmax), values(N * dmax, K(-1)), deg(N, 0) {}
-
-    // Fill constructor: N vertices, each initialized with the given row. dmax = row size.
-    DenseGraph(K N, const std::vector<K>& initial_row)
-        : N(N), dmax(int(initial_row.size())), values(N * dmax, K(-1)),
-          deg(N, uint8_t(initial_row.size())) {
-        for (K v = 0; v < N; ++v)
-            for (int i = 0; i < dmax; ++i)
-                values[v * dmax + i] = initial_row[i];
-    }
-
-    // Brace-init constructor: DenseGraph{{1,2,3},{4,5,6},...}. dmax = max row size.
-    DenseGraph(std::initializer_list<std::initializer_list<K>> adj)
-        : N(K(adj.size())), dmax(0) {
-        for (auto& row : adj) dmax = std::max(dmax, int(row.size()));
-        values.resize(N * dmax, K(-1));
-        deg.resize(N, 0);
-        int v = 0;
-        for (auto& row : adj) {
-            deg[v] = uint8_t(row.size());
-            int i = 0;
-            for (K x : row) values[v * dmax + i++] = x;
-            v++;
-        }
-    }
-
-    // Converting constructor from vector<vector<K>>. dmax = max row size.
-    DenseGraph(const std::vector<std::vector<K>>& adj)
-        : N(K(adj.size())), dmax(0) {
-        for (auto& row : adj) dmax = std::max(dmax, int(row.size()));
-        values.resize(N * dmax, K(-1));
-        deg.resize(N, 0);
-        for (int v = 0; v < int(adj.size()); ++v) {
-            deg[v] = uint8_t(adj[v].size());
-            for (int i = 0; i < int(adj[v].size()); ++i)
-                values[v * dmax + i] = adj[v][i];
-        }
-    }
+    // View constructor: wrap existing storage.
+    DenseGraph(K N, int dmax, K* values, uint8_t* deg)
+        : N(N), dmax(dmax), values(values), deg(deg) {}
 
     // --- operator[] returns span over active entries ---
 
     std::span<K> operator[](K u) {
-        return {values.data() + u * dmax, (size_t)deg[u]};
+        return {values + u * dmax, (size_t)deg[u]};
     }
     std::span<const K> operator[](K u) const {
-        return {values.data() + u * dmax, (size_t)deg[u]};
+        return {values + u * dmax, (size_t)deg[u]};
     }
 
     // --- Span-based accessors ---
 
     std::span<const K> nbrs(K u) const {
-        return {values.data() + u * dmax, (size_t)deg[u]};
+        return {values + u * dmax, (size_t)deg[u]};
     }
 
     std::span<K> nbrs_mut(K u) {
-        return {values.data() + u * dmax, (size_t)deg[u]};
+        return {values + u * dmax, (size_t)deg[u]};
     }
 
     int degree(K u) const { return deg[u]; }
 
-    // --- Mutation (vertex-targeted) ---
+    // --- Per-row mutation (no reallocation) ---
 
     void push_back(K u, K v) {
         assert(deg[u] < dmax);
@@ -111,7 +71,7 @@ struct DenseGraph {
 
     void insert_at(K u, K v, int pos) {
         assert(deg[u] < dmax);
-        K* row = values.data() + u * dmax;
+        K* row = values + u * dmax;
         int d = deg[u];
         for (int i = d; i > pos; --i)
             row[i] = row[i-1];
@@ -120,7 +80,7 @@ struct DenseGraph {
     }
 
     void erase_at(K u, int pos) {
-        K* row = values.data() + u * dmax;
+        K* row = values + u * dmax;
         int d = deg[u];
         for (int i = pos; i < d - 1; ++i)
             row[i] = row[i+1];
@@ -129,7 +89,7 @@ struct DenseGraph {
     }
 
     int find(K u, K v) const {
-        const K* row = values.data() + u * dmax;
+        const K* row = values + u * dmax;
         for (int i = 0; i < deg[u]; ++i)
             if (row[i] == v) return i;
         return -1;
@@ -169,28 +129,6 @@ struct DenseGraph {
 
     int size() const { return N; }
 
-    void resize(int new_N) {
-        values.resize(new_N * dmax, K(-1));
-        deg.resize(new_N, 0);
-        N = K(new_N);
-    }
-
-    void push_back(const std::vector<K>& row) {
-        assert(int(row.size()) <= dmax);
-        values.resize((N + 1) * dmax, K(-1));
-        deg.push_back(uint8_t(row.size()));
-        for (int i = 0; i < int(row.size()); ++i)
-            values[N * dmax + i] = row[i];
-        N++;
-    }
-
-    void pop_back() {
-        assert(N > 0);
-        N--;
-        values.resize(N * dmax);
-        deg.resize(N);
-    }
-
     std::vector<std::vector<K>> to_vectors() const {
         std::vector<std::vector<K>> adj(N);
         for (K v = 0; v < N; ++v) {
@@ -200,17 +138,155 @@ struct DenseGraph {
         }
         return adj;
     }
+};
+
+// ---------------------------------------------------------------------------
+// OwnedDenseGraph: owning version with vector storage.
+// Inherits all view/mutation methods from DenseGraph.
+// ---------------------------------------------------------------------------
+template<typename K = int32_t>
+struct OwnedDenseGraph : DenseGraph<K> {
+    std::vector<K> owned_values;
+    std::vector<uint8_t> owned_deg;
+
+    void repoint() {
+        this->values = owned_values.data();
+        this->deg = owned_deg.data();
+    }
+
+    // Bring base push_back(K,K) into scope (otherwise hidden by push_back(vector))
+    using DenseGraph<K>::push_back;
+
+    // --- Constructors ---
+
+    OwnedDenseGraph() = default;
+
+    // Explicit: N vertices, given stride, all empty.
+    explicit OwnedDenseGraph(K N, int dmax)
+        : owned_values(N * dmax, K(-1)), owned_deg(N, 0) {
+        this->N = N; this->dmax = dmax; repoint();
+    }
+
+    // Fill constructor: N vertices, each initialized with the given row.
+    OwnedDenseGraph(K N, const std::vector<K>& initial_row)
+        : owned_values(N * int(initial_row.size()), K(-1)),
+          owned_deg(N, uint8_t(initial_row.size())) {
+        this->N = N; this->dmax = int(initial_row.size()); repoint();
+        for (K v = 0; v < N; ++v)
+            for (int i = 0; i < this->dmax; ++i)
+                this->values[v * this->dmax + i] = initial_row[i];
+    }
+
+    // Brace-init constructor: OwnedDenseGraph{{1,2,3},{4,5,6},...}.
+    OwnedDenseGraph(std::initializer_list<std::initializer_list<K>> adj) {
+        this->N = K(adj.size());
+        this->dmax = 0;
+        for (auto& row : adj) this->dmax = std::max(this->dmax, int(row.size()));
+        owned_values.resize(this->N * this->dmax, K(-1));
+        owned_deg.resize(this->N, 0);
+        repoint();
+        int v = 0;
+        for (auto& row : adj) {
+            this->deg[v] = uint8_t(row.size());
+            int i = 0;
+            for (K x : row) this->values[v * this->dmax + i++] = x;
+            v++;
+        }
+    }
+
+    // Converting constructor from vector<vector<K>>.
+    OwnedDenseGraph(const std::vector<std::vector<K>>& adj) {
+        this->N = K(adj.size());
+        this->dmax = 0;
+        for (auto& row : adj) this->dmax = std::max(this->dmax, int(row.size()));
+        owned_values.resize(this->N * this->dmax, K(-1));
+        owned_deg.resize(this->N, 0);
+        repoint();
+        for (int v = 0; v < int(adj.size()); ++v) {
+            this->deg[v] = uint8_t(adj[v].size());
+            for (int i = 0; i < int(adj[v].size()); ++i)
+                this->values[v * this->dmax + i] = adj[v][i];
+        }
+    }
+
+    // Converting constructor from DenseGraph view (copies data).
+    OwnedDenseGraph(const DenseGraph<K>& v) {
+        this->N = v.N; this->dmax = v.dmax;
+        if (v.N > 0 && v.values) {
+            owned_values.assign(v.values, v.values + v.N * v.dmax);
+            owned_deg.assign(v.deg, v.deg + v.N);
+        }
+        repoint();
+    }
+
+    // --- Rule of 5 ---
+
+    OwnedDenseGraph(const OwnedDenseGraph& o)
+        : owned_values(o.owned_values), owned_deg(o.owned_deg) {
+        this->N = o.N; this->dmax = o.dmax; repoint();
+    }
+
+    OwnedDenseGraph(OwnedDenseGraph&& o) noexcept
+        : owned_values(std::move(o.owned_values)), owned_deg(std::move(o.owned_deg)) {
+        this->N = o.N; this->dmax = o.dmax; repoint();
+        o.values = nullptr; o.deg = nullptr; o.N = 0;
+    }
+
+    OwnedDenseGraph& operator=(const OwnedDenseGraph& o) {
+        if (this != &o) {
+            this->N = o.N; this->dmax = o.dmax;
+            owned_values = o.owned_values;
+            owned_deg = o.owned_deg;
+            repoint();
+        }
+        return *this;
+    }
+
+    OwnedDenseGraph& operator=(OwnedDenseGraph&& o) noexcept {
+        this->N = o.N; this->dmax = o.dmax;
+        owned_values = std::move(o.owned_values);
+        owned_deg = std::move(o.owned_deg);
+        repoint();
+        o.values = nullptr; o.deg = nullptr; o.N = 0;
+        return *this;
+    }
+
+    // --- Resize operations (require reallocation) ---
+
+    void resize(int new_N) {
+        owned_values.resize(new_N * this->dmax, K(-1));
+        owned_deg.resize(new_N, 0);
+        this->N = K(new_N);
+        repoint();
+    }
+
+    void push_back(const std::vector<K>& row) {
+        assert(int(row.size()) <= this->dmax);
+        owned_values.resize((this->N + 1) * this->dmax, K(-1));
+        owned_deg.push_back(uint8_t(row.size()));
+        repoint();
+        for (int i = 0; i < int(row.size()); ++i)
+            this->values[this->N * this->dmax + i] = row[i];
+        this->N++;
+    }
+
+    void pop_back() {
+        assert(this->N > 0);
+        this->N--;
+        owned_values.resize(this->N * this->dmax);
+        owned_deg.resize(this->N);
+        repoint();
+    }
 
     // --- Stride change ---
 
-    // Create a copy with a different dmax (narrowing or widening).
-    DenseGraph restride(int new_dmax) const {
-        DenseGraph g(N, new_dmax);
-        for (K v = 0; v < N; ++v) {
-            assert(deg[v] <= new_dmax);
-            g.deg[v] = deg[v];
-            for (int i = 0; i < deg[v]; ++i)
-                g.values[v * new_dmax + i] = values[v * dmax + i];
+    OwnedDenseGraph restride(int new_dmax) const {
+        OwnedDenseGraph g(this->N, new_dmax);
+        for (K v = 0; v < this->N; ++v) {
+            assert(this->deg[v] <= new_dmax);
+            g.deg[v] = this->deg[v];
+            for (int i = 0; i < this->deg[v]; ++i)
+                g.values[v * new_dmax + i] = this->values[v * this->dmax + i];
         }
         return g;
     }
@@ -224,9 +300,10 @@ std::ostream& operator<<(std::ostream& s, const DenseGraph<K>& g) {
     for (K v = 0; v < g.N; ++v) {
         if (v) s << ',';
         s << '[';
-        for (int i = 0; i < g.deg[v]; ++i) {
+        auto row = g[v];
+        for (int i = 0; i < int(row.size()); ++i) {
             if (i) s << ',';
-            s << g.values[v * g.dmax + i];
+            s << row[i];
         }
         s << ']';
     }
@@ -263,8 +340,8 @@ PlanarCSR<Owned, K> freeze(const DenseGraph<K>& g) {
 // Caller must choose dmax large enough for the graph's maximum degree.
 // ---------------------------------------------------------------------------
 template<typename K>
-DenseGraph<K> thaw(const PlanarCSR<Owned, K>& csr, int dmax) {
-    DenseGraph<K> g(csr.N, dmax);
+OwnedDenseGraph<K> thaw(const PlanarCSR<Owned, K>& csr, int dmax) {
+    OwnedDenseGraph<K> g(csr.N, dmax);
     for (K v = 0; v < csr.N; ++v) {
         K d = csr.offsets[v+1] - csr.offsets[v];
         assert(d <= dmax);
@@ -279,10 +356,10 @@ DenseGraph<K> thaw(const PlanarCSR<Owned, K>& csr, int dmax) {
 // Conversion: vector<vector<int>> -> Dense. O(N).
 // ---------------------------------------------------------------------------
 template<typename K = int32_t>
-DenseGraph<K> dense_from_neighbours(int N_verts,
+OwnedDenseGraph<K> dense_from_neighbours(int N_verts,
                                      const std::vector<std::vector<int>>& neighbours,
                                      int dmax) {
-    DenseGraph<K> g(K(N_verts), dmax);
+    OwnedDenseGraph<K> g(K(N_verts), dmax);
     for (int v = 0; v < N_verts; ++v) {
         assert(int(neighbours[v].size()) <= dmax);
         g.deg[v] = uint8_t(neighbours[v].size());
