@@ -42,6 +42,17 @@ container_output(vector);
 container_output(list);
 container_output(set);
 
+template<typename T> ostream& operator<<(ostream& s, std::span<T> v)
+{
+  s << LIST_OPEN;
+  for(size_t i=0;i<v.size();i++){
+    if(i) s << ",";
+    s << v[i];
+  }
+  s << LIST_CLOSE;
+  return s;
+}
+
 
 // Directed edge is an ordered pair of nodes
 typedef pair<node_t,node_t> arc_t;

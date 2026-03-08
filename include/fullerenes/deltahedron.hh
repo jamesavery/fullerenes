@@ -16,7 +16,8 @@ public:
   // Phases: "seed", "placed", "reflected", "patched", "cg", "final".
   // "patched" = after patch optimize, BEFORE full-graph CG (the key one).
   using StepCallback = std::function<void(int step, const char* phase, const Deltahedron& D)>;
-  vector<coord3d> points;
+  std::span<coord3d> points;           // view -- always valid when N > 0
+  std::vector<coord3d> owned_points;   // owned storage (empty when viewing external data)
   int iterations_used = 0;  // Set by optimize()
   double final_gmax_L = 0;  // Set by optimize(): max_i(||g_i||*L) at final iteration
   double final_angle_relerr = 0;  // Set by optimize(): max per-angle |theta-pi/3|/(pi/3)
@@ -28,10 +29,75 @@ public:
   double opt_k_flat = 2.0;  // E_flat coefficient for optimize(). Set to 0 to skip phase 1.
   OptMethod opt_method = OptMethod::CG;  // Optimization method for optimize()
 
+  void repoint_coords() { points = std::span<coord3d>(owned_points); }
+
+  void set_points(std::vector<coord3d> pts) {
+    owned_points = std::move(pts);
+    repoint_coords();
+  }
+
   // Constructors
   Deltahedron() = default;
-  Deltahedron(const Triangulation& T, const vector<coord3d>& points);
+  Deltahedron(const Triangulation& T, std::span<const coord3d> pts);
   Deltahedron(const Polyhedron& P);  // must be a triangulation
+
+  // Rule of 5 (span needs repointing after copy/move)
+  Deltahedron(const Deltahedron& D)
+    : Triangulation(D), owned_points(D.owned_points),
+      iterations_used(D.iterations_used), final_gmax_L(D.final_gmax_L),
+      final_angle_relerr(D.final_angle_relerr), final_n_concave(D.final_n_concave),
+      n_energy_evals(D.n_energy_evals), n_grad_evals(D.n_grad_evals),
+      n_hv_evals(D.n_hv_evals), opt_log(D.opt_log), opt_k_flat(D.opt_k_flat),
+      opt_method(D.opt_method) {
+    if (!owned_points.empty()) repoint_coords();
+    else points = D.points;
+  }
+  Deltahedron(Deltahedron&& D) noexcept
+    : Triangulation(std::move(D)), owned_points(std::move(D.owned_points)),
+      iterations_used(D.iterations_used), final_gmax_L(D.final_gmax_L),
+      final_angle_relerr(D.final_angle_relerr), final_n_concave(D.final_n_concave),
+      n_energy_evals(D.n_energy_evals), n_grad_evals(D.n_grad_evals),
+      n_hv_evals(D.n_hv_evals), opt_log(D.opt_log), opt_k_flat(D.opt_k_flat),
+      opt_method(D.opt_method) {
+    if (!owned_points.empty()) repoint_coords();
+    else points = D.points;
+    D.points = {};
+  }
+  Deltahedron& operator=(const Deltahedron& D) {
+    if (this != &D) {
+      Triangulation::operator=(D);
+      owned_points = D.owned_points;
+      iterations_used = D.iterations_used;
+      final_gmax_L = D.final_gmax_L;
+      final_angle_relerr = D.final_angle_relerr;
+      final_n_concave = D.final_n_concave;
+      n_energy_evals = D.n_energy_evals;
+      n_grad_evals = D.n_grad_evals;
+      n_hv_evals = D.n_hv_evals;
+      opt_log = D.opt_log; opt_k_flat = D.opt_k_flat;
+      opt_method = D.opt_method;
+      if (!owned_points.empty()) repoint_coords();
+      else points = D.points;
+    }
+    return *this;
+  }
+  Deltahedron& operator=(Deltahedron&& D) noexcept {
+    Triangulation::operator=(std::move(D));
+    owned_points = std::move(D.owned_points);
+    iterations_used = D.iterations_used;
+    final_gmax_L = D.final_gmax_L;
+    final_angle_relerr = D.final_angle_relerr;
+    final_n_concave = D.final_n_concave;
+    n_energy_evals = D.n_energy_evals;
+    n_grad_evals = D.n_grad_evals;
+    n_hv_evals = D.n_hv_evals;
+    opt_log = D.opt_log; opt_k_flat = D.opt_k_flat;
+    opt_method = D.opt_method;
+    if (!owned_points.empty()) repoint_coords();
+    else points = D.points;
+    D.points = {};
+    return *this;
+  }
 
   // Build from extension path with incremental geometry.
   // Uses tridiagonal Laplacian to place strip vertices at each step.
@@ -67,30 +133,13 @@ public:
   Deltahedron halma_transform(int m) const;
 
   // Optimize geometry toward equilateral triangles.
-  // Replaces this->points with optimized coordinates.
-  // target_L: desired edge length (0 = compute from mean of initial edges).
-  // max_iter: maximum CG iterations (default 3000).
-  // grad_tol: dimensionless convergence tolerance (default 1e-10).
-  //           Convergence is declared when max_i(||g_i|| * L) < grad_tol,
-  //           i.e. the largest per-vertex force in dimensionless units is
-  //           below this threshold.  This is scale-invariant: the same
-  //           tolerance gives the same geometric quality regardless of N or L.
-  // Returns true if converged.
-  bool optimize(const vector<coord3d>& initial_geometry, double target_L = 0, int max_iter = 3000, double grad_tol = 1e-10,
+  bool optimize(std::span<const coord3d> initial_geometry, double target_L = 0, int max_iter = 3000, double grad_tol = 1e-10,
                 const vector<bool>& fixed = {},
                 long long max_work = 0,
                 double angle_tol = 0);
 
   // Optimize a small local patch using trust-region Newton.
-  // Called on a sub-Deltahedron extracted by extractPatch (O(1) vertices).
-  // free_mask[i] = true for vertices that may move; false = fixed boundary.
-  // Uses E_bond + E_angle + E_conv (softplus convexity bias) + hard
-  // convexity check (h >= -0.05*L for all free vertices).
-  // Solves the trust-region subproblem via lambda-search on (H+lambda*I),
-  // which naturally handles indefinite Hessians.
-  // target_L: desired edge length (0 = compute from boundary edges).
-  // Returns true if converged.
-  bool optimize_patch(const vector<coord3d>& initial_geometry,
+  bool optimize_patch(std::span<const coord3d> initial_geometry,
                       const vector<bool>& free_mask,
                       const vector<bool>& interior_mask = {},
                       double target_L = 0,
@@ -98,21 +147,14 @@ public:
                       double grad_tol = 1e-6);
 
   // Reflect concave vertices through their neighbor centroid plane.
-  // Vertices with h < -threshold are reflected (h = signed height above
-  // centroid along fan normal; h < 0 = concave).
-  // If fixed is non-empty, fixed[v]=true vertices are skipped.
-  // Returns number of vertices reflected.
-  int reflect_concave(vector<coord3d>& pts, double threshold = 0,
+  int reflect_concave(std::span<coord3d> pts, double threshold = 0,
                       const vector<bool>& fixed = {}) const;
 
   // Finite-difference gradient check. Returns max relative error.
-  // Uses the given geometry (or this->points if empty).
-  double gradient_check(const vector<coord3d>& geometry, double target_L = 0, double eps = 1e-6) const;
+  double gradient_check(std::span<const coord3d> geometry, double target_L = 0, double eps = 1e-6) const;
 
   // Finite-difference Hessian check for optimize_patch's analytical Hessian.
-  // Compares assemble_patch_hessian against FD of the gradient.
-  // Returns max relative error. Prints worst entries if verbose.
-  double hessian_check(const vector<coord3d>& geometry,
+  double hessian_check(std::span<const coord3d> geometry,
                        const vector<bool>& free_mask,
                        const vector<bool>& interior_mask = {},
                        double target_L = 0,

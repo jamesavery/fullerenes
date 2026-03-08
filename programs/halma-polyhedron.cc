@@ -182,7 +182,7 @@ int main(int ac, char **av)
   {
     P.move_to_origin();
     matrix3d If(P.principal_axes());
-    P.points = If*P.points;
+    for(node_t u=0;u<P.N;u++) P.points[u] = If * P.points[u];
 
     Polyhedron::to_file(P,"output/"+basename+"-if.mol2");
 
@@ -208,7 +208,7 @@ int main(int ac, char **av)
   Polyhedron D(P.dual());
   // output << "PD = " << D << ";\n";
 
-  Deltahedron DD{D,D.points};
+  Deltahedron DD{D,vector<coord3d>(D.points.begin(), D.points.end())};
   DD.smooth(.8);
   Deltahedron HD(halma_triangulation(DD,1)); // Might as well roll all this into polyhedron (but assert graph is triangulation)/
   HD = halma_triangulation(HD,1); // Might as well roll all this into polyhedron (but assert graph is triangulation)/

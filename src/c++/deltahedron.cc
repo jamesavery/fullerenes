@@ -9,15 +9,18 @@
 #include <set>
 #include <chrono>
 
-Deltahedron::Deltahedron(const Triangulation& T, const vector<coord3d>& points)
-  : Triangulation(T), points(points)
+Deltahedron::Deltahedron(const Triangulation& T, std::span<const coord3d> pts)
+  : Triangulation(T), owned_points(pts.begin(), pts.end())
 {
+  repoint_coords();
   assert((int)points.size() == N);
 }
 
 Deltahedron::Deltahedron(const Polyhedron& P)
-  : Triangulation(static_cast<const Graph&>(P)), points(P.points)
+  : Triangulation(static_cast<const Graph&>(P)),
+    owned_points(P.points.begin(), P.points.end())
 {
+  repoint_coords();
   assert(P.is_triangulation());
 }
 
@@ -76,7 +79,7 @@ void Deltahedron::smooth(double q) {
     avg /= degree(u);
     new_points[u] = points[u]*(1.0-q) + avg*q;
   }
-  points = new_points;
+  set_points(std::move(new_points));
 }
 
 Deltahedron Deltahedron::halma_transform(int m) const {
@@ -1170,7 +1173,7 @@ static pair<double,coord3d> smallest_eigenpair_3x3(const matrix3d& A)
 static double deltahedron_energy_and_gradient(
     const Deltahedron& D,
     const vector<edge_t>& edges,
-    const vector<coord3d>& x,
+    std::span<const coord3d> x,
     vector<coord3d>* grad,
     double L,           // target edge length
     double k_bond,
@@ -1449,7 +1452,7 @@ static void vec_zero(vector<coord3d>& a){
 static void deltahedron_hv_product(
     const Deltahedron& D,
     const vector<edge_t>& edges,
-    const vector<coord3d>& x,
+    std::span<const coord3d> x,
     const vector<coord3d>& v,
     vector<coord3d>& Hv,
     double L,
@@ -1673,7 +1676,7 @@ static void deltahedron_hv_product(
 static double deltahedron_energy_only(
     const Deltahedron& D,
     const vector<edge_t>& edges,
-    const vector<coord3d>& x,
+    std::span<const coord3d> x,
     double L, double k_bond, double k_angle, double k_curv, double k_flat, double k_conv,
     const vector<bool>& conv_mask = {})
 {
@@ -1714,7 +1717,7 @@ static bool check_convexity(const Deltahedron& D, const vector<coord3d>& x,
 static void assemble_patch_hessian(
     const Deltahedron& D,
     const vector<edge_t>& edges,
-    const vector<coord3d>& x,
+    std::span<const coord3d> x,
     vector<vector<double>>& H,
     const vector<int>& free_idx,
     double L,
@@ -1945,14 +1948,14 @@ static void assemble_patch_hessian(
   }
 }
 
-bool Deltahedron::optimize_patch(const vector<coord3d>& initial_geometry,
+bool Deltahedron::optimize_patch(std::span<const coord3d> initial_geometry,
                                  const vector<bool>& free_mask,
                                  const vector<bool>& interior_mask,
                                  double target_L, int max_iter, double grad_tol)
 {
   assert((int)initial_geometry.size() == N);
   assert((int)free_mask.size() == N);
-  points = initial_geometry;
+  set_points(vector<coord3d>(initial_geometry.begin(), initial_geometry.end()));
 
   vector<edge_t> edges = undirected_edges();
 
@@ -1989,10 +1992,10 @@ bool Deltahedron::optimize_patch(const vector<coord3d>& initial_geometry,
   // Lambdas wrapping energy/gradient computation.
   // interior_mask restricts E_conv to vertices with full neighbor sets in the
   // patch — boundary vertices have truncated degree and produce bogus h values.
-  auto energy_fn = [&](const vector<coord3d>& x) -> double {
+  auto energy_fn = [&](std::span<const coord3d> x) -> double {
     return deltahedron_energy_only(*this, edges, x, L, k_bond, k_angle, k_curv, k_flat, k_conv, interior_mask);
   };
-  auto grad_fn = [&](const vector<coord3d>& x, vector<coord3d>& g) -> double {
+  auto grad_fn = [&](std::span<const coord3d> x, vector<coord3d>& g) -> double {
     return deltahedron_energy_and_gradient(*this, edges, x, &g, L, k_bond, k_angle, k_curv, k_flat, k_conv, interior_mask);
   };
 
@@ -2148,7 +2151,7 @@ bool Deltahedron::optimize_patch(const vector<coord3d>& initial_geometry,
     }
 
     // Trial point
-    vector<coord3d> x_trial = points;
+    vector<coord3d> x_trial(points.begin(), points.end());
     for(int k = 0; k < nfree; k++)
       for(int c = 0; c < 3; c++)
         x_trial[free_idx[k]][c] = points[free_idx[k]][c] + delta[3*k+c];
@@ -2186,7 +2189,7 @@ bool Deltahedron::optimize_patch(const vector<coord3d>& initial_geometry,
   return false;  // didn't converge
 }
 
-int Deltahedron::reflect_concave(vector<coord3d>& pts, double threshold,
+int Deltahedron::reflect_concave(std::span<coord3d> pts, double threshold,
                                   const vector<bool>& fixed) const
 {
   bool has_fixed = !fixed.empty();
@@ -2219,12 +2222,12 @@ int Deltahedron::reflect_concave(vector<coord3d>& pts, double threshold,
   return count;
 }
 
-bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double target_L, int max_iter, double grad_tol,
+bool Deltahedron::optimize(std::span<const coord3d> initial_geometry, double target_L, int max_iter, double grad_tol,
                            const vector<bool>& fixed, long long max_work, double angle_tol)
 {
   assert((int)initial_geometry.size() == N);
   assert(fixed.empty() || (int)fixed.size() == N);
-  points = initial_geometry;
+  set_points(vector<coord3d>(initial_geometry.begin(), initial_geometry.end()));
   const bool has_fixed = !fixed.empty();
 
   // Cache edge list (avoid recomputing on every energy evaluation)
@@ -2661,7 +2664,7 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
       bool accepted = (rho > 0.1);
 
       if(accepted){
-        points = x_trial;
+        set_points(x_trial);
         E = compute_eg(grad);
         if(rho > 0.75 && znorm > 0.5 * Delta) Delta = min(2.0 * Delta, Delta_max);
       } else {
@@ -2694,9 +2697,9 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
   return converged;
 }
 
-double Deltahedron::gradient_check(const vector<coord3d>& geometry, double target_L, double eps) const
+double Deltahedron::gradient_check(std::span<const coord3d> geometry, double target_L, double eps) const
 {
-  vector<coord3d> x = geometry;
+  vector<coord3d> x(geometry.begin(), geometry.end());
   vector<edge_t> edges = undirected_edges();
 
   double L = target_L;
@@ -2739,12 +2742,12 @@ double Deltahedron::gradient_check(const vector<coord3d>& geometry, double targe
   return max_rel_err;
 }
 
-double Deltahedron::hessian_check(const vector<coord3d>& geometry,
+double Deltahedron::hessian_check(std::span<const coord3d> geometry,
                                   const vector<bool>& free_mask,
                                   const vector<bool>& interior_mask,
                                   double target_L, double eps, bool verbose) const
 {
-  vector<coord3d> x = geometry;
+  vector<coord3d> x(geometry.begin(), geometry.end());
   vector<edge_t> edges = undirected_edges();
 
   // Same force constants as optimize_patch

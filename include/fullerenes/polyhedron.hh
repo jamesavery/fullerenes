@@ -10,18 +10,68 @@
 using namespace std;
 
 struct Polyhedron : public PlanarGraph {
-  int face_max;
-  vector<coord3d> points;
+  int face_max = INT_MAX;
+  std::span<coord3d> points;           // view -- always valid when N > 0
+  std::vector<coord3d> owned_points;   // owned storage (empty when viewing external data)
   vector<face_t> faces;
+
+  void repoint_coords() { points = std::span<coord3d>(owned_points); }
+
+  void set_points(std::vector<coord3d> pts) {
+    owned_points = std::move(pts);
+    repoint_coords();
+  }
 
   //---- Constructors ----//
   // Default constructor
-  Polyhedron(const int face_max = INT_MAX) : face_max(face_max) {  }
+  Polyhedron() = default;
+  Polyhedron(const int face_max) : face_max(face_max) {}
+
+  // Owning: copies points into owned storage
   Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_ = vector<coord3d>(), const int face_max = INT_MAX,
+	     const vector<face_t> faces = vector<face_t>());
+
+  // View: uses external coordinate memory (caller manages lifetime)
+  Polyhedron(const PlanarGraph& G, std::span<coord3d> points_, const int face_max = INT_MAX,
 	     const vector<face_t> faces = vector<face_t>());
 
   // Create polyhedron from point collection, assuming shortest distance is approximate bond length
   Polyhedron(const vector<coord3d>& xs, double tolerance = 1.2);
+
+  // Rule of 5 (span needs repointing after copy/move)
+  Polyhedron(const Polyhedron& P)
+    : PlanarGraph(P), face_max(P.face_max), owned_points(P.owned_points), faces(P.faces) {
+    if (!owned_points.empty()) repoint_coords();
+    else points = P.points;
+  }
+  Polyhedron(Polyhedron&& P) noexcept
+    : PlanarGraph(std::move(P)), face_max(P.face_max),
+      owned_points(std::move(P.owned_points)), faces(std::move(P.faces)) {
+    if (!owned_points.empty()) repoint_coords();
+    else points = P.points;
+    P.points = {};
+  }
+  Polyhedron& operator=(const Polyhedron& P) {
+    if (this != &P) {
+      PlanarGraph::operator=(P);
+      face_max = P.face_max;
+      owned_points = P.owned_points;
+      faces = P.faces;
+      if (!owned_points.empty()) repoint_coords();
+      else points = P.points;
+    }
+    return *this;
+  }
+  Polyhedron& operator=(Polyhedron&& P) noexcept {
+    PlanarGraph::operator=(std::move(P));
+    face_max = P.face_max;
+    owned_points = std::move(P.owned_points);
+    faces = std::move(P.faces);
+    if (!owned_points.empty()) repoint_coords();
+    else points = P.points;
+    P.points = {};
+    return *this;
+  }
 
   double surface_area() const;
 
@@ -35,7 +85,7 @@ struct Polyhedron : public PlanarGraph {
   Polyhedron incremental_convex_hull() const;
 
   matrix3d inertia_matrix() const;
-  matrix3d principal_axes() const; 
+  matrix3d principal_axes() const;
 
   void scale(const coord3d& x) {
     for(node_t u=0;u<N;u++) points[u] *= x;
@@ -51,7 +101,7 @@ struct Polyhedron : public PlanarGraph {
   }
   void align_with_axes(){
     matrix3d If(principal_axes());
-    points = If*points;
+    for(node_t u=0;u<N;u++) points[u] = If * points[u];
   }
 
 
@@ -60,10 +110,10 @@ struct Polyhedron : public PlanarGraph {
 
   static Polyhedron C20() {
     constexpr double bond_length = 1.45; // approximate C-C bond length in Angstrom
-    vector<coord3d> points(20);
+    vector<coord3d> pts(20);
     for(node_t u=0;u<20;u++)
-      points[u] = coord3d(dodecahedron_points[u][0],dodecahedron_points[u][1],dodecahedron_points[u][2]) * bond_length;
-    return Polyhedron(FullereneGraph::C20(),points);
+      pts[u] = coord3d(dodecahedron_points[u][0],dodecahedron_points[u][1],dodecahedron_points[u][2]) * bond_length;
+    return Polyhedron(FullereneGraph::C20(),pts);
   }
 
   static vector<coord3d> polar_mapping(const vector<coord2d>& angles) {
@@ -94,7 +144,7 @@ struct Polyhedron : public PlanarGraph {
   // TODO: Add check if force-field is converged
   bool is_triangulation() const;
   bool is_invalid() const;
-  
+
   double  diameter() const;
   coord3d width_height_depth() const;
 
@@ -104,7 +154,7 @@ struct Polyhedron : public PlanarGraph {
   static int format_id(string id);
 
   static Polyhedron fullerene_polyhedron(FullereneGraph G);
-  
+
   static Polyhedron from_file(string path);
   static Polyhedron from_file(FILE *file, string format);
   static Polyhedron from_xyz(FILE *file);
@@ -114,18 +164,17 @@ struct Polyhedron : public PlanarGraph {
   static bool to_file(const Polyhedron &G, FILE *file, string format);
   static bool to_ascii(const Polyhedron &G, FILE *file);
   static bool to_wavefront_obj(const Polyhedron &G, FILE *file);
-  static bool to_turbomole(const Polyhedron &G, FILE *file);  
+  static bool to_turbomole(const Polyhedron &G, FILE *file);
   static bool to_gaussian(const Polyhedron &P, FILE *file, string header="");
   static bool to_xyz(const Polyhedron &G, FILE *file);
   static bool to_mol2(const Polyhedron &G, FILE *file);
-  static bool to_cc1(const Polyhedron &G, FILE *file);      
-			      
+  static bool to_cc1(const Polyhedron &G, FILE *file);
+
   string to_latex(bool show_dual = false, bool number_vertices = false, bool include_latex_header = false) const;
-  string to_povray(double w_cm = -1, double h_cm = 10, 
+  string to_povray(double w_cm = -1, double h_cm = 10,
 		   int line_colour = 0x888888, int vertex_colour = 0x667744, int face_colour = 0xc03500,
 		   double line_width = 0.7, double vertex_diameter = 2.0, double face_opacity = 0.4) const;
 
   static double dodecahedron_points[20][3];
 };
-
 

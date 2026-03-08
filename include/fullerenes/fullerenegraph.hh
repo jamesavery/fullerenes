@@ -43,7 +43,7 @@ public:
   matrix<int> pentagon_distance_mtx() const;
 
   vector<coord3d> zero_order_geometry(double scalerad=4) const;
-  vector<coord3d> optimized_geometry(const vector<coord3d>& initial_geometry, int opt_method = 3, double ftol = 1e-12) const;
+  vector<coord3d> optimized_geometry(std::span<const coord3d> initial_geometry, int opt_method = 3, double ftol = 1e-12) const;
 
   static FullereneGraph C20() {
     // CW-oriented neighbour lists for dodecahedral C20, obtained from buckygen

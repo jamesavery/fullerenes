@@ -18,7 +18,7 @@ double Polyhedron::diameter() const {
 
 // Helper: build the extended point list for centroid triangulation.
 // Appends each face's centroid to the vertex list.
-static vector<coord3d> centroid_points(const vector<coord3d>& points, const vector<face_t>& faces) {
+static vector<coord3d> centroid_points(std::span<const coord3d> points, const vector<face_t>& faces) {
   vector<coord3d> pts(points.begin(), points.end());
   for (const auto& f : faces) pts.push_back(f.centroid(points));
   return pts;
@@ -192,11 +192,11 @@ Polyhedron Polyhedron::incremental_convex_hull() const {
 }
 
 struct sort_ccw_coord3d {
-  const vector<coord3d> &points;
+  std::span<const coord3d> points;
   coord3d X, Y, n;
 
   // Points are only neighbour displacements from origin-node
-  sort_ccw_coord3d(const vector<coord3d>& points)
+  sort_ccw_coord3d(std::span<const coord3d> points)
     : points(points) {
 
     // TODO: More numerically robust method    
@@ -246,18 +246,29 @@ static void orient_polyhedron_neighbours(Polyhedron& P)
   }
 }
 
-Polyhedron::Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_, const int face_max_, const vector<face_t> faces_) : 
-  PlanarGraph(G), face_max(face_max_), points(points_), faces(faces_)
+Polyhedron::Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_, const int face_max_, const vector<face_t> faces_) :
+  PlanarGraph(G), face_max(face_max_), owned_points(points_), faces(faces_)
 {
+  repoint_coords();
   if(!is_consistently_oriented()) orient_polyhedron_neighbours(*this);
 
-  //  for(node_t u=0;u<N;u++) points[u] = points_[u];
-  
   if(faces.size() == 0){
     faces = compute_faces(face_max);
     face_max = 0;
     for(int i=0;i<faces.size();i++) if(faces[i].size() > face_max) face_max = faces[i].size();
-  } 
+  }
+}
+
+Polyhedron::Polyhedron(const PlanarGraph& G, std::span<coord3d> points_, const int face_max_, const vector<face_t> faces_) :
+  PlanarGraph(G), face_max(face_max_), points(points_), faces(faces_)
+{
+  if(!is_consistently_oriented()) orient_polyhedron_neighbours(*this);
+
+  if(faces.size() == 0){
+    faces = compute_faces(face_max);
+    face_max = 0;
+    for(int i=0;i<faces.size();i++) if(faces[i].size() > face_max) face_max = faces[i].size();
+  }
 }
 
 Polyhedron::Polyhedron(const vector<coord3d>& xs, double tolerance) 
@@ -282,7 +293,7 @@ Polyhedron::Polyhedron(const vector<coord3d>& xs, double tolerance)
     }
   }
 
-  (*this) = Polyhedron(PlanarGraph(Graph(nb)), xs);
+  *this = Polyhedron(PlanarGraph(Graph(nb)), xs);
 }
 
 
@@ -371,7 +382,8 @@ Polyhedron Polyhedron::leapfrog_dual() const
   size_t Nf = faces.size();
 
   Polyhedron Plf(Graph(N+Nf));
-  Plf.points.resize(N+Nf);
+  Plf.owned_points.resize(N+Nf);
+  Plf.repoint_coords();
    
   // Start with all the existing nodes
   for(node_t u=0;u<N;u++){
@@ -415,7 +427,7 @@ Polyhedron Polyhedron::leapfrog_dual() const
 Polyhedron Polyhedron::fullerene_polyhedron(FullereneGraph G)
 {
   Polyhedron P(G,G.zero_order_geometry(),6);
-  P.points = G.optimized_geometry(P.points);
+  P.set_points(G.optimized_geometry(P.points));
 
   P.move_to_origin();		// Center of mass at (0,0,0)
   P.align_with_axes();		// Align with principal axes
@@ -427,7 +439,7 @@ bool Polyhedron::optimize(int opt_method, double ftol)
 {
   if(is_a_fullerene()){
     FullereneGraph g(*this);
-    points = g.optimized_geometry(points,opt_method,ftol);
+    set_points(g.optimized_geometry(points,opt_method,ftol));
     return true;
   } if(is_cubic()) {
     bool optimize_angles = true;

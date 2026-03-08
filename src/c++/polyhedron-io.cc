@@ -477,7 +477,7 @@ Polyhedron Polyhedron::from_mol2(FILE *file)
 
   Polyhedron P;
   static_cast<neighbours_t&>(P) = static_cast<const neighbours_t&>(G);
-  P.points = points;
+  P.set_points(std::move(points));
   {
     vector<coord2d> layout = P.tutte_layout();
     layout2d::orient_neighbours(P, layout);

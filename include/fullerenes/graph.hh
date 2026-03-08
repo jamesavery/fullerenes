@@ -77,7 +77,7 @@ struct Graph : neighbours_t {
   int hamiltonian_count(node_t current_node, vector<bool>& used_edges, vector<bool>& used_nodes, vector<node_t>& path, const vector<int>& distances) const;
 
   coord2d centre2d(const vector<coord2d>& layout) const;
-  coord3d centre3d(const vector<coord3d>& layout) const;
+  coord3d centre3d(std::span<const coord3d> layout) const;
 
   int max_degree() const;
 

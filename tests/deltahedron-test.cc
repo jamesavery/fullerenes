@@ -865,7 +865,7 @@ static void check_convexity(const Deltahedron& D, double tol = 1e-6) {
 
 TEST_F(DeltahedronTest, GradientCheck_Icosahedron) {
   // Perturbed icosahedron ensures all gradient terms are exercised
-  vector<coord3d> noisy(ico.points);
+  vector<coord3d> noisy(ico.points.begin(), ico.points.end());
   srand(123);
   for(int u = 0; u < ico.N; u++)
     for(int d = 0; d < 3; d++)
@@ -878,7 +878,7 @@ TEST_F(DeltahedronTest, GradientCheck_Icosahedron) {
 
 TEST_F(DeltahedronTest, GradientCheck_LargePerturbation) {
   // Large perturbation creates concavities, exercising E_conv gradient
-  vector<coord3d> noisy(ico.points);
+  vector<coord3d> noisy(ico.points.begin(), ico.points.end());
   srand(789);
   for(int u = 0; u < ico.N; u++)
     for(int d = 0; d < 3; d++)
@@ -894,7 +894,7 @@ TEST_F(DeltahedronTest, GradientCheck_LargePerturbation) {
 
 TEST_F(DeltahedronTest, HessianCheck_Icosahedron) {
   // All vertices free, small perturbation
-  vector<coord3d> noisy(ico.points);
+  vector<coord3d> noisy(ico.points.begin(), ico.points.end());
   srand(456);
   for(int u = 0; u < ico.N; u++)
     for(int d = 0; d < 3; d++)
@@ -908,7 +908,7 @@ TEST_F(DeltahedronTest, HessianCheck_Icosahedron) {
 
 TEST_F(DeltahedronTest, HessianCheck_PartiallyFixed) {
   // Fix half the vertices (boundary), free the other half
-  vector<coord3d> noisy(ico.points);
+  vector<coord3d> noisy(ico.points.begin(), ico.points.end());
   srand(789);
   for(int u = 0; u < ico.N; u++)
     for(int d = 0; d < 3; d++)
@@ -923,7 +923,7 @@ TEST_F(DeltahedronTest, HessianCheck_PartiallyFixed) {
 
 TEST_F(DeltahedronTest, HessianCheck_WithConcavity) {
   // Large perturbation to create concavities, exercising E_conv Hessian
-  vector<coord3d> noisy(ico.points);
+  vector<coord3d> noisy(ico.points.begin(), ico.points.end());
   srand(321);
   for(int u = 0; u < ico.N; u++)
     for(int d = 0; d < 3; d++)
@@ -955,7 +955,7 @@ TEST_F(DeltahedronTest, Optimize_PerturbedIcosahedron) {
   Deltahedron D = ico;
 
   // Add noise to the coordinates
-  vector<coord3d> noisy(ico.points);
+  vector<coord3d> noisy(ico.points.begin(), ico.points.end());
   srand(42);
   for(int u = 0; u < D.N; u++){
     for(int d = 0; d < 3; d++)

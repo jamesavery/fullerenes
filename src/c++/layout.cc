@@ -264,7 +264,7 @@ coord2d Graph::centre2d(const vector<coord2d>& layout) const {
   return centre/double(layout.size());
 }
 
-coord3d Graph::centre3d(const vector<coord3d>& layout) const {
+coord3d Graph::centre3d(std::span<const coord3d> layout) const {
   coord3d centre(0,0,0);
   for(node_t u=0;u<layout.size();u++) centre += layout[u];
   return centre/double(layout.size());

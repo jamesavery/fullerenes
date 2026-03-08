@@ -487,8 +487,9 @@ int main(int ac, char **av)
     const coord3d c2=P.points[it->second];
     coord3d dc = c2-c1;
     //cout << "c1, c2, dc: " << c1 << c2 << dc << endl;
-    P.points.push_back(c1 + dc*(long_edge_single/long_edge_total)); 
-    P.points.push_back(c2 - dc*(long_edge_single/long_edge_total)); 
+    P.owned_points.push_back(c1 + dc*(long_edge_single/long_edge_total));
+    P.owned_points.push_back(c2 - dc*(long_edge_single/long_edge_total));
+    P.repoint_coords();
     //cout << "new point connected to c1: " << c1 + dc*(long_edge_single/long_edge_total) << endl;
     //cout << "new point connected to c2: " << c2 - dc*(long_edge_single/long_edge_total) << endl;
     //cout << "size: " << P.points.size() << endl;
