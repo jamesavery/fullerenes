@@ -169,7 +169,7 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax) const
     node_t u=e_f.first, v=e_f.second, w=-1, i=0;
     do {
       arc_t e_g = get_face_representation({v,u},Fmax);
-      dual.neighbours[i_f].push_back(face_numbers[e_g]);
+      dual.neighbours.push_back(i_f, face_numbers[e_g]);
 
       w = prev(v,u); u = v; v = w;
       assert(++i <= Fmax);
@@ -189,7 +189,7 @@ PlanarGraph PlanarGraph::leapfrog_dual() const
   PlanarGraph lf(Graph(N+Nf));
 
   // Start with all the existing nodes
-  for(node_t u=0;u<N;u++) lf.neighbours[u] = neighbours[u];
+  for(node_t u=0;u<N;u++) lf.neighbours.assign_row(u, neighbours[u]);
 
   // Now connect new face-center nodes in oriented order
   for(int i=0;i<Nf;i++){

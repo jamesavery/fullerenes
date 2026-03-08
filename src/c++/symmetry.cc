@@ -308,8 +308,8 @@ bool Symmetry::reverses_orientation(const Permutation& pi) const
     fprintf(stderr,"pi(G).next(0,1) == {%d,%d} (CW,CCW)\n",
 	    piG.prev(0,1),
 	    piG.next(0,1));
-    cout << "pi(G).neighbours[0] = " << piG.neighbours[0] << ";\n"
-	 << "pi(G).neighbours[1] = " << piG.neighbours[1] << ";\n";
+    cout << "pi(G).neighbours[0] = "; for(auto x: piG.neighbours[0]) cout << x << ' '; cout << ";\n";
+    cout << "pi(G).neighbours[1] = "; for(auto x: piG.neighbours[1]) cout << x << ' '; cout << ";\n";
     abort();
   }
   return true;

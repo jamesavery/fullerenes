@@ -177,7 +177,7 @@ Polyhedron Polyhedron::incremental_convex_hull() const {
     node_t v = first_neighbour[u];
     node_t v0 = v;
     do {
-      nb[u].push_back(v);
+      nb.push_back(u, v);
       v = arc_next.at({u, v});
     } while (v != v0);
   }
@@ -279,8 +279,8 @@ Polyhedron::Polyhedron(const vector<coord3d>& xs, double tolerance)
     for(int j=i+1;j<xs.size();j++){
       double d = (xs[i]-xs[j]).norm();
       if(d <= bondlength*tolerance) {
-        nb[i].push_back(j);
-        nb[j].push_back(i);
+        nb.push_back(i, j);
+        nb.push_back(j, i);
       }
     }
   }
@@ -378,7 +378,7 @@ Polyhedron Polyhedron::leapfrog_dual() const
    
   // Start with all the existing nodes
   for(node_t u=0;u<N;u++){
-    Plf.neighbours[u] = neighbours[u];
+    Plf.neighbours.assign_row(u, neighbours[u]);
     Plf.points[u]     = points[u];
   }
 

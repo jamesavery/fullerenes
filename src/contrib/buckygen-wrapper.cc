@@ -133,7 +133,7 @@ bool next_fullerene(const buckygen_queue& Q, Graph& G)
     neighbours_t adj(Q.Nvertices, GRAPH_DMAX);
     for(int u=0;u<Q.Nvertices;u++)
       for(int i=0; 6>i && (msg.neighbours[u*6+i] != -1); i++)
-	adj[u].push_back(msg.neighbours[u*6+i]);
+	adj.push_back(u, msg.neighbours[u*6+i]);
     // Buckygen's e->next traversal preserves cyclic planar order.
     G = Graph(adj);
 
@@ -225,7 +225,7 @@ bool next_fullerene(const buckygen_queue& Q, Graph& G)
 	neighbours_t adj(H.Nvertices, GRAPH_DMAX);
 	for(int u=0;u<H.Nvertices;u++)
 	  for(int i=0; 6>i && (msg.neighbours[u*6+i] != -1); i++)
-	    adj[u].push_back(msg.neighbours[u*6+i]);
+	    adj.push_back(u, msg.neighbours[u*6+i]);
 	// Buckygen's e->next traversal preserves cyclic planar order.
 	G = Graph(adj);
 

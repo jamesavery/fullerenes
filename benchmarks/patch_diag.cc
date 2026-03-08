@@ -44,37 +44,37 @@ static Graph makeNanotubeDual(int n_rings) {
     neighbours_t adj(N, GRAPH_DMAX);
 
     // pole_N: CCW from outside = cn(0), cn(1), ..., cn(4)
-    for (int i = 0; i < 5; i++) adj[pole_N].push_back(cn(i));
+    for (int i = 0; i < 5; i++) adj.push_back(pole_N, cn(i));
 
     // cn(i) (deg 5): CCW neighbors
     for (int i = 0; i < 5; i++)
-        adj[cn(i)] = {pole_N, cn(i+1), rng(0, i+1), rng(0, i), cn(i-1)};
+        adj.assign_row(cn(i), {pole_N, cn(i+1), rng(0, i+1), rng(0, i), cn(i-1)});
 
     // rng(0, i): connects up to cn(i-1), cn(i) and down to next layer
     if (n_rings == 1) {
         for (int i = 0; i < 5; i++)
-            adj[rng(0, i)] = {cn(i-1), cn(i), rng(0, i+1), cs(i+1), cs(i), rng(0, i-1)};
+            adj.assign_row(rng(0, i), {cn(i-1), cn(i), rng(0, i+1), cs(i+1), cs(i), rng(0, i-1)});
     } else {
         for (int i = 0; i < 5; i++)
-            adj[rng(0, i)] = {cn(i-1), cn(i), rng(0, i+1), rng(1, i+1), rng(1, i), rng(0, i-1)};
+            adj.assign_row(rng(0, i), {cn(i-1), cn(i), rng(0, i+1), rng(1, i+1), rng(1, i), rng(0, i-1)});
     }
 
     // Interior rings: rng(j, i) for 1 <= j <= last-1
     for (int j = 1; j < last; j++)
         for (int i = 0; i < 5; i++)
-            adj[rng(j, i)] = {rng(j-1, i-1), rng(j-1, i), rng(j, i+1), rng(j+1, i+1), rng(j+1, i), rng(j, i-1)};
+            adj.assign_row(rng(j, i), {rng(j-1, i-1), rng(j-1, i), rng(j, i+1), rng(j+1, i+1), rng(j+1, i), rng(j, i-1)});
 
     // rng(last, i): connects down to cs
     if (n_rings >= 2)
         for (int i = 0; i < 5; i++)
-            adj[rng(last, i)] = {rng(last-1, i-1), rng(last-1, i), rng(last, i+1), cs(i+1), cs(i), rng(last, i-1)};
+            adj.assign_row(rng(last, i), {rng(last-1, i-1), rng(last-1, i), rng(last, i+1), cs(i+1), cs(i), rng(last, i-1)});
 
     // cs(i) (deg 5): connected up to rng(last,i-1) and rng(last,i)
     for (int i = 0; i < 5; i++)
-        adj[cs(i)] = {pole_S, cs(i-1), rng(last, i-1), rng(last, i), cs(i+1)};
+        adj.assign_row(cs(i), {pole_S, cs(i-1), rng(last, i-1), rng(last, i), cs(i+1)});
 
     // pole_S (deg 5): CCW from outside (below) = cs(4), cs(3), ..., cs(0)
-    for (int i = 4; i >= 0; i--) adj[pole_S].push_back(cs(i));
+    for (int i = 4; i >= 0; i--) adj.push_back(pole_S, cs(i));
 
     Graph G(adj);
     assert(G.is_consistently_oriented());

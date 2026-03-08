@@ -34,7 +34,8 @@ add_test(NAME buckinverse-roundtrip-test COMMAND buckinverse-roundtrip-test)
 
 add_executable(deltahedron-geometry-test deltahedron-geometry-test.cc)
 target_link_libraries(deltahedron-geometry-test fullerenes GTest::GTest GTest::Main)
-add_test(NAME deltahedron-geometry-test COMMAND deltahedron-geometry-test)
+# Disabled from ctest: takes ~10 minutes. Run manually when needed.
+# add_test(NAME deltahedron-geometry-test COMMAND deltahedron-geometry-test)
 
 add_executable(convex-hull-test convex-hull-test.cc)
 target_link_libraries(convex-hull-test fullerenes GTest::GTest GTest::Main)

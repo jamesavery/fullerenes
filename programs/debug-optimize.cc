@@ -23,7 +23,7 @@ int main(int ac, char **av)
   fclose(file);
 
   PlanarGraph g(N);
-  for(node_t u=0;u<N;u++) g.neighbours[u] = {neighbours_flat[3*u],neighbours_flat[3*u+1],neighbours_flat[3*u+2]};
+  for(node_t u=0;u<N;u++) g.neighbours.assign_row(u, {neighbours_flat[3*u],neighbours_flat[3*u+1],neighbours_flat[3*u+2]});
   
   vector<coord2d> layout = g.tutte_layout();
   cout << layout2d::to_latex(g, layout, 10, 10, true, true, true) << "\n";

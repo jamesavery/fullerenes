@@ -109,26 +109,36 @@ TEST(DenseMutation, Find) {
     EXPECT_EQ(g.find(0, 99), -1);
 }
 
-TEST(DenseMutation, RowProxy) {
+TEST(DenseMutation, SpanAndAssign) {
     S::DenseGraph<> g(2, 3);
 
-    // RowProxy push_back
-    g[0].push_back(1);
-    g[0].push_back(2);
-    g[0].push_back(3);
-    EXPECT_EQ(g[0].size(), 3);
+    // push_back through graph method
+    g.push_back(0, 1);
+    g.push_back(0, 2);
+    g.push_back(0, 3);
+    EXPECT_EQ(g[0].size(), 3u);
     EXPECT_EQ(g[0][0], 1);
     EXPECT_EQ(g[0][1], 2);
 
-    // RowProxy operator=
-    g[1] = {10, 20, 30};
-    EXPECT_EQ(g[1].size(), 3);
+    // assign_row with initializer_list
+    g.assign_row(1, {10, 20, 30});
+    EXPECT_EQ(g[1].size(), 3u);
     EXPECT_EQ(g[1][2], 30);
 
-    // RowProxy convert to vector
-    std::vector<int> v = g[0];
+    // span to vector conversion
+    std::vector<int> v(g[0].begin(), g[0].end());
     EXPECT_EQ(v.size(), 3u);
     EXPECT_EQ(v[0], 1);
+
+    // clear_row
+    g.clear_row(0);
+    EXPECT_EQ(g[0].size(), 0u);
+    EXPECT_EQ(g.degree(0), 0);
+
+    // assign_row with span
+    g.assign_row(0, g[1]);
+    EXPECT_EQ(g[0].size(), 3u);
+    EXPECT_EQ(g[0][0], 10);
 }
 
 // ---------------------------------------------------------------------------
@@ -184,7 +194,7 @@ TEST_P(ThawTest, CubicFreezeThawRoundTrip) {
     auto csr = S::freeze(FG.neighbours);
     auto dense2 = S::thaw(csr, 3);
 
-    EXPECT_EQ(int(dense2.Nv), N);
+    EXPECT_EQ(int(dense2.N), N);
     for (int v = 0; v < N; ++v) {
         EXPECT_EQ(dense2.degree(v), FG.degree(v));
         auto nbs1 = FG.nbrs(v);
@@ -202,7 +212,7 @@ TEST_P(ThawTest, DualFreezeThawRoundTrip) {
     auto csr = S::freeze(dual.neighbours);
     auto dense2 = S::thaw(csr, 6);
 
-    EXPECT_EQ(int(dense2.Nv), dual.N);
+    EXPECT_EQ(int(dense2.N), dual.N);
     for (int v = 0; v < dual.N; ++v) {
         EXPECT_EQ(dense2.degree(v), dual.degree(v));
         auto nbs1 = dual.nbrs(v);

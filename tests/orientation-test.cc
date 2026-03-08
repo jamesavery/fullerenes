@@ -11,8 +11,8 @@ static Graph to_unoriented(const Graph& G) {
   for(node_t u = 0; u < G.N; u++)
     for(node_t v : G.nbrs(u))
       if(u < v) {
-        nb[u].push_back(v);
-        nb[v].push_back(u);
+        nb.push_back(u, v);
+        nb.push_back(v, u);
       }
   return Graph(nb);
 }
@@ -250,8 +250,8 @@ TEST_F(OrientationTest, AdjacencyMatrixPlanarOrient) {
     for(int i = 0; i < N; i++)
       for(int j = i + 1; j < N; j++)
         if(adj[i * N + j]) {
-          nb[i].push_back(j);
-          nb[j].push_back(i);
+          nb.push_back(i, j);
+          nb.push_back(j, i);
         }
 
     Graph recon(nb);

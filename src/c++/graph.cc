@@ -67,7 +67,7 @@ void Graph::remove_isolated_vertices(){
   // cerr << "n new: " << N_new << endl;
   for(int u=0; u<N; u++)
     for(int v: neighbours[u])
-      g.neighbours[new_id[u]].push_back(new_id[v]);
+      g.neighbours.push_back(new_id[u], new_id[v]);
 
   *this = g;
 }

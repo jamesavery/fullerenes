@@ -599,7 +599,7 @@ static vector<int> matchSeedViaSpiralImpl(
         uint8_t m = sv.active;
         for (int p = 0; p < 6; p++) {
             if (m & (1 << p))
-                compact_adj[ci].push_back(to_compact[sv.nbr[p]]);
+                compact_adj.push_back(ci, to_compact[sv.nbr[p]]);
         }
     }
 
@@ -758,7 +758,7 @@ static void computeSeedGeometry(const ExtensionPath& ep, vector<coord3d>& points
         uint8_t m = sv.active;
         for (int p = 0; p < 6; p++)
             if (m & (1 << p))
-                compact_adj[ci].push_back(to_compact[sv.nbr[p]]);
+                compact_adj.push_back(ci, to_compact[sv.nbr[p]]);
     }
 
     Graph seed_graph(compact_adj);
@@ -814,7 +814,7 @@ Deltahedron Deltahedron::fromExtensionPath(const ExtensionPath& ep) {
         compact_points[remap[u]] = points[u];
         uint8_t m = rd.V[u].active;
         for (; m; m &= m - 1)
-            adj[remap[u]].push_back(remap[rd.V[u].nbr[__builtin_ctz(m)]]);
+            adj.push_back(remap[u], remap[rd.V[u].nbr[__builtin_ctz(m)]]);
     }
 
     return Deltahedron(Triangulation(adj), compact_points);
@@ -840,7 +840,7 @@ static Deltahedron extractCompact(
         compact_pts[remap[u]] = points[u];
         uint8_t m = rd.V[u].active;
         for (; m; m &= m - 1)
-            adj[remap[u]].push_back(remap[rd.V[u].nbr[__builtin_ctz(m)]]);
+            adj.push_back(remap[u], remap[rd.V[u].nbr[__builtin_ctz(m)]]);
     }
 
     return Deltahedron(Triangulation(adj), compact_pts);
@@ -894,7 +894,7 @@ static Deltahedron extractPatch(
         for (; mask; mask &= mask - 1) {
             int nb = rd.V[u].nbr[__builtin_ctz(mask)];
             if (remap[nb] >= 0)
-                adj[remap[u]].push_back(remap[nb]);
+                adj.push_back(remap[u], remap[nb]);
         }
     }
 

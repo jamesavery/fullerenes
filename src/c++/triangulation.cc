@@ -27,8 +27,8 @@ vector<tri_t> Triangulation::compute_faces_oriented() const
         node_t w = next_on_face(u,v);
 	if(w==-1){
 	  printf("next_on_face(%d,%d) = prev(%d,%d) = -1\n",u,v,v,u);
-	  printf("\tneibhours[%d] = ",u); cout << neighbours[u] << endl;
-	  printf("\tneibhours[%d] = ",v); cout << neighbours[v] << endl;	  
+	  printf("\tneighbours[%d] = ",u); for(auto x: neighbours[u]) cout << x << ' '; cout << endl;
+	  printf("\tneighbours[%d] = ",v); for(auto x: neighbours[v]) cout << x << ' '; cout << endl;	  
 	  assert(w != -1);
 	}
         //Is This Condition necessary? 
@@ -90,8 +90,8 @@ void Triangulation::compute_lookup_tables(const PlanarGraph&            cubic_gr
 	if((wa<0) || (wb<0)){
 	  printf("next_on_face(%d,%d) = prev(%d,%d) = -1\n",u,v,v,u);
 	  printf("next_on_face(%d,%d) = prev(%d,%d) = -1\n",v,u,u,v);
-	  printf("\tneibhours[%d] = ",u); cout << neighbours[u] << endl;
-	  printf("\tneibhours[%d] = ",v); cout << neighbours[v] << endl;	  
+	  printf("\tneighbours[%d] = ",u); for(auto x: neighbours[u]) cout << x << ' '; cout << endl;
+	  printf("\tneighbours[%d] = ",v); for(auto x: neighbours[v]) cout << x << ' '; cout << endl;	  
 	  assert((wa<0) || (wb<0));
 	}
 
@@ -469,7 +469,7 @@ Triangulation Triangulation::halma_transform(int m, vector<map<edge_t,node_t>>* 
     node_t v = first_nb[u];
     node_t w = v;
     do {
-      neighbours[u].push_back(w);
+      neighbours.push_back(u, w);
       w = nof.at({u,w});
     } while(w != v);
   }
@@ -1169,7 +1169,7 @@ Triangulation Triangulation::sort_nodes() const
   neighbours_t new_neighbours(N, GRAPH_DMAX);
   for(int u=0;u<N;u++)
     for(int i=0;i<degree(u);i++)
-      new_neighbours[newname[u]].push_back(newname[nbrs(u)[i]]);
+      new_neighbours.push_back(newname[u], newname[nbrs(u)[i]]);
 
   return Triangulation(new_neighbours);
 }

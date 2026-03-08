@@ -672,7 +672,7 @@ int main(int ac, char **argv)
     const size_t N = device_graph.size() / 3;
     Graph G(N, true);
     for (node_t u = 0; u < N; u++)
-      G.neighbours[u] = {device_graph[3 * u], device_graph[3 * u + 1], device_graph[3 * u + 2]};
+      G.neighbours.assign_row(u, {device_graph[3 * u], device_graph[3 * u + 1], device_graph[3 * u + 2]});
     return G;
   };
 

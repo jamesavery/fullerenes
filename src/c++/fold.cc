@@ -210,8 +210,8 @@ vector<int> Folding::identify_nodes(const IDCounter<Eisenstein>& grid, const vec
   // Build graph from edge set for connected_components
   neighbours_t same_nb(grid.nextid, GRAPH_DMAX);
   for(const edge_t& e: same_as){
-    same_nb[e.first].push_back(e.second);
-    same_nb[e.second].push_back(e.first);
+    same_nb.push_back(e.first, e.second);
+    same_nb.push_back(e.second, e.first);
   }
   Graph S(same_nb);
   vector<vector<node_t> > components(S.connected_components());
@@ -374,7 +374,7 @@ Triangulation Folding::fold()
   for(node_t u = 0; u < N; u++){
     for(int d = 5; d >= 0; d--){
       if(dir_nb[u][d] >= 0)
-        neighbours[u].push_back(dir_nb[u][d]);
+        neighbours.push_back(u, dir_nb[u][d]);
     }
   }
 

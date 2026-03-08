@@ -225,7 +225,7 @@ void FulleroidDelaunay::align_hole(vector<node_t>& hole) const
 {
   bool done = false;
   while(!done){ // Rotate hole until hole[0] is connected only to hole[-1] and hole[1].
-    const vector<node_t>& n0(neighbours[hole[0]]);    
+    auto n0 = neighbours[hole[0]];
     done = true;
 
     for(int i=2; i< hole.size()-1; i++)
@@ -296,7 +296,8 @@ void FulleroidDelaunay::remove_flat_vertex(node_t v)
   Debug debug("Delaunay",Debug::INFO1);
 
   debug << "(*begin remove flat vertex*)" << endl;
-  vector<node_t> hole(neighbours[v]);
+  auto nv = neighbours[v];
+  vector<node_t> hole(nv.begin(), nv.end());
   debug << "hole=" << (hole+1) << "\n";
 
   // check if hole[0] is already connected to any of the other hole-nodes in

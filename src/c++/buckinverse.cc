@@ -720,7 +720,7 @@ Graph invertReduction(const Graph& g, const InvSite& site) {
 
     // Copy adjacency lists
     adj_t adj(g.N);
-    for (int i = 0; i < g.N; ++i) adj[i] = g.neighbours[i];
+    for (int i = 0; i < g.N; ++i) { auto s = g.neighbours[i]; adj[i].assign(s.begin(), s.end()); }
 
     if (site.kind.type == ExpKind::L_type) {
         if (!reconnectStraight(adj, path, strip, tp))
@@ -769,7 +769,7 @@ Graph invertReduction(const Graph& g, const InvSite& site) {
     for (int i = 0; i < g.N; ++i) {
         if (old_to_new[i] < 0) continue;
         for (node_t nbr : adj[i])
-            new_adj[old_to_new[i]].push_back(old_to_new[nbr]);
+            new_adj.push_back(old_to_new[i], old_to_new[nbr]);
     }
     return Graph(new_adj);
 }
@@ -883,7 +883,7 @@ Graph applyReduction(const Graph& g, const Reduction& red) {
 
         // Copy adjacency and reconnect
         adj_t adj(g.N);
-        for (int i = 0; i < g.N; ++i) adj[i] = g.neighbours[i];
+        for (int i = 0; i < g.N; ++i) { auto s = g.neighbours[i]; adj[i].assign(s.begin(), s.end()); }
         if (!reconnectStraight(adj, path, strip, tp))
             return Graph();
 
@@ -909,7 +909,7 @@ Graph applyReduction(const Graph& g, const Reduction& red) {
         for (int i = 0; i < g.N; ++i) {
             if (old_to_new[i] < 0) continue;
             for (node_t nbr : adj[i])
-                new_adj[old_to_new[i]].push_back(old_to_new[nbr]);
+                new_adj.push_back(old_to_new[i], old_to_new[nbr]);
         }
         return Graph(new_adj);
 
@@ -941,7 +941,7 @@ Graph applyReduction(const Graph& g, const Reduction& red) {
 
         // Copy adjacency and reconnect
         adj_t adj(g.N);
-        for (int i = 0; i < g.N; ++i) adj[i] = g.neighbours[i];
+        for (int i = 0; i < g.N; ++i) { auto s = g.neighbours[i]; adj[i].assign(s.begin(), s.end()); }
         if (!reconnectBent(adj, path, strip, tp, bentPos, bentLen))
             return Graph();
 
@@ -966,7 +966,7 @@ Graph applyReduction(const Graph& g, const Reduction& red) {
         for (int i = 0; i < g.N; ++i) {
             if (old_to_new[i] < 0) continue;
             for (node_t nbr : adj[i])
-                new_adj[old_to_new[i]].push_back(old_to_new[nbr]);
+                new_adj.push_back(old_to_new[i], old_to_new[nbr]);
         }
         return Graph(new_adj);
 
@@ -2166,7 +2166,7 @@ Graph ReducibleDual::toGraph() const {
         if (!alive(u)) continue;
         uint8_t m = V[u].active;
         for (; m; m &= m - 1)
-            adj[remap[u]].push_back(remap[V[u].nbr[__builtin_ctz(m)]]);
+            adj.push_back(remap[u], remap[V[u].nbr[__builtin_ctz(m)]]);
     }
     return Graph(adj);
 }

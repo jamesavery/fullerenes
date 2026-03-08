@@ -56,10 +56,10 @@ int main(int argc, char** argv){
         for (int l = 0; l < N_runs; l++){
             for (int i = 0; i < N_samples; ++i){
                 for (size_t j = 0; j < Nf; j++){
-                    G.neighbours[j].clear();
+                    G.neighbours.clear_row(j);
                     for (size_t k = 0; k < 6; k++) {
                         auto u = input_buffer[id_subset[i]*Nf*6 + j*6 +k];
-                        if(u != UINT16_MAX) G.neighbours[j].push_back(u);
+                        if(u != UINT16_MAX) G.neighbours.push_back(j, u);
                     }
                 }
                     auto T1 = high_resolution_clock::now(); 

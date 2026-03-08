@@ -475,12 +475,12 @@ int main(int ac, char **av)
     P.neighbours.resize(P.N);
     //cout << "neighbours : " << P.neighbours << endl;
     //cout << "trying to insert : " << edge_t(to_zap.first,P.N-2) << edge_t(to_zap.second,P.N-1) << edge_t(P.N-2,P.N-1) << endl;
-    P.neighbours[to_zap.first].push_back(P.N-2);
-    P.neighbours[P.N-2].push_back(to_zap.first);
-    P.neighbours[to_zap.second].push_back(P.N-1);
-    P.neighbours[P.N-1].push_back(to_zap.second);
-    P.neighbours[P.N-2].push_back(P.N-1);
-    P.neighbours[P.N-1].push_back(P.N-2);
+    P.neighbours.push_back(to_zap.first, P.N-2);
+    P.neighbours.push_back(P.N-2, to_zap.first);
+    P.neighbours.push_back(to_zap.second, P.N-1);
+    P.neighbours.push_back(P.N-1, to_zap.second);
+    P.neighbours.push_back(P.N-2, P.N-1);
+    P.neighbours.push_back(P.N-1, P.N-2);
     //cout << "neighbours : " << P.neighbours << endl;
     
     const coord3d c1=P.points[it->first];

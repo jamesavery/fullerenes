@@ -219,7 +219,7 @@ vector<coord2d> PlanarGraph::tutte_layout_iterative(const face_t& outer_face, co
       if(fixed[u]){
         newxys[u] = xys[u];
       } else {
-        const vector<node_t>& ns(neighbours[u]);
+        auto ns = neighbours[u];
         coord2d neighbour_sum(0.0);
         
         for(int i=0;i<ns.size();i++) neighbour_sum += xys[ns[i]];

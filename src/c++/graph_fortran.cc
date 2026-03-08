@@ -11,8 +11,8 @@ static PlanarGraph oriented_graph_from_adjacency(int Nmax, int N, const int *adj
   for(int i=0;i<N;i++)
     for(int j=i+1;j<N;j++)
       if(adjacency[i*Nmax+j]) {
-        nb[i].push_back(j);
-        nb[j].push_back(i);
+        nb.push_back(i, j);
+        nb.push_back(j, i);
       }
   Graph G(nb);
   layout2d::planar_orient(G);

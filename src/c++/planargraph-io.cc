@@ -98,7 +98,7 @@ PlanarGraph PlanarGraph::read_hog_planarcode(FILE *file)
     int v=0;
     do{
       v = read_int();
-      if(v!=0) adj[u].push_back(v-1); // In oriented order
+      if(v!=0) adj.push_back(u, v-1); // In oriented order
     } while(v!=0 && !feof(file));
   }
   Graph g(adj);
