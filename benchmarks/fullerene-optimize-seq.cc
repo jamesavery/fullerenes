@@ -63,7 +63,6 @@ int main(int argc, char** argv){
                     }
                 }
                     auto T1 = high_resolution_clock::now(); 
-                G.update();
                 PlanarGraph pG = G.dual_graph();
                     auto T2 = high_resolution_clock::now(); T_duals[l] += T2 - T1; 
                 Polyhedron P(pG);

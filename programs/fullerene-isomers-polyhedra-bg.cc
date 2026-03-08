@@ -26,7 +26,6 @@ int main(int ac, char **argv)
 
   while(BuckyGen::next_fullerene(Q,dualG)){ // Generate all appropriate C_N isomer duals 
     i++;
-    dualG.update();		            // Update metadata
     FullereneGraph G = dualG.dual_graph();  // Construct fullerene graph
 
     Polyhedron P = Polyhedron::fullerene_polyhedron(G); // Generate optimized fullerene geometry

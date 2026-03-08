@@ -17,8 +17,8 @@ template <typename T> size_t push(vector<T>& s, const T& x){
 unordered_map<arc_t, int> generate_Tid_by_arc(Triangulation &dual)
 {
   unordered_map<arc_t,int> Tid_by_arc;
-  for(int i=0;i<dual.triangles.size();i++){
-    tri_t t = dual.triangles[i];
+  for(int i=0;i<dual.triangles().size();i++){
+    tri_t t = dual.triangles()[i];
     for(int j=0;j<3;j++) Tid_by_arc[{t[j],t[(j+1)%3]}] = i;
   }
   // Every arc should be accounted for
@@ -36,7 +36,7 @@ vector<arc_t> compute_owned_edges(Triangulation &dual)
 {
   unordered_map<arc_t,int> Tid_by_arc = generate_Tid_by_arc(dual); // TODO: Generate metadata outside in O(N) time
 
-  size_t N = dual.triangles.size(), Nf = dual.N;
+  size_t N = dual.triangles().size(), Nf = dual.N;
   
   vector<bool>   seen(N);
   vector<arc_t>  owned_arc(N);
@@ -48,7 +48,7 @@ vector<arc_t> compute_owned_edges(Triangulation &dual)
   // 1. For each remaining triangle t in the work set
   while(!work_stack.empty()){
     int triangle_id = pop(work_stack);
-    tri_t t = dual.triangles[triangle_id];
+    tri_t t = dual.triangles()[triangle_id];
 
     // 2. Process t by picking first unused edge as owned edge and mark t as seen
     if(!seen[triangle_id])

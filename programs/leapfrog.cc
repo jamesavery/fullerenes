@@ -12,7 +12,7 @@ extern "C" void optgraph_(const int *N, const int *iop, const int *iout,
 			  const int *is, const int *mdist, const int *maxl, 
 			  const double *scalePPG, double *xs);
 
-vector<coord2d> OptGraph(const PlanarGraph &g, const vector<coord2d>& layout, int method, double scalePPG)
+vector<coord2d> OptGraph(const PlanarGraph &g, const vector<coord2d>& layout, const face_t& outer_face, int method, double scalePPG)
 {
   vector<double> xs(2*g.N);
   int iout=3;
@@ -32,8 +32,8 @@ vector<coord2d> OptGraph(const PlanarGraph &g, const vector<coord2d>& layout, in
   cout << "maxdist = " << maxdist << ";\n";
 
   // Copy outer face to IS
-  assert(g.outer_face.size() >= 5);
-  for(int i=0;i<g.outer_face.size();i++) IS[i] = g.outer_face[i]+1;
+  assert(outer_face.size() >= 5);
+  for(int i=0;i<outer_face.size();i++) IS[i] = outer_face[i]+1;
 
   // Copy coordinates to Fortran order
   for(unsigned int i=0;i<g.N;i++){

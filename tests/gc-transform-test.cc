@@ -29,11 +29,11 @@ static void check_fullerene_dual(const Triangulation& T) {
   //    matches the expected count from Euler's formula.
   int Nf = T.N;
   int expected_triangles = 2 * (Nf - 2);
-  EXPECT_EQ((int)T.triangles.size(), expected_triangles)
+  EXPECT_EQ((int)T.triangles().size(), expected_triangles)
     << "Triangle count violates Euler formula: expected 2*(Nf-2) = " << expected_triangles;
 
   // Also verify each stored triangle is actually a valid face by tracing with next_on_face
-  for(const auto& tri : T.triangles) {
+  for(const auto& tri : T.triangles()) {
     node_t u = tri[0], v = tri[1], w = tri[2];
     EXPECT_EQ(T.next_on_face(u, v), w)
       << "Triangle {" << u << "," << v << "," << w << "}: next_on_face(" << u << "," << v << ") != " << w;
@@ -113,7 +113,7 @@ TEST_F(GCTransformTest, HalmaConnectivity) {
 TEST_F(GCTransformTest, HalmaTriangleCount) {
   Triangulation result = C20dual.GCtransform(2, 0);
   // F_new = F * T = 20 * 4 = 80
-  EXPECT_EQ((int)result.triangles.size(), F0 * 4);
+  EXPECT_EQ((int)result.triangles().size(), F0 * 4);
 }
 
 // --- Chiral (l!=0, unfold/fold path) tests ---

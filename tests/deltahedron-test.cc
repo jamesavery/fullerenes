@@ -35,7 +35,7 @@ protected:
 TEST_F(DeltahedronTest, ConstructionFromPolyhedron) {
   EXPECT_EQ(ico.N, V0);
   EXPECT_EQ((int)ico.points.size(), V0);
-  EXPECT_EQ((int)ico.triangles.size(), F0);
+  EXPECT_EQ((int)ico.triangles().size(), F0);
 }
 
 TEST_F(DeltahedronTest, ConstructionFromTriangulationAndPoints) {
@@ -127,7 +127,7 @@ TEST_F(DeltahedronTest, GC_2_0_SurfacePreservation) {
   // Every new vertex should have zero distance to some parent triangle
   for(int u = ico.N; u < result.N; u++){
     double min_dist = INFINITY;
-    for(const auto& tri : ico.triangles){
+    for(const auto& tri : ico.triangles()){
       Tri3D T(ico.points[tri[0]], ico.points[tri[1]], ico.points[tri[2]]);
       double d = T.distance(result.points[u]);
       if(d < min_dist) min_dist = d;
@@ -135,7 +135,7 @@ TEST_F(DeltahedronTest, GC_2_0_SurfacePreservation) {
     // The point lies on the surface scaled by k=2, so check against
     // the scaled triangles instead
     min_dist = INFINITY;
-    for(const auto& tri : ico.triangles){
+    for(const auto& tri : ico.triangles()){
       Tri3D T(ico.points[tri[0]]*2, ico.points[tri[1]]*2, ico.points[tri[2]]*2);
       double d = T.distance(result.points[u]);
       if(d < min_dist) min_dist = d;
@@ -152,7 +152,7 @@ TEST_F(DeltahedronTest, GC_2_0_TopologyMatchesHalma) {
   Triangulation topo = ico.halma_transform(1);  // halma_transform(k-1)
 
   EXPECT_EQ(result.N, topo.N);
-  EXPECT_EQ(result.triangles.size(), topo.triangles.size());
+  EXPECT_EQ(result.triangles().size(), topo.triangles().size());
   for(int u = 0; u < result.N; u++){
     EXPECT_EQ(result.degree(u), topo.degree(u))
       << "degree mismatch at node " << u;
@@ -164,7 +164,7 @@ TEST_F(DeltahedronTest, GC_3_0_TopologyMatchesHalma) {
   Triangulation topo = ico.halma_transform(2);
 
   EXPECT_EQ(result.N, topo.N);
-  EXPECT_EQ(result.triangles.size(), topo.triangles.size());
+  EXPECT_EQ(result.triangles().size(), topo.triangles().size());
 }
 
 // ===== Face-interior harmonic property =====
@@ -182,7 +182,7 @@ TEST_F(DeltahedronTest, GC_3_0_FaceInteriorHarmonicProperty) {
 
   // Identify face-interior vertices: grid points (a,b) with a>0, b<m+1, a<b
   vector<bool> is_face_interior(D.N, false);
-  for(int i = 0; i < (int)ico.triangles.size(); i++){
+  for(int i = 0; i < (int)ico.triangles().size(); i++){
     for(const auto& [ab, node_id] : face_grids[i]){
       int a = ab.first, b = ab.second;
       if(a > 0 && b < m+1 && a < b)
@@ -216,7 +216,7 @@ TEST_F(DeltahedronTest, GC_5_0_FaceInteriorHarmonicProperty) {
   Deltahedron D = ico.GCtransform(k, 0);
 
   vector<bool> is_face_interior(D.N, false);
-  for(int i = 0; i < (int)ico.triangles.size(); i++){
+  for(int i = 0; i < (int)ico.triangles().size(); i++){
     for(const auto& [ab, node_id] : face_grids[i]){
       int a = ab.first, b = ab.second;
       if(a > 0 && b < m+1 && a < b)
@@ -333,7 +333,7 @@ TEST_F(DeltahedronTest, GC_1_1_SurfacePreservation) {
 
   for(int u = 0; u < result.N; u++){
     double min_dist = INFINITY;
-    for(const auto& tri : ico.triangles){
+    for(const auto& tri : ico.triangles()){
       Tri3D T(ico.points[tri[0]]*sqrtT, ico.points[tri[1]]*sqrtT, ico.points[tri[2]]*sqrtT);
       double d = T.distance(result.points[u]);
       if(d < min_dist) min_dist = d;
@@ -350,7 +350,7 @@ TEST_F(DeltahedronTest, GC_1_1_TopologyConsistency) {
   Triangulation topo = ico.Triangulation::GCtransform(1, 1);
 
   EXPECT_EQ(result.N, topo.N);
-  EXPECT_EQ(result.triangles.size(), topo.triangles.size());
+  EXPECT_EQ(result.triangles().size(), topo.triangles().size());
 }
 
 TEST_F(DeltahedronTest, GC_2_1_TopologyConsistency) {
@@ -358,7 +358,7 @@ TEST_F(DeltahedronTest, GC_2_1_TopologyConsistency) {
   Triangulation topo = ico.Triangulation::GCtransform(2, 1);
 
   EXPECT_EQ(result.N, topo.N);
-  EXPECT_EQ(result.triangles.size(), topo.triangles.size());
+  EXPECT_EQ(result.triangles().size(), topo.triangles().size());
 }
 
 // ===== No NaN or zero-norm coordinates =====
@@ -498,7 +498,7 @@ TEST(C44DeltahedronTest, AllC44_GC_2_0_TopologyConsistency) {
     Deltahedron result = D.GCtransform(2, 0);
     Triangulation topo = D.halma_transform(1);  // halma_transform(k-1)
     EXPECT_EQ(result.N, topo.N);
-    EXPECT_EQ(result.triangles.size(), topo.triangles.size());
+    EXPECT_EQ(result.triangles().size(), topo.triangles().size());
   }
 }
 
@@ -509,7 +509,7 @@ TEST(C44DeltahedronTest, AllC44_GC_1_1_TopologyConsistency) {
     Deltahedron result = D.GCtransform(1, 1);
     Triangulation topo = D.Triangulation::GCtransform(1, 1);
     EXPECT_EQ(result.N, topo.N);
-    EXPECT_EQ(result.triangles.size(), topo.triangles.size());
+    EXPECT_EQ(result.triangles().size(), topo.triangles().size());
   }
 }
 
@@ -523,7 +523,7 @@ TEST(C44DeltahedronTest, AllC44_GC_2_0_SurfacePreservation) {
 
     for(int u = 0; u < result.N; u++){
       double min_dist = INFINITY;
-      for(const auto& tri : D.triangles){
+      for(const auto& tri : D.triangles()){
         Tri3D T(D.points[tri[0]]*2, D.points[tri[1]]*2, D.points[tri[2]]*2);
         double d = T.distance(result.points[u]);
         if(d < min_dist) min_dist = d;
@@ -543,7 +543,7 @@ TEST(C44DeltahedronTest, AllC44_GC_1_1_SurfacePreservation) {
 
     for(int u = 0; u < result.N; u++){
       double min_dist = INFINITY;
-      for(const auto& tri : D.triangles){
+      for(const auto& tri : D.triangles()){
         Tri3D T(D.points[tri[0]]*sqrtT, D.points[tri[1]]*sqrtT, D.points[tri[2]]*sqrtT);
         double d = T.distance(result.points[u]);
         if(d < min_dist) min_dist = d;
@@ -623,12 +623,12 @@ static void check_C44_GC(int k, int l, const char* label) {
     // Topology consistency with Triangulation::GCtransform
     Triangulation topo = D.Triangulation::GCtransform(k, l);
     EXPECT_EQ(result.N, topo.N);
-    EXPECT_EQ(result.triangles.size(), topo.triangles.size());
+    EXPECT_EQ(result.triangles().size(), topo.triangles().size());
 
     // Surface preservation: every vertex lies on a scaled parent triangle
     for(int u = 0; u < result.N; u++){
       double min_dist = INFINITY;
-      for(const auto& tri : D.triangles){
+      for(const auto& tri : D.triangles()){
         Tri3D T(D.points[tri[0]]*scale, D.points[tri[1]]*scale, D.points[tri[2]]*scale);
         double d = T.distance(result.points[u]);
         if(d < min_dist) min_dist = d;
@@ -739,7 +739,7 @@ struct OptStats {
     double asum = 0, asum2 = 0;
     int na = 0;
     s.ang_min = 180; s.ang_max = 0;
-    for(const auto& tri : D.triangles){
+    for(const auto& tri : D.triangles()){
       for(int c = 0; c < 3; c++){
         coord3d va = D.points[tri[(c+1)%3]] - D.points[tri[c]];
         coord3d vb = D.points[tri[(c+2)%3]] - D.points[tri[c]];
@@ -1009,7 +1009,7 @@ static void dump_geometry(const Deltahedron& D, const string& filename) {
   if(!f) return;
   vector<double> h = vertex_convexity_heights(D);
   // Header
-  fprintf(f, "%d %d\n", D.N, (int)D.triangles.size());
+  fprintf(f, "%d %d\n", D.N, (int)D.triangles().size());
   // Vertices: x y z degree h
   for(int v = 0; v < D.N; v++){
     fprintf(f, "%.12f %.12f %.12f %d %.12f\n",
@@ -1017,7 +1017,7 @@ static void dump_geometry(const Deltahedron& D, const string& filename) {
             D.degree(v), std::isnan(h[v]) ? 999.0 : h[v]);
   }
   // Triangles: v0 v1 v2
-  for(const auto& tri : D.triangles)
+  for(const auto& tri : D.triangles())
     fprintf(f, "%d %d %d\n", tri[0], tri[1], tri[2]);
   fclose(f);
 }

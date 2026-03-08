@@ -386,7 +386,6 @@ int main(int ac, char **argv)
       //   if(max_length(pentagon_distance(dualG)) >= 10){
       //	cout << i << endl;
 	
-      dualG.update();		            // Update metadata
       FullereneGraph G = dualG.dual_graph();  // Construct fullerene graph
       vector<int> RSPI;
       jumplist_t jumps;

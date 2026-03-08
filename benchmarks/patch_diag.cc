@@ -110,7 +110,7 @@ static QStats quality(const Deltahedron& D) {
 
     // Triangle angles
     q.ang_min = 180; q.ang_max = 0;
-    for (const auto& tri : D.triangles)
+    for (const auto& tri : D.triangles())
         for (int c = 0; c < 3; c++) {
             coord3d va = D.points[tri[(c+1)%3]] - D.points[tri[c]];
             coord3d vb = D.points[tri[(c+2)%3]] - D.points[tri[c]];

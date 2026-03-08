@@ -350,7 +350,6 @@ vector<tri_t>& PlanarGraph::orient_triangulation(vector<tri_t>& tris) const
   if(!consistent){
     cerr << "(*** Inconsistent triangulation: ***)\n";
     cerr << "tris = {"; for(int i=0;i<tris.size();i++) cerr << tris[i] << (i+1<tris.size()? ", ":"};\n");
-    cerr << "outerface = " << outer_face << ";\n";
   }
   assert(consistent == true);
   return tris;

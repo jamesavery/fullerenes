@@ -11,7 +11,7 @@ struct Deltahedron {
   vector<coord3d> points;
 
   vector<face_t> faces(){
-    const vector<tri_t> &tris = g.triangles;
+    const vector<tri_t> &tris = g.triangles();
     vector<face_t> faces(tris.size());
     for(int i=0;i<tris.size();i++)
       faces[i] = vector<node_t>{tris[i][0],tris[i][1],tris[i][1]};
@@ -72,7 +72,7 @@ Deltahedron halma_triangulation(const Deltahedron &P, int m=1) {
   }
 
   // For every triangle, we create and connect a halma-type grid
-  const vector<tri_t> triangles = P.g.triangles;
+  const vector<tri_t> triangles = P.g.triangles();
   for(size_t i=0;i<triangles.size();i++){
     map<edge_t,node_t> grid;
     const tri_t& T(triangles[i]);
@@ -116,7 +116,6 @@ Deltahedron halma_triangulation(const Deltahedron &P, int m=1) {
       }
   }
 
-  Phalma.g.update();
   return Phalma;
 }
 

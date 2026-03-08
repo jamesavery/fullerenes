@@ -22,16 +22,17 @@ Deltahedron::Deltahedron(const Polyhedron& P)
 }
 
 vector<face_t> Deltahedron::compute_dual_faces() const {
-  vector<face_t> faces(triangles.size());
-  for(size_t i = 0; i < triangles.size(); i++)
-    faces[i] = face_t(triangles[i]);
+  auto tris = triangles();
+  vector<face_t> faces(tris.size());
+  for(size_t i = 0; i < tris.size(); i++)
+    faces[i] = face_t(tris[i]);
   return faces;
 }
 
 double Deltahedron::max_angle_relerr() const {
   double max_re = 0;
   const double target = M_PI / 3.0;
-  for (const auto& t : triangles) {
+  for (const auto& t : triangles()) {
     for (int c = 0; c < 3; c++) {
       coord3d ea = points[t[(c+1)%3]] - points[t[c]];
       coord3d eb = points[t[(c+2)%3]] - points[t[c]];
@@ -91,8 +92,9 @@ Deltahedron Deltahedron::halma_transform(int m) const {
     // Weights sum to n=k, so corner vertices get k*P_original.
     vector<coord3d> new_points(T_new.N);
 
-    for(int i = 0; i < (int)triangles.size(); i++){
-      const face_t& T = triangles[i];
+    auto tris = triangles();
+    for(int i = 0; i < (int)tris.size(); i++){
+      const face_t& T = tris[i];
       const auto& grid = face_grids[i];
 
       for(const auto& [ab, node_id] : grid){
@@ -137,9 +139,10 @@ Deltahedron Deltahedron::GCtransform(unsigned k, unsigned l) const {
   //    Boundary points get identical coords from adjacent faces.
 
   vector<coord3d> new_points(T_new.N);
+  auto tris = triangles();
 
-  for(int i = 0; i < (int)triangles.size(); i++){
-    const tri_t& tri = triangles[i];
+  for(int i = 0; i < (int)tris.size(); i++){
+    const tri_t& tri = tris[i];
     node_t nu = tri[0], nv = tri[1], nw = tri[2];
 
     // Scaled Eisenstein corners of this face
@@ -1204,7 +1207,7 @@ static double deltahedron_energy_and_gradient(
   // --- E_angle: harmonic springs on triangle corner angles ---
   // E_angle = (k_angle/2) * Sum_triangles Sum_corners (angle - pi/3)^2
   const double target_angle = M_PI / 3.0;
-  for(const auto& tri : D.triangles){
+  for(const auto& tri : D.triangles()){
     int v[3] = {tri[0], tri[1], tri[2]};
 
     for(int c = 0; c < 3; c++){
@@ -1483,7 +1486,7 @@ static void deltahedron_hv_product(
   // --- E_angle Hv ---
   // Per triangle corner: compute arm-space blocks Haa, Hcc, Hac and scatter.
   if(k_angle > 0){
-    for(const auto& tri : D.triangles){
+    for(const auto& tri : D.triangles()){
       for(int c = 0; c < 3; c++){
         int b = tri[c], a = tri[(c+2)%3], dd = tri[(c+1)%3];
         coord3d va = x[a] - x[b], vc = x[dd] - x[b];
@@ -1768,7 +1771,7 @@ static void assemble_patch_hessian(
   //   H(a,b) = -(Haa + Hac),  H(c,b) = -(Hcc + Hca),  H(b,b) = sum of all four
   if(k_angle > 0){
     const double theta0 = M_PI / 3.0;
-    for(const auto& tri : D.triangles){
+    for(const auto& tri : D.triangles()){
       for(int c = 0; c < 3; c++){
         int b = tri[c], a = tri[(c+2)%3], dd = tri[(c+1)%3];
         coord3d va = x[a] - x[b], vc = x[dd] - x[b];

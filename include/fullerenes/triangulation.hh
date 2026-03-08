@@ -14,8 +14,6 @@ class Triangulation : public PlanarGraph {
 public:
   typedef function<bool(Triangulation)> predicate_t;
 
-  vector<tri_t> triangles;	// Faces 
-
   // Operations:
   //  1. Orient triangulation
   //  2. Unfold (assert deg(v) <= 6 for all v)
@@ -24,8 +22,8 @@ public:
   //  5. Embed in 2D
   //  6. Embed in 3D
   Triangulation(int N) : PlanarGraph(N, 6) {}
-  Triangulation(const Graph& g = Graph()) : PlanarGraph(g) { update(); }
-  Triangulation(const neighbours_t& neighbours) : PlanarGraph(Graph(neighbours)) { update(); }
+  Triangulation(const Graph& g = Graph()) : PlanarGraph(g) {}
+  Triangulation(const neighbours_t& neighbours) : PlanarGraph(Graph(neighbours)) {}
 
   Triangulation(const vector<int>& spiral_string, const jumplist_t& jumps = jumplist_t(), const bool best_effort=false); // and the opposite of 'best-effort' is 'fast and robust'
   Triangulation(const spiral_nomenclature &fsn): Triangulation(fsn.spiral.spiral_code, fsn.spiral.jumps, true){} // best_effort = true
@@ -81,10 +79,8 @@ public:
 
   vector<node_t> vertex_numbers(vector<vector<node_t>> &perms, const vector<node_t> &loc) const;
   
-  void update() {
-    if(count_edges() > 0)
-      triangles = compute_faces_oriented();
-  }
+  vector<tri_t> triangles() const { return compute_faces_oriented(); }
+  int n_triangles() const { return 2*N - 4; }
 
   struct simple_geodesic {
     Eisenstein g;
@@ -154,7 +150,7 @@ class CubicPair {
     
   CubicPair(const Triangulation &T) : G(T.dual_graph()), CtoD(G.N,vector<arc_t>(3)), DtoC(T.N)
   {
-    for(const auto &t: T.triangles) triangle_id.insert(t.sorted());
+    for(const auto &t: T.triangles()) triangle_id.insert(t.sorted());
   
     for(node_t u=0;u<T.N;u++){
       auto nu = T.nbrs(u);

@@ -188,8 +188,6 @@ Polyhedron Polyhedron::incremental_convex_hull() const {
   faces.reserve(output.size());
   for (const tri_t& t : output)
     faces.push_back(tri_t(nodemap[t[0]], nodemap[t[1]], nodemap[t[2]]));
-  g.outer_face = faces[0];
-
   return Polyhedron(g, remaining_points, 3, faces);
 }
 
@@ -257,7 +255,6 @@ Polyhedron::Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_, con
   
   if(faces.size() == 0){
     faces = compute_faces(face_max);
-    assert(outer_face.size() <= face_max);
     face_max = 0;
     for(int i=0;i<faces.size();i++) if(faces[i].size() > face_max) face_max = faces[i].size();
   } 
@@ -444,8 +441,8 @@ bool Polyhedron::optimize(int opt_method, double ftol)
     // inverse_tranges for faster lookup:
     // indices in 'triangles' at which there are triangles containing this vertex
     vector<vector<int>> inverse_triangle_list(LFD.N);
-    for (int i=0; i<LFD.triangles.size(); i++){
-      const tri_t& tri = LFD.triangles[i];
+    for (int i=0; i<LFD.triangles().size(); i++){
+      const tri_t& tri = LFD.triangles()[i];
       inverse_triangle_list[tri[0]].push_back(i);
       inverse_triangle_list[tri[1]].push_back(i);
       inverse_triangle_list[tri[2]].push_back(i);

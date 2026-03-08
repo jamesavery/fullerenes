@@ -116,16 +116,17 @@ Permutation Permutation::operator*(const Permutation& q) const {
 //		  SYMMETRY-DETECTION IMPLEMENTATION
 //////////////////////////////////////////////////////////////////////
 vector<Permutation> Symmetry::tri_permutation(const vector<Permutation>& Gf) const {
-  assert(triangles.size() == (N-2)*2); // Triangulation is cubic dual
-  vector<Permutation> Gtri(Gf.size(),Permutation(triangles.size()));
+  auto tris = triangles();
+  assert(tris.size() == (N-2)*2); // Triangulation is cubic dual
+  vector<Permutation> Gtri(Gf.size(),Permutation(tris.size()));
   IDCounter<tri_t> tri_id;
-    
-  for(int i=0;i<triangles.size();i++) tri_id.insert(triangles[i].sorted());
-    
+
+  for(int i=0;i<tris.size();i++) tri_id.insert(tris[i].sorted());
+
   for(int j=0;j<Gf.size();j++){
-    const Permutation& pi = Gf[j];    
-    for(int i=0;i<triangles.size();i++){
-      const tri_t &t  = triangles[i];
+    const Permutation& pi = Gf[j];
+    for(int i=0;i<tris.size();i++){
+      const tri_t &t  = tris[i];
       const tri_t &tp = {pi[t[0]], pi[t[1]], pi[t[2]]}; 
       
       int tp_id = tri_id(tp.sorted());
@@ -140,7 +141,7 @@ vector<Permutation> Symmetry::tri_permutation(const vector<Permutation>& Gf) con
 	cout << "tp = " << tp << endl;
 	cout << "tp.sorted() = " << tp.sorted() << endl;
 
-	cout << "triangles = " << triangles << endl;
+	cout << "triangles = " << tris << endl;
 	
 	assert(tp_id >= 0);
       }

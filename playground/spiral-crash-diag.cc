@@ -15,7 +15,7 @@ int test_triple(const Triangulation& T, node_t u, node_t v, node_t w, bool gener
 void diagnose_isomer(const Triangulation& T, int N, int idx)
 {
   fprintf(stderr, "\n  Diagnosing N=%d isomer #%d (N_tri=%d, N_vert=%zu):\n",
-          N, idx, T.N, T.triangles.size());
+          N, idx, T.N, T.triangles().size());
 
   // Print degree sequence
   fprintf(stderr, "  Degrees:");

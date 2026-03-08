@@ -19,9 +19,9 @@ int test_all(int N)
 
     // --- Triangulation sanity ---
     int expected_tris = 2 * (T.N - 2);
-    if((int)T.triangles.size() != expected_tris){
+    if((int)T.triangles().size() != expected_tris){
       fprintf(stderr, "  TRI FAIL: N=%d #%d: got %zu expected %d\n",
-              N, count, T.triangles.size(), expected_tris);
+              N, count, T.triangles().size(), expected_tris);
       fails++;
       continue;
     }

@@ -76,10 +76,10 @@ int main(int ac, char **av)
   // Dual node coordinates
   vector<coord3d> dual_coords(Nf);
   
-  assert(t.triangles.size() == N);
+  assert(t.triangles().size() == N);
 
   for(node_t u=0;u<N;u++){
-    tri_t triangle = t.triangles[u];    
+    tri_t triangle = t.triangles()[u];    
     coord3d triangle_center = P.points[u];
     
     for(int i=0;i<3;i++)
@@ -114,7 +114,7 @@ int main(int ac, char **av)
   cerr << "# Dual graph and its faces\n";
   cerr << "dual_neighbours   = " << t.neighbours << ";\n\n";
   //  cerr << "next_on_tri       = array(" << next_on_tri << ");\n\n";  
-  cerr << "triangles         = array(" << t.triangles << ");\n\n";
+  cerr << "triangles         = array(" << t.triangles() << ");\n\n";
   cerr << "dual_points     = array(" << dual_coords << ");\n\n";  
   cerr << "# prev_on_tri is the same as next_on_tri\n";
 

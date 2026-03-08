@@ -95,7 +95,7 @@ static IsomerGeometry analyzeGeometry(const Deltahedron& D) {
     //   F triangles on a sphere of radius R
     //   expected_area = 4*pi*R^2 / F
     //   expected_edge from equilateral triangle: A = sqrt(3)/4 * L^2
-    int n_faces = D.triangles.size();
+    int n_faces = D.triangles().size();
     double exp_area = 4.0 * M_PI * g.R * g.R / n_faces;
     double exp_edge = sqrt(4.0 * exp_area / sqrt(3.0));
     g.expected_volume = 4.0 / 3.0 * M_PI * g.R * g.R * g.R;
@@ -103,7 +103,7 @@ static IsomerGeometry analyzeGeometry(const Deltahedron& D) {
     // Collect face areas
     vector<double> areas;
     areas.reserve(n_faces);
-    for (const auto& tri : D.triangles) {
+    for (const auto& tri : D.triangles()) {
         coord3d a = D.points[tri[0]], b = D.points[tri[1]], c = D.points[tri[2]];
         areas.push_back((b - a).cross(c - a).norm() / 2.0);
     }
@@ -211,7 +211,7 @@ TEST(DeltahedronGeometry, SingleStep) {
 
             Deltahedron D = Deltahedron::fromExtensionPath(ep1);
 
-            for (const auto& tri : D.triangles) {
+            for (const auto& tri : D.triangles()) {
                 coord3d a = D.points[tri[0]], b = D.points[tri[1]], c = D.points[tri[2]];
                 EXPECT_GT((b - a).cross(c - a).norm(), 1e-15)
                     << "C" << N << " degenerate triangle";
@@ -247,7 +247,7 @@ static void processIsomer(const Deltahedron& D, AccumulatedStats& acc) {
     acc.total++;
 
     // Degeneracy check
-    for (const auto& tri : D.triangles) {
+    for (const auto& tri : D.triangles()) {
         coord3d a = D.points[tri[0]], b = D.points[tri[1]], c = D.points[tri[2]];
         if ((b - a).cross(c - a).norm() / 2.0 < 1e-15) {
             acc.degenerate++;
@@ -656,7 +656,7 @@ TEST(DeltahedronGeometry, GCExpansionGeometry) {
                 ms_ep);
 
         // No degenerate faces
-        for (const auto& tri : gc_ep.triangles) {
+        for (const auto& tri : gc_ep.triangles()) {
             coord3d a = gc_ep.points[tri[0]], b = gc_ep.points[tri[1]], c = gc_ep.points[tri[2]];
             EXPECT_GT((b - a).cross(c - a).norm(), 1e-15)
                 << "GC(" << k << ",0) degenerate triangle";
@@ -840,14 +840,14 @@ TEST(DeltahedronGeometry, NanotubeBuilderVerify) {
 
     // Verify it's a valid triangulation
     Triangulation T1(G1);
-    EXPECT_EQ((int)T1.triangles.size(), 2 * T1.N - 4)
+    EXPECT_EQ((int)T1.triangles().size(), 2 * T1.N - 4)
         << "Euler formula: F = 2V-4 for triangulation of sphere";
 
     // n_rings=2 should be C40 dual (22 vertices)
     Graph G2 = makeNanotubeDual(2);
     EXPECT_EQ(G2.N, 22);
     Triangulation T2(G2);
-    EXPECT_EQ((int)T2.triangles.size(), 2 * T2.N - 4);
+    EXPECT_EQ((int)T2.triangles().size(), 2 * T2.N - 4);
 
     // Verify n_rings=2 is isomorphic to the C40 (5,0) nanotube from BuckyGen
     // The (5,0) nanotube reduces to C30 with an F-ring step
@@ -954,7 +954,7 @@ TEST(DeltahedronGeometry, NanotubeGeometry) {
                 ms_p2);
 
         // Phase 2 should produce non-degenerate geometry
-        for (const auto& tri : D2.triangles) {
+        for (const auto& tri : D2.triangles()) {
             coord3d a = D2.points[tri[0]], b = D2.points[tri[1]], c = D2.points[tri[2]];
             EXPECT_GT((b - a).cross(c - a).norm(), 1e-15)
                 << "C" << N_fullerene << " degenerate triangle in Phase 2";
@@ -1046,7 +1046,7 @@ static vector<int> concave_vertices(const Deltahedron& D, double tol = 1e-6) {
 static int count_orientation_defects(const Deltahedron& D) {
     // Count directed arc occurrences across all triangles
     map<pair<int,int>, int> arc_count;
-    for (const auto& tri : D.triangles) {
+    for (const auto& tri : D.triangles()) {
         arc_count[{tri[0], tri[1]}]++;
         arc_count[{tri[1], tri[2]}]++;
         arc_count[{tri[2], tri[0]}]++;
@@ -1072,7 +1072,7 @@ static int count_orientation_defects(const Deltahedron& D) {
 // triangle normals point outward, regardless of surface shape.
 static bool has_positive_orientation(const Deltahedron& D) {
     double total_vol = 0;
-    for (const auto& tri : D.triangles) {
+    for (const auto& tri : D.triangles()) {
         const coord3d& a = D.points[tri[0]];
         const coord3d& b = D.points[tri[1]];
         const coord3d& c = D.points[tri[2]];
@@ -1113,7 +1113,7 @@ struct ConvexityStats {
         double asum = 0, asum2 = 0;
         int na = 0;
         s.ang_min = 180; s.ang_max = 0;
-        for (const auto& tri : D.triangles) {
+        for (const auto& tri : D.triangles()) {
             for (int c = 0; c < 3; c++) {
                 coord3d va = D.points[tri[(c+1)%3]] - D.points[tri[c]];
                 coord3d vb = D.points[tri[(c+2)%3]] - D.points[tri[c]];
@@ -1134,7 +1134,7 @@ struct ConvexityStats {
 
         // Signed volume from triangle fan (no Polyhedron construction needed)
         double vol = 0;
-        for (const auto& tri : D.triangles) {
+        for (const auto& tri : D.triangles()) {
             const coord3d &a = D.points[tri[0]], &b = D.points[tri[1]], &c = D.points[tri[2]];
             vol += a.dot(b.cross(c));
         }
@@ -1380,7 +1380,7 @@ static void test_extpath_convexity_size(int N) {
 
         // Triangle angles
         double ang_min = 180, ang_max = 0, asum = 0, asum2 = 0; int na = 0;
-        for (const auto& tri : D.triangles)
+        for (const auto& tri : D.triangles())
             for (int c = 0; c < 3; c++) {
                 coord3d va = D.points[tri[(c+1)%3]] - D.points[tri[c]];
                 coord3d vb = D.points[tri[(c+2)%3]] - D.points[tri[c]];
@@ -1602,7 +1602,7 @@ TEST(ExtPathConvexity, NanotubeSeries) {
 
         // Triangle angles
         double ang_min = 180, ang_max = 0, asum = 0, asum2 = 0; int na = 0;
-        for (const auto& tri : D.triangles)
+        for (const auto& tri : D.triangles())
             for (int c = 0; c < 3; c++) {
                 coord3d va = D.points[tri[(c+1)%3]] - D.points[tri[c]];
                 coord3d vb = D.points[tri[(c+2)%3]] - D.points[tri[c]];
@@ -1676,7 +1676,7 @@ TEST(ExtPathConvexity, GCSeries) {
 
         // Triangle angles
         double ang_min = 180, ang_max = 0, asum = 0, asum2 = 0; int na = 0;
-        for (const auto& tri : D.triangles)
+        for (const auto& tri : D.triangles())
             for (int c = 0; c < 3; c++) {
                 coord3d va = D.points[tri[(c+1)%3]] - D.points[tri[c]];
                 coord3d vb = D.points[tri[(c+2)%3]] - D.points[tri[c]];
@@ -1736,7 +1736,7 @@ TEST(ExtPathConvexity, GCSeries) {
 
         // Triangle angles
         double ang_min = 180, ang_max = 0, asum = 0, asum2 = 0; int na = 0;
-        for (const auto& tri : D.triangles)
+        for (const auto& tri : D.triangles())
             for (int c = 0; c < 3; c++) {
                 coord3d va = D.points[tri[(c+1)%3]] - D.points[tri[c]];
                 coord3d vb = D.points[tri[(c+2)%3]] - D.points[tri[c]];

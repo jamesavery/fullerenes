@@ -74,7 +74,6 @@ int main(int argc, char** argv) {
         }
         FullereneDual FD(G);
         auto T0 = std::chrono::steady_clock::now(); ftime += std::chrono::duration<double, std::nano>(T0 - start).count();
-        FD.update();
         PlanarGraph pG = FD.dual_graph();
 
         for (size_t j = 0; j < N; j++){

@@ -228,8 +228,8 @@ int main(int ac, char **av)
   printf("Computing planar layout\n");
   vector<coord2d> g_layout;
   if(Nex <= outer_faces.size()){
-    g.outer_face = outer_faces[Nex-1]+(-1);
-    g_layout = g.tutte_layout(g.outer_face);
+    face_t of = outer_faces[Nex-1]+(-1);
+    g_layout = g.tutte_layout(of);
   } else
     g_layout = g.tutte_layout();
 

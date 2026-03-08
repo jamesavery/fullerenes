@@ -19,7 +19,7 @@ int main(int ac, char **av)
   output
     << "dual      = " << dual << ";\n"
     << "outline   = " << uf.outline << ";\n"
-    << "triangles = " << dual.triangles << ";\n"
+    << "triangles = " << dual.triangles() << ";\n"
     << "P         = " << P << ";\n"
     << "PD        = " << dP << ";\n"
     << "arcs    = " << get_keys(uf.edgecoords) << ";\n"

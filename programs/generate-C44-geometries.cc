@@ -51,8 +51,6 @@ int main(int ac, char **av)
   int count = 0, written = 0;
   while(BuckyGen::next_fullerene(Q, dualG)){
     count++;
-    dualG.update();
-
     // Extract spiral and convert to pentagon indices
     vector<int> spiral_code;
     jumplist_t jumps;

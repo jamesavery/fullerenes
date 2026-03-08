@@ -39,7 +39,7 @@ void Unfolding::unfold(const Triangulation& T, arc_t first_arc)
 
   // Initialize helper structures
   for(int U=0;U<N;U++){
-    const tri_t &t = T.triangles[U];
+    const tri_t &t = T.triangles()[U];
 
     for(int i=0;i<3;i++){
       node_t u = t[i], v = t[(i+1)%3];

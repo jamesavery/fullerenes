@@ -329,6 +329,7 @@ string to_povray(const PlanarGraph& G, const vector<coord2d>& layout,
 struct optlayout_params_t
 {
   PlanarGraph *graph;
+  face_t outer_face;
   vector<double> *zero_values_dist;
   vector<double> *k_dist;
   vector<double> *k_angle;
@@ -340,6 +341,7 @@ static double optlayout_pot(const gsl_vector* coordinates, void* parameters)
 {
   optlayout_params_t &params = *static_cast<optlayout_params_t*>(parameters);
   PlanarGraph &graph = *params.graph;
+  const face_t &outer_face = params.outer_face;
   vector<double> &zero_values_dist = *params.zero_values_dist;
   vector<double> &k_dist = *params.k_dist;
   vector<double> &k_angle = *params.k_angle;
@@ -369,9 +371,9 @@ static double optlayout_pot(const gsl_vector* coordinates, void* parameters)
   int i=0;
   for(const edge_t &e: edge_set){
     vector<node_t>::const_iterator it1, it2;
-    it1 = find (graph.outer_face.begin(), graph.outer_face.end(), e.first);
-    it2 = find (graph.outer_face.begin(), graph.outer_face.end(), e.second);
-    if (it1 != graph.outer_face.end() && it2 != graph.outer_face.end() && ( it1 == it2+1 || it1 == it2-1 || (it1 == graph.outer_face.begin() && it2 == graph.outer_face.end()-1) || (it1 == graph.outer_face.end()-1 && it2 == graph.outer_face.begin()))){
+    it1 = find (outer_face.begin(), outer_face.end(), e.first);
+    it2 = find (outer_face.begin(), outer_face.end(), e.second);
+    if (it1 != outer_face.end() && it2 != outer_face.end() && ( it1 == it2+1 || it1 == it2-1 || (it1 == outer_face.begin() && it2 == outer_face.end()-1) || (it1 == outer_face.end()-1 && it2 == outer_face.begin()))){
       continue; // edge is part of outer face
     }
 
@@ -404,13 +406,13 @@ static double optlayout_pot(const gsl_vector* coordinates, void* parameters)
 
   // AREA TERM
   double A_tot=0;
-  const double bx = gsl_vector_get(coordinates, 2* graph.outer_face[0]);
-  const double by = gsl_vector_get(coordinates, 2* graph.outer_face[0] +1);
-  for (int i=1; i<graph.outer_face.size()-1; ++i){
-    const double ax = gsl_vector_get(coordinates, 2* graph.outer_face[i]  );
-    const double ay = gsl_vector_get(coordinates, 2* graph.outer_face[i]+1);
-    const double cx = gsl_vector_get(coordinates, 2* graph.outer_face[i+1]  );
-    const double cy = gsl_vector_get(coordinates, 2* graph.outer_face[i+1]+1);
+  const double bx = gsl_vector_get(coordinates, 2* outer_face[0]);
+  const double by = gsl_vector_get(coordinates, 2* outer_face[0] +1);
+  for (int i=1; i<outer_face.size()-1; ++i){
+    const double ax = gsl_vector_get(coordinates, 2* outer_face[i]  );
+    const double ay = gsl_vector_get(coordinates, 2* outer_face[i]+1);
+    const double cx = gsl_vector_get(coordinates, 2* outer_face[i+1]  );
+    const double cy = gsl_vector_get(coordinates, 2* outer_face[i+1]+1);
 
     A_tot += ((ax-bx)*(cy-by) - (ay-by)*(cx-bx))/2;
   }
@@ -441,6 +443,7 @@ static void optlayout_grad(const gsl_vector* coordinates, void* parameters, gsl_
 {
   optlayout_params_t &params = *static_cast<optlayout_params_t*>(parameters);
   PlanarGraph &graph = *params.graph;
+  const face_t &outer_face = params.outer_face;
   vector<double> &zero_values_dist = *params.zero_values_dist;
   vector<double> &k_dist = *params.k_dist;
   vector<double> &k_angle = *params.k_angle;
@@ -505,13 +508,13 @@ static void optlayout_grad(const gsl_vector* coordinates, void* parameters, gsl_
 
   // AREA TERM
   double A_tot=0;
-  const double bx = gsl_vector_get(coordinates, 2* graph.outer_face[0]);
-  const double by = gsl_vector_get(coordinates, 2* graph.outer_face[0] +1);
-  for (int i=1; i+1<graph.outer_face.size(); ++i){
-    const double ax = gsl_vector_get(coordinates, 2* graph.outer_face[i  ]  );
-    const double ay = gsl_vector_get(coordinates, 2* graph.outer_face[i  ]+1);
-    const double cx = gsl_vector_get(coordinates, 2* graph.outer_face[i+1]  );
-    const double cy = gsl_vector_get(coordinates, 2* graph.outer_face[i+1]+1);
+  const double bx = gsl_vector_get(coordinates, 2* outer_face[0]);
+  const double by = gsl_vector_get(coordinates, 2* outer_face[0] +1);
+  for (int i=1; i+1<outer_face.size(); ++i){
+    const double ax = gsl_vector_get(coordinates, 2* outer_face[i  ]  );
+    const double ay = gsl_vector_get(coordinates, 2* outer_face[i  ]+1);
+    const double cx = gsl_vector_get(coordinates, 2* outer_face[i+1]  );
+    const double cy = gsl_vector_get(coordinates, 2* outer_face[i+1]+1);
 
     A_tot += ((ax-bx)*(cy-by) - (ay-by)*(cx-bx))/2;
   }
@@ -546,7 +549,7 @@ static void optlayout_grad(const gsl_vector* coordinates, void* parameters, gsl_
   }
 
   // fix outer face
-  for(vector<node_t>::iterator it = graph.outer_face.begin(); it != graph.outer_face.end(); ++it){
+  for(vector<node_t>::iterator it = outer_face.begin(); it != outer_face.end(); ++it){
     derivatives[*it].first = 0;
     derivatives[*it].second = 0;
   }
@@ -586,6 +589,7 @@ bool optimize_layout(PlanarGraph& G, vector<coord2d>& layout,
 
   optlayout_params_t params;
   params.graph = &G;
+  params.outer_face = find_outer_face(G, layout);
   params.zero_values_dist = &zero_values_dist;
   params.k_dist = &k_dist;
   params.k_angle = &k_angle;

@@ -533,8 +533,6 @@ int main(int ac, char **argv)
   BuckyGen::buckygen_queue Q = BuckyGen::start(N,IPR,only_nontrivial);  
   while(BuckyGen::next_fullerene(Q,dualG)) if((++i) == pick_number) {      
       cerr << "isomer "<< i << endl;
-      dualG.update();
-      
       Polyhedron P  = Polyhedron::fullerene_polyhedron(dualG.dual_graph());
       Polyhedron dP = P.dual();
 

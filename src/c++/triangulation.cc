@@ -120,11 +120,12 @@ unordered_map<arc_t,arc_t> Triangulation::arc_translation() const
 {
   // TODO: Common metadata, calculate once
   IDCounter<tri_t> tri_numbers;
-  unordered_map<arc_t,arc_t> arc_translate(triangles.size()*3);
+  auto tris = triangles();
+  unordered_map<arc_t,arc_t> arc_translate(tris.size()*3);
 
-  if(triangles.size() != (N-2)*2){
-    cout << "triangles = " << triangles << endl;
-    assert(triangles.size() == (N-2)*2);
+  if(tris.size() != (N-2)*2){
+    cout << "triangles = " << tris << endl;
+    assert(tris.size() == (N-2)*2);
   }
   
   // Dual arcs
@@ -145,17 +146,18 @@ PlanarGraph Triangulation::dual_graph() const
 {
   IDCounter<tri_t> tri_numbers;
 
-  //assert(triangles.size() == (N-2)*2);
-  if(triangles.size() != (N-2)*2){
-    cout << "triangles = " << triangles << endl;
-    assert(triangles.size() == (N-2)*2);
+  auto tris = triangles();
+  //assert(tris.size() == (N-2)*2);
+  if(tris.size() != (N-2)*2){
+    cout << "triangles = " << tris << endl;
+    assert(tris.size() == (N-2)*2);
   }
-  for(int i=0;i<triangles.size();i++) tri_numbers.insert(triangles[i].sorted());
+  for(int i=0;i<tris.size();i++) tri_numbers.insert(tris[i].sorted());
 
-  neighbours_t A(triangles.size(),vector<node_t>(3));
+  neighbours_t A(tris.size(),vector<node_t>(3));
 
-  for(node_t U=0;U<triangles.size();U++){
-    const tri_t& t(triangles[U]);
+  for(node_t U=0;U<tris.size();U++){
+    const tri_t& t(tris[U]);
 
     for(int i=0;i<3;i++){
       const node_t& u(t[i]), v(t[(i+1)%3]);
@@ -181,7 +183,8 @@ vector<face_t> Triangulation::cubic_faces() const
   vector<face_t> dfaces(N);
 
   IDCounter<tri_t> tri_numbers;
-  for(int i=0;i<triangles.size();i++) tri_numbers.insert(triangles[i].sorted());
+  auto tris = triangles();
+  for(int i=0;i<tris.size();i++) tri_numbers.insert(tris[i].sorted());
 
   for(node_t u=0;u<N;u++){
     auto nu = nbrs(u);
@@ -365,7 +368,6 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
     remove_isolated_vertices();
   }
 
-  update();
 }
 
 
@@ -396,12 +398,13 @@ Triangulation Triangulation::halma_transform(int m, vector<map<edge_t,node_t>>* 
   }
 
   // Build per-face halma grids and create interior nodes.
-  int n_faces = triangles.size();
+  auto tris = triangles();
+  int n_faces = tris.size();
   vector<map<edge_t,node_t>> face_grid(n_faces);
 
   for(int i = 0; i < n_faces; i++){
     auto& grid = face_grid[i];
-    const face_t& T = triangles[i];
+    const face_t& T = tris[i];
     const vector<node_t>& ns0(arc_nodes[{T[0],T[1]}]);
     const vector<node_t>& ns1(arc_nodes[{T[1],T[2]}]);
     const vector<node_t>& ns2(arc_nodes[{T[0],T[2]}]);

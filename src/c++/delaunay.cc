@@ -296,8 +296,7 @@ void FulleroidDelaunay::remove_flat_vertex(node_t v)
   Debug debug("Delaunay",Debug::INFO1);
 
   debug << "(*begin remove flat vertex*)" << endl;
-  auto nv = neighbours[v];
-  vector<node_t> hole(nv.begin(), nv.end());
+  vector<node_t> hole(neighbours[v].begin(), neighbours[v].end());
   debug << "hole=" << (hole+1) << "\n";
 
   // check if hole[0] is already connected to any of the other hole-nodes in

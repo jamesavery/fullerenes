@@ -16,6 +16,7 @@ vector<coord2d> PlanarGraph::tutte_layout(node_t s, node_t t, node_t r, unsigned
   if(s<0) s = 0;
   if(t<0) t = neighbours[s][0];
 
+  face_t outer_face;
   if(is_consistently_oriented()){
     outer_face = get_face_oriented({s,t},face_max);
   } else {

@@ -45,7 +45,7 @@ static void check_fullerene_dual(const Triangulation& T) {
 
   int Nf = T.N;
   int expected_triangles = 2 * (Nf - 2);
-  EXPECT_EQ((int)T.triangles.size(), expected_triangles)
+  EXPECT_EQ((int)T.triangles().size(), expected_triangles)
     << "Triangle count violates Euler formula";
 
   int deg5 = 0, deg6 = 0, other = 0;

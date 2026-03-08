@@ -7,7 +7,6 @@
 //       Exploit duality between triangulation and cubic planar graph.
 class PlanarGraph : public Graph {
 public:
-  mutable face_t outer_face;
   typedef spiral_nomenclature::construction_scheme_t construction_scheme_t;
 
   explicit PlanarGraph(size_t N=0, int dmax=6) : Graph(N, dmax) {}
