@@ -51,13 +51,13 @@ public:
   // max_work_per_step: work budget per optimize() call. 0 = default (20*N^3).
   static Deltahedron fromExtensionPathOptimized(const buckinverse::ExtensionPath& ep, FILE* log = nullptr,
                                                   StepCallback diag = nullptr,
-                                                  OptMethod method = OptMethod::CG,
-                                                  double step_tol = 1e-3,
-                                                  double final_tol = 1e-5,
+                                                  OptMethod method = OptMethod::LBFGS,
+                                                  double step_tol = 1e-4,
+                                                  double final_tol = 1e-11,
                                                   long long max_work_per_step = 0,
                                                   double step_angle_tol = 0,
                                                   double final_angle_tol = 0,
-                                                  OptMethod final_method = OptMethod::CG,
+                                                  OptMethod final_method = OptMethod::STEIHAUG,
                                                   double patch_grad_tol = 1e-10,
                                                   bool global_post_patch_reflect = false);
 
@@ -106,7 +106,8 @@ public:
                       const vector<bool>& interior_mask = {},
                       double target_L = 0,
                       int max_iter = 150,
-                      double grad_tol = 1e-6);
+                      double grad_tol = 1e-6,
+                      bool convex_constraint = true);
 
   // Reflect concave vertices through their neighbor centroid plane.
   // Vertices with h < -threshold are reflected (h = signed height above
@@ -115,6 +116,11 @@ public:
   // Returns number of vertices reflected.
   int reflect_concave(vector<coord3d>& pts, double threshold = 0,
                       const vector<bool>& fixed = {}) const;
+
+  // Repeatedly reflect concave vertices until none remain (or 20-pass limit).
+  // Returns total number of vertices reflected across all passes.
+  int reflect_all_concave(vector<coord3d>& pts, double threshold = 0,
+                          const vector<bool>& fixed = {}) const;
 
   // Finite-difference gradient check. Returns max relative error.
   // Uses the given geometry (or this->points if empty).

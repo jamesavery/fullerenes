@@ -1397,12 +1397,7 @@ Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, FIL
             vector<int> refl_remap;
             Deltahedron D = extractCompact(rd, full_N, points, refl_remap);
 
-            int pass;
-            for (pass = 0; pass < 20; pass++)
-                if (D.reflect_concave(D.points) == 0) break;
-            if (pass == 20)
-                fprintf(stderr, "WARNING: reflect_concave hit 20-pass limit at step %d (N=%d)\n",
-                        step_idx, D.N);
+            D.reflect_all_concave(D.points);
 
             // Copy reflected coords back to full array
             for (int u = 0; u < full_N; u++)
@@ -1419,23 +1414,40 @@ Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, FIL
             diag(step_idx + 1, "reflected", D_diag);
         }
 
-        // d. Extract small patch sub-graph (O(1) vertices)
-        vector<bool> free_mask, interior_mask;
-        vector<int> patch_remap;
-        Deltahedron patch = extractPatch(rd, full_N, step, points,
-                                         free_mask, interior_mask, patch_remap,
-                                         global_post_patch_reflect);
+        // d-f. Patch reflect-optimize loop: optimize patch without hard convexity
+        //       constraint (which causes it to get stuck at h=0 boundary), then
+        //       reflect any concavities on the full graph and re-optimize.
+        for (int patch_round = 0; patch_round < 10; patch_round++) {
+            // d. Extract small patch sub-graph (O(1) vertices)
+            vector<bool> free_mask, interior_mask;
+            vector<int> patch_remap;
+            Deltahedron patch = extractPatch(rd, full_N, step, points,
+                                             free_mask, interior_mask, patch_remap,
+                                             global_post_patch_reflect);
 
-        // e. Trust-region optimize on patch only (strip + path + tp free)
-        patch.opt_log = log;
-        patch.optimize_patch(patch.points, free_mask, interior_mask, 0, 150, patch_grad_tol);
-        patch.opt_log = nullptr;
-        total_patch_iters += patch.iterations_used;
+            // e. Trust-region optimize on patch only (no hard convexity constraint;
+            //    E_conv softplus still provides a soft bias toward convexity)
+            patch.opt_log = log;
+            patch.optimize_patch(patch.points, free_mask, interior_mask, 0, 150, patch_grad_tol, false);
+            patch.opt_log = nullptr;
+            total_patch_iters += patch.iterations_used;
 
-        // f. Copy patch free-vertex coords back to full array
-        for (int u = 0; u < full_N; u++)
-            if (patch_remap[u] >= 0 && free_mask[patch_remap[u]])
-                points[u] = patch.points[patch_remap[u]];
+            // f. Copy patch free-vertex coords back to full array
+            for (int u = 0; u < full_N; u++)
+                if (patch_remap[u] >= 0 && free_mask[patch_remap[u]])
+                    points[u] = patch.points[patch_remap[u]];
+
+            // g. Reflect concave on full graph, re-loop if any were reflected
+            {
+                vector<int> refl_remap;
+                Deltahedron D = extractCompact(rd, full_N, points, refl_remap);
+                int n_refl = D.reflect_all_concave(D.points);
+                for (int u = 0; u < full_N; u++)
+                    if (refl_remap[u] >= 0)
+                        points[u] = D.points[refl_remap[u]];
+                if (n_refl == 0) break;  // patch produced convex result
+            }
+        }
 
         auto t_patch = clk::now();
         ms_patch += chrono::duration<double,milli>(t_patch - t_refl).count();
@@ -1444,7 +1456,6 @@ Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, FIL
         if (diag) {
             vector<int> diag_remap;
             Deltahedron D_diag = extractCompact(rd, full_N, points, diag_remap);
-            D_diag.iterations_used = patch.iterations_used;
             diag(step_idx + 1, "patched", D_diag);
         }
 
@@ -1463,15 +1474,7 @@ Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, FIL
 
         for(int round = 0; round < 10; round++){
           // Reflect into convex basin
-          int n_refl = 0, pass;
-          for(pass = 0; pass < 20; pass++){
-            int n = D.reflect_concave(D.points);
-            if(n == 0) break;
-            n_refl += n;
-          }
-          if(pass == 20)
-            fprintf(stderr, "WARNING: reflect_concave hit 20-pass limit at step %d round %d (N=%d)\n",
-                    step_idx, round, D.N);
+          int n_refl = D.reflect_all_concave(D.points);
           if(round > 0 && n_refl == 0) break;  // stable in convex basin
 
           // Optimize pure quality
@@ -1505,7 +1508,7 @@ Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, FIL
                     step_idx, D.N,
                     chrono::duration<double,milli>(t_place - ts).count(),
                     chrono::duration<double,milli>(t_refl - t_place).count(),
-                    chrono::duration<double,milli>(t_patch - t_refl).count(), patch.iterations_used,
+                    chrono::duration<double,milli>(t_patch - t_refl).count(), total_patch_iters,
                     chrono::duration<double,milli>(t_relax - t_patch).count(), D.iterations_used);
         }
         step_idx++;
@@ -1530,15 +1533,7 @@ Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, FIL
 
     for(int round = 0; round < 10; round++){
       // Reflect into convex basin
-      int n_refl = 0, pass;
-      for(pass = 0; pass < 20; pass++){
-        int n = D.reflect_concave(D.points);
-        if(n == 0) break;
-        n_refl += n;
-      }
-      if(pass == 20)
-        fprintf(stderr, "WARNING: reflect_concave hit 20-pass limit in final round %d (N=%d)\n",
-                round, D.N);
+      int n_refl = D.reflect_all_concave(D.points);
       if(round > 0 && n_refl == 0) break;  // stable in convex basin
 
       if(diag && round == 0) diag((int)ep.steps.size() + 1, "reflected", D);
@@ -1559,6 +1554,9 @@ Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, FIL
     // Final constrained Steihaug polish: h>=0 trust region prevents regression
     // to concave.  k_conv=0 so the Hessian is pure quality — the constraint
     // is the only convexity mechanism.
+    // Reflect first so that all vertices start with h>0 — the constraint only
+    // protects vertices that are currently convex, not already-concave ones.
+    D.reflect_all_concave(D.points);
     D.opt_convex_constraint = true;
     D.opt_method = OptMethod::STEIHAUG;
     if (log) D.opt_log = log;
@@ -2076,7 +2074,8 @@ static void assemble_patch_hessian(
 bool Deltahedron::optimize_patch(const vector<coord3d>& initial_geometry,
                                  const vector<bool>& free_mask,
                                  const vector<bool>& interior_mask,
-                                 double target_L, int max_iter, double grad_tol)
+                                 double target_L, int max_iter, double grad_tol,
+                                 bool convex_constraint)
 {
   assert((int)initial_geometry.size() == N);
   assert((int)free_mask.size() == N);
@@ -2294,9 +2293,10 @@ bool Deltahedron::optimize_patch(const vector<coord3d>& initial_geometry,
     vector<double> h_trial;
     compute_h_values(*this, x_trial, h_trial);
     bool convex = true;
-    for(int v = 0; v < N && convex; v++)
-      if(checked_mask[v] && h_start[v] > 0 && h_trial[v] < 0)
-        convex = false;
+    if(convex_constraint)
+      for(int v = 0; v < N && convex; v++)
+        if(checked_mask[v] && h_start[v] > 0 && h_trial[v] < 0)
+          convex = false;
 
     // Trust region update
     double rho = (pred > 0) ? actual / pred : -1;
@@ -2370,6 +2370,20 @@ int Deltahedron::reflect_concave(vector<coord3d>& pts, double threshold,
     }
   }
   return count;
+}
+
+int Deltahedron::reflect_all_concave(vector<coord3d>& pts, double threshold,
+                                      const vector<bool>& fixed) const
+{
+  int total = 0;
+  for(int pass = 0; pass < 20; pass++){
+    int n = reflect_concave(pts, threshold, fixed);
+    if(n == 0) break;
+    total += n;
+    if(pass == 19)
+      fprintf(stderr, "WARNING: reflect_all_concave hit 20-pass limit (N=%d)\n", N);
+  }
+  return total;
 }
 
 bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double target_L,
@@ -2884,14 +2898,7 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
   // Skipped when opt_skip_post_reflect is set (caller will handle convexity).
   if(!opt_skip_post_reflect)
   {
-    int total_reflected = 0, pass;
-    for(pass = 0; pass < 20; pass++){
-      int n = reflect_concave(points, 0, fixed);
-      if(n == 0) break;
-      total_reflected += n;
-    }
-    if(pass == 20)
-      fprintf(stderr, "WARNING: post-reflect hit 20-pass limit (N=%d)\n", N);
+    int total_reflected = reflect_all_concave(points, 0, fixed);
     if(total_reflected > 0){
       // Reflection moved vertices — brief CG (Polak-Ribiere) polish to recover angle quality.
       E = compute_eg(grad);
@@ -2917,7 +2924,7 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
         if(has_fixed) for(int i = 0; i < N; i++) if(fixed[i]) dir_r[i] = coord3d(0,0,0);
       }
       // Final reflect pass in case CG polish re-introduced barely-concave vertices
-      reflect_concave(points, 0, fixed);
+      reflect_all_concave(points, 0, fixed);
       if(opt_log)
         fprintf(opt_log, "  Post-reflect polish: reflected=%d ang=%.4e\n",
                 total_reflected, max_angle_relerr());
