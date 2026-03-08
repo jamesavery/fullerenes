@@ -32,6 +32,9 @@ target_link_libraries(step_mol2 fullerenes)
 add_executable(bench_epopt bench_epopt.cc)
 target_link_libraries(bench_epopt fullerenes)
 
+add_executable(replay_perstep replay_perstep.cc)
+target_link_libraries(replay_perstep fullerenes)
+
 add_executable(bench_quality bench_quality.cc)
 target_link_libraries(bench_quality fullerenes)
 

@@ -26,6 +26,14 @@ public:
   int n_hv_evals = 0;       // Set by optimize(): number of Hessian-vector products
   FILE* opt_log = nullptr;  // If set, optimize() writes periodic diagnostics here
   double opt_k_flat = 2.0;  // E_flat coefficient for optimize(). Set to 0 to skip phase 1.
+  double opt_k_conv = 0;   // E_conv coefficient for optimize(). Quadratic one-sided penalty:
+                            // E_conv = k * sum_v max(0, -h_v)^2.  Zero at any convex geometry,
+                            // pushes concave vertices toward convexity.  Set to ~10 in the
+                            // extension path pipeline.  See CONVEX-BFGS-design.md.
+  bool opt_convex_constraint = false;  // Steihaug rejects steps that make convex vertices
+                                       // concave (hard constraint). Use with k_conv=0.
+  bool opt_skip_post_reflect = false;   // Skip post-optimization reflect_concave + CG polish.
+                                        // Use when a subsequent phase will handle convexity.
   OptMethod opt_method = OptMethod::CG;  // Optimization method for optimize()
 
   // Constructors
@@ -50,7 +58,8 @@ public:
                                                   double step_angle_tol = 0,
                                                   double final_angle_tol = 0,
                                                   OptMethod final_method = OptMethod::CG,
-                                                  double patch_grad_tol = 1e-10);
+                                                  double patch_grad_tol = 1e-10,
+                                                  bool global_post_patch_reflect = false);
 
   // Quality metrics
   double max_angle_relerr() const;  // max over face angles of |theta - pi/3| / (pi/3)

@@ -244,10 +244,10 @@ int main(int argc, char** argv) {
         [&](int step, const char* phase, const Deltahedron& D_snap) {
             print_row(step, phase, D_snap);
 
-            // Write mol2 for key phases: seed, patched (before CG), cg, final
+            // Write mol2 for key phases: seed, patched (before relaxation), relaxed, final
             if (strcmp(phase, "seed") == 0 ||
                 strcmp(phase, "patched") == 0 ||
-                strcmp(phase, "cg") == 0 ||
+                strcmp(phase, "relaxed") == 0 ||
                 strcmp(phase, "final") == 0) {
                 char path[256];
                 snprintf(path, sizeof(path), "/tmp/%s_step%02d_%s.mol2",
@@ -257,7 +257,7 @@ int main(int argc, char** argv) {
         },
         opt_method, step_tol, final_tol);
 
-    fprintf(stderr, "\nmol2 files in /tmp/%s_step*_{seed,patched,cg,final}.mol2\n", label.c_str());
+    fprintf(stderr, "\nmol2 files in /tmp/%s_step*_{seed,patched,relaxed,final}.mol2\n", label.c_str());
 
     // Primitive cost measurement: run each method for a fixed budget, measure time and eval counts.
     fprintf(stderr, "\n=== Primitive cost ratios at N=%d ===\n", D.N);

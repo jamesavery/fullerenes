@@ -9,6 +9,339 @@
 #include <set>
 #include <chrono>
 
+// ============================================================
+// VertexHData: per-vertex convexity geometry and derivatives.
+//
+// Level 1 (basic): h, n_hat, centroid, N_len — for h queries.
+// Level 2 (derivs): adds r_perp, per-neighbor De/g/w/Dex/Q —
+//   for E_conv gradient, Hv product, and Hessian assembly.
+//
+// h = (x_v - centroid) · n_hat,  n_hat = N/|N|,
+// N = Sum_j (e_j × e_{j+1}),  e_j = x[n_j] - x_v.
+// ============================================================
+struct VertexHData {
+  int vertex;           // vertex index
+  int d;                // degree
+  double h;             // signed convexity height (h>0 = convex)
+  coord3d n_hat;        // unit outward fan normal
+  coord3d centroid;     // neighbor centroid
+  double N_len;         // |N_fan|
+  bool valid;           // false if degenerate (N_len < eps)
+
+  // Derivative-level data (populated by compute_derivs)
+  coord3d r_perp;       // (x_v - centroid) - h*n_hat
+  struct Nbr {
+    int id;             // neighbor vertex index
+    coord3d De;         // e_{j-1} - e_{j+1}
+    coord3d g;          // dh/dx_{n_j} = -n_hat/d + r_perp × De / N_len
+    coord3d w;          // r_perp × De / N_len (normal-derivative part of g)
+    matrix3d Dex;       // [De]×  (cross-product matrix)
+    matrix3d Q;         // P · [De]× / N_len  (d(n_hat)/dx_{n_j})
+  };
+  vector<Nbr> nb;
+  bool has_derivs = false;
+
+  // Compute basic h data for vertex v.
+  static VertexHData compute_h(const Deltahedron& D, const vector<coord3d>& x, int v) {
+    VertexHData vd;
+    vd.vertex = v;
+    vd.d = (int)D.neighbours[v].size();
+    vd.has_derivs = false;
+
+    // Neighbor centroid
+    vd.centroid = coord3d(0,0,0);
+    for(int j = 0; j < vd.d; j++) vd.centroid += x[D.neighbours[v][j]];
+    vd.centroid /= (double)vd.d;
+
+    // Fan normal (unnormalized)
+    coord3d N_fan(0,0,0);
+    for(int j = 0; j < vd.d; j++){
+      coord3d e1 = x[D.neighbours[v][j]] - x[v];
+      coord3d e2 = x[D.neighbours[v][(j+1)%vd.d]] - x[v];
+      N_fan += e1.cross(e2);
+    }
+    vd.N_len = N_fan.norm();
+    vd.valid = (vd.N_len > 1e-15);
+    if(!vd.valid){ vd.h = 0; vd.n_hat = coord3d(0,0,0); return vd; }
+
+    vd.n_hat = N_fan / vd.N_len;
+    vd.h = (x[v] - vd.centroid).dot(vd.n_hat);
+    return vd;
+  }
+
+  // Compute full derivative data (extends basic h data).
+  static VertexHData compute_derivs(const Deltahedron& D, const vector<coord3d>& x, int v) {
+    VertexHData vd = compute_h(D, x, v);
+    if(!vd.valid) return vd;
+    vd.has_derivs = true;
+
+    vd.r_perp = (x[v] - vd.centroid) - vd.n_hat * vd.h;
+    matrix3d P = matrix3d::unit_matrix() - vd.n_hat.outer(vd.n_hat);
+
+    vd.nb.resize(vd.d);
+    for(int j = 0; j < vd.d; j++){
+      vd.nb[j].id = D.neighbours[v][j];
+      coord3d ej_prev = x[D.neighbours[v][(j+vd.d-1)%vd.d]] - x[v];
+      coord3d ej_next = x[D.neighbours[v][(j+1)%vd.d]]       - x[v];
+      vd.nb[j].De  = ej_prev - ej_next;
+      vd.nb[j].g   = vd.n_hat * (-1.0/vd.d) + vd.r_perp.cross(vd.nb[j].De) / vd.N_len;
+      vd.nb[j].w   = vd.r_perp.cross(vd.nb[j].De) / vd.N_len;
+      vd.nb[j].Dex = matrix3d::cross_matrix(vd.nb[j].De);
+      vd.nb[j].Q   = P * vd.nb[j].Dex * (1.0/vd.N_len);
+    }
+    return vd;
+  }
+
+  // --- Operations on derivative data ---
+
+  // Gather: (dh/dx) · v  where dh/dx_v = n_hat, dh/dx_{n_j} = g_j.
+  double dhdx_dot(const vector<coord3d>& v) const {
+    double s = n_hat.dot(v[vertex]);
+    for(int j = 0; j < d; j++) s += nb[j].g.dot(v[nb[j].id]);
+    return s;
+  }
+
+  // Scatter: out[v] += alpha * n_hat;  out[n_j] += alpha * g_j.
+  // (Gradient of a scalar function f(h): df/dx = dfdh * dh/dx.)
+  void scatter_dhdx(double alpha, vector<coord3d>& out) const {
+    out[vertex] = out[vertex] + n_hat * alpha;
+    for(int j = 0; j < d; j++)
+      out[nb[j].id] = out[nb[j].id] + nb[j].g * alpha;
+  }
+
+  // Correction-term Hv: Hv += dEdh * d²h/dx² * v.
+  // d²h/dx² has blocks H_{vv}=0, H_{v,j}=Q_j, H_{j,k}=7-term formula.
+  void scatter_d2h_hv(double dEdh, const vector<coord3d>& v, vector<coord3d>& Hv) const {
+    if(fabs(dEdh) < 1e-15) return;
+    matrix3d R = matrix3d::cross_matrix(r_perp);
+
+    // H_{v,j} blocks: Hv[v] += Q_j * dEdh * v[n_j], Hv[n_j] += Q_j^T * dEdh * v[v]
+    for(int j = 0; j < d; j++){
+      matrix3d Hvj = nb[j].Q * dEdh;
+      Hv[vertex]   = Hv[vertex]   + Hvj * v[nb[j].id];
+      Hv[nb[j].id] = Hv[nb[j].id] + Hvj.transpose() * v[vertex];
+    }
+
+    // H_{j,k} blocks (7-term formula)
+    for(int j = 0; j < d; j++){
+      for(int k = 0; k < d; k++){
+        matrix3d Hjk = nb[k].Q * (-1.0/d)                                        // A: -(1/d) Q_k
+                     + nb[j].Dex * (1.0 / (d * N_len))                            // B: [De_j]× / (d·|N|)
+                     + nb[j].De.cross(n_hat).outer(nb[k].g) * (1.0/N_len)         // C: (De_j × n_hat)⊗g_k / |N|
+                     + nb[j].Dex * nb[k].Q * (h / N_len);                         // D: h·[De_j]×·Q_k / |N|
+        if(k == (j+d-1)%d) Hjk += R * ( 1.0/N_len);                              // E: +[r_perp]× for k=j-1
+        if(k == (j+1)%d)   Hjk += R * (-1.0/N_len);                              // F: -[r_perp]× for k=j+1
+        Hjk += nb[j].w.outer(n_hat.cross(nb[k].De)) * (-1.0/N_len);              // G: -w_j ⊗ (n_hat × De_k)/|N|
+
+        Hv[nb[j].id] = Hv[nb[j].id] + (Hjk * dEdh) * v[nb[k].id];
+      }
+    }
+  }
+
+  // Correction-term Hessian blocks: calls add_block(row_vertex, col_vertex, 3x3 matrix).
+  // Same formula as scatter_d2h_hv but assembles explicit blocks.
+  template<typename AddBlockFn>
+  void scatter_d2h_blocks(double dEdh, AddBlockFn&& add_block) const {
+    if(fabs(dEdh) < 1e-15) return;
+    matrix3d R = matrix3d::cross_matrix(r_perp);
+
+    // H_{v,j} blocks
+    for(int j = 0; j < d; j++){
+      matrix3d Hvj = nb[j].Q * dEdh;
+      add_block(vertex, nb[j].id, Hvj);
+      add_block(nb[j].id, vertex, Hvj.transpose());
+    }
+
+    // H_{j,k} blocks
+    for(int j = 0; j < d; j++){
+      for(int k = 0; k < d; k++){
+        matrix3d Hjk = nb[k].Q * (-1.0/d)
+                     + nb[j].Dex * (1.0 / (d * N_len))
+                     + nb[j].De.cross(n_hat).outer(nb[k].g) * (1.0/N_len)
+                     + nb[j].Dex * nb[k].Q * (h / N_len);
+        if(k == (j+d-1)%d) Hjk += R * ( 1.0/N_len);
+        if(k == (j+1)%d)   Hjk += R * (-1.0/N_len);
+        Hjk += nb[j].w.outer(n_hat.cross(nb[k].De)) * (-1.0/N_len);
+
+        add_block(nb[j].id, nb[k].id, Hjk * dEdh);
+      }
+    }
+  }
+
+  // Rank-1 Hessian blocks: d²E/dh² * (dh/dx)⊗(dh/dx).
+  // Calls add_block(row_vertex, col_vertex, 3x3 matrix).
+  template<typename AddBlockFn>
+  void scatter_rank1_blocks(double d2Edh2, AddBlockFn&& add_block) const {
+    if(fabs(d2Edh2) < 1e-15) return;
+    // v-v block
+    add_block(vertex, vertex, n_hat.outer(n_hat) * d2Edh2);
+    // v-j and j-v blocks
+    for(int j = 0; j < d; j++){
+      matrix3d Bvj = n_hat.outer(nb[j].g) * d2Edh2;
+      add_block(vertex, nb[j].id, Bvj);
+      add_block(nb[j].id, vertex, Bvj.transpose());
+    }
+    // j-k blocks
+    for(int j = 0; j < d; j++)
+      for(int k = 0; k < d; k++)
+        add_block(nb[j].id, nb[k].id, nb[j].g.outer(nb[k].g) * d2Edh2);
+  }
+};
+
+// ============================================================
+// EdgeBondData: per-edge bond geometry for E_bond.
+//
+// E_bond = (k/2) * (r - L)^2  per edge.
+// Hessian: M = k[(1-L/r)I + (L/r^3)d⊗d].
+// ============================================================
+struct EdgeBondData {
+  int u, v;
+  coord3d d;          // x[u] - x[v]
+  double r, dev;      // |d|, r - L
+  bool valid;
+
+  static EdgeBondData compute(const vector<coord3d>& x, int u, int v, double L) {
+    EdgeBondData ed;
+    ed.u = u; ed.v = v;
+    ed.d = x[u] - x[v];
+    ed.r = ed.d.norm();
+    ed.valid = (ed.r > 1e-15);
+    ed.dev = ed.r - L;
+    return ed;
+  }
+
+  double energy(double k) const { return 0.5 * k * dev * dev; }
+
+  // out[u] += k*(dev/r)*d,  out[v] -= same
+  void scatter_gradient(double k, vector<coord3d>& out) const {
+    coord3d g = d * (k * dev / r);
+    out[u] = out[u] + g;
+    out[v] = out[v] - g;
+  }
+
+  // Hv[u] += M*(v[u]-v[v]),  Hv[v] -= same
+  // M*dv = k*(1-L/r)*dv + k*(L/r^3)*(d.dv)*d
+  void scatter_hv(double k, double L, const vector<coord3d>& v, vector<coord3d>& Hv) const {
+    coord3d dv = v[u] - v[this->v];
+    coord3d Mdv = dv * (k * (1 - L/r)) + d * (k * L / (r*r*r) * d.dot(dv));
+    Hv[u] = Hv[u] + Mdv;
+    Hv[this->v] = Hv[this->v] - Mdv;
+  }
+
+  // Hessian blocks: H(u,u) = H(v,v) = +M,  H(u,v) = H(v,u) = -M
+  template<typename F>
+  void scatter_blocks(double k, double L, F&& add_block) const {
+    matrix3d M = matrix3d::unit_matrix() * (k * (1 - L/r))
+               + d.outer(d) * (k * L / (r*r*r));
+    add_block(u, v,       -M);
+    add_block(this->v, u, -M);
+    add_block(u, u,        M);
+    add_block(this->v, this->v, M);
+  }
+};
+
+// ============================================================
+// CornerAngleData: per-triangle-corner angle geometry.
+//
+// Angle theta at vertex b between arms va = x[a]-x[b], vc = x[d]-x[b].
+// E_angle = (k/2) * (theta - pi/3)^2  per corner.
+// Shared by E_angle (per triangle) and E_curv (per vertex fan).
+// ============================================================
+struct CornerAngleData {
+  int a, b, d;              // arm1 end, apex, arm2 end
+  double theta, dev;        // angle, deviation from pi/3
+  coord3d p, q;             // dtheta/d(va), dtheta/d(vc)
+  double ra, rc, S, alpha;  // arm lengths, sin(theta), 1 - dev*cos/sin
+  coord3d ua, uc;           // unit arm vectors
+  bool valid;
+
+  static CornerAngleData compute(const vector<coord3d>& x, int a, int b, int d) {
+    CornerAngleData ca;
+    ca.a = a; ca.b = b; ca.d = d;
+
+    coord3d va = x[a] - x[b], vc = x[d] - x[b];
+    ca.ra = va.norm(); ca.rc = vc.norm();
+    ca.valid = (ca.ra > 1e-15 && ca.rc > 1e-15);
+    if(!ca.valid) return ca;
+
+    ca.ua = va / ca.ra;
+    ca.uc = vc / ca.rc;
+    double C = max(-1.0, min(1.0, ca.ua.dot(ca.uc)));
+    ca.theta = acos(C);
+    ca.S = sin(ca.theta);
+    if(ca.S < 1e-10){ ca.valid = false; return ca; }
+
+    ca.dev = ca.theta - M_PI / 3.0;
+    ca.alpha = 1.0 - ca.dev * C / ca.S;
+
+    coord3d::dangle(va, vc, ca.p, ca.q);
+    return ca;
+  }
+
+  // out[a] += w*p,  out[d] += w*q,  out[b] -= w*(p+q)
+  void scatter_gradient(double w, vector<coord3d>& out) const {
+    out[a] = out[a] + p * w;
+    out[d] = out[d] + q * w;
+    out[b] = out[b] - (p + q) * w;
+  }
+
+  // Hv scatter with weight k.
+  // Builds arm-space blocks Haa/Hcc/Hac, scatters k*(block*v) to {a,d,b}.
+  // Includes both rank-1 (k*alpha*p⊗p etc) and correction terms.
+  void scatter_hv(double k, const vector<coord3d>& v, vector<coord3d>& Hv) const {
+    matrix3d sym_ac = ua.outer(uc) + uc.outer(ua);
+
+    matrix3d Haa = p.outer(p) * (k * alpha)
+      + (sym_ac + matrix3d::unit_matrix() * (ua.dot(uc))
+         - ua.outer(ua) * (3*ua.dot(uc))) * (k * dev / (ra*ra * S));
+
+    matrix3d Hcc = q.outer(q) * (k * alpha)
+      + (sym_ac + matrix3d::unit_matrix() * (ua.dot(uc))
+         - uc.outer(uc) * (3*ua.dot(uc))) * (k * dev / (rc*rc * S));
+
+    matrix3d Hac = p.outer(q) * (k * alpha)
+      + (ua.outer(ua) + uc.outer(uc) - ua.outer(uc) * (ua.dot(uc))
+         - matrix3d::unit_matrix()) * (k * dev / (ra*rc * S));
+
+    matrix3d Hab = Haa + Hac;
+    matrix3d Hcb = Hcc + Hac.transpose();
+
+    Hv[a] = Hv[a] + Haa * v[a] + Hac * v[d] + (-Hab) * v[b];
+    Hv[d] = Hv[d] + Hac.transpose() * v[a] + Hcc * v[d] + (-Hcb) * v[b];
+    Hv[b] = Hv[b] + (-Hab.transpose()) * v[a] + (-Hcb.transpose()) * v[d] + (Hab + Hcb) * v[b];
+  }
+
+  // Hessian blocks via add_block callback, weight k.
+  template<typename F>
+  void scatter_blocks(double k, F&& add_block) const {
+    matrix3d sym_ac = ua.outer(uc) + uc.outer(ua);
+    double C = ua.dot(uc);
+    matrix3d I = matrix3d::unit_matrix();
+
+    matrix3d Haa = p.outer(p) * (k * alpha)
+      + (sym_ac + I * C - ua.outer(ua) * (3*C)) * (k * dev / (ra*ra * S));
+
+    matrix3d Hcc = q.outer(q) * (k * alpha)
+      + (sym_ac + I * C - uc.outer(uc) * (3*C)) * (k * dev / (rc*rc * S));
+
+    matrix3d Hac = p.outer(q) * (k * alpha)
+      + (ua.outer(ua) + uc.outer(uc) - ua.outer(uc) * C - I) * (k * dev / (ra*rc * S));
+
+    add_block(a, a, Haa);
+    add_block(a, d, Hac);
+    add_block(d, a, Hac.transpose());
+    add_block(d, d, Hcc);
+
+    matrix3d Hab = Haa + Hac;
+    matrix3d Hcb = Hcc + Hac.transpose();
+    add_block(a, b, -Hab);
+    add_block(b, a, -Hab.transpose());
+    add_block(d, b, -Hcb);
+    add_block(b, d, -Hcb.transpose());
+    add_block(b, b, Hab + Hcb);
+  }
+};
+
 Deltahedron::Deltahedron(const Triangulation& T, const vector<coord3d>& points)
   : Triangulation(T), points(points)
 {
@@ -49,22 +382,9 @@ double Deltahedron::max_angle_relerr() const {
 
 int Deltahedron::count_concave() const {
   int n_concave = 0;
-  for (int v = 0; v < N; v++) {
-    int deg = (int)neighbours[v].size();
-    coord3d centroid(0,0,0);
-    for (int nb : neighbours[v]) centroid = centroid + points[nb];
-    centroid = centroid * (1.0 / deg);
-    coord3d fan_normal(0,0,0);
-    for (int j = 0; j < deg; j++) {
-      coord3d e1 = points[neighbours[v][j]] - points[v];
-      coord3d e2 = points[neighbours[v][(j+1)%deg]] - points[v];
-      fan_normal = fan_normal + e1.cross(e2);
-    }
-    double nn = fan_normal.norm();
-    if (nn < 1e-15) continue;
-    coord3d nhat = fan_normal / nn;
-    double h = (points[v] - centroid).dot(nhat);
-    if (h < 0) n_concave++;
+  for(int v = 0; v < N; v++){
+    auto vd = VertexHData::compute_h(*this, points, v);
+    if(vd.valid && vd.h < 0) n_concave++;
   }
   return n_concave;
 }
@@ -194,6 +514,31 @@ using buckinverse::ExtensionStep;
 using buckinverse::ExpKind;
 using buckinverse::ReducibleDual;
 
+// Thomas algorithm for tridiagonal system with coord3d values.
+// diag[i] = diagonal entries, rhs[i] = right-hand sides.
+// Sub- and super-diagonal entries are all -1.
+// Returns solution in-place in rhs.
+static void solveTridiagonal(const vector<double>& diag, vector<coord3d>& rhs) {
+    int n = (int)rhs.size();
+    if (n == 0) return;
+    if (n == 1) { rhs[0] = rhs[0] / diag[0]; return; }
+
+    // Forward sweep
+    vector<double> d(diag);
+    vector<double> c(n - 1, -1.0);  // super-diagonal
+
+    for (int i = 1; i < n; i++) {
+        double w = -1.0 / d[i - 1];  // sub-diagonal / d'[i-1]
+        d[i] -= w * c[i - 1];
+        rhs[i] = rhs[i] - rhs[i - 1] * w;
+    }
+
+    // Back substitution
+    rhs[n - 1] = rhs[n - 1] / d[n - 1];
+    for (int i = n - 2; i >= 0; i--)
+        rhs[i] = (rhs[i] - rhs[i + 1] * c[i]) / d[i];
+}
+
 // Solve 5x5 cyclic tridiagonal system for F-ring.
 // All diagonal entries = 6, sub/super-diagonal = -1, corner entries = -1.
 // Uses direct Gaussian elimination (5x5 is tiny).
@@ -317,7 +662,7 @@ static void shiftForFRing(const ReducibleDual& rd, const ExtensionStep& step,
 
 // Compute strip vertex coordinates for one expansion step.
 // points[] is indexed by ReducibleDual vertex IDs (full graph numbering).
-// TODO: Cleanup (cleaner code, factor into higher-level abstractions  + add clearer descriptions of the method).
+// Places each strip vertex at the centroid of its 4 non-strip neighbors.
 static void computeStripCoords(const ExtensionStep& step, vector<coord3d>& points) {
     const auto& strip = step.strip;
     const auto& path = step.path;
@@ -325,13 +670,11 @@ static void computeStripCoords(const ExtensionStep& step, vector<coord3d>& point
     int n = (int)strip.size();
 
     if (step.kind.type == ExpKind::L_type) {
-        // L-type: quad centroid initial placement.
         for (int j = 0; j < n; j++)
             points[strip[j]] = (points[path[j]] + points[path[j + 1]]
                               + points[tp[j]] + points[tp[j + 1]]) * 0.25;
 
     } else if (step.kind.type == ExpKind::B_type) {
-        // B(0,0): quad centroid for each of the 3 strip vertices.
         assert(step.kind.i == 0 && step.kind.j == 0 && n == 3);
         points[strip[0]] = (points[path[0]] + points[path[1]]
                           + points[tp[0]] + points[tp[1]]) * 0.25;
@@ -887,25 +1230,47 @@ static Deltahedron extractPatch(
     const vector<coord3d>& points,
     vector<bool>& free_mask,
     vector<bool>& interior_mask,
-    vector<int>& remap)
+    vector<int>& remap,
+    bool wider = false)
 {
-    // 1. Collect free vertices (strip + path + tp)
-    set<int> free_set;
-    for (int v : step.strip) free_set.insert(v);
-    for (int v : step.path)  free_set.insert(v);
-    for (int v : step.tp)    free_set.insert(v);
+    // 1. Collect core free vertices (strip + path + tp)
+    set<int> core_free;
+    for (int v : step.strip) core_free.insert(v);
+    for (int v : step.path)  core_free.insert(v);
+    for (int v : step.tp)    core_free.insert(v);
 
-    // 2. Expand to one-ring of (path ∪ tp) for the fixed boundary
-    set<int> patch_set = free_set;
+    // 2. Expand to one-ring of (path ∪ tp) for boundary ring 1
+    set<int> ring1;
     for (int v : step.path) {
         uint8_t m = rd.V[v].active;
-        for (; m; m &= m - 1)
-            patch_set.insert(rd.V[v].nbr[__builtin_ctz(m)]);
+        for (; m; m &= m - 1) {
+            int nb = rd.V[v].nbr[__builtin_ctz(m)];
+            if (!core_free.count(nb)) ring1.insert(nb);
+        }
     }
     for (int v : step.tp) {
         uint8_t m = rd.V[v].active;
-        for (; m; m &= m - 1)
-            patch_set.insert(rd.V[v].nbr[__builtin_ctz(m)]);
+        for (; m; m &= m - 1) {
+            int nb = rd.V[v].nbr[__builtin_ctz(m)];
+            if (!core_free.count(nb)) ring1.insert(nb);
+        }
+    }
+
+    // Free set: core + (if wider, ring1 is also free)
+    set<int> free_set = core_free;
+    if (wider) free_set.insert(ring1.begin(), ring1.end());
+
+    // Patch set: free_set + boundary ring
+    set<int> patch_set = free_set;
+    if (wider) {
+        // Ring 2: one-ring of ring1 not already in patch
+        for (int v : ring1) {
+            uint8_t m = rd.V[v].active;
+            for (; m; m &= m - 1)
+                patch_set.insert(rd.V[v].nbr[__builtin_ctz(m)]);
+        }
+    } else {
+        patch_set.insert(ring1.begin(), ring1.end());
     }
 
     // 3. Remap patch vertices to 0..m-1
@@ -950,14 +1315,15 @@ static Deltahedron extractPatch(
 Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, FILE* log, StepCallback diag,
                                                      OptMethod method, double step_tol, double final_tol, long long max_work_per_step,
                                                      double step_angle_tol, double final_angle_tol,
-                                                     OptMethod final_method, double patch_grad_tol) {
+                                                     OptMethod final_method, double patch_grad_tol,
+                                                     bool global_post_patch_reflect) {
     int full_N = ep.full_N;
     vector<coord3d> points(full_N);
 
     // Timing accumulators (only used when opt_log is set)
     using clk = chrono::steady_clock;
-    double ms_seed = 0, ms_place = 0, ms_reflect = 0, ms_patch = 0, ms_cg = 0, ms_final = 0;
-    int total_cg_iters = 0, total_patch_iters = 0;
+    double ms_seed = 0, ms_place = 0, ms_reflect = 0, ms_patch = 0, ms_relax = 0, ms_final = 0;
+    int total_relax_iters = 0, total_patch_iters = 0;
     int acc_energy = 0, acc_grad = 0, acc_hv = 0;
     auto t0 = clk::now();
 
@@ -1000,7 +1366,7 @@ Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, FIL
         auto t_place = clk::now();
         ms_place += chrono::duration<double,milli>(t_place - ts).count();
 
-        // F-ring placement is exact — skip reflect, patch, and CG.
+        // F-ring placement is exact — skip reflect, patch, and relaxation.
         if (step.kind.type == ExpKind::F_type) {
             if (diag) {
                 vector<int> diag_remap;
@@ -1008,7 +1374,7 @@ Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, FIL
                 diag(step_idx + 1, "placed", D_diag);
                 diag(step_idx + 1, "reflected", D_diag);
                 diag(step_idx + 1, "patched", D_diag);
-                diag(step_idx + 1, "cg", D_diag);
+                diag(step_idx + 1, "relaxed", D_diag);
             }
             if (log)
                 fprintf(log, "  step %2d: N=%3d F-ring (exact placement, no optimization)\n",
@@ -1025,7 +1391,7 @@ Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, FIL
         }
 
         // c. Reflect concave free vertices on the full graph (before patch extraction).
-        //    This is O(N) and saves the optimizer from spending expensive CG iterations
+        //    This is O(N) and saves the optimizer from spending expensive iterations
         //    fighting concavity from inverted strip vertices.
         {
             set<int> free_set;
@@ -1063,7 +1429,8 @@ Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, FIL
         vector<bool> free_mask, interior_mask;
         vector<int> patch_remap;
         Deltahedron patch = extractPatch(rd, full_N, step, points,
-                                         free_mask, interior_mask, patch_remap);
+                                         free_mask, interior_mask, patch_remap,
+                                         global_post_patch_reflect);
 
         // e. Trust-region optimize on patch only (strip + path + tp free)
         patch.opt_log = log;
@@ -1079,26 +1446,28 @@ Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, FIL
         auto t_patch = clk::now();
         ms_patch += chrono::duration<double,milli>(t_patch - t_refl).count();
 
-        // Diagnostic: after patch optimize, BEFORE full-graph CG (the key snapshot)
+        // Diagnostic: after patch optimize, before full-graph relaxation
         if (diag) {
             vector<int> diag_remap;
             Deltahedron D_diag = extractCompact(rd, full_N, points, diag_remap);
+            D_diag.iterations_used = patch.iterations_used;
             diag(step_idx + 1, "patched", D_diag);
         }
 
-        // g. Full-graph CG relaxation to release accumulated strain.
+        // g. Full-graph relaxation to release accumulated strain.
         vector<int> full_remap;
         Deltahedron D = extractCompact(rd, full_N, points, full_remap);
 
-        D.opt_k_flat = 0;  // skip E_flat in intermediate steps (final CG uses default)
+        D.opt_k_flat = 0;  // skip E_flat in intermediate steps
+        D.opt_k_conv = 100.0;  // quadratic convexity penalty (margin=0)
         D.opt_method = method;
-        // Log CG details for a few representative steps
+        // Log details for a few representative steps
         int n_steps = (int)ep.steps.size();
         bool log_this = log && (step_idx <= 2 || step_idx == n_steps/2 || step_idx >= n_steps - 2);
         if (log_this) D.opt_log = log;
         D.optimize(D.points, 0, step_tol, {}, max_work_per_step, step_angle_tol);
         if (log_this) D.opt_log = nullptr;
-        total_cg_iters += D.iterations_used;
+        total_relax_iters += D.iterations_used;
         acc_energy += D.n_energy_evals;
         acc_grad += D.n_grad_evals;
         acc_hv += D.n_hv_evals;
@@ -1108,23 +1477,24 @@ Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, FIL
             if (full_remap[u] >= 0)
                 points[u] = D.points[full_remap[u]];
 
-        auto t_cg = clk::now();
-        ms_cg += chrono::duration<double,milli>(t_cg - t_patch).count();
+        auto t_relax = clk::now();
+        ms_relax += chrono::duration<double,milli>(t_relax - t_patch).count();
 
-        // Diagnostic: after CG
+        // Diagnostic: after full-graph relaxation
         if (diag) {
             vector<int> diag_remap;
             Deltahedron D_diag = extractCompact(rd, full_N, points, diag_remap);
-            diag(step_idx + 1, "cg", D_diag);
+            D_diag.iterations_used = D.iterations_used;
+            diag(step_idx + 1, "relaxed", D_diag);
         }
 
         if (log) {
-            fprintf(log, "  step %2d: N=%3d place=%.1f refl=%.1f patch=%.1f(%d) cg=%.1f(%d) ms\n",
+            fprintf(log, "  step %2d: N=%3d place=%.1f refl=%.1f patch=%.1f(%d) relax=%.1f(%d) ms\n",
                     step_idx, D.N,
                     chrono::duration<double,milli>(t_place - ts).count(),
                     chrono::duration<double,milli>(t_refl - t_place).count(),
                     chrono::duration<double,milli>(t_patch - t_refl).count(), patch.iterations_used,
-                    chrono::duration<double,milli>(t_cg - t_patch).count(), D.iterations_used);
+                    chrono::duration<double,milli>(t_relax - t_patch).count(), D.iterations_used);
         }
         step_idx++;
     }
@@ -1137,9 +1507,44 @@ Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, FIL
     if (diag) diag((int)ep.steps.size() + 1, "patched", D);
 
     D.opt_k_flat = 0;  // geometry is already 3D from seed expansion; E_flat fights equilateral
+
+    // Two-phase final optimization:
+    // Phase 1: E_conv (margin=0, k=100) with final_method to get into convex basin.
+    //   With margin=0, E_conv=0 at any convex geometry — zero contamination.
+    //   Coarse tolerance only.
+    D.opt_k_conv = 100.0;
+    D.opt_convex_constraint = false;
+    D.opt_skip_post_reflect = true;  // phase 2 handles convexity via constraint
     D.opt_method = final_method;
+    if (log) D.opt_log = log;
+    D.optimize(D.points, 0, step_tol, {}, max_work_per_step, step_angle_tol);
+    D.opt_log = nullptr;
+    D.opt_skip_post_reflect = false;
+
+    if (diag) diag((int)ep.steps.size() + 1, "reflected", D);
+
+    // Phase 2: Constrained Steihaug with E_conv (exact Hv).
+    //   E_conv is quadratic, identically zero for h>=0 (no contamination
+    //   at convex vertices).  E_conv in both gradient AND Hv product — no mismatch.
+    //   Trust-region constraint rejects steps that make convex vertices concave.
+    //   E_conv pushes concave vertices (h<0) toward h=0.
+    //   No reflect before this phase: h<0 vertices from phase 1 are NOT
+    //   constrained (h_current<0 → free), but E_conv pushes them convex.
+    acc_energy += D.n_energy_evals;
+    acc_grad += D.n_grad_evals;
+    acc_hv += D.n_hv_evals;
+    int phase1_iters = D.iterations_used;
+
+    D.opt_k_conv = 100.0;
+    D.opt_convex_constraint = true;
+    D.opt_skip_post_reflect = true;
+    D.opt_method = OptMethod::STEIHAUG;
+    if (log) D.opt_log = log;
     D.optimize(D.points, 0, final_tol, {}, max_work_per_step, final_angle_tol);
+    D.opt_log = nullptr;
+    D.opt_skip_post_reflect = false;
     ms_final = chrono::duration<double,milli>(clk::now() - t_final).count();
+    D.iterations_used += phase1_iters;
 
     // Diagnostic: after final optimization
     if (diag) diag((int)ep.steps.size() + 1, "final", D);
@@ -1154,12 +1559,12 @@ Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, FIL
 
     if (log) {
         double ms_total = chrono::duration<double,milli>(clk::now() - t0).count();
-        fprintf(log, "  totals: seed=%.0f place=%.0f refl=%.0f patch=%.0f(%d) cg=%.0f(%d) final=%.0f(%d) total=%.0f ms\n",
+        fprintf(log, "  totals: seed=%.0f place=%.0f refl=%.0f patch=%.0f(%d) relax=%.0f(%d) final=%.0f(%d) total=%.0f ms\n",
                 ms_seed, ms_place, ms_reflect, ms_patch, total_patch_iters,
-                ms_cg, total_cg_iters, ms_final, D.iterations_used, ms_total);
+                ms_relax, total_relax_iters, ms_final, D.iterations_used, ms_total);
     }
 
-    D.iterations_used += total_cg_iters;
+    D.iterations_used += total_relax_iters;
     return D;
 }
 
@@ -1231,92 +1636,45 @@ static double deltahedron_energy_and_gradient(
   if(grad)
     for(int i = 0; i < N; i++) (*grad)[i] = coord3d(0,0,0);
 
-  // --- E_bond: harmonic springs on edge lengths ---
-  // E_bond = (k_bond/2) * Sum_edges (|x_u - x_v| - L)^2
+  // --- E_bond = (k/2) Sum_edges (r - L)^2 ---
   for(const edge_t& e : edges){
-    int u = e.first, v = e.second;
-    coord3d diff = x[u] - x[v];
-    double r = diff.norm();
-    if(r < 1e-15) continue;  // degenerate edge, skip
-    double dev = r - L;
-    energy += 0.5 * k_bond * dev * dev;
-
-    if(grad){
-      coord3d g = diff * (k_bond * dev / r);
-      (*grad)[u] += g;
-      (*grad)[v] -= g;
-    }
+    auto ed = EdgeBondData::compute(x, e.first, e.second, L);
+    if(!ed.valid) continue;
+    energy += ed.energy(k_bond);
+    if(grad) ed.scatter_gradient(k_bond, *grad);
   }
 
-  // --- E_angle: harmonic springs on triangle corner angles ---
-  // E_angle = (k_angle/2) * Sum_triangles Sum_corners (angle - pi/3)^2
-  const double target_angle = M_PI / 3.0;
+  // --- E_angle = (k/2) Sum_corners (theta - pi/3)^2 ---
   for(const auto& tri : D.triangles){
-    int v[3] = {tri[0], tri[1], tri[2]};
-
     for(int c = 0; c < 3; c++){
-      // Angle at vertex v[c] between v[c]->v[c-1] and v[c]->v[c+1]
-      int b = v[c];
-      int a = v[(c+2) % 3];  // previous
-      int d = v[(c+1) % 3];  // next
-
-      coord3d va = x[a] - x[b];
-      coord3d vc = x[d] - x[b];
-
-      double theta = coord3d::angle(va, vc);
-      double dev = theta - target_angle;
-      energy += 0.5 * k_angle * dev * dev;
-
-      if(grad){
-        coord3d da, dc;
-        coord3d::dangle(va, vc, da, dc);
-        double w = k_angle * dev;
-        (*grad)[a] += da * w;
-        (*grad)[d] += dc * w;
-        (*grad)[b] -= (da + dc) * w;
-      }
+      auto ca = CornerAngleData::compute(x, tri[(c+2)%3], tri[c], tri[(c+1)%3]);
+      if(!ca.valid) continue;
+      energy += 0.5 * k_angle * ca.dev * ca.dev;
+      if(grad) ca.scatter_gradient(k_angle * ca.dev, *grad);
     }
   }
 
-  // --- E_curv: harmonic springs on discrete Gaussian curvature ---
-  // K(v) = 2pi - sum of face angles at v
-  // K_target(v) = 2pi - deg(v)*pi/3
-  // E_curv = (k_curv/2) * Sum_v (K(v) - K_target(v))^2
-  //        = (k_curv/2) * Sum_v (deg(v)*pi/3 - angle_sum(v))^2
+  // --- E_curv = (k/2) Sum_v (K_target - angle_sum)^2 ---
+  // K(v) = 2pi - angle_sum(v), K_target = 2pi - deg*pi/3.
+  // dev = K - K_target = deg*pi/3 - angle_sum.
   for(int v = 0; v < N; v++){
     int d = (int)D.neighbours[v].size();
-    double angle_sum = 0.0;
 
-    // Compute angle sum (and store derivatives if needed)
-    vector<coord3d> da_list, dc_list;
-    if(grad){ da_list.resize(d); dc_list.resize(d); }
-
+    // Compute per-fan-angle data
+    double angle_sum = 0;
+    vector<CornerAngleData> fan(d);
     for(int i = 0; i < d; i++){
-      int ni   = D.neighbours[v][i];
-      int ni1  = D.neighbours[v][(i+1) % d];
-      coord3d va = x[ni]  - x[v];
-      coord3d vc = x[ni1] - x[v];
-
-      angle_sum += coord3d::angle(va, vc);
-      if(grad) coord3d::dangle(va, vc, da_list[i], dc_list[i]);
+      fan[i] = CornerAngleData::compute(x, D.neighbours[v][i], v, D.neighbours[v][(i+1)%d]);
+      if(fan[i].valid) angle_sum += fan[i].theta;
     }
 
-    double target_sum = d * M_PI / 3.0;
-    double dev = target_sum - angle_sum;  // = K(v) - K_target(v)
+    double dev = d * M_PI / 3.0 - angle_sum;
     energy += 0.5 * k_curv * dev * dev;
 
     if(grad){
-      // Gradient: dE/d(...) = k_curv * dev * d(dev)/d(...)
-      // dev = target_sum - angle_sum, so d(dev)/d(...) = -d(angle_sum)/d(...)
-      double w = -k_curv * dev;  // negative because dev = target - sum
-      for(int i = 0; i < d; i++){
-        int ni  = D.neighbours[v][i];
-        int ni1 = D.neighbours[v][(i+1) % d];
-
-        (*grad)[ni]  += da_list[i] * w;
-        (*grad)[ni1] += dc_list[i] * w;
-        (*grad)[v]   -= (da_list[i] + dc_list[i]) * w;
-      }
+      double w = -k_curv * dev;  // d(dev)/d(angle) = -1
+      for(int i = 0; i < d; i++)
+        if(fan[i].valid) fan[i].scatter_gradient(w, *grad);
     }
   }
 
@@ -1381,73 +1739,24 @@ static double deltahedron_energy_and_gradient(
     }
   }
 
-  // E_conv: smooth convexity bias via softplus (currently disabled in optimize(),
-  // replaced by periodic vertex reflection; retained for gradient_check() and
-  // potential future use).
-  // For each qualifying vertex, compute signed height h above neighbor centroid
-  // plane (positive = convex). Penalty: k_conv * sigma * log(1 + exp(-h/sigma)).
-  // Nearly zero for h > 0, linear in -h for h < 0, smooth everywhere.
-  // Exact gradient including normal-rotation term for each neighbour.
+  // E_conv: quadratic one-sided convexity penalty.
+  // E_conv = k_conv * sum_v max(0, -h_v)^2.
+  // Identically zero at any convex geometry (all h_v > 0).
   if(k_conv > 0){
-    const double sigma = 0.2 * L;  // transition width ~ 20% of edge length
     for(int v = 0; v < N; v++){
       int d = (int)D.neighbours[v].size();
       if(d > 6) continue;
-      if(!conv_mask.empty() && !conv_mask[v]) continue;  // skip truncated boundary verts
+      if(!conv_mask.empty() && !conv_mask[v]) continue;
 
-      // Neighbor centroid
-      coord3d centroid(0,0,0);
-      for(int i = 0; i < d; i++) centroid += x[D.neighbours[v][i]];
-      centroid /= (double)d;
+      auto vd = grad ? VertexHData::compute_derivs(D, x, v)
+                     : VertexHData::compute_h(D, x, v);
+      if(!vd.valid || vd.h >= 0) continue;  // h >= 0: zero energy, skip
 
-      // Fan normal (unnormalized, outward for convex)
-      coord3d N_fan(0,0,0);
-      for(int i = 0; i < d; i++){
-        coord3d e1 = x[D.neighbours[v][i]] - x[v];
-        coord3d e2 = x[D.neighbours[v][(i+1)%d]] - x[v];
-        N_fan += e1.cross(e2);
-      }
-      double N_len = N_fan.norm();
-      if(N_len < 1e-15) continue;
-      coord3d n_hat = N_fan / N_len;
-
-      double h = (x[v] - centroid).dot(n_hat);
-
-      // Softplus: sigma * log(1 + exp(-h/sigma))
-      double z = h / sigma;
-      double sp, sig;
-      if(z > 20){         // convex: softplus ≈ 0
-        sp = sigma * exp(-z);
-        sig = 0;
-      } else if(z < -20){ // concave: softplus ≈ -h
-        sp = -h;
-        sig = 1;
-      } else {
-        sp = sigma * log(1 + exp(-z));
-        sig = 1.0 / (1 + exp(z));  // sigmoid(-z)
-      }
-
-      energy += k_conv * sp;
+      energy += k_conv * vd.h * vd.h;
 
       if(grad){
-        // dE/dh = -k_conv * sigmoid(-h/sigma)
-        double dEdh = -k_conv * sig;
-
-        // Exact gradient: dh/dx[v] = n_hat (same as frozen-normal,
-        // since dN/dx[v] = 0 by telescoping sum of edge differences)
-        (*grad)[v] += n_hat * dEdh;
-
-        // Exact gradient for neighbours:
-        // dh/dx[n_j] = -n_hat/d + r_perp x (e_{j-1} - e_{j+1}) / |N|
-        // where r_perp = (x[v] - centroid) - h*n_hat, e_k = x[n_k] - x[v]
-        coord3d r_perp = (x[v] - centroid) - n_hat * h;
-        for(int j = 0; j < d; j++){
-          coord3d ej_prev = x[D.neighbours[v][(j+d-1)%d]] - x[v];
-          coord3d ej_next = x[D.neighbours[v][(j+1)%d]]   - x[v];
-          coord3d dhdx_nj = n_hat * (-1.0/d)
-                          + r_perp.cross(ej_prev - ej_next) / N_len;
-          (*grad)[D.neighbours[v][j]] += dhdx_nj * dEdh;
-        }
+        double dEdh = 2.0 * k_conv * vd.h;  // negative for h<0 (pushes toward h>0)
+        vd.scatter_dhdx(dEdh, *grad);
       }
     }
   }
@@ -1498,7 +1807,8 @@ static void deltahedron_hv_product(
     vector<coord3d>& Hv,
     double L,
     double k_bond, double k_angle, double k_curv, double k_flat,
-    const vector<bool>& fixed = {})
+    const vector<bool>& fixed = {},
+    double k_conv = 0)
 {
   const int N = D.N;
   const matrix3d I = matrix3d::unit_matrix();
@@ -1510,181 +1820,83 @@ static void deltahedron_hv_product(
   };
 
   // --- E_bond Hv ---
-  // Per edge: M = k*[(1-L/r)*I + (L/r^3)*d⊗d]
-  // Hv[u] += M*(v[u]-v[v]),  Hv[v] -= M*(v[u]-v[v])
   if(k_bond > 0){
     for(const edge_t& e : edges){
-      int u = e.first, vv = e.second;
-      coord3d d = x[u] - x[vv];
-      double r = d.norm();
-      if(r < 1e-15) continue;
-
-      coord3d dv = v[u] - v[vv];
-      // M*dv = k*(1 - L/r)*dv + k*(L/r^3)*(d.dv)*d
-      coord3d Mdv = dv * (k_bond * (1 - L/r)) + d * (k_bond * L / (r*r*r) * d.dot(dv));
-      Hv[u] = Hv[u] + Mdv;
-      Hv[vv] = Hv[vv] - Mdv;
+      auto ed = EdgeBondData::compute(x, e.first, e.second, L);
+      if(!ed.valid) continue;
+      ed.scatter_hv(k_bond, L, v, Hv);
     }
   }
 
   // --- E_angle Hv ---
-  // Per triangle corner: compute arm-space blocks Haa, Hcc, Hac and scatter.
   if(k_angle > 0){
     for(const auto& tri : D.triangles){
       for(int c = 0; c < 3; c++){
-        int b = tri[c], a = tri[(c+2)%3], dd = tri[(c+1)%3];
-        coord3d va = x[a] - x[b], vc = x[dd] - x[b];
-        double ra = va.norm(), rc = vc.norm();
-        if(ra < 1e-15 || rc < 1e-15) continue;
-
-        coord3d ua = va / ra, uc = vc / rc;
-        double C = max(-1.0, min(1.0, ua.dot(uc)));
-        double theta = acos(C);
-        double S = sin(theta);
-        if(S < 1e-10) continue;
-
-        double dev = theta - theta0;
-        double alpha = 1.0 - dev * C / S;
-
-        coord3d p, q;
-        coord3d::dangle(va, vc, p, q);
-
-        matrix3d sym_ac = ua.outer(uc) + uc.outer(ua);
-
-        matrix3d Haa = p.outer(p) * (k_angle * alpha)
-          + (sym_ac + I * C - ua.outer(ua) * (3*C)) * (k_angle * dev / (ra*ra * S));
-
-        matrix3d Hcc = q.outer(q) * (k_angle * alpha)
-          + (sym_ac + I * C - uc.outer(uc) * (3*C)) * (k_angle * dev / (rc*rc * S));
-
-        matrix3d Hac = p.outer(q) * (k_angle * alpha)
-          + (ua.outer(ua) + uc.outer(uc) - ua.outer(uc) * C - I) * (k_angle * dev / (ra*rc * S));
-
-        // Scatter: same pattern as assemble_patch_hessian, but M*v instead of storing M
-        matrix3d Hab = Haa + Hac;
-        matrix3d Hcb = Hcc + Hac.transpose();
-
-        // H(a,a)*v[a] + H(a,dd)*v[dd] + H(a,b)*v[b]
-        Hv[a] = Hv[a] + Haa * v[a] + Hac * v[dd] + (-Hab) * v[b];
-        // H(dd,a)*v[a] + H(dd,dd)*v[dd] + H(dd,b)*v[b]
-        Hv[dd] = Hv[dd] + Hac.transpose() * v[a] + Hcc * v[dd] + (-Hcb) * v[b];
-        // H(b,a)*v[a] + H(b,dd)*v[dd] + H(b,b)*v[b]
-        Hv[b] = Hv[b] + (-Hab.transpose()) * v[a] + (-Hcb.transpose()) * v[dd] + (Hab + Hcb) * v[b];
+        auto ca = CornerAngleData::compute(x, tri[(c+2)%3], tri[c], tri[(c+1)%3]);
+        if(!ca.valid) continue;
+        ca.scatter_hv(k_angle, v, Hv);
       }
     }
   }
 
   // --- E_curv Hv ---
-  // E_curv = (k_curv/2) * sum_v (K_target - angle_sum)^2
-  // H_curv = k_curv * sum_v [dK⊗dK + dev * d^2K/dx^2]
-  //
-  // For the rank-1 term: dK_v/dx is the Gaussian curvature gradient at vertex v.
-  // dK_v/dx[ni] = -da_i - dc_{i-1}  (sum of angle derivatives at v)
-  // dK_v/dx[v]  = sum_i (da_i + dc_i)
-  //
-  // For the d^2K/dx^2 term: same arm-space angle Hessian blocks as E_angle,
-  // but summed per-vertex (over the fan of angles at v) instead of per-triangle.
+  // H_curv = k_curv * sum_v [dK⊗dK + dev * d²K/dx²]
+  // Rank-1: gather dK.v over fan, scatter dK.
+  // Correction: sum of per-fan-angle Hessian blocks (same as E_angle).
   if(k_curv > 0){
     for(int vertex = 0; vertex < N; vertex++){
       int deg = (int)D.neighbours[vertex].size();
 
-      // First pass: compute angle sum, derivatives, and curvature deviation
+      // Compute per-fan-angle data
       double angle_sum = 0;
-      vector<coord3d> da_list(deg), dc_list(deg);
+      vector<CornerAngleData> fan(deg);
       for(int i = 0; i < deg; i++){
-        int ni  = D.neighbours[vertex][i];
-        int ni1 = D.neighbours[vertex][(i+1) % deg];
-        coord3d va = x[ni] - x[vertex], vc = x[ni1] - x[vertex];
-        angle_sum += coord3d::angle(va, vc);
-        coord3d::dangle(va, vc, da_list[i], dc_list[i]);
+        fan[i] = CornerAngleData::compute(x, D.neighbours[vertex][i], vertex,
+                                          D.neighbours[vertex][(i+1)%deg]);
+        if(fan[i].valid) angle_sum += fan[i].theta;
       }
       double dev = deg * M_PI / 3.0 - angle_sum;
 
-      // Rank-1 term: Hv += k_curv * (dK . v) * dK
-      // dK/dx[ni] = -sum of da_i terms pointing to ni - sum of dc_j terms pointing to ni
-      // dK/dx[v] = sum_i (da_i + dc_i)  (the chain rule d(va)/d(x_b) = -I part)
-      //
-      // But dK.v = -dev_weight * sum_i (da_i . (v[ni] - v[vertex]) + dc_i . (v[ni1] - v[vertex]))
-      // where dev_weight = ... actually let's compute it directly.
-      //
-      // The gradient of E_curv at vertex `vertex` contributes:
-      //   g[ni]  += w * da_i   (for each i where ni = neighbours[vertex][i])
-      //   g[ni1] += w * dc_i
-      //   g[vertex] -= w * (da_i + dc_i)
-      // where w = -k_curv * dev.
-      //
-      // So the Jacobian dK/dx (without the -k_curv*dev factor) has:
-      //   (dK/dx)[ni]     += -da_i       (and also -dc_{i-1})
-      //   (dK/dx)[vertex] += (da_i + dc_i)
-      //
-      // For the rank-1 Hv: factor = k_curv * (dK . v), then scatter factor * dK.
-      // dK = d(angle_sum)/dx  (gradient of angle sum, not energy gradient)
-
-      // Compute dK . v = sum_i [ da_i . v[ni] + dc_i . v[ni1] - (da_i + dc_i) . v[vertex] ]
+      // Rank-1: Hv += k_curv * (dK.v) * dK
+      // dK = d(angle_sum)/dx, scatter via fan[i].scatter_gradient
       double dK_dot_v = 0;
-      for(int i = 0; i < deg; i++){
-        int ni  = D.neighbours[vertex][i];
-        int ni1 = D.neighbours[vertex][(i+1) % deg];
-        dK_dot_v += da_list[i].dot(v[ni] - v[vertex]) + dc_list[i].dot(v[ni1] - v[vertex]);
-      }
-
-      // Scatter: Hv += k_curv * dK_dot_v * dK
-      double w = k_curv * dK_dot_v;
-      for(int i = 0; i < deg; i++){
-        int ni  = D.neighbours[vertex][i];
-        int ni1 = D.neighbours[vertex][(i+1) % deg];
-        Hv[ni]     = Hv[ni]     + da_list[i] * w;
-        Hv[ni1]    = Hv[ni1]    + dc_list[i] * w;
-        Hv[vertex] = Hv[vertex] - (da_list[i] + dc_list[i]) * w;
-      }
-
-      // Curvature correction term: k_curv * dev * d^2(angle_sum)/dx^2 * v
-      // This is the same angle Hessian blocks as E_angle, but summed over the
-      // fan of angles at vertex `vertex`, weighted by k_curv * dev.
-      if(fabs(dev) > 1e-15){
-        double w2 = -k_curv * dev;  // negative because dev = target - sum, d(dev)/d(angle) = -1
-
-        for(int i = 0; i < deg; i++){
-          int ni  = D.neighbours[vertex][i];
-          int ni1 = D.neighbours[vertex][(i+1) % deg];
-          int b = vertex;
-
-          coord3d va = x[ni] - x[b], vc = x[ni1] - x[b];
-          double ra = va.norm(), rc = vc.norm();
-          if(ra < 1e-15 || rc < 1e-15) continue;
-
-          coord3d ua = va / ra, uc = vc / rc;
-          double Cos = max(-1.0, min(1.0, ua.dot(uc)));
-          double theta = acos(Cos);
-          double Sin = sin(theta);
-          if(Sin < 1e-10) continue;
-
-          double angle_dev = theta - theta0;
-          double alph = 1.0 - angle_dev * Cos / Sin;
-
-          coord3d p_a, q_c;
-          coord3d::dangle(va, vc, p_a, q_c);
-
-          matrix3d sym = ua.outer(uc) + uc.outer(ua);
-
-          matrix3d Haa = p_a.outer(p_a) * alph
-            + (sym + I * Cos - ua.outer(ua) * (3*Cos)) * (angle_dev / (ra*ra * Sin));
-
-          matrix3d Hcc = q_c.outer(q_c) * alph
-            + (sym + I * Cos - uc.outer(uc) * (3*Cos)) * (angle_dev / (rc*rc * Sin));
-
-          matrix3d Hac_m = p_a.outer(q_c) * alph
-            + (ua.outer(ua) + uc.outer(uc) - ua.outer(uc) * Cos - I) * (angle_dev / (ra*rc * Sin));
-
-          // Scale by w2 and scatter (same pattern)
-          matrix3d Hab_m = Haa + Hac_m;
-          matrix3d Hcb_m = Hcc + Hac_m.transpose();
-
-          Hv[ni]  = Hv[ni]  + (Haa * v[ni] + Hac_m * v[ni1] + (-Hab_m) * v[b]) * w2;
-          Hv[ni1] = Hv[ni1] + (Hac_m.transpose() * v[ni] + Hcc * v[ni1] + (-Hcb_m) * v[b]) * w2;
-          Hv[b]   = Hv[b]   + ((-Hab_m.transpose()) * v[ni] + (-Hcb_m.transpose()) * v[ni1] + (Hab_m + Hcb_m) * v[b]) * w2;
+      for(int i = 0; i < deg; i++)
+        if(fan[i].valid){
+          // dK.v contribution from fan angle i: p.v[a] + q.v[d] - (p+q).v[b]
+          dK_dot_v += fan[i].p.dot(v[fan[i].a] - v[vertex])
+                    + fan[i].q.dot(v[fan[i].d] - v[vertex]);
         }
+      for(int i = 0; i < deg; i++)
+        if(fan[i].valid) fan[i].scatter_gradient(k_curv * dK_dot_v, Hv);
+
+      // Correction: Hv += (-k_curv * dev) * d²(angle_sum)/dx² * v
+      if(fabs(dev) > 1e-15){
+        double w2 = -k_curv * dev;
+        for(int i = 0; i < deg; i++)
+          if(fan[i].valid) fan[i].scatter_hv(w2, v, Hv);
       }
+    }
+  }
+
+  // --- E_conv Hv --- quadratic one-sided: E = k * h² for h<0, 0 for h>=0.
+  // Exact Hv = d²E/dh² * (dh/dx ⊗ dh/dx) * v  +  dE/dh * d²h/dx² * v.
+  // Identically zero for h >= 0.  C1 at h=0.
+  if(k_conv > 0){
+    for(int vertex = 0; vertex < N; vertex++){
+      int d = (int)D.neighbours[vertex].size();
+      if(d > 6) continue;
+
+      auto vd = VertexHData::compute_derivs(D, x, vertex);
+      if(!vd.valid || vd.h >= 0) continue;
+
+      double dEdh   = 2.0 * k_conv * vd.h;
+      double d2Edh2 = 2.0 * k_conv;
+
+      // Rank-1: Hv += d²E/dh² * (dh/dx · v) * dh/dx
+      vd.scatter_dhdx(d2Edh2 * vd.dhdx_dot(v), Hv);
+
+      // Correction: Hv += dE/dh * d²h/dx² * v
+      vd.scatter_d2h_hv(dEdh, v, Hv);
     }
   }
 
@@ -1724,30 +1936,35 @@ static double deltahedron_energy_only(
   return deltahedron_energy_and_gradient(D, edges, x, nullptr, L, k_bond, k_angle, k_curv, k_flat, k_conv, conv_mask);
 }
 
-// Check convexity constraint: h(v) >= -tau*L for all free vertices.
+// Compute signed convexity height h for all vertices.
+// h > 0 = convex, h < 0 = concave.  Fixed or high-degree vertices get h = 1.0.
+static void compute_h_values(const Deltahedron& D, const vector<coord3d>& x,
+                              vector<double>& h, const vector<bool>& fixed = {})
+{
+  int N = D.N;
+  h.resize(N);
+  for(int v = 0; v < N; v++){
+    int d = (int)D.neighbours[v].size();
+    if(d > 6 || (!fixed.empty() && fixed[v])){
+      h[v] = 1.0;
+      continue;
+    }
+    auto vd = VertexHData::compute_h(D, x, v);
+    h[v] = vd.h;  // 0 if degenerate
+  }
+}
+
+// Check convexity constraint: h(v) >= -tau*L for all free/interior vertices.
 // Returns true if all constraints satisfied.
 static bool check_convexity(const Deltahedron& D, const vector<coord3d>& x,
-                            const vector<bool>& free_mask, double L, double tau = 0.05)
+                            const vector<bool>& free_mask, double L, double tau = 0.05,
+                            const vector<bool>& interior_mask = {})
 {
   for(int v = 0; v < D.N; v++){
-    if(!free_mask[v]) continue;
-    int d = (int)D.neighbours[v].size();
-
-    coord3d centroid(0,0,0);
-    for(int j = 0; j < d; j++) centroid += x[D.neighbours[v][j]];
-    centroid /= (double)d;
-
-    coord3d n_fan(0,0,0);
-    for(int j = 0; j < d; j++){
-      coord3d e1 = x[D.neighbours[v][j]] - x[v];
-      coord3d e2 = x[D.neighbours[v][(j+1)%d]] - x[v];
-      n_fan += e1.cross(e2);
-    }
-    double n_len = n_fan.norm();
-    if(n_len < 1e-15) continue;
-
-    double h = (x[v] - centroid).dot(n_fan / n_len);
-    if(h < -tau * L) return false;
+    bool is_interior = !interior_mask.empty() && interior_mask[v];
+    if(!free_mask[v] && !is_interior) continue;
+    auto vd = VertexHData::compute_h(D, x, v);
+    if(vd.valid && vd.h < -tau * L) return false;
   }
   return true;
 }
@@ -1781,84 +1998,22 @@ static void assemble_patch_hessian(
         H[3*ki+p][3*kj+q] += M(p,q);
   };
 
-  // --- E_bond = (k/2) Sum_edges (|x_u - x_v| - L)^2 ---
-  // Exact Hessian per edge: M = k*[(1-L/r)*I + (L/r^3)*d⊗d]
-  // H(u,u) = H(v,v) = +M,  H(u,v) = H(v,u) = -M
+  // --- E_bond = (k/2) Sum_edges (r - L)^2 ---
   if(k_bond > 0){
     for(const edge_t& e : edges){
-      int u = e.first, v = e.second;
-      coord3d d = x[u] - x[v];
-      double r = d.norm();
-      if(r < 1e-15) continue;
-
-      matrix3d M = I * (k_bond * (1 - L/r)) + d.outer(d) * (k_bond * L / (r*r*r));
-
-      add_block(u, u, M);
-      add_block(v, v, M);
-      add_block(u, v, -M);
-      add_block(v, u, -M);
+      auto ed = EdgeBondData::compute(x, e.first, e.second, L);
+      if(!ed.valid) continue;
+      ed.scatter_blocks(k_bond, L, add_block);
     }
   }
 
   // --- E_angle = (k/2) Sum_corners (theta - pi/3)^2 ---
-  // Exact Hessian.  Angle theta at vertex b, arms va = x_a - x_b, vc = x_c - x_b.
-  // Unit vectors ua = va/ra, uc = vc/rc.  C = cos(theta), S = sin(theta).
-  // First derivatives: p = dtheta/d(va), q = dtheta/d(vc) (from coord3d::dangle).
-  //
-  // Arm-space Hessian (second derivatives w.r.t. va, vc):
-  //   alpha = 1 - dev*cot(theta)
-  //   Haa = k*alpha * p⊗p + (k*dev)/(ra^2*S) * [ua⊗uc + uc⊗ua + C*I - 3C*ua⊗ua]
-  //   Hcc = k*alpha * q⊗q + (k*dev)/(rc^2*S) * [uc⊗ua + ua⊗uc + C*I - 3C*uc⊗uc]
-  //   Hac = k*alpha * p⊗q + (k*dev)/(ra*rc*S) * [ua⊗ua + uc⊗uc - C*ua⊗uc - I]
-  //
-  // Chain rule to vertex coordinates (d(va)/d(x_b) = -I, d(vc)/d(x_b) = -I):
-  //   H(a,b) = -(Haa + Hac),  H(c,b) = -(Hcc + Hca),  H(b,b) = sum of all four
   if(k_angle > 0){
-    const double theta0 = M_PI / 3.0;
     for(const auto& tri : D.triangles){
       for(int c = 0; c < 3; c++){
-        int b = tri[c], a = tri[(c+2)%3], dd = tri[(c+1)%3];
-        coord3d va = x[a] - x[b], vc = x[dd] - x[b];
-        double ra = va.norm(), rc = vc.norm();
-        if(ra < 1e-15 || rc < 1e-15) continue;
-
-        coord3d ua = va / ra, uc = vc / rc;
-        double C = max(-1.0, min(1.0, ua.dot(uc)));
-        double theta = acos(C);
-        double S = sin(theta);
-        if(S < 1e-10) continue;
-
-        double dev = theta - theta0;
-        double alpha = 1.0 - dev * C / S;
-
-        coord3d p, q;
-        coord3d::dangle(va, vc, p, q);
-
-        // Arm-space Hessian blocks (rank-1 + correction)
-        matrix3d sym_ac = ua.outer(uc) + uc.outer(ua);  // symmetric part, shared by Haa and Hcc
-
-        matrix3d Haa = p.outer(p) * (k_angle * alpha)
-          + (sym_ac + I * C - ua.outer(ua) * (3*C)) * (k_angle * dev / (ra*ra * S));
-
-        matrix3d Hcc = q.outer(q) * (k_angle * alpha)
-          + (sym_ac + I * C - uc.outer(uc) * (3*C)) * (k_angle * dev / (rc*rc * S));
-
-        matrix3d Hac = p.outer(q) * (k_angle * alpha)
-          + (ua.outer(ua) + uc.outer(uc) - ua.outer(uc) * C - I) * (k_angle * dev / (ra*rc * S));
-
-        // Scatter to vertex coordinates via chain rule
-        add_block(a, a, Haa);
-        add_block(a, dd, Hac);
-        add_block(dd, a, Hac.transpose());
-        add_block(dd, dd, Hcc);
-
-        matrix3d Hab = Haa + Hac;               // H(a,b) = -Hab
-        matrix3d Hcb = Hcc + Hac.transpose();   // H(c,b) = -Hcb
-        add_block(a, b, -Hab);
-        add_block(b, a, -Hab.transpose());
-        add_block(dd, b, -Hcb);
-        add_block(b, dd, -Hcb.transpose());
-        add_block(b, b, Hab + Hcb);
+        auto ca = CornerAngleData::compute(x, tri[(c+2)%3], tri[c], tri[(c+1)%3]);
+        if(!ca.valid) continue;
+        ca.scatter_blocks(k_angle, add_block);
       }
     }
   }
@@ -1866,125 +2021,27 @@ static void assemble_patch_hessian(
   // --- E_conv = k * Sum_v softplus(-h/sigma) ---
   // Exact Hessian: d²E/dh² * (dh/dx)⊗(dh/dx) + dE/dh * d²h/dx²
   // where d²E/dh² = (k/sigma²) * sig * (1 - sig),  dE/dh = -(k/sigma) * sig.
-  //
-  // h = (x_v - centroid) · n_hat,  n_hat = N/|N|,  N = Σ (e_i × e_{i+1}).
-  // Key fact: dN/dx_v = 0 (telescoping), so dn_hat/dx_v = 0 and d²h/dx_v² = 0.
-  //
-  // Hessian blocks of h:
-  //   H_{vv} = 0
-  //   H_{v,j} = P · [Δe_j]× / |N|                     (dn_hat/dx_{n_j})
-  //   H_{j,k} = -(1/d)Qk + {[Δe_j]×/d + (Δe_j × n_hat)⊗g_k + h·[Δe_j]×·Qk
-  //             + δ_{k,j-1}[r_perp]× - δ_{k,j+1}[r_perp]×} / |N|
-  //             - w_j ⊗ (n_hat × Δe_k) / |N|²
-  // where Qk = P·[Δe_k]×/|N|, Δe_j = e_{j-1} - e_{j+1}, [·]× = cross_matrix.
   if(k_conv > 0){
-    using Mx = matrix3d;  // shorthand
-
     for(int v = 0; v < D.N; v++){
       int d = (int)D.neighbours[v].size();
       if(d > 6) continue;
       if(!conv_mask.empty() && !conv_mask[v]) continue;
 
-      coord3d centroid(0,0,0);
-      for(int i = 0; i < d; i++) centroid += x[D.neighbours[v][i]];
-      centroid /= (double)d;
+      auto vd = VertexHData::compute_derivs(D, x, v);
+      if(!vd.valid) continue;
 
-      coord3d N_fan(0,0,0);
-      for(int i = 0; i < d; i++){
-        coord3d e1 = x[D.neighbours[v][i]] - x[v];
-        coord3d e2 = x[D.neighbours[v][(i+1)%d]] - x[v];
-        N_fan += e1.cross(e2);
-      }
-      double N_len = N_fan.norm();
-      if(N_len < 1e-15) continue;
-      coord3d n_hat = N_fan / N_len;
-
-      double h = (x[v] - centroid).dot(n_hat);
-      double z = h / sigma;
-      double sig;
-      if(z > 20) sig = 0;
-      else if(z < -20) sig = 1;
-      else sig = 1.0 / (1 + exp(z));
+      double z = vd.h / sigma;
+      double sig = (z > 20) ? 0.0 : (z < -20) ? 1.0 : 1.0 / (1 + exp(z));
 
       double d2Edh2 = (k_conv / sigma) * sig * (1 - sig);
       double dEdh   = -k_conv * sig;
-      if(abs(d2Edh2) < 1e-15 && abs(dEdh) < 1e-15) continue;
+      if(fabs(d2Edh2) < 1e-15 && fabs(dEdh) < 1e-15) continue;
 
-      coord3d r_perp = (x[v] - centroid) - n_hat * h;
-      const Mx P = I - n_hat.outer(n_hat);
-      const Mx R = Mx::cross_matrix(r_perp);  // [r_perp]×
+      // Rank-1: d²E/dh² * (dh/dx)⊗(dh/dx)
+      vd.scatter_rank1_blocks(d2Edh2, add_block);
 
-      // Precompute per-neighbor data
-      struct NbrData {
-        int id;          // global vertex index
-        coord3d De;      // Δe_j = e_{j-1} - e_{j+1}
-        coord3d g;       // dh/dx_{n_j}
-        coord3d w;       // r_perp × Δe_j / |N|
-        Mx Dex;          // [Δe_j]×
-        Mx Q;            // P · [Δe_j]× / |N|
-      };
-      vector<NbrData> nb(d);
-      for(int j = 0; j < d; j++){
-        nb[j].id = D.neighbours[v][j];
-        coord3d ej_prev = x[D.neighbours[v][(j+d-1)%d]] - x[v];
-        coord3d ej_next = x[D.neighbours[v][(j+1)%d]]   - x[v];
-        nb[j].De  = ej_prev - ej_next;
-        nb[j].g   = n_hat * (-1.0/d) + r_perp.cross(nb[j].De) / N_len;
-        nb[j].w   = r_perp.cross(nb[j].De) / N_len;
-        nb[j].Dex = Mx::cross_matrix(nb[j].De);
-        nb[j].Q   = P * nb[j].Dex * (1.0/N_len);
-      }
-
-      // --- Rank-1 term: d²E/dh² * (dh/dx)⊗(dh/dx) ---
-      if(abs(d2Edh2) > 1e-15){
-        // v-v block (g_v = n_hat)
-        add_block(v, v, n_hat.outer(n_hat) * d2Edh2);
-        // v-j and j-v blocks
-        for(int j = 0; j < d; j++){
-          Mx Bvj = n_hat.outer(nb[j].g) * d2Edh2;
-          add_block(v, nb[j].id, Bvj);
-          add_block(nb[j].id, v, Bvj.transpose());
-        }
-        // j-k blocks
-        for(int j = 0; j < d; j++)
-          for(int k = 0; k < d; k++)
-            add_block(nb[j].id, nb[k].id, nb[j].g.outer(nb[k].g) * d2Edh2);
-      }
-
-      // --- Correction term: dE/dh * d²h/dx² ---
-      if(abs(dEdh) > 1e-15){
-        // H_{vv} = 0  (nothing to add)
-
-        // H_{v,j} = P · [Δe_j]× / |N|
-        for(int j = 0; j < d; j++){
-          Mx Hvj = nb[j].Q * dEdh;
-          add_block(v, nb[j].id, Hvj);
-          add_block(nb[j].id, v, Hvj.transpose());
-        }
-
-        // H_{j,k} blocks
-        for(int j = 0; j < d; j++){
-          for(int k = 0; k < d; k++){
-            // Term A: -(1/d) Qk
-            Mx Hjk = nb[k].Q * (-1.0/d);
-            // Term B: [Δe_j]× / (d·|N|)
-            Hjk += nb[j].Dex * (1.0 / (d * N_len));
-            // Term C: (Δe_j × n_hat) ⊗ g_k / |N|
-            Hjk += nb[j].De.cross(n_hat).outer(nb[k].g) * (1.0/N_len);
-            // Term D: h · [Δe_j]× · Qk / |N|
-            Hjk += nb[j].Dex * nb[k].Q * (h / N_len);
-            // Term E: δ_{k,j-1} [r_perp]× / |N|
-            if(k == (j+d-1)%d) Hjk += R * (1.0/N_len);
-            // Term F: -δ_{k,j+1} [r_perp]× / |N|
-            if(k == (j+1)%d)   Hjk += R * (-1.0/N_len);
-            // Term G: -w_j ⊗ (n_hat × Δe_k) / |N|
-            // (from product rule: (r_perp × Δe_j) · d(1/|N|)/dx_{n_k}, and w_j = (r_perp × Δe_j)/|N|)
-            Hjk += nb[j].w.outer(n_hat.cross(nb[k].De)) * (-1.0/N_len);
-
-            add_block(nb[j].id, nb[k].id, Hjk * dEdh);
-          }
-        }
-      }
+      // Correction: dE/dh * d²h/dx²
+      vd.scatter_d2h_blocks(dEdh, add_block);
     }
   }
 }
@@ -2020,7 +2077,15 @@ bool Deltahedron::optimize_patch(const vector<coord3d>& initial_geometry,
   // Force constants: bond + angle + convexity bias, no curvature/flatness.
   const double k_bond = 1.0, k_angle = 1.0;
   const double k_curv = 0, k_flat = 0, k_conv = 5.0;
-  const double conv_tau = 0.05;  // hard convexity threshold: h >= -tau*L
+
+  // "No new concavities" constraint: compute h at entry for checked vertices.
+  // Reject any step that makes a vertex with h_start > 0 have h_trial < 0.
+  // Build a mask of checked vertices (free + interior).
+  vector<bool> checked_mask(N, false);
+  for(int v = 0; v < N; v++)
+    checked_mask[v] = free_mask[v] || (!interior_mask.empty() && interior_mask[v]);
+  vector<double> h_start;
+  compute_h_values(*this, points, h_start);
 
   // Collect free vertex indices
   vector<int> free_idx;
@@ -2196,7 +2261,15 @@ bool Deltahedron::optimize_patch(const vector<coord3d>& initial_geometry,
 
     double Et = energy_fn(x_trial);
     double actual = E - Et;
-    bool convex = check_convexity(*this, x_trial, free_mask, L, conv_tau);
+
+    // "No new concavities" constraint: reject if any checked vertex that was
+    // convex at entry (h_start > 0) becomes concave in the trial geometry.
+    vector<double> h_trial;
+    compute_h_values(*this, x_trial, h_trial);
+    bool convex = true;
+    for(int v = 0; v < N && convex; v++)
+      if(checked_mask[v] && h_start[v] > 0 && h_trial[v] < 0)
+        convex = false;
 
     // Trust region update
     double rho = (pred > 0) ? actual / pred : -1;
@@ -2221,9 +2294,32 @@ bool Deltahedron::optimize_patch(const vector<coord3d>& initial_geometry,
     }
 
     if(opt_log){
-      fprintf(opt_log, "    patch %3d: E=%.6e |g|=%.3e |d|=%.2e D=%.2e rho=%.2f %-14s %s neg=%d\n",
+      // Compute h_min over interior vertices of the current (possibly trial) geometry
+      const vector<coord3d>& xlog = accepted ? points : x_trial;
+      double h_min_log = 1e30;
+      double ang_log = 0;
+      for(int v = 0; v < N; v++){
+        bool is_int = !interior_mask.empty() && interior_mask[v];
+        if(!free_mask[v] && !is_int) continue;
+        int d = (int)neighbours[v].size();
+        coord3d cen(0,0,0);
+        for(int j = 0; j < d; j++) cen += xlog[neighbours[v][j]];
+        cen /= (double)d;
+        coord3d nf(0,0,0);
+        for(int j = 0; j < d; j++){
+          coord3d e1 = xlog[neighbours[v][j]] - xlog[v];
+          coord3d e2 = xlog[neighbours[v][(j+1)%d]] - xlog[v];
+          nf += e1.cross(e2);
+        }
+        double nl = nf.norm();
+        if(nl < 1e-15) continue;
+        double h = (xlog[v] - cen).dot(nf / nl);
+        if(h < h_min_log) h_min_log = h;
+      }
+      ang_log = max_angle_relerr();
+      fprintf(opt_log, "    patch %3d: E=%.6e |g|=%.3e |d|=%.2e D=%.2e rho=%.2f %-14s %-11s neg=%d h=%+.4f ang=%.2e\n",
               iter, E, gnorm, dnorm, Delta, rho, step_type,
-              tr_action, n_neg_eig);
+              tr_action, n_neg_eig, h_min_log, ang_log);
     }
   }
   return false;  // didn't converge
@@ -2239,23 +2335,10 @@ int Deltahedron::reflect_concave(vector<coord3d>& pts, double threshold,
     int d = (int)neighbours[v].size();
     if(d > 6) continue;
 
-    coord3d centroid(0,0,0);
-    for(int j = 0; j < d; j++) centroid += pts[neighbours[v][j]];
-    centroid /= (double)d;
-
-    coord3d n_fan(0,0,0);
-    for(int j = 0; j < d; j++){
-      coord3d e1 = pts[neighbours[v][j]] - pts[v];
-      coord3d e2 = pts[neighbours[v][(j+1)%d]] - pts[v];
-      n_fan += e1.cross(e2);
-    }
-    double n_len = n_fan.norm();
-    if(n_len < 1e-15) continue;
-    coord3d n_hat = n_fan / n_len;
-
-    double h = (pts[v] - centroid).dot(n_hat);
-    if(h < -threshold){
-      pts[v] = centroid + n_hat * (-h);
+    auto vd = VertexHData::compute_h(*this, pts, v);
+    if(!vd.valid) continue;
+    if(vd.h < -threshold){
+      pts[v] = vd.centroid + vd.n_hat * (-vd.h);
       count++;
     }
   }
@@ -2289,7 +2372,7 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
   const double k_bond   = 1.0;
   const double k_angle  = 1.0;
   const double k_curv   = 2.0;
-  const double k_conv   = 0;
+  const double k_conv   = opt_k_conv;  // quadratic one-sided convexity penalty
 
   // Two-phase optimization:
   //   Phase 1: k_flat active — settle into flat/equilateral
@@ -2298,7 +2381,6 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
   int phase = (k_flat > 0) ? 1 : 2;
   double phase1_grad_norm0 = 0;
 
-  const double refl_threshold = 0.05 * L;
   const double c1 = 1e-4;        // Armijo parameter
 
   // Shared helpers
@@ -2356,11 +2438,6 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
     int ne = (int)edges.size();
     double mu = s / ne;
     return sqrt(max(0.0, s2/ne - mu*mu)) / mu;
-  };
-
-  // Periodic reflection (shared by all methods)
-  auto do_reflect = [&]() -> bool {
-    return reflect_concave(points, refl_threshold, fixed) > 0;
   };
 
   // Phase transition logic (shared by all methods)
@@ -2435,15 +2512,6 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
       iterations_used = iter + 1;
       if(total_work_fn() >= max_work) break;
 
-      // Periodic reflection
-      bool reflected = false;
-      if(iter > 0){
-        if(do_reflect()){
-          E = compute_eg(grad);
-          reflected = true;
-        }
-      }
-
       // Phase transition
       if(check_phase_transition(iter, grad)){
         E = compute_eg(grad);
@@ -2480,9 +2548,9 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
 
       // Logging
       if(log_interval > 0 && iter % log_interval == 0)
-        fprintf(opt_log, "  CG %4d: E=%.6f |g|=%.4e gmax*L=%.4e a=%.3e cv=%.4f ang=%.2e ph=%d%s\n",
+        fprintf(opt_log, "  CG %4d: E=%.6f |g|=%.4e gmax*L=%.4e a=%.3e cv=%.4f ang=%.2e ph=%d\n",
                 iter, E, vec_norm(grad), compute_gmax(grad), alpha, edge_cv(),
-                max_angle_relerr(), phase, reflected ? " R" : "");
+                max_angle_relerr(), phase);
 
       // Polak-Ribiere beta
       double gg_old = vec_dot(grad_old, grad_old);
@@ -2507,17 +2575,6 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
     for(int iter = 0; ; iter++){
       iterations_used = iter + 1;
       if(total_work_fn() >= max_work) break;
-
-      // Periodic reflection
-      bool reflected = false;
-      if(iter > 0){
-        if(do_reflect()){
-          E = compute_eg(grad);
-          reflected = true;
-          // Clear L-BFGS history after reflection (geometry changed externally)
-          S.clear(); Y.clear(); rho_hist.clear();
-        }
-      }
 
       // Phase transition
       if(check_phase_transition(iter, grad)){
@@ -2599,10 +2656,31 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
       }
 
       // Logging
-      if(log_interval > 0 && iter % log_interval == 0)
-        fprintf(opt_log, "  LB %4d: E=%.6f |g|=%.4e gmax*L=%.4e a=%.3e cv=%.4f ang=%.2e ph=%d h=%d%s\n",
+      if(log_interval > 0 && iter % log_interval == 0){
+        // Compute h_min for log
+        double h_min_log = 1e30;
+        for(int v = 0; v < N; v++){
+          if(has_fixed && fixed[v]) continue;
+          int d = (int)neighbours[v].size();
+          if(d > 6) continue;
+          coord3d cen(0,0,0);
+          for(int j = 0; j < d; j++) cen += points[neighbours[v][j]];
+          cen /= (double)d;
+          coord3d nf(0,0,0);
+          for(int j = 0; j < d; j++){
+            coord3d e1 = points[neighbours[v][j]] - points[v];
+            coord3d e2 = points[neighbours[v][(j+1)%d]] - points[v];
+            nf += e1.cross(e2);
+          }
+          double nl = nf.norm();
+          if(nl < 1e-15) continue;
+          double h = (points[v] - cen).dot(nf / nl);
+          if(h < h_min_log) h_min_log = h;
+        }
+        fprintf(opt_log, "  LB %4d: E=%.6f |g|=%.4e gmax*L=%.4e a=%.3e cv=%.4f ang=%.2e hmin=%+.4f ph=%d h=%d\n",
                 iter, E, vec_norm(grad), compute_gmax(grad), alpha, edge_cv(),
-                max_angle_relerr(), phase, (int)S.size(), reflected ? " R" : "");
+                max_angle_relerr(), h_min_log, phase, (int)S.size());
+      }
     }
   }
 
@@ -2615,23 +2693,24 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
     // Temp vectors for inner CG
     vector<coord3d> z(N), r_cg(N), d_cg(N), Hd(N), x_trial(N);
 
+    // Convexity constraint: h_current tracks which vertices are convex.
+    // Updated at each accepted step; only convex→concave transitions are rejected.
+    // Works with or without E_conv: constraint prevents new concavities,
+    // E_conv (if active) pushes existing concave vertices toward h=0.
+    vector<double> h_current, h_trial;
+    if(opt_convex_constraint){
+      compute_h_values(*this, points, h_current, fixed);
+    }
+
     for(int iter = 0; ; iter++){
       iterations_used = iter + 1;
       if(total_work_fn() >= max_work) break;
-
-      // Periodic reflection
-      bool reflected = false;
-      if(iter > 0){
-        if(do_reflect()){
-          E = compute_eg(grad);
-          reflected = true;
-        }
-      }
 
       // Phase transition
       if(check_phase_transition(iter, grad)){
         E = compute_eg(grad);
         Delta = 0.5 * L;  // reset trust region on phase change
+        if(opt_convex_constraint) compute_h_values(*this, points, h_current, fixed);
       }
 
       // Convergence check
@@ -2659,7 +2738,7 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
         vec_zero(Hd);
         n_hv_evals++;
         deltahedron_hv_product(*this, edges, points, d_cg, Hd, L,
-                               k_bond, k_angle, k_curv, k_flat, fixed);
+                               k_bond, k_angle, k_curv, k_flat, fixed, k_conv);
 
         double kappa = vec_dot(d_cg, Hd);
 
@@ -2723,7 +2802,7 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
       vec_zero(Hd);
       n_hv_evals++;
       deltahedron_hv_product(*this, edges, points, z, Hd, L,
-                             k_bond, k_angle, k_curv, k_flat, fixed);
+                             k_bond, k_angle, k_curv, k_flat, fixed, k_conv);
       double pred = -(vec_dot(grad, z) + 0.5 * vec_dot(z, Hd));
 
       // Trial point
@@ -2733,14 +2812,21 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
 
       double rho = (pred > 1e-30) ? actual / pred : -1;
 
-      // Accept based on energy reduction only; convexity is handled
-      // by periodic reflect_concave (same as CG and L-BFGS).
+      // Accept based on energy reduction.  If opt_convex_constraint is on,
+      // also reject steps that make a currently-convex vertex concave.
       bool accepted = (rho > 0.1);
+      if(accepted && opt_convex_constraint){
+        compute_h_values(*this, x_trial, h_trial, fixed);
+        for(int v = 0; v < N && accepted; v++)
+          if(h_current[v] > 0 && h_trial[v] < 0)
+            accepted = false;
+      }
 
       if(accepted){
         double E_old = E;
         points = x_trial;
         E = compute_eg(grad);
+        if(opt_convex_constraint) compute_h_values(*this, points, h_current, fixed);
         if(rho > 0.75 && znorm > 0.5 * Delta) Delta = min(2.0 * Delta, Delta_max);
         // Stagnation tracking
         if(E_old - E > 1e-15 * max(1.0, fabs(E_old))){ stag_count = 0; stag_E_ref = E; }
@@ -2753,9 +2839,9 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
 
       // Logging
       if(log_interval > 0 && iter % log_interval == 0)
-        fprintf(opt_log, "  ST %4d: E=%.6f |g|=%.4e gmax*L=%.4e |z|=%.2e D=%.2e rho=%.2f ang=%.2e in=%d ph=%d %s%s\n",
+        fprintf(opt_log, "  ST %4d: E=%.6f |g|=%.4e gmax*L=%.4e |z|=%.2e D=%.2e rho=%.2f ang=%.2e in=%d ph=%d %s\n",
                 iter, E, vec_norm(grad), compute_gmax(grad), znorm, Delta, rho,
-                max_angle_relerr(), inner_iters, phase, accepted ? "acc" : "REJ", reflected ? " R" : "");
+                max_angle_relerr(), inner_iters, phase, accepted ? "acc" : "REJ");
     }
   }
 
@@ -2768,6 +2854,8 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
 
   // Post-optimization strict convexity cleanup.
   // reflect_concave can disturb angle quality, so CG polish after reflecting.
+  // Skipped when opt_skip_post_reflect is set (caller will handle convexity).
+  if(!opt_skip_post_reflect)
   {
     int total_reflected = 0;
     for(int pass = 0; pass < 3; pass++){
