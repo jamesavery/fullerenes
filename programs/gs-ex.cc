@@ -10,7 +10,7 @@ int testRSPI[12] = {1,2,3,4,5,6,37,38,39,40,41,42};
 Graph example1()
 {
   int M = 6, N = 18;
-  Graph neighbours(Spanify::OwnedDenseGraph<node_t>(N, vector<node_t>(3)));
+  Graph neighbours(N, vector<node_t>(3));
 
   for(int i=0;i<3;i++){
     // Outer triangle
@@ -46,7 +46,7 @@ Graph example1()
 // Tutte graph
 Graph example2(){
   const int M=3, N=46;
-  Graph neighbours(Spanify::OwnedDenseGraph<node_t>(N, vector<node_t>(3)));
+  Graph neighbours(N, vector<node_t>(3));
 
   for(int i=0; i!=3; ++i){
     neighbours[i][0] = 45;
@@ -121,7 +121,7 @@ Graph example2(){
 // smallest non-spiral graph with face sizes less/equal 6
 Graph example3(){
   const int M=3, N=36;
-  Graph neighbours(Spanify::OwnedDenseGraph<node_t>(N, vector<node_t>(3)));
+  Graph neighbours(N, vector<node_t>(3));
 
   for(int i=0; i!=3; ++i){
     neighbours[i][0] = (i+1)%M;
@@ -180,7 +180,7 @@ Graph example3(){
 // smallest (?) polyhedron with only pentagons and heptagons
 Graph example4(){
   const int M=7, N=28;
-  Graph neighbours(Spanify::OwnedDenseGraph<node_t>(N, vector<node_t>(3)));
+  Graph neighbours(N, vector<node_t>(3));
 
   for(int i=0; i!=7; ++i){
     neighbours[i][0] = (i+1)%M;

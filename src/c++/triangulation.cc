@@ -154,7 +154,7 @@ PlanarGraph Triangulation::dual_graph() const
   }
   for(int i=0;i<tris.size();i++) tri_numbers.insert(tris[i].sorted());
 
-  Graph A(Spanify::OwnedDenseGraph<node_t>(tris.size(), vector<node_t>(3)));
+  Graph A(tris.size(), vector<node_t>(3));
 
   for(node_t U=0;U<tris.size();U++){
     const tri_t& t(tris[U]);

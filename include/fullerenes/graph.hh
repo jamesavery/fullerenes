@@ -50,6 +50,14 @@ struct Graph : Spanify::DenseGraph<node_t> {
     N = node_t(N_); dmax = dmax_; repoint();
   }
 
+  // Allocating: N vertices, each initialized to initial_row.
+  Graph(size_t N_, const std::vector<node_t>& initial_row)
+      : owned_values(N_ * initial_row.size()), owned_deg(N_, uint8_t(initial_row.size())) {
+    N = node_t(N_); dmax = int(initial_row.size()); repoint();
+    for (size_t v = 0; v < N_; ++v)
+      std::copy(initial_row.begin(), initial_row.end(), owned_values.data() + v * dmax);
+  }
+
   // Copy from adjacency view (copies data, owns it).
   Graph(const base_t& adj)
       : owned_values(adj.values, adj.values + adj.N * adj.dmax),

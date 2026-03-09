@@ -248,7 +248,7 @@ int main(int ac, char **argv)
 
   Graph G;
   auto Nf = N / 2 + 2;
-  static_cast<Graph&>(G) = Spanify::OwnedDenseGraph<node_t>(Nf, std::vector<node_t>(6));
+  static_cast<Graph&>(G) = Graph(Nf, std::vector<node_t>(6));
   G.N = Nf;
 
   constexpr real_t carbon_mass = 1.9944733e-26 /*kg*/, aangstrom_length = 1e-10 /*m*/;
