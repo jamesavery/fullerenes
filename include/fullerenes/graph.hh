@@ -22,14 +22,14 @@ struct Graph : Spanify::DenseGraph<node_t> {
   using base_t = Spanify::DenseGraph<node_t>;
 
   // Optional owned storage (empty when Graph is a view of external memory).
-  // Follows the SpanVector pattern: base_t pointers (values, deg) always
-  // point to either owned storage or external memory.
+  // Follows the SpanVector pattern: base_t spans (values, deg) always
+  // reference either owned storage or external memory.
   std::vector<node_t> owned_values;
   std::vector<uint8_t> owned_deg;
 
   void repoint() {
-    values = owned_values.data();
-    deg = owned_deg.data();
+    values = std::span<node_t>(owned_values.data(), owned_values.size());
+    deg = std::span<uint8_t>(owned_deg.data(), owned_deg.size());
   }
 
   // Bring base push_back(K u, K v) into scope (otherwise hidden by push_back(vector))
@@ -40,7 +40,7 @@ struct Graph : Spanify::DenseGraph<node_t> {
   Graph() = default;
 
   // View: wrap existing adjacency memory (caller manages lifetime).
-  Graph(node_t N_, int dmax_, node_t* values_, uint8_t* deg_) {
+  Graph(node_t N_, int dmax_, std::span<node_t> values_, std::span<uint8_t> deg_) {
     N = N_; dmax = dmax_; values = values_; deg = deg_;
   }
 
@@ -60,8 +60,8 @@ struct Graph : Spanify::DenseGraph<node_t> {
 
   // Copy from adjacency view (copies data, owns it).
   Graph(const base_t& adj)
-      : owned_values(adj.values, adj.values + adj.N * adj.dmax),
-        owned_deg(adj.deg, adj.deg + adj.N) {
+      : owned_values(adj.values.begin(), adj.values.end()),
+        owned_deg(adj.deg.begin(), adj.deg.end()) {
     N = adj.N; dmax = adj.dmax; repoint();
   }
 
@@ -70,7 +70,7 @@ struct Graph : Spanify::DenseGraph<node_t> {
       : owned_values(std::move(adj.owned_values)),
         owned_deg(std::move(adj.owned_deg)) {
     N = adj.N; dmax = adj.dmax; repoint();
-    adj.values = nullptr; adj.deg = nullptr; adj.N = 0;
+    adj.values = {}; adj.deg = {}; adj.N = 0;
   }
 
   // Copy from OwnedDenseGraph.
@@ -104,7 +104,7 @@ struct Graph : Spanify::DenseGraph<node_t> {
     owned_values = std::move(adj.owned_values);
     owned_deg = std::move(adj.owned_deg);
     repoint();
-    adj.values = nullptr; adj.deg = nullptr; adj.N = 0;
+    adj.values = {}; adj.deg = {}; adj.N = 0;
     return *this;
   }
 
@@ -127,7 +127,7 @@ struct Graph : Spanify::DenseGraph<node_t> {
       : base_t(o), owned_values(std::move(o.owned_values)),
         owned_deg(std::move(o.owned_deg)) {
     if (!owned_values.empty()) repoint();
-    o.values = nullptr; o.deg = nullptr; o.N = 0;
+    o.values = {}; o.deg = {}; o.N = 0;
   }
 
   Graph& operator=(const Graph& o) {
@@ -147,7 +147,7 @@ struct Graph : Spanify::DenseGraph<node_t> {
     owned_deg = std::move(o.owned_deg);
     if (!owned_values.empty()) repoint();
     else { values = o.values; deg = o.deg; }
-    o.values = nullptr; o.deg = nullptr; o.N = 0;
+    o.values = {}; o.deg = {}; o.N = 0;
     return *this;
   }
 

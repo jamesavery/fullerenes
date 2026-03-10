@@ -29,34 +29,34 @@ template<typename K = int32_t>
 struct DenseGraph {
     K N = 0;
     int dmax = 0;
-    K* values = nullptr;         // [N * dmax] -- neighbor IDs, row-major
-    uint8_t* deg = nullptr;      // [N] -- current degree of each vertex
+    std::span<K> values;         // [N * dmax] -- neighbor IDs, row-major
+    std::span<uint8_t> deg;      // [N] -- current degree of each vertex
 
     // --- Constructors ---
 
     DenseGraph() = default;
 
-    // View constructor: wrap existing storage.
-    DenseGraph(K N, int dmax, K* values, uint8_t* deg)
+    // View constructor: wrap existing spans.
+    DenseGraph(K N, int dmax, std::span<K> values, std::span<uint8_t> deg)
         : N(N), dmax(dmax), values(values), deg(deg) {}
 
     // --- operator[] returns span over active entries ---
 
     std::span<K> operator[](K u) {
-        return {values + u * dmax, (size_t)deg[u]};
+        return {values.data() + u * dmax, (size_t)deg[u]};
     }
     std::span<const K> operator[](K u) const {
-        return {values + u * dmax, (size_t)deg[u]};
+        return {values.data() + u * dmax, (size_t)deg[u]};
     }
 
     // --- Span-based accessors ---
 
     std::span<const K> nbrs(K u) const {
-        return {values + u * dmax, (size_t)deg[u]};
+        return {values.data() + u * dmax, (size_t)deg[u]};
     }
 
     std::span<K> nbrs_mut(K u) {
-        return {values + u * dmax, (size_t)deg[u]};
+        return {values.data() + u * dmax, (size_t)deg[u]};
     }
 
     int degree(K u) const { return deg[u]; }
@@ -71,7 +71,7 @@ struct DenseGraph {
 
     void insert_at(K u, K v, int pos) {
         assert(deg[u] < dmax);
-        K* row = values + u * dmax;
+        K* row = values.data() + u * dmax;
         int d = deg[u];
         for (int i = d; i > pos; --i)
             row[i] = row[i-1];
@@ -80,7 +80,7 @@ struct DenseGraph {
     }
 
     void erase_at(K u, int pos) {
-        K* row = values + u * dmax;
+        K* row = values.data() + u * dmax;
         int d = deg[u];
         for (int i = pos; i < d - 1; ++i)
             row[i] = row[i+1];
@@ -89,7 +89,7 @@ struct DenseGraph {
     }
 
     int find(K u, K v) const {
-        const K* row = values + u * dmax;
+        const K* row = values.data() + u * dmax;
         for (int i = 0; i < deg[u]; ++i)
             if (row[i] == v) return i;
         return -1;
@@ -150,8 +150,8 @@ struct OwnedDenseGraph : DenseGraph<K> {
     std::vector<uint8_t> owned_deg;
 
     void repoint() {
-        this->values = owned_values.data();
-        this->deg = owned_deg.data();
+        this->values = std::span<K>(owned_values.data(), owned_values.size());
+        this->deg = std::span<uint8_t>(owned_deg.data(), owned_deg.size());
     }
 
     // Bring base push_back(K,K) into scope (otherwise hidden by push_back(vector))
@@ -212,9 +212,9 @@ struct OwnedDenseGraph : DenseGraph<K> {
     // Converting constructor from DenseGraph view (copies data).
     OwnedDenseGraph(const DenseGraph<K>& v) {
         this->N = v.N; this->dmax = v.dmax;
-        if (v.N > 0 && v.values) {
-            owned_values.assign(v.values, v.values + v.N * v.dmax);
-            owned_deg.assign(v.deg, v.deg + v.N);
+        if (v.N > 0 && v.values.data()) {
+            owned_values.assign(v.values.begin(), v.values.end());
+            owned_deg.assign(v.deg.begin(), v.deg.end());
         }
         repoint();
     }
@@ -229,7 +229,7 @@ struct OwnedDenseGraph : DenseGraph<K> {
     OwnedDenseGraph(OwnedDenseGraph&& o) noexcept
         : owned_values(std::move(o.owned_values)), owned_deg(std::move(o.owned_deg)) {
         this->N = o.N; this->dmax = o.dmax; repoint();
-        o.values = nullptr; o.deg = nullptr; o.N = 0;
+        o.values = {}; o.deg = {}; o.N = 0;
     }
 
     OwnedDenseGraph& operator=(const OwnedDenseGraph& o) {
@@ -247,7 +247,7 @@ struct OwnedDenseGraph : DenseGraph<K> {
         owned_values = std::move(o.owned_values);
         owned_deg = std::move(o.owned_deg);
         repoint();
-        o.values = nullptr; o.deg = nullptr; o.N = 0;
+        o.values = {}; o.deg = {}; o.N = 0;
         return *this;
     }
 
