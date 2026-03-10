@@ -28,6 +28,7 @@ struct IsomerStats {
     double ms;
     int iters;
     bool converged;
+    OptResult result = OptResult::BUDGET_EXHAUSTED;  // exit reason
     double edge_cv;
     double edge_relerr_max;  // max |L_i - L_mean| / L_mean
     double h_min;
@@ -39,6 +40,7 @@ struct IsomerStats {
     int n_steps;
     int n_energy, n_grad, n_hv;
     long long work;          // n_energy + 2*n_grad + 7*n_hv
+    PipelineDiag diag;       // pipeline diagnostics bitfield
 };
 
 static IsomerStats compute_stats(const Deltahedron& D, int idx, int seed, int n_steps) {
@@ -100,18 +102,21 @@ static IsomerStats compute_stats(const Deltahedron& D, int idx, int seed, int n_
 
 // Write one JSONL line for a single isomer result
 static void append_jsonl(FILE* f, const IsomerStats& s) {
-    fprintf(f, "{\"idx\":%d,\"ms\":%.2f,\"iters\":%d,\"converged\":%s,"
+    fprintf(f, "{\"idx\":%d,\"ms\":%.2f,\"iters\":%d,\"converged\":%s,\"exit\":\"%s\","
             "\"edge_cv\":%.6e,\"edge_relerr_max\":%.6e,"
             "\"h_min\":%.6f,\"n_concave\":%d,"
             "\"ang_min\":%.3f,\"ang_max\":%.3f,\"ang_std\":%.6e,\"ang_relerr_max\":%.6e,"
             "\"gmax_L\":%.6e,\"seed\":%d,\"n_steps\":%d,"
-            "\"n_energy\":%d,\"n_grad\":%d,\"n_hv\":%d,\"work\":%lld}\n",
+            "\"n_energy\":%d,\"n_grad\":%d,\"n_hv\":%d,\"work\":%lld,"
+            "\"diag_flags\":\"0x%08x\",\"diag_counters\":\"0x%08x\"}\n",
             s.idx, s.ms, s.iters, s.converged ? "true" : "false",
+            opt_result_name(s.result),
             s.edge_cv, s.edge_relerr_max,
             s.h_min, s.n_concave,
             s.ang_min, s.ang_max, s.ang_std, s.ang_relerr_max,
             s.gmax_L, s.seed, s.n_steps,
-            s.n_energy, s.n_grad, s.n_hv, s.work);
+            s.n_energy, s.n_grad, s.n_hv, s.work,
+            s.diag.flags, s.diag.counters);
     fflush(f);
 }
 
@@ -164,6 +169,7 @@ static void write_json(const char* path, int N, int total_isomers, int stride,
     double astd_max = 0, armax_max = 0;
     double gmax_max = 0;
     int converged_count = 0;
+    int n_stagnated = 0, n_budget = 0, n_convexity_stuck = 0;
     int n_bad_edge = 0, n_bad_ang = 0;
     long long work_sum = 0, work_max = 0;
 
@@ -180,6 +186,9 @@ static void write_json(const char* path, int N, int total_isomers, int stride,
         armax_max = max(armax_max, s.ang_relerr_max);
         gmax_max = max(gmax_max, s.gmax_L);
         if (s.converged) converged_count++;
+        if (s.result == OptResult::STAGNATED) n_stagnated++;
+        if (s.result == OptResult::BUDGET_EXHAUSTED) n_budget++;
+        if (s.result == OptResult::CONVEXITY_STUCK) n_convexity_stuck++;
         if (s.edge_relerr_max > 0.01) n_bad_edge++;
         if (s.ang_relerr_max > 0.01) n_bad_ang++;
         work_sum += s.work;
@@ -245,26 +254,65 @@ static void write_json(const char* path, int N, int total_isomers, int stride,
             gmax_mean, gmax_std, gmax_max);
     fprintf(f, "    \"work_mean\": %.0f, \"work_median\": %.0f, \"work_max\": %lld,\n",
             work_mean, work_median, work_max);
-    fprintf(f, "    \"n_bad_edge\": %d, \"n_bad_ang\": %d, \"n_not_converged\": %d\n",
+    fprintf(f, "    \"n_bad_edge\": %d, \"n_bad_ang\": %d, \"n_not_converged\": %d,\n",
             n_bad_edge, n_bad_ang, actual_M - converged_count);
+    fprintf(f, "    \"n_stagnated\": %d, \"n_budget_exhausted\": %d, \"n_convexity_stuck\": %d\n",
+            n_stagnated, n_budget, n_convexity_stuck);
+    fprintf(f, "  },\n");
+
+    // Diagnostic summary: count isomers with each flag set
+    fprintf(f, "  \"diag_summary\": {\n");
+    {
+        // All flag bits to count
+        static constexpr struct { uint32_t bit; const char* name; } flag_list[] = {
+            {PipelineDiag::REFLECT_CYCLING_STEP, "n_reflect_cycling_step"},
+            {PipelineDiag::HULL_USED_STEP,       "n_hull_used_step"},
+            {PipelineDiag::HULL_CYCLING_STEP,    "n_hull_cycling_step"},
+            {PipelineDiag::CONVEXITY_FAIL_STEP,  "n_cvx_fail_step"},
+            {PipelineDiag::PATCH_CYCLING,        "n_patch_cycling"},
+            {PipelineDiag::STAG_STEP,            "n_stag_step"},
+            {PipelineDiag::REFLECT_CYCLING_FINAL,"n_reflect_cycling_final"},
+            {PipelineDiag::HULL_USED_FINAL,      "n_hull_used_final"},
+            {PipelineDiag::HULL_CYCLING_FINAL,   "n_hull_cycling_final"},
+            {PipelineDiag::STAG_FINAL,           "n_stag_final"},
+            {PipelineDiag::STAG_CONSTRAINED,     "n_stag_constrained"},
+            {PipelineDiag::BUDGET_CONSTRAINED,   "n_budget_constrained"},
+            {PipelineDiag::NEG_CURVATURE,        "n_neg_curvature"},
+            {PipelineDiag::TR_BOUNDARY,          "n_tr_boundary"},
+            {PipelineDiag::STEP_REJECTED,        "n_step_rejected"},
+            {PipelineDiag::CVX_REJECTED,         "n_cvx_rejected"},
+            {PipelineDiag::LBFGS_RESET,          "n_lbfgs_reset"},
+            {PipelineDiag::HAS_F_RING,           "n_has_f_ring"},
+        };
+        for (int fi = 0; fi < (int)(sizeof(flag_list)/sizeof(flag_list[0])); fi++) {
+            int count = 0;
+            for (const auto& s : stats)
+                if (s.diag.flags & flag_list[fi].bit) count++;
+            fprintf(f, "    \"%s\": %d%s\n", flag_list[fi].name, count,
+                    fi + 1 < (int)(sizeof(flag_list)/sizeof(flag_list[0])) ? "," : "");
+        }
+    }
     fprintf(f, "  },\n");
 
     // Per-isomer data
     fprintf(f, "  \"per_isomer\": [\n");
     for (int i = 0; i < actual_M; i++) {
         const auto& s = stats[i];
-        fprintf(f, "    {\"idx\":%d,\"ms\":%.2f,\"iters\":%d,\"converged\":%s,"
+        fprintf(f, "    {\"idx\":%d,\"ms\":%.2f,\"iters\":%d,\"converged\":%s,\"exit\":\"%s\","
                 "\"edge_cv\":%.6e,\"edge_relerr_max\":%.6e,"
                 "\"h_min\":%.6f,\"n_concave\":%d,"
                 "\"ang_min\":%.3f,\"ang_max\":%.3f,\"ang_std\":%.6e,\"ang_relerr_max\":%.6e,"
                 "\"gmax_L\":%.6e,\"seed\":%d,\"n_steps\":%d,"
-                "\"n_energy\":%d,\"n_grad\":%d,\"n_hv\":%d,\"work\":%lld}%s\n",
+                "\"n_energy\":%d,\"n_grad\":%d,\"n_hv\":%d,\"work\":%lld,"
+                "\"diag_flags\":\"0x%08x\",\"diag_counters\":\"0x%08x\"}%s\n",
                 s.idx, s.ms, s.iters, s.converged ? "true" : "false",
+                opt_result_name(s.result),
                 s.edge_cv, s.edge_relerr_max,
                 s.h_min, s.n_concave,
                 s.ang_min, s.ang_max, s.ang_std, s.ang_relerr_max,
                 s.gmax_L, s.seed, s.n_steps,
                 s.n_energy, s.n_grad, s.n_hv, s.work,
+                s.diag.flags, s.diag.counters,
                 (i + 1 < actual_M) ? "," : "");
     }
     fprintf(f, "  ]\n");
@@ -371,12 +419,14 @@ int main(int argc, char** argv) {
                 IsomerStats s = compute_stats(D, enum_idx, (int)ep.seed, (int)ep.steps.size());
                 s.ms = duration<double,milli>(t1 - t0).count();
                 s.iters = D.iterations_used;
-                s.converged = (D.final_gmax_L < 1e-5);
+                s.result = D.final_opt_result;
+                s.converged = (D.final_opt_result == OptResult::CONVERGED);
                 s.gmax_L = D.final_gmax_L;
                 s.n_energy = D.n_energy_evals;
                 s.n_grad = D.n_grad_evals;
                 s.n_hv = D.n_hv_evals;
                 s.work = (long long)s.n_energy + 2LL*s.n_grad + 7LL*s.n_hv;
+                s.diag = D.diag;
                 stats.push_back(s);
 
                 // Write incrementally to JSONL

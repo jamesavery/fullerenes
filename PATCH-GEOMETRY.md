@@ -31,15 +31,22 @@ placement and skip all subsequent sub-steps.
 through their neighbor centroid plane (up to 20 passes). This fixes concavities
 anywhere in the graph before handing off to the optimizer.
 
-**d. Extract patch.** Build a small O(1)-vertex sub-graph containing the strip
-and its immediate neighborhood (ring-1 free, ring-2 boundary).
+**d-f. Patch reflect-optimize loop** (up to 10 rounds):
 
-**e. Patch optimize.** Trust-region Newton with analytical Hessian on the patch
-sub-graph. Energy: E_bond + E_angle + E_conv(k=5). The interior_mask restricts
-E_conv to vertices with complete neighbor sets in the patch (prevents bogus h
-values at truncated boundaries). Max 150 iterations.
+  1. Extract patch sub-graph (ring-1 free, ring-2 boundary).
+  2. Trust-region Newton with analytical Hessian on the patch. Energy:
+     E_bond + E_angle + E_conv(k=5). The interior_mask restricts E_conv to
+     vertices with complete neighbor sets (prevents bogus h at truncated
+     boundaries). Max 150 iterations, no hard convexity constraint.
+  3. Copy patch coords back to the full vertex array.
+  4. `reflect_all_concave` on full graph (up to 20 passes per round).
+  5. If nothing was reflected, break (patch produced convex result).
+  6. Otherwise, re-extract patch with updated coordinates and repeat.
 
-**f. Copy patch coords back** to the full vertex array.
+This replaces the earlier "no new concavities" hard constraint, which got
+stuck at h=0 boundaries (trust region shrinking to machine epsilon with
+|g|=9). The reflect-optimize loop lets the patch converge freely, then
+fixes concavities by basin-switching on the full graph.
 
 **g. Reflect-optimize loop.** Full-graph relaxation using a reflect-then-optimize
 loop (up to 10 rounds):
@@ -47,7 +54,7 @@ loop (up to 10 rounds):
   1. Reflect all concave vertices (up to 20 passes, warn if limit hit)
   2. If round > 0 and nothing was reflected, break (stable in convex basin)
   3. Optimize with pure quality energy (E_bond + E_angle + E_curv, k_conv=0,
-     k_flat=0) to step_tol, using the per-step method (CG or LBFGS).
+     k_flat=0) to step_tol, using the per-step method (default LBFGS, m=10).
      Post-reflect inside optimize() is disabled (skip_post_reflect=true)
      since the loop handles reflection explicitly.
 
@@ -66,7 +73,7 @@ After all expansion steps complete, extract the full graph and run:
 
   1. Reflect all concave vertices (up to 20 passes)
   2. If round > 0 and nothing reflected, break
-  3. Optimize to final_tol with final_method (default CG), k_conv=0, k_flat=0
+  3. Optimize to final_tol with final_method (default STEIHAUG), k_conv=0, k_flat=0
 
 **Constrained Steihaug polish:**
 
@@ -109,22 +116,27 @@ energy_and_gradient, hv_product, and assemble_patch_hessian:
 
 ### Convexity strategy
 
-The pipeline does NOT use E_conv or opt_convex_constraint during per-step
-optimization. Instead:
+Convexity is maintained by reflect-optimize loops at every level:
 
-1. **reflect_concave** handles basin-switching. It moves concave vertices
-   to the convex side of the centroid plane -- a discontinuous operation
-   that cannot be replicated by any smooth energy penalty.
+1. **`reflect_all_concave`** handles basin-switching. It mirrors concave
+   vertices through their neighbor centroid plane (up to 20 passes until
+   none remain). This is a discontinuous jump that no smooth energy penalty
+   can replicate.
 
-2. **Reflect-optimize loops** iterate: reflect -> optimize -> check. The
-   optimizer starts each round in the convex basin and converges there.
-   Typically 1-2 rounds suffice; hard cases need up to 4.
+2. **Patch reflect-optimize loop** (step d-f): optimize patch freely (no
+   hard convexity constraint) → reflect concave on full graph → re-extract
+   patch and repeat if anything was reflected. Replaces the earlier "no new
+   concavities" hard constraint which got stuck at h=0 boundaries.
 
-3. **Constrained Steihaug** at the end prevents regression. The h >= 0
+3. **Full-graph reflect-optimize loops** (step g, final phase): reflect →
+   optimize → check. Typically 1-2 rounds suffice; hard cases need up to 4.
+
+4. **Constrained Steihaug** at the end prevents regression. The h >= 0
    trust-region constraint locks in convexity during final polish.
 
-E_conv with large k (e.g. k=100) was tried and abandoned: d^2E/dh^2 = 2k
-dominates the Hessian, destroying angle quality (1.04e-02 vs 7e-12 without).
+E_conv (k=5) is used only in the patch optimizer for smooth guidance. It is
+NOT used in the full-graph optimizer (k_conv=0) because its Hessian dominates
+and corrupts angle quality (1.04e-02 vs 7e-12 without).
 
 ### Test results
 

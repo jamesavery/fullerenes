@@ -257,7 +257,10 @@ int main(int argc, char** argv) {
         },
         opt_method, step_tol, final_tol);
 
-    fprintf(stderr, "\nmol2 files in /tmp/%s_step*_{seed,patched,relaxed,final}.mol2\n", label.c_str());
+    fprintf(stderr, "\nResult: %s  ang=%.2e  conc=%d  gmax_L=%.2e\n",
+            opt_result_name(D.final_opt_result), D.max_angle_relerr(),
+            D.count_concave(), D.final_gmax_L);
+    fprintf(stderr, "mol2 files in /tmp/%s_step*_{seed,patched,relaxed,final}.mol2\n", label.c_str());
 
     // Primitive cost measurement: run each method for a fixed budget, measure time and eval counts.
     fprintf(stderr, "\n=== Primitive cost ratios at N=%d ===\n", D.N);

@@ -134,8 +134,10 @@ bool PlanarGraph::read_hog_metadata(FILE *file, size_t &graph_count, size_t &gra
   //find number of vertices per graph
   //this only works for files with graphs of equal size
   fseek(file, header_size, SEEK_SET);
-  
-  //Assumes planarcode files containing only graphs of equal size
+
+  // ASSUMPTION: All graphs in the file have equal record size (same N, same degree sequence).
+  // This holds for single-N planarcode files (e.g. all C60 isomers from buckygen/plantri).
+  // Random access via from_planarcode(file, index) will give wrong results for mixed-N files.
   Graph first(read_hog_planarcode(file));
   graph_size = ftell(file)-header_size;
 
@@ -175,6 +177,8 @@ bool PlanarGraph::to_planarcode(const PlanarGraph &G, FILE *file)
 {
   auto write_int = [&](uint16_t x){ fputc(x&0xff,file); if(G.N>255) fputc((x>>8)&0xff,file); };
     
+  // TODO: The header should only be written once per file, not per graph.
+  // Callers writing multiple graphs should write the header separately.
   fputs(">>planar_code<<",file);
   if(G.N>255) fputc(0,file);
 
@@ -182,7 +186,7 @@ bool PlanarGraph::to_planarcode(const PlanarGraph &G, FILE *file)
 
   for(uint16_t u=0;u<G.N;u++){
     for(uint16_t v: G.neighbours[u])
-      write_int(v);
+      write_int(v+1);		// planar_code is 1-indexed; 0 is the terminator
     write_int(0);
   }
 

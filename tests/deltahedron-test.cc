@@ -941,7 +941,7 @@ TEST_F(DeltahedronTest, HessianCheck_WithConcavity) {
 
 TEST_F(DeltahedronTest, Optimize_Icosahedron_StaysFixed) {
   Deltahedron D = ico;  // copy
-  bool converged = D.optimize(ico.points);
+  bool converged = (OptResult::CONVERGED == D.optimize(ico.points));
   EXPECT_TRUE(converged);
 
   // Should be very close to original (up to possible uniform scale)
@@ -966,7 +966,7 @@ TEST_F(DeltahedronTest, Optimize_PerturbedIcosahedron) {
   EdgeStats before = EdgeStats::compute(Deltahedron(D, noisy));
   EXPECT_GT(before.variance, 1e-6) << "perturbation should create variance";
 
-  bool converged = D.optimize(noisy);
+  bool converged = (OptResult::CONVERGED == D.optimize(noisy));
   EXPECT_TRUE(converged);
 
   EdgeStats after = EdgeStats::compute(D);
@@ -1075,7 +1075,7 @@ TEST(C44DeltahedronTest, Optimize_AllC44) {
   for(int idx : subset){
     SCOPED_TRACE("isomer " + to_string(idx));
     Deltahedron D = make_C44_deltahedron(idx);
-    bool converged = D.optimize(D.points, target_L);
+    bool converged = (OptResult::CONVERGED == D.optimize(D.points, target_L));
     OptStats s = OptStats::compute(D, converged);
     s.h_min = min_convexity_height(D);
     s.print_row(idx);
@@ -1137,7 +1137,7 @@ static void test_optimize_fullerene_duals(int N, int max_isomers = -1, bool IPR 
     int V_dual = N/2 + 2;
     EXPECT_EQ(D.N, V_dual) << "dual vertex count should be N/2+2";
 
-    bool converged = D.optimize(D.points, target_L, 1e-10, {}, max_work);
+    bool converged = (OptResult::CONVERGED == D.optimize(D.points, target_L, 1e-10, {}, max_work));
     OptStats s = OptStats::compute(D, converged);
     s.h_min = min_convexity_height(D);
 
@@ -1212,7 +1212,7 @@ TEST(OptimizeTest, SmallFullerenes) {
     vector<int> nc;
     for(int idx : indices){
       Deltahedron D = make_deltahedron_from_db(N, db.entries[idx]);
-      bool converged = D.optimize(D.points, target_L);
+      bool converged = (OptResult::CONVERGED == D.optimize(D.points, target_L));
       OptStats s = OptStats::compute(D, converged);
       s.h_min = min_convexity_height(D);
       stats.push_back(s);
@@ -1277,7 +1277,7 @@ TEST(OptimizeTest, C60_Hard) {
 
   for(int idx : hard){
     Deltahedron D = make_deltahedron_from_db(60, db.entries[idx]);
-    bool converged = D.optimize(D.points, target_L);
+    bool converged = (OptResult::CONVERGED == D.optimize(D.points, target_L));
     OptStats s = OptStats::compute(D, converged);
     s.h_min = min_convexity_height(D);
 
@@ -1316,7 +1316,7 @@ TEST(OptimizeTest, C60_IPR) {
   ASSERT_GT((int)db.entries.size(), 1811);
 
   Deltahedron D = make_deltahedron_from_db(60, db.entries[1811]);
-  bool converged = D.optimize(D.points, target_L);
+  bool converged = (OptResult::CONVERGED == D.optimize(D.points, target_L));
   OptStats s = OptStats::compute(D, converged);
   s.h_min = min_convexity_height(D);
   s.print_row(1811);
@@ -1380,7 +1380,7 @@ TEST(OptimizeTest, C100_Sample) {
 
   for(int idx : sample_indices){
     Deltahedron D = make_deltahedron_from_db(100, db.entries[idx]);
-    bool converged = D.optimize(D.points, target_L);
+    bool converged = (OptResult::CONVERGED == D.optimize(D.points, target_L));
     OptStats s = OptStats::compute(D, converged);
     s.h_min = min_convexity_height(D);
 

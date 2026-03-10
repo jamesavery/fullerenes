@@ -1085,11 +1085,14 @@ struct ConvexityStats {
     int n_orient_defects;  // number of orientation-inconsistent edges
     double vol_ratio;      // volume / hull_volume
     bool converged;
+    OptResult result = OptResult::CONVERGED;
     int iters;
 
     static ConvexityStats compute(const Deltahedron& D) {
         ConvexityStats s{};
         s.iters = D.iterations_used;
+        s.result = D.final_opt_result;
+        s.converged = (D.final_opt_result == OptResult::CONVERGED);
 
         // Edge lengths
         vector<double> edge_lens;
@@ -1142,7 +1145,9 @@ struct ConvexityStats {
                ang_min, ang_max, ang_std,
                h_min, n_concave, n_orient_defects,
                vol_ratio,
-               converged ? "" : " [NC]");
+               converged ? "" : result == OptResult::STAGNATED ? " [STAG]"
+                                : result == OptResult::CONVEXITY_STUCK ? " [CONV]"
+                                : " [BUD]");
     }
 
     static void print_summary(const vector<ConvexityStats>& all) {

@@ -7,6 +7,8 @@
 #include <numeric>
 #include <queue>
 #include <set>
+#include <map>
+#include <array>
 #include <chrono>
 
 // ============================================================
@@ -1319,6 +1321,7 @@ Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, FIL
                                                      bool global_post_patch_reflect) {
     int full_N = ep.full_N;
     vector<coord3d> points(full_N);
+    PipelineDiag pd;  // Pipeline diagnostics accumulator
 
     // Timing accumulators (only used when opt_log is set)
     using clk = chrono::steady_clock;
@@ -1329,6 +1332,7 @@ Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, FIL
 
     // 1. Compute seed geometry
     computeSeedGeometry(ep, points);
+    pd.set_seed_type((int)ep.seed);  // 0=C20, 1=C28, 2=C30
 
     // 2. Create ReducibleDual and load seed state
     ReducibleDual rd(full_N);
@@ -1368,6 +1372,7 @@ Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, FIL
 
         // F-ring placement is exact — skip reflect, patch, and relaxation.
         if (step.kind.type == ExpKind::F_type) {
+            pd.flags |= PipelineDiag::HAS_F_RING;
             if (diag) {
                 vector<int> diag_remap;
                 Deltahedron D_diag = extractCompact(rd, full_N, points, diag_remap);
@@ -1417,36 +1422,53 @@ Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, FIL
         // d-f. Patch reflect-optimize loop: optimize patch without hard convexity
         //       constraint (which causes it to get stuck at h=0 boundary), then
         //       reflect any concavities on the full graph and re-optimize.
-        for (int patch_round = 0; patch_round < 10; patch_round++) {
-            // d. Extract small patch sub-graph (O(1) vertices)
-            vector<bool> free_mask, interior_mask;
-            vector<int> patch_remap;
-            Deltahedron patch = extractPatch(rd, full_N, step, points,
-                                             free_mask, interior_mask, patch_remap,
-                                             global_post_patch_reflect);
+        //       Cycle guard: if reflection count doesn't decrease, break early
+        //       (the full-graph optimizer will handle remaining concavities).
+        {
+            int prev_refl = INT_MAX;
+            int patch_round;
+            for (patch_round = 0; patch_round < 10; patch_round++) {
+                // d. Extract small patch sub-graph (O(1) vertices)
+                vector<bool> free_mask, interior_mask;
+                vector<int> patch_remap;
+                Deltahedron patch = extractPatch(rd, full_N, step, points,
+                                                 free_mask, interior_mask, patch_remap,
+                                                 global_post_patch_reflect);
 
-            // e. Trust-region optimize on patch only (no hard convexity constraint;
-            //    E_conv softplus still provides a soft bias toward convexity)
-            patch.opt_log = log;
-            patch.optimize_patch(patch.points, free_mask, interior_mask, 0, 150, patch_grad_tol, false);
-            patch.opt_log = nullptr;
-            total_patch_iters += patch.iterations_used;
+                // e. Trust-region optimize on patch only (no hard convexity constraint;
+                //    E_conv softplus still provides a soft bias toward convexity)
+                patch.opt_log = log;
+                patch.optimize_patch(patch.points, free_mask, interior_mask, 0, 150, patch_grad_tol, false);
+                patch.opt_log = nullptr;
+                total_patch_iters += patch.iterations_used;
 
-            // f. Copy patch free-vertex coords back to full array
-            for (int u = 0; u < full_N; u++)
-                if (patch_remap[u] >= 0 && free_mask[patch_remap[u]])
-                    points[u] = patch.points[patch_remap[u]];
+                // f. Copy patch free-vertex coords back to full array
+                for (int u = 0; u < full_N; u++)
+                    if (patch_remap[u] >= 0 && free_mask[patch_remap[u]])
+                        points[u] = patch.points[patch_remap[u]];
 
-            // g. Reflect concave on full graph, re-loop if any were reflected
-            {
+                // g. Reflect concave on full graph; break if convex or cycling
                 vector<int> refl_remap;
                 Deltahedron D = extractCompact(rd, full_N, points, refl_remap);
                 int n_refl = D.reflect_all_concave(D.points);
                 for (int u = 0; u < full_N; u++)
                     if (refl_remap[u] >= 0)
                         points[u] = D.points[refl_remap[u]];
+
                 if (n_refl == 0) break;  // patch produced convex result
+
+                if (log)
+                    fprintf(log, "    step %2d patch_round %d: reflected=%d, conc=%d, ang=%.2e\n",
+                            step_idx, patch_round, n_refl, D.count_concave(), D.max_angle_relerr());
+
+                // Cycle guard: if not making progress, stop looping
+                if (n_refl >= prev_refl) {
+                    pd.flags |= PipelineDiag::PATCH_CYCLING;
+                    break;
+                }
+                prev_refl = n_refl;
             }
+            pd.set_max_patch_rounds(patch_round + 1);
         }
 
         auto t_patch = clk::now();
@@ -1460,31 +1482,77 @@ Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, FIL
         }
 
         // g. Full-graph reflect-optimize loop.
-        //    Reflect first to start optimization in convex basin, then optimize
-        //    pure quality.  Loop until reflect finds nothing to fix.
+        //    Reflect concave vertices, then optimize.  If cycling is detected
+        //    (concavity not decreasing), escalate to convex hull projection.
         vector<int> full_remap;
         Deltahedron D = extractCompact(rd, full_N, points, full_remap);
 
         D.opt_k_flat = 0;  // skip E_flat in intermediate steps
-        D.opt_k_conv = 0;   // pure quality; reflect handles convexity
-        D.opt_skip_post_reflect = true;  // we handle reflect in the loop
+        D.opt_k_conv = 0;   // pure quality; reflect/hull handles convexity
+        D.opt_skip_post_reflect = true;  // we handle convexity in the loop
         D.opt_method = method;
         int n_steps = (int)ep.steps.size();
         bool log_this = log && (step_idx <= 2 || step_idx == n_steps/2 || step_idx >= n_steps - 2);
 
-        for(int round = 0; round < 10; round++){
-          // Reflect into convex basin
-          int n_refl = D.reflect_all_concave(D.points);
-          if(round > 0 && n_refl == 0) break;  // stable in convex basin
+        {
+          int prev_conc = INT_MAX;
+          bool used_hull = false;
+          int round;
+          for(round = 0; round < 10; round++){
+            int n_fix;
+            if(!used_hull){
+              n_fix = D.reflect_all_concave(D.points);
+            } else {
+              n_fix = D.project_onto_convex_hull(D.points);
+            }
+            if(round > 0 && n_fix == 0) break;  // stable in convex basin
 
-          // Optimize pure quality
-          if (log_this) D.opt_log = log;
-          D.optimize(D.points, 0, step_tol, {}, max_work_per_step, step_angle_tol);
-          if (log_this) D.opt_log = nullptr;
-          total_relax_iters += D.iterations_used;
-          acc_energy += D.n_energy_evals;
-          acc_grad += D.n_grad_evals;
-          acc_hv += D.n_hv_evals;
+            // Optimize
+            if (log_this) D.opt_log = log;
+            OptResult step_result = D.optimize(D.points, 0, step_tol, {}, max_work_per_step, step_angle_tol);
+            if (log_this) D.opt_log = nullptr;
+            pd.flags |= D.opt_diag_flags;  // accumulate optimizer-level flags
+            if(step_result == OptResult::STAGNATED) {
+              pd.flags |= PipelineDiag::STAG_STEP;
+              pd.inc_stag_steps();
+            }
+            total_relax_iters += D.iterations_used;
+            acc_energy += D.n_energy_evals;
+            acc_grad += D.n_grad_evals;
+            acc_hv += D.n_hv_evals;
+
+            int conc = D.count_concave();
+            if(log && (log_this || conc > 0))
+              fprintf(log, "    step %2d round %d: %s=%d, %d iters, ang=%.2e, conc=%d\n",
+                      step_idx, round, used_hull ? "projected" : "reflected",
+                      n_fix, D.iterations_used, D.max_angle_relerr(), conc);
+
+            if(conc == 0) break;  // success
+
+            // Cycle guard: if concavity not decreasing, escalate to hull projection
+            if(conc >= prev_conc){
+              if(!used_hull){
+                pd.flags |= PipelineDiag::REFLECT_CYCLING_STEP;
+                used_hull = true;  // escalate — retry with hull projection
+                pd.flags |= PipelineDiag::HULL_USED_STEP;
+                if(log) fprintf(log, "    step %2d: reflect cycling (%d→%d), escalating to hull projection\n",
+                                step_idx, prev_conc, conc);
+              } else {
+                pd.flags |= PipelineDiag::HULL_CYCLING_STEP;
+                break;  // hull projection also cycling — give up
+              }
+            }
+            prev_conc = conc;
+          }
+          pd.set_max_reflect_rounds_step(round + 1);
+        }
+
+        // Convexity invariant: per-step must produce convex geometry
+        if(D.count_concave() > 0) {
+          pd.flags |= PipelineDiag::CONVEXITY_FAIL_STEP;
+          pd.inc_cvx_fail_steps();
+          fprintf(stderr, "CONVEXITY FAILURE: step %d (N=%d) ended with %d concave vertices\n",
+                  step_idx, D.N, D.count_concave());
         }
 
         // h. Write optimized coordinates back to full array
@@ -1523,55 +1591,105 @@ Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, FIL
 
     D.opt_k_flat = 0;  // geometry is already 3D from seed expansion; E_flat fights equilateral
 
-    // Final reflect-optimize loop: reflect first to enter convex basin, then
-    // optimize pure quality.  Loop until reflect finds nothing to fix.
+    // Final reflect-optimize loop with hull projection escalation.
+    // Reflect concave vertices, then optimize.  If cycling is detected
+    // (concavity not decreasing), escalate to convex hull projection.
     D.opt_k_conv = 0;
     D.opt_convex_constraint = false;
-    D.opt_skip_post_reflect = true;  // we handle reflect in the loop
+    D.opt_skip_post_reflect = true;  // we handle convexity in the loop
     D.opt_method = final_method;
     int total_final_iters = 0;
 
-    for(int round = 0; round < 10; round++){
-      // Reflect into convex basin
-      int n_refl = D.reflect_all_concave(D.points);
-      if(round > 0 && n_refl == 0) break;  // stable in convex basin
+    {
+      int prev_conc = INT_MAX;
+      bool used_hull = false;
+      int round;
+      for(round = 0; round < 10; round++){
+        int n_fix;
+        if(!used_hull){
+          n_fix = D.reflect_all_concave(D.points);
+        } else {
+          n_fix = D.project_onto_convex_hull(D.points);
+        }
+        if(round > 0 && n_fix == 0) break;  // stable in convex basin
 
-      if(diag && round == 0) diag((int)ep.steps.size() + 1, "reflected", D);
+        if(diag && round == 0) diag((int)ep.steps.size() + 1, "reflected", D);
 
-      // Optimize pure quality from convex starting point
-      if (log) D.opt_log = log;
-      D.optimize(D.points, 0, final_tol, {}, max_work_per_step, final_angle_tol);
-      D.opt_log = nullptr;
-      total_final_iters += D.iterations_used;
-      acc_energy += D.n_energy_evals;
-      acc_grad += D.n_grad_evals;
-      acc_hv += D.n_hv_evals;
+        // Optimize
+        if (log) D.opt_log = log;
+        OptResult fr = D.optimize(D.points, 0, final_tol, {}, max_work_per_step, final_angle_tol);
+        D.opt_log = nullptr;
+        pd.flags |= D.opt_diag_flags;  // accumulate optimizer-level flags
+        if(fr == OptResult::STAGNATED) pd.flags |= PipelineDiag::STAG_FINAL;
+        total_final_iters += D.iterations_used;
+        acc_energy += D.n_energy_evals;
+        acc_grad += D.n_grad_evals;
+        acc_hv += D.n_hv_evals;
 
-      if(log) fprintf(log, "  final round %d: reflected=%d, %d iters, ang=%.2e, conc=%d\n",
-                      round, n_refl, D.iterations_used, D.max_angle_relerr(), D.count_concave());
+        int conc = D.count_concave();
+        if(log) fprintf(log, "  final round %d: %s=%d, %d iters, ang=%.2e, conc=%d\n",
+                        round, used_hull ? "projected" : "reflected",
+                        n_fix, D.iterations_used, D.max_angle_relerr(), conc);
+
+        if(conc == 0) break;  // success
+
+        // Cycle guard: if concavity not decreasing, escalate to hull projection
+        if(conc >= prev_conc){
+          if(!used_hull){
+            pd.flags |= PipelineDiag::REFLECT_CYCLING_FINAL;
+            used_hull = true;  // escalate — retry with hull projection
+            pd.flags |= PipelineDiag::HULL_USED_FINAL;
+            if(log) fprintf(log, "  final: reflect cycling (%d→%d), escalating to hull projection\n",
+                            prev_conc, conc);
+          } else {
+            pd.flags |= PipelineDiag::HULL_CYCLING_FINAL;
+            break;  // hull projection also cycling — give up
+          }
+        }
+        prev_conc = conc;
+      }
+      pd.set_final_reflect_rounds(round + 1);
+    }
+
+    if(D.count_concave() > 0 && log) {
+      fprintf(log, "  final loop ended with %d concave, attempting hull+reflect cleanup\n",
+              D.count_concave());
     }
 
     // Final constrained Steihaug polish: h>=0 trust region prevents regression
     // to concave.  k_conv=0 so the Hessian is pure quality — the constraint
     // is the only convexity mechanism.
-    // Reflect first so that all vertices start with h>0 — the constraint only
-    // protects vertices that are currently convex, not already-concave ones.
+    // Use hull projection + reflect to ensure all vertices start convex.
+    // Hull projection handles deep concavities (large graphs); reflect handles
+    // remaining h < 0 cases (small graphs where all vertices are on the hull).
+    D.project_onto_convex_hull(D.points);
     D.reflect_all_concave(D.points);
     D.opt_convex_constraint = true;
     D.opt_method = OptMethod::STEIHAUG;
     if (log) D.opt_log = log;
-    D.optimize(D.points, 0, final_tol, {}, max_work_per_step, final_angle_tol);
+    OptResult final_result = D.optimize(D.points, 0, final_tol, {}, max_work_per_step, final_angle_tol);
     D.opt_log = nullptr;
+    pd.flags |= D.opt_diag_flags;  // accumulate optimizer-level flags from constrained phase
+    if(final_result == OptResult::STAGNATED) pd.flags |= PipelineDiag::STAG_CONSTRAINED;
+    if(final_result == OptResult::BUDGET_EXHAUSTED) pd.flags |= PipelineDiag::BUDGET_CONSTRAINED;
     total_final_iters += D.iterations_used;
     acc_energy += D.n_energy_evals;
     acc_grad += D.n_grad_evals;
     acc_hv += D.n_hv_evals;
     D.opt_convex_constraint = false;
 
-    if(log) fprintf(log, "  final constrained: %d iters, ang=%.2e, conc=%d\n",
-                    D.iterations_used, D.max_angle_relerr(), D.count_concave());
+    if(log) fprintf(log, "  final constrained: %d iters, ang=%.2e, conc=%d, %s\n",
+                    D.iterations_used, D.max_angle_relerr(), D.count_concave(),
+                    opt_result_name(final_result));
+
+    // Override result if convexity loop couldn't fix concavity
+    if(D.count_concave() > 0)
+      final_result = OptResult::CONVEXITY_STUCK;
 
     D.iterations_used = total_final_iters;
+    D.final_opt_result = final_result;
+    pd.set_final_result(final_result);
+    D.diag = pd;
     ms_final = chrono::duration<double,milli>(clk::now() - t_final).count();
 
     // Diagnostic: after final optimization
@@ -1584,9 +1702,10 @@ Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, FIL
 
     if (log) {
         double ms_total = chrono::duration<double,milli>(clk::now() - t0).count();
-        fprintf(log, "  totals: seed=%.0f place=%.0f refl=%.0f patch=%.0f(%d) relax=%.0f(%d) final=%.0f(%d) total=%.0f ms\n",
+        fprintf(log, "  totals: seed=%.0f place=%.0f refl=%.0f patch=%.0f(%d) relax=%.0f(%d) final=%.0f(%d) total=%.0f ms result=%s\n",
                 ms_seed, ms_place, ms_reflect, ms_patch, total_patch_iters,
-                ms_relax, total_relax_iters, ms_final, D.iterations_used, ms_total);
+                ms_relax, total_relax_iters, ms_final, D.iterations_used, ms_total,
+                opt_result_name(D.final_opt_result));
     }
 
     D.iterations_used += total_relax_iters;
@@ -2353,7 +2472,8 @@ bool Deltahedron::optimize_patch(const vector<coord3d>& initial_geometry,
 }
 
 int Deltahedron::reflect_concave(vector<coord3d>& pts, double threshold,
-                                  const vector<bool>& fixed) const
+                                  const vector<bool>& fixed,
+                                  vector<bool>* reflected_mask) const
 {
   bool has_fixed = !fixed.empty();
   int count = 0;
@@ -2367,17 +2487,19 @@ int Deltahedron::reflect_concave(vector<coord3d>& pts, double threshold,
     if(vd.h < -threshold){
       pts[v] = vd.centroid + vd.n_hat * (-vd.h);
       count++;
+      if(reflected_mask) (*reflected_mask)[v] = true;
     }
   }
   return count;
 }
 
 int Deltahedron::reflect_all_concave(vector<coord3d>& pts, double threshold,
-                                      const vector<bool>& fixed) const
+                                      const vector<bool>& fixed,
+                                      vector<bool>* reflected_mask) const
 {
   int total = 0;
   for(int pass = 0; pass < 20; pass++){
-    int n = reflect_concave(pts, threshold, fixed);
+    int n = reflect_concave(pts, threshold, fixed, reflected_mask);
     if(n == 0) break;
     total += n;
     if(pass == 19)
@@ -2386,14 +2508,247 @@ int Deltahedron::reflect_all_concave(vector<coord3d>& pts, double threshold,
   return total;
 }
 
-bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double target_L,
-                           double grad_tol, const vector<bool>& fixed,
-                           long long max_work, double angle_tol)
+// ============================================================
+// Convex hull projection: compute the convex hull of the point set,
+// then project every concave vertex onto the nearest hull face.
+// ============================================================
+
+// Closest point on triangle (a,b,c) to point p.
+// Returns the point on the triangle surface nearest to p,
+// handling interior, edge, and vertex cases via Voronoi regions.
+static coord3d closest_point_on_triangle(const coord3d& p,
+                                         const coord3d& a, const coord3d& b, const coord3d& c)
+{
+  coord3d ab = b - a, ac = c - a, ap = p - a;
+  double d1 = ab.dot(ap), d2 = ac.dot(ap);
+  if(d1 <= 0 && d2 <= 0) return a;  // vertex A region
+
+  coord3d bp = p - b;
+  double d3 = ab.dot(bp), d4 = ac.dot(bp);
+  if(d3 >= 0 && d4 <= d3) return b;  // vertex B region
+
+  coord3d cp = p - c;
+  double d5 = ab.dot(cp), d6 = ac.dot(cp);
+  if(d6 >= 0 && d5 <= d6) return c;  // vertex C region
+
+  // Edge AB
+  double vc = d1*d4 - d3*d2;
+  if(vc <= 0 && d1 >= 0 && d3 <= 0){
+    double v = d1 / (d1 - d3);
+    return a + ab * v;
+  }
+
+  // Edge AC
+  double vb = d5*d2 - d1*d6;
+  if(vb <= 0 && d2 >= 0 && d6 <= 0){
+    double w = d2 / (d2 - d6);
+    return a + ac * w;
+  }
+
+  // Edge BC
+  double va = d3*d6 - d5*d4;
+  if(va <= 0 && (d4-d3) >= 0 && (d5-d6) >= 0){
+    double w = (d4-d3) / ((d4-d3) + (d5-d6));
+    return b + (c - b) * w;
+  }
+
+  // Interior
+  double denom = 1.0 / (va + vb + vc);
+  double v = vb * denom, w = vc * denom;
+  return a + ab * v + ac * w;
+}
+
+// Incremental convex hull returning just the triangle list.
+// Each triangle is an array of 3 vertex indices into the pts array.
+// Triangles are oriented with outward normals.
+static vector<array<int,3>> build_convex_hull(const vector<coord3d>& pts)
+{
+  int n = (int)pts.size();
+  if(n < 4) return {};
+
+  // Find 4 non-coplanar points for initial tetrahedron
+  int p0 = 0, p1 = -1, p2 = -1, p3 = -1;
+
+  // Find p1: furthest from p0
+  double best = 0;
+  for(int i = 1; i < n; i++){
+    double d = (pts[i] - pts[p0]).dot(pts[i] - pts[p0]);
+    if(d > best){ best = d; p1 = i; }
+  }
+  if(p1 < 0) return {};
+
+  // Find p2: furthest from line p0-p1
+  coord3d u01 = pts[p1] - pts[p0];
+  double u01_len2 = u01.dot(u01);
+  best = 0;
+  for(int i = 0; i < n; i++){
+    if(i == p0 || i == p1) continue;
+    coord3d v = pts[i] - pts[p0];
+    double proj = v.dot(u01) / u01_len2;
+    coord3d perp = v - u01 * proj;
+    double d = perp.dot(perp);
+    if(d > best){ best = d; p2 = i; }
+  }
+  if(p2 < 0) return {};
+
+  // Find p3: furthest from plane p0-p1-p2
+  coord3d normal = (pts[p1] - pts[p0]).cross(pts[p2] - pts[p0]);
+  double nlen = normal.norm();
+  if(nlen < 1e-15) return {};
+  normal /= nlen;
+  best = 0;
+  for(int i = 0; i < n; i++){
+    if(i == p0 || i == p1 || i == p2) continue;
+    double d = fabs((pts[i] - pts[p0]).dot(normal));
+    if(d > best){ best = d; p3 = i; }
+  }
+  if(p3 < 0) return {};
+
+  // Build initial tetrahedron with outward-facing triangles
+  coord3d centroid = (pts[p0] + pts[p1] + pts[p2] + pts[p3]) / 4.0;
+
+  auto make_outward = [&](int a, int b, int c) -> array<int,3> {
+    coord3d fn = (pts[b] - pts[a]).cross(pts[c] - pts[a]);
+    coord3d fc = (pts[a] + pts[b] + pts[c]) / 3.0 - centroid;
+    if(fn.dot(fc) < 0) return {a, c, b};  // flip
+    return {a, b, c};
+  };
+
+  vector<array<int,3>> tris;
+  tris.push_back(make_outward(p0, p1, p2));
+  tris.push_back(make_outward(p0, p1, p3));
+  tris.push_back(make_outward(p0, p2, p3));
+  tris.push_back(make_outward(p1, p2, p3));
+
+  // Track which vertices are on the hull
+  vector<bool> on_hull(n, false);
+  on_hull[p0] = on_hull[p1] = on_hull[p2] = on_hull[p3] = true;
+
+  // Incrementally add each remaining vertex
+  for(int i = 0; i < n; i++){
+    if(on_hull[i]) continue;
+    const coord3d& p = pts[i];
+
+    // Find visible faces (point is in front of the face)
+    vector<int> visible;
+    for(int f = 0; f < (int)tris.size(); f++){
+      coord3d fn = (pts[tris[f][1]] - pts[tris[f][0]]).cross(pts[tris[f][2]] - pts[tris[f][0]]);
+      if(fn.dot(p - pts[tris[f][0]]) > 1e-14 * fn.norm())
+        visible.push_back(f);
+    }
+    if(visible.empty()) continue;  // inside hull
+
+    on_hull[i] = true;
+
+    // Find horizon edges: edges shared between one visible and one invisible face
+    // An edge (a,b) in a visible triangle: check if the reverse edge (b,a) is in
+    // any visible triangle. If not, it's a horizon edge.
+    set<int> vis_set(visible.begin(), visible.end());
+
+    // Build directed edge → face map for visible faces
+    map<pair<int,int>, int> edge_face;
+    for(int fi : visible){
+      auto& t = tris[fi];
+      for(int j = 0; j < 3; j++)
+        edge_face[{t[j], t[(j+1)%3]}] = fi;
+    }
+
+    // Horizon edges: directed edges of visible faces whose reverse is NOT in a visible face
+    vector<pair<int,int>> horizon;
+    for(auto& [edge, fi] : edge_face){
+      if(edge_face.find({edge.second, edge.first}) == edge_face.end())
+        horizon.push_back(edge);
+    }
+
+    // Remove visible faces (in reverse order to preserve indices)
+    sort(visible.rbegin(), visible.rend());
+    for(int fi : visible)
+      tris.erase(tris.begin() + fi);
+
+    // Add new faces connecting point i to each horizon edge
+    for(auto& [a, b] : horizon)
+      tris.push_back({i, a, b});  // a,b is CCW from outside of invisible neighbor,
+                                   // so i,a,b has outward normal (away from hull interior)
+  }
+
+  return tris;
+}
+
+int Deltahedron::project_onto_convex_hull(vector<coord3d>& pts) const
+{
+  // 1. Identify concave vertices
+  vector<int> concave;
+  for(int v = 0; v < N; v++){
+    auto vd = VertexHData::compute_h(*this, pts, v);
+    if(vd.valid && vd.h < 0) concave.push_back(v);
+  }
+  if(concave.empty()) return 0;
+
+  // 2. Build convex hull
+  auto tris = build_convex_hull(pts);
+  if(tris.empty()) return 0;
+
+  // 3. For each concave vertex, project onto nearest hull face
+  for(int v : concave){
+    double best_dist2 = 1e30;
+    coord3d best_pt;
+    for(auto& tri : tris){
+      coord3d cp = closest_point_on_triangle(pts[v], pts[tri[0]], pts[tri[1]], pts[tri[2]]);
+      double d2 = (cp - pts[v]).dot(cp - pts[v]);
+      if(d2 < best_dist2){
+        best_dist2 = d2;
+        best_pt = cp;
+      }
+    }
+    pts[v] = best_pt;
+  }
+
+  return (int)concave.size();
+}
+
+const char* opt_result_name(OptResult r) {
+  switch(r) {
+    case OptResult::CONVERGED:        return "CONVERGED";
+    case OptResult::STAGNATED:        return "STAGNATED";
+    case OptResult::BUDGET_EXHAUSTED: return "BUDGET_EXHAUSTED";
+    case OptResult::CONVEXITY_STUCK:  return "CONVEXITY_STUCK";
+  }
+  return "UNKNOWN";
+}
+
+const char* PipelineDiag::flag_name(uint32_t f) {
+  switch(f) {
+    case REFLECT_CYCLING_STEP:  return "reflect_cycling_step";
+    case HULL_USED_STEP:        return "hull_used_step";
+    case HULL_CYCLING_STEP:     return "hull_cycling_step";
+    case CONVEXITY_FAIL_STEP:   return "cvx_fail_step";
+    case PATCH_CYCLING:         return "patch_cycling";
+    case STAG_STEP:             return "stag_step";
+    case REFLECT_CYCLING_FINAL: return "reflect_cycling_final";
+    case HULL_USED_FINAL:       return "hull_used_final";
+    case HULL_CYCLING_FINAL:    return "hull_cycling_final";
+    case STAG_FINAL:            return "stag_final";
+    case STAG_CONSTRAINED:      return "stag_constrained";
+    case BUDGET_CONSTRAINED:    return "budget_constrained";
+    case NEG_CURVATURE:         return "neg_curvature";
+    case TR_BOUNDARY:           return "tr_boundary";
+    case STEP_REJECTED:         return "step_rejected";
+    case CVX_REJECTED:          return "cvx_rejected";
+    case LBFGS_RESET:           return "lbfgs_reset";
+    case HAS_F_RING:            return "has_f_ring";
+  }
+  return "unknown";
+}
+
+OptResult Deltahedron::optimize(const vector<coord3d>& initial_geometry, double target_L,
+                                double grad_tol, const vector<bool>& fixed,
+                                long long max_work, double angle_tol)
 {
   assert((int)initial_geometry.size() == N);
   assert(fixed.empty() || (int)fixed.size() == N);
   points = initial_geometry;
   const bool has_fixed = !fixed.empty();
+  opt_diag_flags = 0;  // Reset per-call optimizer diagnostics
 
   // Cache edge list (avoid recomputing on every energy evaluation)
   vector<edge_t> edges = undirected_edges();
@@ -2563,10 +2918,8 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
       // Convergence check
       double gmax = compute_gmax(grad);
       if(gmax < grad_tol){ converged = true; break; }
-      if(angle_tol > 0){
-        if(max_angle_relerr() < angle_tol && count_concave() == 0){ converged = true; break; }
-        if(stag_count >= stag_window) break;
-      }
+      if(angle_tol > 0 && max_angle_relerr() < angle_tol && count_concave() == 0){ converged = true; break; }
+      if(stag_count >= stag_window) break;  // no progress for 50 iterations
 
       // Ensure descent direction
       double slope = vec_dot(grad, dir);
@@ -2626,10 +2979,8 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
       // Convergence check
       double gmax = compute_gmax(grad);
       if(gmax < grad_tol){ converged = true; break; }
-      if(angle_tol > 0){
-        if(max_angle_relerr() < angle_tol && count_concave() == 0){ converged = true; break; }
-        if(stag_count >= stag_window) break;
-      }
+      if(angle_tol > 0 && max_angle_relerr() < angle_tol && count_concave() == 0){ converged = true; break; }
+      if(stag_count >= stag_window) break;  // no progress for 50 iterations
 
       // Two-loop recursion to compute search direction
       dir = grad;  // q = grad
@@ -2662,6 +3013,7 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
       // Safeguard: if not a descent direction, reset to -grad
       double slope = vec_dot(grad, dir);
       if(slope > 0){
+        opt_diag_flags |= PipelineDiag::LBFGS_RESET;
         for(int i = 0; i < N; i++) dir[i] = grad[i] * (-1.0);
         if(has_fixed) for(int i = 0; i < N; i++) if(fixed[i]) dir[i] = coord3d(0,0,0);
         S.clear(); Y.clear(); rho_hist.clear();
@@ -2757,10 +3109,8 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
       // Convergence check
       double gmax = compute_gmax(grad);
       if(gmax < grad_tol){ converged = true; break; }
-      if(angle_tol > 0){
-        if(max_angle_relerr() < angle_tol && count_concave() == 0){ converged = true; break; }
-        if(stag_count >= stag_window) break;
-      }
+      if(angle_tol > 0 && max_angle_relerr() < angle_tol && count_concave() == 0){ converged = true; break; }
+      if(stag_count >= stag_window) break;  // no progress for 50 iterations
 
       // --- Steihaug CG to solve trust-region subproblem ---
       // Approximately solve: min_z  g^T z + 0.5 z^T H z,  ||z|| <= Delta
@@ -2785,6 +3135,7 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
 
         if(kappa <= 1e-15 * rr){
           // Negative or zero curvature: step to trust-region boundary along d
+          opt_diag_flags |= PipelineDiag::NEG_CURVATURE;
           double zz = vec_dot(z, z);
           double zd = vec_dot(z, d_cg);
           double dd = vec_dot(d_cg, d_cg);
@@ -2807,6 +3158,7 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
           double z_new_norm = vec_norm(z_new);
           if(z_new_norm >= Delta){
             // Truncate to boundary
+            opt_diag_flags |= PipelineDiag::TR_BOUNDARY;
             double zz = vec_dot(z, z);
             double zd = vec_dot(z, d_cg);
             double dd = vec_dot(d_cg, d_cg);
@@ -2859,8 +3211,10 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
       if(accepted && opt_convex_constraint){
         compute_h_values(*this, x_trial, h_trial, fixed);
         for(int v = 0; v < N && accepted; v++)
-          if(h_current[v] > 0 && h_trial[v] < 0)
+          if(h_current[v] > 0 && h_trial[v] < 0){
             accepted = false;
+            opt_diag_flags |= PipelineDiag::CVX_REJECTED;
+          }
       }
 
       if(accepted){
@@ -2873,6 +3227,7 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
         if(E_old - E > 1e-15 * max(1.0, fabs(E_old))){ stag_count = 0; stag_E_ref = E; }
         else stag_count++;
       } else {
+        opt_diag_flags |= PipelineDiag::STEP_REJECTED;
         Delta *= 0.25;
         if(Delta < 1e-14 * L) Delta = 1e-14 * L;
         stag_count++;  // rejected step = no progress
@@ -2888,19 +3243,20 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
 
   // Final stats
   final_gmax_L = compute_gmax(grad);
+  bool stagnated = !converged && stag_count >= stag_window;
   if(opt_log)
     fprintf(opt_log, "  %s done: %d iters, E=%.6f gmax*L=%.4e cv=%.4f %s\n",
             method_name, iterations_used, E, final_gmax_L, edge_cv(),
-            converged ? "CONVERGED" : "budget");
+            converged ? "CONVERGED" : stagnated ? "STAGNATED" : "budget");
 
   // Post-optimization strict convexity cleanup.
-  // reflect_concave can disturb angle quality, so CG polish after reflecting.
+  // Hull projection can disturb angle quality, so CG polish after projecting.
   // Skipped when opt_skip_post_reflect is set (caller will handle convexity).
   if(!opt_skip_post_reflect)
   {
-    int total_reflected = reflect_all_concave(points, 0, fixed);
-    if(total_reflected > 0){
-      // Reflection moved vertices — brief CG (Polak-Ribiere) polish to recover angle quality.
+    int total_projected = project_onto_convex_hull(points);
+    if(total_projected > 0){
+      // Projection moved vertices — brief CG (Polak-Ribiere) polish to recover angle quality.
       E = compute_eg(grad);
       zero_fixed_grad(grad);
       vector<coord3d> dir_r(N), grad_old_r(N), x_trial_r(N);
@@ -2923,18 +3279,21 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
         for(int i = 0; i < N; i++) dir_r[i] = grad[i] * (-1.0) + dir_r[i] * beta;
         if(has_fixed) for(int i = 0; i < N; i++) if(fixed[i]) dir_r[i] = coord3d(0,0,0);
       }
-      // Final reflect pass in case CG polish re-introduced barely-concave vertices
-      reflect_all_concave(points, 0, fixed);
+      // Final projection in case CG polish re-introduced barely-concave vertices
+      project_onto_convex_hull(points);
       if(opt_log)
-        fprintf(opt_log, "  Post-reflect polish: reflected=%d ang=%.4e\n",
-                total_reflected, max_angle_relerr());
+        fprintf(opt_log, "  Post-project polish: projected=%d ang=%.4e\n",
+                total_projected, max_angle_relerr());
     }
   }
 
   final_angle_relerr = max_angle_relerr();
   final_n_concave = count_concave();
+  final_opt_result = converged ? OptResult::CONVERGED
+                   : stagnated ? OptResult::STAGNATED
+                               : OptResult::BUDGET_EXHAUSTED;
 
-  return converged;
+  return final_opt_result;
 }
 
 double Deltahedron::gradient_check(const vector<coord3d>& geometry, double target_L, double eps) const
