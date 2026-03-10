@@ -25,8 +25,9 @@ static vector<coord3d> centroid_points(std::span<const coord3d> points, const ve
 }
 
 double Polyhedron::surface_area() const {
-  vector<tri_t>  tris(centroid_triangulation(faces));
-  vector<coord3d> pts(centroid_points(points, faces));
+  auto fs = faces();
+  vector<tri_t>  tris(centroid_triangulation(fs));
+  vector<coord3d> pts(centroid_points(points, fs));
 
   double A = 0;
   for (const auto& tri : tris)
@@ -38,8 +39,9 @@ double Polyhedron::surface_area() const {
 // For a flat triangle, a·n̂ = b·n̂ = c·n̂ (constant on plane), so using
 // any vertex gives the exact integral over the triangle.
 double Polyhedron::volume_divergence() const {
-  vector<tri_t>   tris(centroid_triangulation(faces));
-  vector<coord3d> pts(centroid_points(points, faces));
+  auto fs = faces();
+  vector<tri_t>   tris(centroid_triangulation(fs));
+  vector<coord3d> pts(centroid_points(points, fs));
 
   double V = 0;
   for (const auto& t : tris) {
@@ -52,8 +54,9 @@ double Polyhedron::volume_divergence() const {
 // Signed volume via signed tetrahedra from the origin:
 // V = (1/6) Σ a·(b×c) for each triangle (a,b,c).
 double Polyhedron::volume_tetra() const {
-  vector<tri_t>   tris(centroid_triangulation(faces));
-  vector<coord3d> pts(centroid_points(points, faces));
+  auto fs = faces();
+  vector<tri_t>   tris(centroid_triangulation(fs));
+  vector<coord3d> pts(centroid_points(points, fs));
 
   double V = 0;
   for (const auto& t : tris) {
@@ -188,7 +191,7 @@ Polyhedron Polyhedron::incremental_convex_hull() const {
   faces.reserve(output.size());
   for (const tri_t& t : output)
     faces.push_back(tri_t(nodemap[t[0]], nodemap[t[1]], nodemap[t[2]]));
-  return Polyhedron(g, remaining_points, 3, faces);
+  return Polyhedron(g, remaining_points, 3);
 }
 
 struct sort_ccw_coord3d {
@@ -246,27 +249,27 @@ static void orient_polyhedron_neighbours(Polyhedron& P)
   }
 }
 
-Polyhedron::Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_, const int face_max_, const vector<face_t> faces_) :
-  PlanarGraph(G), face_max(face_max_), points(points_), faces(faces_)
+Polyhedron::Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_, const int face_max_) :
+  PlanarGraph(G), face_max(face_max_), points(points_)
 {
   if(!is_consistently_oriented()) orient_polyhedron_neighbours(*this);
 
-  if(faces.size() == 0){
-    faces = compute_faces(face_max);
+  if(face_max == INT_MAX){
+    auto fs = faces();
     face_max = 0;
-    for(int i=0;i<faces.size();i++) if(faces[i].size() > face_max) face_max = faces[i].size();
+    for(auto& f: fs) if(int(f.size()) > face_max) face_max = f.size();
   }
 }
 
-Polyhedron::Polyhedron(const PlanarGraph& G, std::span<coord3d> points_, const int face_max_, const vector<face_t> faces_) :
-  PlanarGraph(G), face_max(face_max_), points(points_), faces(faces_)
+Polyhedron::Polyhedron(const PlanarGraph& G, std::span<coord3d> points_, const int face_max_) :
+  PlanarGraph(G), face_max(face_max_), points(points_)
 {
   if(!is_consistently_oriented()) orient_polyhedron_neighbours(*this);
 
-  if(faces.size() == 0){
-    faces = compute_faces(face_max);
+  if(face_max == INT_MAX){
+    auto fs = faces();
     face_max = 0;
-    for(int i=0;i<faces.size();i++) if(faces[i].size() > face_max) face_max = faces[i].size();
+    for(auto& f: fs) if(int(f.size()) > face_max) face_max = f.size();
   }
 }
 
@@ -359,13 +362,14 @@ coord3d Polyhedron::width_height_depth() const {
 
 
 
-Polyhedron Polyhedron::dual() const 
+Polyhedron Polyhedron::dual() const
 {
   PlanarGraph d(dual_graph());
+  auto fs = faces();
 
   vector<coord3d> coordinates(d.N);
   for(node_t u=0;u<d.N;u++){
-    const face_t& f = faces[u];
+    const face_t& f = fs[u];
     coord3d avg;
     for(auto v: f) avg += points[v];
     coordinates[u] = avg/double(f.size());
@@ -375,51 +379,43 @@ Polyhedron Polyhedron::dual() const
 }
 
 
-Polyhedron Polyhedron::leapfrog_dual() const 
+Polyhedron Polyhedron::leapfrog_dual() const
 {
   assert(is_consistently_oriented());
-  size_t Nf = faces.size();
+  auto fs = faces();
+  size_t Nf = fs.size();
 
   Polyhedron Plf(Graph(N+Nf));
   Plf.points.owned.resize(N+Nf);
   Plf.points.repoint();
-   
+
   // Start with all the existing nodes
   for(node_t u=0;u<N;u++){
     Plf.assign_row(u, (*this)[u]);
     Plf.points[u]     = points[u];
   }
 
-  // The result is a deltahedron: a polyhedron consisting of
-  // only triangles. The first Nv points are the original vertices,
-  // the last Nf are the midpoints of the original faces.
-  int n_tris = 0;
-  for(auto f: faces) n_tris += f.size();
-  Plf.faces = vector<face_t>(n_tris);
-
-  // Now connect new face-center nodes in oriented order
-  for(int i=0;i<faces.size();i++){
-    const face_t &f  = faces[i];
+  // Now connect new face-center nodes in oriented order.
+  // The result is a deltahedron: all triangular faces.
+  for(int i=0;i<int(Nf);i++){
+    const face_t &f  = fs[i];
     node_t c = N+i;                // Face-center node
-    
-    // cerr << "new node " << c << " at face " << f << "\n";
+
     coord3d xc = {0,0,0};
     size_t   d = f.size();
-    for(int j=0;j<d;j++){
+    for(int j=0;j<int(d);j++){
       node_t u = f[j], v = f[(j+1)%f.size()];
 
       // Center node position is middle of face
       xc += points[u]/d;
 
-      // Add edge mumble mumble
+      // Add edge
       Plf.insert_edge(arc_t{v,c},u,-1);
-
-      // Add triangle
-      Plf.faces[c] = tri_t{u,v,c};
     }
     Plf.points[c] = xc;
   }
 
+  Plf.face_max = 3;
   return Plf;
 }
 
@@ -483,7 +479,7 @@ bool Polyhedron::optimize(int opt_method, double ftol)
 }
 
 bool Polyhedron::is_triangulation() const {
-  for(int i=0;i<faces.size();i++) if(faces[i].size()!=3) return false;
+  for(auto& f: faces()) if(f.size()!=3) return false;
   return true;
 }
 

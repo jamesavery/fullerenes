@@ -102,9 +102,6 @@ bool extrude(Polyhedron& P, int p) // Requires that P is a triangulation.
   //       My suspicion is that the problem arises from the outer face.
   layout = P.tutte_layout();
 
-  // Update faces
-  // TODO: Replace triangles directly instead of recomputing?
-  P.faces    = P.compute_faces_flat(3,true);
   P.face_max = 3;
 
 

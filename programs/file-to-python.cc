@@ -22,17 +22,18 @@ int main(int ac, char **av)
   vector<int> spiral;
   Tdual.get_spiral(spiral, jumps);
 
+  auto fs = P.faces();
   vector<face_t>
     pentagons(vector<face_t>(12)),
-    hexagons (vector<face_t>(P.faces.size()-12));
+    hexagons (vector<face_t>(fs.size()-12));
 
-  for(int j=0,npent=0,nhex=0;j<P.faces.size();j++)
-    if      (P.faces[j].size() == 5) pentagons[npent++] = P.faces[j];
-    else if (P.faces[j].size() == 6) hexagons [nhex++]  = P.faces[j];  
+  for(int j=0,npent=0,nhex=0;j<int(fs.size());j++)
+    if      (fs[j].size() == 5) pentagons[npent++] = fs[j];
+    else if (fs[j].size() == 6) hexagons [nhex++]  = fs[j];
 
   cerr << "from numpy import array\n\n";
   cerr << "N = " << P.N << ";\n";
-  cerr << "Nf = " << P.faces.size() << ";\n\n";  
+  cerr << "Nf = " << fs.size() << ";\n\n";
   cerr << "spiral       = array(" << spiral << ")\n\n";
   cerr << "spiral_jumps = array(" << jumps << ");\n\n";
   cerr << "neighbours   = array(" << static_cast<const neighbours_t&>(P) << ").reshape(1,N,3);\n\n";

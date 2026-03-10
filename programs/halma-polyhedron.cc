@@ -218,7 +218,7 @@ int main(int ac, char **av)
   HD2.smooth(.8);
   HD2.smooth(.8);
 
-  Polyhedron  PHD(HD.g,HD.points,3,HD.faces());  
+  Polyhedron  PHD(HD.g,HD.points,3);
   //  Polyhedron  PHD2(HD2.g,HD2.points,3,HD2.faces());
   Polyhedron  PH(PHD.dual());
 

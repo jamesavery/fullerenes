@@ -94,7 +94,6 @@ int main(int ac, char **av)
 
   Polyhedron::to_file(D,"output/"+basename+"-dual.mol2");
   
-  D.faces    = D.compute_faces(3);
   D.face_max = 3;
   //   D.optimize();
   output << "PD = " << D << ";\n";

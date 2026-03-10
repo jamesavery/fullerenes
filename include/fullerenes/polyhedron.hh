@@ -13,7 +13,9 @@ using namespace std;
 struct Polyhedron : public PlanarGraph {
   int face_max = INT_MAX;
   Spanify::SpanVector<coord3d> points;
-  vector<face_t> faces;
+
+  // Compute faces on demand from oriented adjacency (like Triangulation::triangles()).
+  vector<face_t> faces() const { return compute_faces(face_max); }
 
   //---- Constructors ----//
   // Default constructor
@@ -21,12 +23,10 @@ struct Polyhedron : public PlanarGraph {
   Polyhedron(const int face_max) : face_max(face_max) {}
 
   // Owning: copies points into owned storage
-  Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_ = vector<coord3d>(), const int face_max = INT_MAX,
-	     const vector<face_t> faces = vector<face_t>());
+  Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_ = vector<coord3d>(), const int face_max = INT_MAX);
 
   // View: uses external coordinate memory (caller manages lifetime)
-  Polyhedron(const PlanarGraph& G, std::span<coord3d> points_, const int face_max = INT_MAX,
-	     const vector<face_t> faces = vector<face_t>());
+  Polyhedron(const PlanarGraph& G, std::span<coord3d> points_, const int face_max = INT_MAX);
 
   // Create polyhedron from point collection, assuming shortest distance is approximate bond length
   Polyhedron(const vector<coord3d>& xs, double tolerance = 1.2);
@@ -98,7 +98,8 @@ struct Polyhedron : public PlanarGraph {
   friend ostream& operator<<(ostream& s, const Polyhedron& P){
     vector<node_t> reachable_points;
     for(node_t u=0;u<P.N;u++) if(P.degree(u)!=0) reachable_points.push_back(u);
-    s << "{" << (reachable_points+1) << ", " << P.points << ", " << (vector<vector<int> >(P.faces.begin(),P.faces.end())+1) << ", " << static_cast<Graph>(P) << "}";
+    auto fs = P.faces();
+    s << "{" << (reachable_points+1) << ", " << P.points << ", " << (vector<vector<int> >(fs.begin(),fs.end())+1) << ", " << static_cast<Graph>(P) << "}";
     return s;
   }
 

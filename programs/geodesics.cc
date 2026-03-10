@@ -542,7 +542,7 @@ int main(int ac, char **argv)
       ofstream output_file("output/geodesics.m");
       LIST_OPEN = '{'; LIST_CLOSE = '}';
       output_file << "neighbours = " << static_cast<const neighbours_t&>(dP) << "+1;\n"
-      		  << "faces      = " << dP.faces      << "+1;\n"
+      		  << "faces      = " << dP.faces()      << "+1;\n"
 		  << "points     = " << dP.points     << ";\n";
 
       dualG = FullereneDual(dP);

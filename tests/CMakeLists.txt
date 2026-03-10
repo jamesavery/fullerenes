@@ -52,3 +52,7 @@ add_test(NAME csr-test COMMAND csr-test)
 add_executable(dense-graph-test dense-graph-test.cc)
 target_link_libraries(dense-graph-test fullerenes GTest::GTest GTest::Main)
 add_test(NAME dense-graph-test COMMAND dense-graph-test)
+
+add_executable(view-test view-test.cc)
+target_link_libraries(view-test fullerenes GTest::GTest GTest::Main)
+add_test(NAME view-test COMMAND view-test)

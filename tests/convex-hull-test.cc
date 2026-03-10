@@ -35,8 +35,9 @@ TEST(ConvexHull, IcosahedronIsOriented) {
 TEST(ConvexHull, FacesAreTriangles) {
   Polyhedron CH = Polyhedron::C20().convex_hull();
 
-  EXPECT_FALSE(CH.faces.empty());
-  for (const auto& f : CH.faces)
+  auto fs = CH.faces();
+  EXPECT_FALSE(fs.empty());
+  for (const auto& f : fs)
     EXPECT_EQ(f.size(), 3u);
 }
 
@@ -46,6 +47,6 @@ TEST(ConvexHull, EulerFormula) {
 
   int V = CH.N;
   int E = CH.count_edges();
-  int F = CH.faces.size();
+  int F = CH.faces().size();
   EXPECT_EQ(V - E + F, 2);
 }

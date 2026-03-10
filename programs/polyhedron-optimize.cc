@@ -86,7 +86,6 @@ int main(int ac, char **av)
   output << "P = " << P << ";\n";
 
   Polyhedron D(P.dual());
-  D.faces    = D.compute_faces(3);
   D.face_max = 3;
   D.optimize();
   output << "PD = " << D << ";\n";

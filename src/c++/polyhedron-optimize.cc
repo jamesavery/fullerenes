@@ -16,6 +16,7 @@ using namespace std;
 struct params_t
 {
   Polyhedron *P;
+  vector<face_t> *faces;  // cached faces (topology doesn't change during optimization)
   map<edge_t, double> *zero_values_dist;
   vector<double> *zero_values_dihedral;
   vector<double> *force_constants_dist;
@@ -62,16 +63,15 @@ double polyhedron_pot(const gsl_vector* coordinates, void* parameters)
   // it->first is the face size
   // iterate over faces of equal size
   if(params.optimize_angles){
-    for(int i=0;i<P.faces.size();i++){
-      const face_t &f(P.faces[i]);
+    const auto& faces = *params.faces;
+    for(int i=0;i<int(faces.size());i++){
+      const face_t &f(faces[i]);
       const int face_size = f.size();
-    
-//      cout << " face of size-" << it->first << ": " << *jt << endl;
+
       // iterate over nodes in face
       for (int i=0; i<face_size; ++i)
       {
         int f0 = f[(i-1+face_size)%face_size], f1 = f[i], f2 = f[(i+1)%face_size];
-        // cout << " 3 nodes: " << f[(i+ it->first -1) % it->first] << ", " << f[i] <<", " <<  f[(i+1) % it->first] << endl;
         const double ax = gsl_vector_get(coordinates, 3*f0    );
         const double ay = gsl_vector_get(coordinates, 3*f0 + 1);
         const double az = gsl_vector_get(coordinates, 3*f0 + 2);
@@ -84,7 +84,6 @@ double polyhedron_pot(const gsl_vector* coordinates, void* parameters)
 
         const double angle_beta = coord3d::angle(coord3d(ax,ay,az) - coord3d(bx,by,bz), coord3d(cx,cy,cz) - coord3d(bx,by,bz));
         potential_energy += 0.5 * force_constants_angle[1] * pow(angle_beta - M_PI*(1.0-2.0/double(face_size)),2);
-        // cout << angle_beta << ", " << M_PI*(1.0-2.0/it->first) << ", " << it->first << endl;
       }
     }
   }
@@ -170,15 +169,14 @@ void polyhedron_grad(const gsl_vector* coordinates, void* parameters, gsl_vector
 
   //iterate over all faces
   if(params.optimize_angles){
-    for(int i=0;i<P.faces.size();i++){
-      const face_t &f(P.faces[i]);
+    const auto& faces = *params.faces;
+    for(int i=0;i<int(faces.size());i++){
+      const face_t &f(faces[i]);
       const int face_size = f.size();
-    
-      // cout << " face of size-" << it->first << ": " << *jt << endl;
+
       // iterate over nodes in face
       for (int i=0; i<face_size; ++i){
         int f0 = f[(i-1+face_size)%face_size], f1 = f[i], f2 = f[(i+1)%face_size];
-        //        cout << " 3 nodes: " << (*jt)[(i+ it->first -1) % it->first] << ", " << (*jt)[i] <<", " <<  (*jt)[(i+1) % it->first] << endl;
         const double ax = gsl_vector_get(coordinates,   3*f0);
         const double ay = gsl_vector_get(coordinates,   3*f0 + 1);
         const double az = gsl_vector_get(coordinates,   3*f0 + 2);
@@ -188,14 +186,12 @@ void polyhedron_grad(const gsl_vector* coordinates, void* parameters, gsl_vector
         const double cx = gsl_vector_get(coordinates,   3*f2   );
         const double cy = gsl_vector_get(coordinates,   3*f2 + 1);
         const double cz = gsl_vector_get(coordinates,   3*f2 + 2);
-        
+
         coord3d a(coord3d(ax,ay,az) - coord3d(bx,by,bz)), c(coord3d(cx,cy,cz) - coord3d(bx,by,bz)), da, dc;
         coord3d::dangle(a, c, da, dc);
-        
+
         const double angle_beta = coord3d::angle(coord3d(ax,ay,az) - coord3d(bx,by,bz), coord3d(cx,cy,cz) - coord3d(bx,by,bz));
-        //        cout << angle_beta << ", " << M_PI*(1.0-2.0/it->first) << ", " << it->first << endl;
-        //        cout << "da: " << da << endl;
-        
+
         derivatives[f0] += da *       (angle_beta - M_PI*(1.0-2.0/face_size)) * force_constants_angle[f1];
         derivatives[f1] += -(da+dc) * (angle_beta - M_PI*(1.0-2.0/face_size)) * force_constants_angle[f1];
         derivatives[f2] += dc *       (angle_beta - M_PI*(1.0-2.0/face_size)) * force_constants_angle[f1];
@@ -373,8 +369,11 @@ bool Polyhedron::optimize_other(bool optimize_angles, map<edge_t, double> zero_v
   vector<double> force_constants_angle(2 * edges.size(), 200.0); // FIXME possibly change later // only for cubic graphs
   vector<double> force_constants_dihedral(N, 50.0);
 
+  auto cached_faces = faces();
+
   params_t params;
-  params.P = this; 
+  params.P = this;
+  params.faces = &cached_faces;
   params.zero_values_dist = &zero_values_dist;
   params.zero_values_dihedral = &zero_values_dihedral;
   params.force_constants_dist = &force_constants_dist;
