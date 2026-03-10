@@ -54,13 +54,14 @@ Polyhedron poly(PlanarGraph(view),
 
 ```cpp
 Graph G = FullereneGraph::C20();
-G.owned_values.empty();   // false -> owned
+G.owns_memory();           // true -> owned
 
 Graph view(N, dmax, span_vals, span_deg);
-view.owned_values.empty(); // true -> view
+view.owns_memory();        // false -> view
 
 Polyhedron P = Polyhedron::C20();
-P.points.owned.empty();    // false -> owned points
+P.owns_memory();           // true -> owns adjacency
+P.points.owns_memory();   // true -> owns coordinates
 ```
 
 ## Design

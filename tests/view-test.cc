@@ -19,7 +19,7 @@ TEST(GraphView, OwnedGraphBasics) {
     Graph G = FullereneGraph::C20();
     EXPECT_EQ(G.N, 20);
     EXPECT_EQ(G.dmax, 3);
-    EXPECT_FALSE(G.owned_values.empty());  // owns its data
+    EXPECT_TRUE(G.owns_memory());  // owns its data
 
     for (node_t u = 0; u < G.N; u++)
         EXPECT_EQ(G.degree(u), 3);
@@ -33,7 +33,7 @@ TEST(GraphView, ViewFromExternalMemory) {
                std::span<node_t>(owned.owned_values),
                std::span<uint8_t>(owned.owned_deg));
 
-    EXPECT_TRUE(view.owned_values.empty());  // view, not owned
+    EXPECT_FALSE(view.owns_memory());  // view, not owned
     EXPECT_EQ(view.N, 20);
     EXPECT_EQ(view.dmax, 3);
 
@@ -75,11 +75,11 @@ TEST(GraphView, CopyOfViewIsOwned) {
 
     // Copy a view -> produces an owned copy
     Graph copy(view);
-    EXPECT_TRUE(copy.owned_values.empty());  // copy of view is still a view
+    EXPECT_FALSE(copy.owns_memory());  // copy of view is still a view
 
     // But constructing via base_t makes an owned copy
     Graph deep_copy(static_cast<const Graph::base_t&>(view));
-    EXPECT_FALSE(deep_copy.owned_values.empty());  // owned copy
+    EXPECT_TRUE(deep_copy.owns_memory());  // owned copy
     EXPECT_EQ(deep_copy.degree(0), view.degree(0));
 }
 
@@ -90,7 +90,7 @@ TEST(GraphView, MovePreservesView) {
                std::span<uint8_t>(owned.owned_deg));
 
     Graph moved(std::move(view));
-    EXPECT_TRUE(moved.owned_values.empty());  // still a view
+    EXPECT_FALSE(moved.owns_memory());  // still a view
     EXPECT_EQ(moved.N, 20);
     EXPECT_EQ(moved.degree(0), 3);
 }
@@ -109,7 +109,7 @@ TEST(HierarchyView, CubicGraphFromViewGraph) {
     CubicGraph cg(view);
     // CubicGraph copies the view (via PlanarGraph -> Graph copy ctor)
     // Since owned_values of view is empty, copy is also a view
-    EXPECT_TRUE(cg.owned_values.empty());
+    EXPECT_FALSE(cg.owns_memory());
     EXPECT_EQ(cg.N, 20);
     EXPECT_EQ(cg.dmax, 3);
 }
@@ -121,7 +121,7 @@ TEST(HierarchyView, FullereneGraphFromViewGraph) {
                std::span<uint8_t>(owned.owned_deg));
 
     FullereneGraph fg(view);
-    EXPECT_TRUE(fg.owned_values.empty());
+    EXPECT_FALSE(fg.owns_memory());
     EXPECT_EQ(fg.N, 20);
     EXPECT_TRUE(fg.is_consistently_oriented());
 }
@@ -133,7 +133,7 @@ TEST(HierarchyView, FullereneGraphFromViewGraph) {
 TEST(PolyhedronView, OwnedPolyhedron) {
     Polyhedron P = Polyhedron::C20();
     EXPECT_EQ(P.N, 20);
-    EXPECT_FALSE(P.points.owned.empty());  // owns coordinates
+    EXPECT_TRUE(P.points.owns_memory());  // owns coordinates
 
     auto fs = P.faces();
     EXPECT_EQ(int(fs.size()), 12);  // C20 has 12 pentagonal faces
@@ -147,7 +147,7 @@ TEST(PolyhedronView, ViewCoordinates) {
     std::span<coord3d> pts_span(owned.points.owned.data(), owned.points.owned.size());
     Polyhedron view(static_cast<const PlanarGraph&>(owned), pts_span, 6);
 
-    EXPECT_TRUE(view.points.owned.empty());  // coordinate view
+    EXPECT_FALSE(view.points.owns_memory());  // coordinate view
     EXPECT_EQ(view.N, 20);
 
     // Coordinates are the same
@@ -203,7 +203,7 @@ TEST(BatchSlicing, GraphBatch) {
         std::span<uint8_t> degs(all_deg.data() + b * N, N);
 
         Graph view(N, dmax, vals, degs);
-        EXPECT_TRUE(view.owned_values.empty());
+        EXPECT_FALSE(view.owns_memory());
         EXPECT_EQ(view.N, N);
 
         // Run graph algorithms on the view
@@ -213,7 +213,7 @@ TEST(BatchSlicing, GraphBatch) {
 
         // Construct fullerene graph from the view
         FullereneGraph fg_view(view);
-        EXPECT_TRUE(fg_view.owned_values.empty());
+        EXPECT_FALSE(fg_view.owns_memory());
 
         // Spiral extraction works on view
         vector<int> spiral;
@@ -254,8 +254,8 @@ TEST(BatchSlicing, PolyhedronBatch) {
         Graph g_view(N, dmax, vals, degs);
         Polyhedron poly(PlanarGraph(g_view), pts, 6);
 
-        EXPECT_TRUE(poly.owned_values.empty());
-        EXPECT_TRUE(poly.points.owned.empty());
+        EXPECT_FALSE(poly.owns_memory());
+        EXPECT_FALSE(poly.points.owns_memory());
         EXPECT_EQ(poly.N, N);
 
         // Geometry works on the view
@@ -307,7 +307,7 @@ TEST(TriangulationView, FromGraphView) {
                std::span<uint8_t>(T_owned.owned_deg));
 
     Triangulation T_view(view);
-    EXPECT_TRUE(T_view.owned_values.empty());
+    EXPECT_FALSE(T_view.owns_memory());
     EXPECT_EQ(T_view.N, T_owned.N);
 
     // triangles() works on the view
@@ -338,7 +338,7 @@ TEST(GraphFill, FillConstructor) {
 TEST(GraphView, EmptyGraph) {
     Graph G;
     EXPECT_EQ(G.N, 0);
-    EXPECT_TRUE(G.owned_values.empty());
+    EXPECT_FALSE(G.owns_memory());
     EXPECT_TRUE(G.values.empty());
 }
 
@@ -349,5 +349,5 @@ TEST(GraphView, EmptyView) {
                std::span<node_t>(values),
                std::span<uint8_t>(deg));
     EXPECT_EQ(view.N, 0);
-    EXPECT_TRUE(view.owned_values.empty());
+    EXPECT_FALSE(view.owns_memory());
 }

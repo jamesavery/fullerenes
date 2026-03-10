@@ -32,6 +32,8 @@ struct Graph : Spanify::DenseGraph<node_t> {
     deg = std::span<uint8_t>(owned_deg.data(), owned_deg.size());
   }
 
+  bool owns_memory() const { return !owned_values.empty(); }
+
   // Bring base push_back(K u, K v) into scope (otherwise hidden by push_back(vector))
   using base_t::push_back;
 

@@ -84,6 +84,7 @@ struct SpanVector {
 
     size_t size() const { return view.size(); }
     bool empty() const { return view.empty(); }
+    bool owns_memory() const { return !owned.empty(); }
     T* data() { return view.data(); }
     const T* data() const { return view.data(); }
 
