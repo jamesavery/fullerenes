@@ -1,3 +1,148 @@
+# Deltahedron Geometry Pipeline
+
+## Extension Path Pipeline (`fromExtensionPathOptimized`)
+
+Reduces a fullerene to a seed (C20/C28/C30), uses precomputed seed geometry,
+and incrementally expands with per-step optimization. Entry point:
+
+```cpp
+Deltahedron D = Deltahedron::fromExtensionPathOptimized(ep);
+```
+
+### Phase 1: Seed geometry
+
+Precomputed machine-precision coordinates for the dual of C20, C28, or C30.
+These are small (12, 16, 17 vertices) deltahedra with known exact embeddings.
+
+### Phase 2: Per-step expansion loop
+
+For each of ~N/10 expansion steps (L-type, B-type, or F-type):
+
+**a. Place strip vertices.** Compute coordinates for new strip vertices as the
+centroid of their 4 non-strip neighbors. F-ring steps first shift the tp-side
+outward to make room.
+
+**b. Expand topology + lift.** Insert strip into the graph via `rd.expand()`.
+Then push strip vertices outward along the fan normal until their signed height
+h matches the average h of their non-strip neighbors. F-ring steps have exact
+placement and skip all subsequent sub-steps.
+
+**c. Global reflect.** Reflect ALL concave vertices (not just near the strip)
+through their neighbor centroid plane (up to 20 passes). This fixes concavities
+anywhere in the graph before handing off to the optimizer.
+
+**d. Extract patch.** Build a small O(1)-vertex sub-graph containing the strip
+and its immediate neighborhood (ring-1 free, ring-2 boundary).
+
+**e. Patch optimize.** Trust-region Newton with analytical Hessian on the patch
+sub-graph. Energy: E_bond + E_angle + E_conv(k=5). The interior_mask restricts
+E_conv to vertices with complete neighbor sets in the patch (prevents bogus h
+values at truncated boundaries). Max 150 iterations.
+
+**f. Copy patch coords back** to the full vertex array.
+
+**g. Reflect-optimize loop.** Full-graph relaxation using a reflect-then-optimize
+loop (up to 10 rounds):
+
+  1. Reflect all concave vertices (up to 20 passes, warn if limit hit)
+  2. If round > 0 and nothing was reflected, break (stable in convex basin)
+  3. Optimize with pure quality energy (E_bond + E_angle + E_curv, k_conv=0,
+     k_flat=0) to step_tol, using the per-step method (CG or LBFGS).
+     Post-reflect inside optimize() is disabled (skip_post_reflect=true)
+     since the loop handles reflection explicitly.
+
+The key insight: reflect_concave is a basin-switching operation -- a
+discontinuous jump across the centroid plane that no smooth energy penalty
+can replicate. By reflecting FIRST, the optimizer starts in the convex basin
+and converges to the convex minimum.
+
+**h. Copy optimized coords back** to the full vertex array.
+
+### Phase 3: Final optimization
+
+After all expansion steps complete, extract the full graph and run:
+
+**Reflect-optimize loop** (up to 10 rounds, same structure as step g):
+
+  1. Reflect all concave vertices (up to 20 passes)
+  2. If round > 0 and nothing reflected, break
+  3. Optimize to final_tol with final_method (default CG), k_conv=0, k_flat=0
+
+**Constrained Steihaug polish:**
+
+  Optimize to final_tol using Steihaug-Toint with opt_convex_constraint=true.
+  This rejects any trust-region step that would make a currently-convex vertex
+  concave (h >= 0 trust region). k_conv=0 so the Hessian remains pure quality --
+  the constraint is the only convexity mechanism. This prevents the optimizer
+  from regressing to a concave basin during final convergence.
+
+### Energy terms in the pipeline
+
+- **E_bond** = k * sum_edges (|e| - L)^2. Spring energy for uniform edge length.
+- **E_angle** = k * sum_corners (theta - pi/3)^2. Penalty for non-equilateral angles.
+- **E_curv** = k * sum_vertices (K_v - K_target)^2. Gaussian curvature distribution.
+  K_target = pi/3 for degree-5, 0 for degree-6.
+- **E_flat** = k * lambda_min(I_v). Flatness penalty (phase 1 only for cold-start
+  from planar geometry). Always OFF (k_flat=0) in the extension path pipeline.
+- **E_conv**: Convexity penalty. In the patch optimizer (k=5): softplus form
+  E = k * sum_v softplus(-h_v/sigma), which smoothly penalizes concavity with
+  bounded Hessian. In the full-graph optimizer: quadratic form k * sum_v max(0,-h)^2.
+  NOT used in full-graph optimization (k_conv=0) because its Hessian dominates
+  and corrupts angle convergence. Reflect-optimize loops handle convexity instead.
+
+### Energy term abstractions (deltahedron.cc)
+
+Three per-element data structs eliminate code duplication across
+energy_and_gradient, hv_product, and assemble_patch_hessian:
+
+- **VertexHData**: Per-vertex convexity geometry. Two computation levels:
+  compute_h (basic h, n_hat, centroid) and compute_derivs (full dh/dx per
+  neighbor). Methods: dhdx_dot, scatter_dhdx, scatter_d2h_hv,
+  scatter_d2h_blocks, scatter_rank1_blocks.
+
+- **EdgeBondData**: Per-edge bond geometry. compute -> energy,
+  scatter_gradient, scatter_hv, scatter_blocks.
+
+- **CornerAngleData**: Per-triangle-corner angle geometry with arm-space
+  Hessian blocks (Haa, Hcc, Hac). Shared by E_angle and E_curv fan
+  correction. compute -> scatter_gradient, scatter_hv, scatter_blocks.
+
+### Convexity strategy
+
+The pipeline does NOT use E_conv or opt_convex_constraint during per-step
+optimization. Instead:
+
+1. **reflect_concave** handles basin-switching. It moves concave vertices
+   to the convex side of the centroid plane -- a discontinuous operation
+   that cannot be replicated by any smooth energy penalty.
+
+2. **Reflect-optimize loops** iterate: reflect -> optimize -> check. The
+   optimizer starts each round in the convex basin and converges there.
+   Typically 1-2 rounds suffice; hard cases need up to 4.
+
+3. **Constrained Steihaug** at the end prevents regression. The h >= 0
+   trust-region constraint locks in convexity during final polish.
+
+E_conv with large k (e.g. k=100) was tried and abandoned: d^2E/dh^2 = 2k
+dominates the Hessian, destroying angle quality (1.04e-02 vs 7e-12 without).
+
+### Test results
+
+All tests pass with zero concave vertices:
+
+| Test | Isomers | L_cv | h_min | ang range | concave |
+|------|---------|------|-------|-----------|---------|
+| C42 | 45 | 1.6e-6 | +0.028 | [60.00, 60.00] | 0 |
+| C50 | 271 | 9.8e-6 | +0.004 | [60.00, 60.00] | 0 |
+| C500 nanotube | 1 | 5.0e-15 | +0.221 | [60.00, 60.00] | 0 |
+| GC(7,0) C980 | 1 | 4.4e-5 | +0.000 | [60.00, 60.00] | 0 |
+| C300 #24000 | 1 | -- | +0.001 | -- | 0 |
+
+C300 #24000 is the hardest known case (10 deeply concave vertices at step 47).
+The reflect-optimize loop fixes it in 4 rounds with ang=7.3e-12.
+
+---
+
 # Full-Graph Optimizer: CG vs L-BFGS vs Steihaug-Toint
 
 ## Background

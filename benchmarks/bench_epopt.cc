@@ -11,6 +11,7 @@
 #include "fullerenes/deltahedron.hh"
 #include "fullerenes/buckinverse.hh"
 #include "fullerenes/isomerdb.hh"
+#include "fullerenes/stats.hh"
 #include <chrono>
 #include <cmath>
 #include <fstream>
@@ -36,6 +37,8 @@ struct IsomerStats {
     double gmax_L;
     int seed;
     int n_steps;
+    int n_energy, n_grad, n_hv;
+    long long work;          // n_energy + 2*n_grad + 7*n_hv
 };
 
 static IsomerStats compute_stats(const Deltahedron& D, int idx, int seed, int n_steps) {
@@ -44,17 +47,14 @@ static IsomerStats compute_stats(const Deltahedron& D, int idx, int seed, int n_
     s.seed = seed;
     s.n_steps = n_steps;
 
-    // Edge lengths: CV and max relative error
+    // Edge lengths
     vector<double> edge_lens;
     edge_lens.reserve(D.N * 3);
     for (int u = 0; u < D.N; u++)
-        for (int v : D.nbrs(u))
+        for (int v : D[u])
             if (v > u) edge_lens.push_back((D.points[u] - D.points[v]).norm());
-    double sum = 0, sum2 = 0;
-    for (double l : edge_lens) { sum += l; sum2 += l*l; }
-    int ne = (int)edge_lens.size();
-    double L_mean = sum / ne;
-    s.edge_cv = sqrt(max(0.0, sum2/ne - L_mean*L_mean)) / L_mean;
+    s.edge_cv = cv_twopass(edge_lens);
+    double L_mean = accumulate(edge_lens.begin(), edge_lens.end(), 0.0) / edge_lens.size();
     s.edge_relerr_max = 0;
     for (double l : edge_lens)
         s.edge_relerr_max = max(s.edge_relerr_max, fabs(l - L_mean) / L_mean);
@@ -63,15 +63,15 @@ static IsomerStats compute_stats(const Deltahedron& D, int idx, int seed, int n_
     s.h_min = INFINITY;
     s.n_concave = 0;
     for (int v = 0; v < D.N; v++) {
-        int d = (int)D.degree(v);
+        int d = D.degree(v);
         if (d > 6) continue;
         coord3d centroid(0,0,0);
-        for (int i = 0; i < d; i++) centroid += D.points[D.nbrs(v)[i]];
+        for (int i = 0; i < d; i++) centroid += D.points[D[v][i]];
         centroid /= (double)d;
         coord3d n_fan(0,0,0);
         for (int i = 0; i < d; i++) {
-            coord3d e1 = D.points[D.nbrs(v)[i]] - D.points[v];
-            coord3d e2 = D.points[D.nbrs(v)[(i+1)%d]] - D.points[v];
+            coord3d e1 = D.points[D[v][i]] - D.points[v];
+            coord3d e2 = D.points[D[v][(i+1)%d]] - D.points[v];
             n_fan += e1.cross(e2);
         }
         double n_len = n_fan.norm();
@@ -82,17 +82,17 @@ static IsomerStats compute_stats(const Deltahedron& D, int idx, int seed, int n_
     }
 
     // Triangle angles
+    vector<double> angles;
     s.ang_min = 180; s.ang_max = 0;
-    double asum = 0, asum2 = 0; int na = 0;
     for (const auto& tri : D.triangles())
         for (int c = 0; c < 3; c++) {
             coord3d va = D.points[tri[(c+1)%3]] - D.points[tri[c]];
             coord3d vb = D.points[tri[(c+2)%3]] - D.points[tri[c]];
             double ang = coord3d::angle(va, vb) * 180.0 / M_PI;
-            asum += ang; asum2 += ang*ang; na++;
+            angles.push_back(ang);
             s.ang_min = min(s.ang_min, ang); s.ang_max = max(s.ang_max, ang);
         }
-    s.ang_std = sqrt(max(0.0, asum2/na - (asum/na)*(asum/na)));
+    s.ang_std = stddev_twopass(angles);
     s.ang_relerr_max = max(60.0 - s.ang_min, s.ang_max - 60.0) / 60.0;
 
     return s;
@@ -104,12 +104,14 @@ static void append_jsonl(FILE* f, const IsomerStats& s) {
             "\"edge_cv\":%.6e,\"edge_relerr_max\":%.6e,"
             "\"h_min\":%.6f,\"n_concave\":%d,"
             "\"ang_min\":%.3f,\"ang_max\":%.3f,\"ang_std\":%.6e,\"ang_relerr_max\":%.6e,"
-            "\"gmax_L\":%.6e,\"seed\":%d,\"n_steps\":%d}\n",
+            "\"gmax_L\":%.6e,\"seed\":%d,\"n_steps\":%d,"
+            "\"n_energy\":%d,\"n_grad\":%d,\"n_hv\":%d,\"work\":%lld}\n",
             s.idx, s.ms, s.iters, s.converged ? "true" : "false",
             s.edge_cv, s.edge_relerr_max,
             s.h_min, s.n_concave,
             s.ang_min, s.ang_max, s.ang_std, s.ang_relerr_max,
-            s.gmax_L, s.seed, s.n_steps);
+            s.gmax_L, s.seed, s.n_steps,
+            s.n_energy, s.n_grad, s.n_hv, s.work);
     fflush(f);
 }
 
@@ -128,14 +130,17 @@ static vector<IsomerStats> read_jsonl(const string& path) {
             "\"edge_cv\":%lf,\"edge_relerr_max\":%lf,"
             "\"h_min\":%lf,\"n_concave\":%d,"
             "\"ang_min\":%lf,\"ang_max\":%lf,\"ang_std\":%lf,\"ang_relerr_max\":%lf,"
-            "\"gmax_L\":%lf,\"seed\":%d,\"n_steps\":%d}",
+            "\"gmax_L\":%lf,\"seed\":%d,\"n_steps\":%d,"
+            "\"n_energy\":%d,\"n_grad\":%d,\"n_hv\":%d,\"work\":%lld",
             &s.idx, &s.ms, &s.iters, conv_str,
             &s.edge_cv, &s.edge_relerr_max,
             &s.h_min, &s.n_concave,
             &s.ang_min, &s.ang_max, &s.ang_std, &s.ang_relerr_max,
-            &s.gmax_L, &s.seed, &s.n_steps);
+            &s.gmax_L, &s.seed, &s.n_steps,
+            &s.n_energy, &s.n_grad, &s.n_hv, &s.work);
         if (n >= 13) {
             s.converged = (conv_str[0] == 't');
+            if (n < 19) { s.n_energy = s.n_grad = s.n_hv = 0; s.work = 0; }
             results.push_back(s);
         }
     }
@@ -151,24 +156,19 @@ static void write_json(const char* path, int N, int total_isomers, int stride,
     int dual_N = N/2 + 2;
 
     // Summary statistics
-    double ms_sum = 0, ms_sum2 = 0;
     double iters_sum = 0;
-    double ecv_sum = 0, ecv_sum2 = 0, ecv_max = 0;
-    double ermax_max = 0;
+    double ecv_max = 0, ermax_max = 0;
     double hmin_min = INFINITY;
     int concave_total = 0, concave_isomers = 0;
     double amin_min = 180, amax_max = 0;
-    double astd_sum = 0, astd_sum2 = 0, astd_max = 0;
-    double armax_max = 0;
-    double gmax_sum = 0, gmax_sum2 = 0, gmax_max = 0;
+    double astd_max = 0, armax_max = 0;
+    double gmax_max = 0;
     int converged_count = 0;
-    int n_bad_edge = 0;
-    int n_bad_ang = 0;
+    int n_bad_edge = 0, n_bad_ang = 0;
+    long long work_sum = 0, work_max = 0;
 
     for (const auto& s : stats) {
-        ms_sum += s.ms; ms_sum2 += s.ms * s.ms;
         iters_sum += s.iters;
-        ecv_sum += s.edge_cv; ecv_sum2 += s.edge_cv * s.edge_cv;
         ecv_max = max(ecv_max, s.edge_cv);
         ermax_max = max(ermax_max, s.edge_relerr_max);
         if (s.h_min < hmin_min) hmin_min = s.h_min;
@@ -176,26 +176,47 @@ static void write_json(const char* path, int N, int total_isomers, int stride,
         concave_total += s.n_concave;
         amin_min = min(amin_min, s.ang_min);
         amax_max = max(amax_max, s.ang_max);
-        astd_sum += s.ang_std; astd_sum2 += s.ang_std * s.ang_std;
         astd_max = max(astd_max, s.ang_std);
         armax_max = max(armax_max, s.ang_relerr_max);
-        gmax_sum += s.gmax_L; gmax_sum2 += s.gmax_L * s.gmax_L;
         gmax_max = max(gmax_max, s.gmax_L);
         if (s.converged) converged_count++;
         if (s.edge_relerr_max > 0.01) n_bad_edge++;
         if (s.ang_relerr_max > 0.01) n_bad_ang++;
+        work_sum += s.work;
+        work_max = max(work_max, s.work);
     }
 
     int actual_M = (int)stats.size();
-    double ms_mean = actual_M > 0 ? ms_sum / actual_M : 0;
-    double ms_std = actual_M > 0 ? sqrt(max(0.0, ms_sum2/actual_M - ms_mean*ms_mean)) : 0;
-    double ecv_mean = actual_M > 0 ? ecv_sum / actual_M : 0;
-    double ecv_std = actual_M > 0 ? sqrt(max(0.0, ecv_sum2/actual_M - ecv_mean*ecv_mean)) : 0;
-    double astd_mean = actual_M > 0 ? astd_sum / actual_M : 0;
-    double astd_std = actual_M > 0 ? sqrt(max(0.0, astd_sum2/actual_M - astd_mean*astd_mean)) : 0;
-    double gmax_mean = actual_M > 0 ? gmax_sum / actual_M : 0;
-    double gmax_std = actual_M > 0 ? sqrt(max(0.0, gmax_sum2/actual_M - gmax_mean*gmax_mean)) : 0;
+    auto ms_mean  = actual_M > 0 ? accumulate(stats.begin(), stats.end(), 0.0, [](double a, const IsomerStats& s){ return a + s.ms; }) / actual_M : 0.0;
+    auto ecv_mean = actual_M > 0 ? accumulate(stats.begin(), stats.end(), 0.0, [](double a, const IsomerStats& s){ return a + s.edge_cv; }) / actual_M : 0.0;
+    auto astd_mean= actual_M > 0 ? accumulate(stats.begin(), stats.end(), 0.0, [](double a, const IsomerStats& s){ return a + s.ang_std; }) / actual_M : 0.0;
+    auto gmax_mean= actual_M > 0 ? accumulate(stats.begin(), stats.end(), 0.0, [](double a, const IsomerStats& s){ return a + s.gmax_L; }) / actual_M : 0.0;
+    double ms_std   = stddev_twopass(actual_M, [&](int i){ return stats[i].ms; });
+    double ecv_std  = stddev_twopass(actual_M, [&](int i){ return stats[i].edge_cv; });
+    double astd_std = stddev_twopass(actual_M, [&](int i){ return stats[i].ang_std; });
+    double gmax_std = stddev_twopass(actual_M, [&](int i){ return stats[i].gmax_L; });
     double iters_per_vertex = actual_M > 0 ? iters_sum / ((double)dual_N * actual_M) : 0;
+    double work_mean = actual_M > 0 ? (double)work_sum / actual_M : 0;
+
+    // Median computation for key metrics
+    double armax_median = 0, ms_median = 0, work_median = 0, astd_median = 0;
+    if (actual_M > 0) {
+        vector<double> armax_vals(actual_M), ms_vals(actual_M), work_vals(actual_M), astd_vals(actual_M);
+        for (int i = 0; i < actual_M; i++) {
+            armax_vals[i] = stats[i].ang_relerr_max;
+            ms_vals[i] = stats[i].ms;
+            work_vals[i] = (double)stats[i].work;
+            astd_vals[i] = stats[i].ang_std;
+        }
+        sort(armax_vals.begin(), armax_vals.end());
+        sort(ms_vals.begin(), ms_vals.end());
+        sort(work_vals.begin(), work_vals.end());
+        sort(astd_vals.begin(), astd_vals.end());
+        armax_median = armax_vals[actual_M / 2];
+        ms_median = ms_vals[actual_M / 2];
+        work_median = work_vals[actual_M / 2];
+        astd_median = astd_vals[actual_M / 2];
+    }
 
     fprintf(f, "{\n");
     fprintf(f, "  \"N\": %d,\n", N);
@@ -205,7 +226,9 @@ static void write_json(const char* path, int N, int total_isomers, int stride,
     fprintf(f, "  \"dual_N\": %d,\n", dual_N);
     fprintf(f, "  \"total_ms\": %.1f,\n", elapsed_ms);
     fprintf(f, "  \"summary\": {\n");
-    fprintf(f, "    \"ms_mean\": %.3f, \"ms_std\": %.3f,\n", ms_mean, ms_std);
+    double ms_max = actual_M > 0 ? max_element(stats.begin(), stats.end(),
+        [](const IsomerStats& a, const IsomerStats& b){ return a.ms < b.ms; })->ms : 0.0;
+    fprintf(f, "    \"ms_mean\": %.3f, \"ms_std\": %.3f, \"ms_median\": %.3f, \"ms_max\": %.3f,\n", ms_mean, ms_std, ms_median, ms_max);
     fprintf(f, "    \"iters_per_vertex\": %.1f,\n", iters_per_vertex);
     fprintf(f, "    \"converged_frac\": %.4f,\n", actual_M > 0 ? (double)converged_count / actual_M : 0.0);
     fprintf(f, "    \"edge_cv_mean\": %.6e, \"edge_cv_std\": %.6e, \"edge_cv_max\": %.6e,\n",
@@ -215,11 +238,13 @@ static void write_json(const char* path, int N, int total_isomers, int stride,
     fprintf(f, "    \"concave_isomers\": %d, \"concave_vertices_total\": %d,\n",
             concave_isomers, concave_total);
     fprintf(f, "    \"ang_min_worst\": %.2f, \"ang_max_worst\": %.2f,\n", amin_min, amax_max);
-    fprintf(f, "    \"ang_std_mean\": %.6e, \"ang_std_std\": %.6e, \"ang_std_max\": %.6e,\n",
-            astd_mean, astd_std, astd_max);
-    fprintf(f, "    \"ang_relerr_max\": %.6e,\n", armax_max);
+    fprintf(f, "    \"ang_std_mean\": %.6e, \"ang_std_std\": %.6e, \"ang_std_max\": %.6e, \"ang_std_median\": %.6e,\n",
+            astd_mean, astd_std, astd_max, astd_median);
+    fprintf(f, "    \"ang_relerr_max\": %.6e, \"ang_relerr_median\": %.6e,\n", armax_max, armax_median);
     fprintf(f, "    \"gmax_L_mean\": %.6e, \"gmax_L_std\": %.6e, \"gmax_L_max\": %.6e,\n",
             gmax_mean, gmax_std, gmax_max);
+    fprintf(f, "    \"work_mean\": %.0f, \"work_median\": %.0f, \"work_max\": %lld,\n",
+            work_mean, work_median, work_max);
     fprintf(f, "    \"n_bad_edge\": %d, \"n_bad_ang\": %d, \"n_not_converged\": %d\n",
             n_bad_edge, n_bad_ang, actual_M - converged_count);
     fprintf(f, "  },\n");
@@ -232,12 +257,14 @@ static void write_json(const char* path, int N, int total_isomers, int stride,
                 "\"edge_cv\":%.6e,\"edge_relerr_max\":%.6e,"
                 "\"h_min\":%.6f,\"n_concave\":%d,"
                 "\"ang_min\":%.3f,\"ang_max\":%.3f,\"ang_std\":%.6e,\"ang_relerr_max\":%.6e,"
-                "\"gmax_L\":%.6e,\"seed\":%d,\"n_steps\":%d}%s\n",
+                "\"gmax_L\":%.6e,\"seed\":%d,\"n_steps\":%d,"
+                "\"n_energy\":%d,\"n_grad\":%d,\"n_hv\":%d,\"work\":%lld}%s\n",
                 s.idx, s.ms, s.iters, s.converged ? "true" : "false",
                 s.edge_cv, s.edge_relerr_max,
                 s.h_min, s.n_concave,
                 s.ang_min, s.ang_max, s.ang_std, s.ang_relerr_max,
                 s.gmax_L, s.seed, s.n_steps,
+                s.n_energy, s.n_grad, s.n_hv, s.work,
                 (i + 1 < actual_M) ? "," : "");
     }
     fprintf(f, "  ]\n");
@@ -346,6 +373,10 @@ int main(int argc, char** argv) {
                 s.iters = D.iterations_used;
                 s.converged = (D.final_gmax_L < 1e-5);
                 s.gmax_L = D.final_gmax_L;
+                s.n_energy = D.n_energy_evals;
+                s.n_grad = D.n_grad_evals;
+                s.n_hv = D.n_hv_evals;
+                s.work = (long long)s.n_energy + 2LL*s.n_grad + 7LL*s.n_hv;
                 stats.push_back(s);
 
                 // Write incrementally to JSONL

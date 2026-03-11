@@ -109,7 +109,7 @@ int main() {
 
     // Build full result with logging
     fprintf(stderr, "\n=== Full pipeline (with CG log) ===\n");
-    Deltahedron D_full = Deltahedron::fromExtensionPathOptimized(ep, 0, stderr);
+    Deltahedron D_full = Deltahedron::fromExtensionPathOptimized(ep, stderr);
     write_mol2(D_full, "/tmp/c60_1217_final.mol2");
     print_stats(D_full, "final");
 

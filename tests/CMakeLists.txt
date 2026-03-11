@@ -56,3 +56,7 @@ add_test(NAME dense-graph-test COMMAND dense-graph-test)
 add_executable(view-test view-test.cc)
 target_link_libraries(view-test fullerenes GTest::GTest GTest::Main)
 add_test(NAME view-test COMMAND view-test)
+
+add_executable(delaunay-test delaunay-test.cc)
+target_link_libraries(delaunay-test fullerenes GTest::GTest GTest::Main)
+add_test(NAME delaunay-test COMMAND delaunay-test)

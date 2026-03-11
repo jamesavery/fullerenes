@@ -29,8 +29,10 @@ using namespace buckinverse;
 
 struct Config {
   OptMethod method;
+  OptMethod final_method;
   double step_tol;
   const char* method_name;
+  const char* final_method_name;
 };
 
 struct Quality {
@@ -51,9 +53,9 @@ Quality measure_pipeline(const ExtensionPath& ep, const Config& cfg,
   double grad_final_tol = 1e-15;
 
   Deltahedron D = Deltahedron::fromExtensionPathOptimized(
-      ep, 0, nullptr, nullptr,
+      ep, nullptr, nullptr,
       cfg.method, grad_step_tol, grad_final_tol, work_budget,
-      cfg.step_tol, final_tol);
+      cfg.step_tol, final_tol, cfg.final_method);
   double ms = chrono::duration<double,milli>(chrono::high_resolution_clock::now()-t0).count();
 
   int Nv = D.N;
@@ -162,7 +164,7 @@ struct Accum {
     conc_v.push_back(q.n_concave);
     iter_v.push_back(q.iters);
     ms_v.push_back(q.ms);
-    long long w = (long long)q.n_energy + (long long)Nv * q.n_grad + (long long)Nv * q.n_hv;
+    long long w = (long long)q.n_energy + 2LL * q.n_grad + 7LL * q.n_hv;
     work_v.push_back((double)w);
     if(q.conv) n_conv++;
     n_total++;
@@ -204,7 +206,8 @@ void print_accum(const char* method, double step_tol, const Accum& a) {
 int main(int argc, char** argv) {
   if(argc < 2) {
     fprintf(stderr, "Usage: bench_quality_pipeline N [options]\n");
-    fprintf(stderr, "  --methods LBFGS,ST     Methods (default: LBFGS,ST)\n");
+    fprintf(stderr, "  --methods LBFGS,ST     Step methods (default: LBFGS,ST)\n");
+    fprintf(stderr, "  --final-method CG      Final optimize method (default: same as step)\n");
     fprintf(stderr, "  --step-tols 1e-1,...   Step angle tolerances\n");
     fprintf(stderr, "  --final-tol 1e-3       Final angle tolerance\n");
     fprintf(stderr, "  --stride 1             Buckygen stride\n");
@@ -218,16 +221,18 @@ int main(int argc, char** argv) {
 
   // Defaults
   const char* methods_str = "LBFGS,ST";
+  const char* final_method_str = nullptr;  // nullptr = same as step method
   const char* step_tols_str = "1e-1,1e-2,1e-3";
   double final_tol = 1e-3;
   int stride = 1;
   int max_enum = 0;
   const char* csv_path = nullptr;
-  int work_factor = 20;
+  int work_factor = 400;
 
-  // Parse options
+  // Parse options (stride=0 treated as 1)
   for(int i = 2; i < argc; i++) {
     if(!strcmp(argv[i], "--methods") && i+1 < argc) methods_str = argv[++i];
+    else if(!strcmp(argv[i], "--final-method") && i+1 < argc) final_method_str = argv[++i];
     else if(!strcmp(argv[i], "--step-tols") && i+1 < argc) step_tols_str = argv[++i];
     else if(!strcmp(argv[i], "--final-tol") && i+1 < argc) final_tol = atof(argv[++i]);
     else if(!strcmp(argv[i], "--stride") && i+1 < argc) stride = atoi(argv[++i]);
@@ -238,21 +243,32 @@ int main(int argc, char** argv) {
   }
 
   if(!csv_path) { fprintf(stderr, "Error: --csv is required\n"); return 1; }
+  if(stride <= 0) stride = 1;
 
   auto methods = parse_methods(methods_str);
   auto step_tols = parse_doubles(step_tols_str);
 
+  // Parse final method override (if any)
+  pair<OptMethod,const char*> final_method_override = {OptMethod::CG, nullptr};
+  if(final_method_str) {
+    auto fm = parse_methods(final_method_str);
+    if(!fm.empty()) final_method_override = fm[0];
+  }
+
   // Build configs: cross product of methods x step_tols
   vector<Config> configs;
   for(auto& [m, name] : methods)
-    for(double st : step_tols)
-      configs.push_back({m, st, name});
+    for(double st : step_tols) {
+      OptMethod fm = final_method_override.second ? final_method_override.first : m;
+      const char* fm_name = final_method_override.second ? final_method_override.second : name;
+      configs.push_back({m, fm, st, name, fm_name});
+    }
 
   int n_configs = (int)configs.size();
   int Nv = N/2 + 2;
-  long long work_budget = (long long)work_factor * Nv * Nv * Nv;
+  long long work_budget = (long long)work_factor * Nv * Nv;
 
-  printf("Pipeline benchmark: C%d (Nv=%d), stride=%d, final_tol=%.0e, work=%d*Nv^3=%lld\n",
+  printf("Pipeline benchmark: C%d (Nv=%d), stride=%d, final_tol=%.0e, work=%d*Nv^2=%lld\n",
          N, Nv, stride, final_tol, work_factor, work_budget);
   printf("Methods: %s, step_tols: %s, %d configs\n", methods_str, step_tols_str, n_configs);
   if(max_enum > 0) printf("Max enum: %d\n", max_enum);
@@ -286,7 +302,7 @@ int main(int argc, char** argv) {
       for(int c = 0; c < n_configs; c++) {
         accums[c].add(results[c], Nv);
         const Quality& q = results[c];
-        long long w = (long long)q.n_energy + (long long)Nv * q.n_grad + (long long)Nv * q.n_hv;
+        long long w = (long long)q.n_energy + 2LL * q.n_grad + 7LL * q.n_hv;
         fprintf(csv, "%d,%d,%s,%.0e,%.6e,%.6e,%.6e,%.6e,%.6f,%d,%d,%lld,%.6e,%.3f,%d\n",
                 N, idx, configs[c].method_name, configs[c].step_tol,
                 q.ang_max_re, q.ang_mean_re, q.edge_relerr, q.ang_std,
@@ -306,11 +322,16 @@ int main(int argc, char** argv) {
   fclose(csv);
 
   printf("\nResults for C%d (%d isomers, %d configs each):\n", N, tested, n_configs);
-  printf("Work budget: %d*Nv^3 = %lld per optimize() call\n", work_factor, work_budget);
+  printf("Work budget: %d*Nv^2 = %lld per optimize() call\n", work_factor, work_budget);
   printf("Final angle tol: %.0e\n\n", final_tol);
 
   for(int c = 0; c < n_configs; c++) {
-    print_accum(configs[c].method_name, configs[c].step_tol, accums[c]);
+    char label[64];
+    if(strcmp(configs[c].method_name, configs[c].final_method_name) != 0)
+      snprintf(label, sizeof(label), "%s+%s", configs[c].method_name, configs[c].final_method_name);
+    else
+      snprintf(label, sizeof(label), "%s", configs[c].method_name);
+    print_accum(label, configs[c].step_tol, accums[c]);
     printf("\n");
   }
 

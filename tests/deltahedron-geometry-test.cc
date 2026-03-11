@@ -12,7 +12,7 @@
 #include "fullerenes/polyhedron.hh"
 #include "fullerenes/isomerdb.hh"
 #include "fullerenes/triangulation.hh"
-#include "fullerenes/layout2d.hh"
+#include "fullerenes/stats.hh"
 #include <cmath>
 #include <map>
 #include <set>
@@ -95,7 +95,8 @@ static IsomerGeometry analyzeGeometry(const Deltahedron& D) {
     //   F triangles on a sphere of radius R
     //   expected_area = 4*pi*R^2 / F
     //   expected_edge from equilateral triangle: A = sqrt(3)/4 * L^2
-    int n_faces = D.triangles().size();
+    auto tris = D.triangles();
+    int n_faces = tris.size();
     double exp_area = 4.0 * M_PI * g.R * g.R / n_faces;
     double exp_edge = sqrt(4.0 * exp_area / sqrt(3.0));
     g.expected_volume = 4.0 / 3.0 * M_PI * g.R * g.R * g.R;
@@ -103,7 +104,7 @@ static IsomerGeometry analyzeGeometry(const Deltahedron& D) {
     // Collect face areas
     vector<double> areas;
     areas.reserve(n_faces);
-    for (const auto& tri : D.triangles()) {
+    for (const auto& tri : tris) {
         coord3d a = D.points[tri[0]], b = D.points[tri[1]], c = D.points[tri[2]];
         areas.push_back((b - a).cross(c - a).norm() / 2.0);
     }
@@ -112,12 +113,13 @@ static IsomerGeometry analyzeGeometry(const Deltahedron& D) {
     // Collect edge lengths
     vector<double> edges;
     for (int u = 0; u < D.N; u++)
-        for (int v : D.nbrs(u))
+        for (int v : D[u])
             if (v > u) edges.push_back((D.points[u] - D.points[v]).norm());
     g.edge = computeStats(edges, exp_edge);
 
     // Volume: mesh volume and convex hull volume via Polyhedron
-    Polyhedron P(static_cast<const PlanarGraph&>(D), vector<coord3d>(D.points.begin(), D.points.end()));
+    vector<coord3d> pts_copy(D.points.begin(), D.points.end());
+    Polyhedron P(static_cast<const PlanarGraph&>(D), pts_copy);
     g.volume = P.volume();
     try {
         Polyhedron hull = P.convex_hull();
@@ -255,7 +257,7 @@ static void processIsomer(const Deltahedron& D, AccumulatedStats& acc) {
         }
     }
     for (int u = 0; u < D.N; u++)
-        for (int v : D.nbrs(u))
+        for (int v : D[u])
             if (v > u && (D.points[u] - D.points[v]).norm() < 1e-10) {
                 acc.coincident++;
                 return;
@@ -560,7 +562,7 @@ struct EdgeStats {
         EdgeStats s{};
         vector<double> lens;
         for (int u = 0; u < D.N; u++)
-            for (int v : D.nbrs(u))
+            for (int v : D[u])
                 if (v > u) lens.push_back((D.points[u] - D.points[v]).norm());
         s.mean = 0;
         for (double l : lens) s.mean += l;
@@ -611,7 +613,8 @@ TEST(DeltahedronGeometry, GCExpansionGeometry) {
         ASSERT_EQ(gc_bary.N, N_dual) << "GC(" << k << ",0) dual node count";
 
         // 2. Direct optimize on GC geometry (baseline)
-        Deltahedron gc_opt(static_cast<const Triangulation&>(gc_bary), gc_bary.points);
+        vector<coord3d> gc_bary_pts(gc_bary.points.begin(), gc_bary.points.end());
+        Deltahedron gc_opt(static_cast<const Triangulation&>(gc_bary), gc_bary_pts);
         auto t0 = chrono::steady_clock::now();
         gc_opt.optimize(gc_opt.points);
         auto t1 = chrono::steady_clock::now();
@@ -701,7 +704,8 @@ TEST(DeltahedronGeometry, GCExpansionGeometry) {
         int gc_N_dual = gc_dual.N;
 
         // Direct optimize on GC geometry
-        Deltahedron gc_direct(static_cast<const Triangulation&>(gc_dual), gc_dual.points);
+        vector<coord3d> gc_dual_pts(gc_dual.points.begin(), gc_dual.points.end());
+        Deltahedron gc_direct(static_cast<const Triangulation&>(gc_dual), gc_dual_pts);
         auto t0 = chrono::steady_clock::now();
         gc_direct.optimize(gc_direct.points);
         auto t1 = chrono::steady_clock::now();
@@ -764,68 +768,63 @@ static Graph makeNanotubeDual(int n_rings) {
     auto cs  = [&](int i) -> int { return 6 + 5*n_rings + mod5(i); };  // cap_S[i]
     int pole_N = 0;
     int pole_S = 11 + 5*n_rings;
-    int last = n_rings - 1;
 
-    // Build oriented adjacency lists directly (CCW as seen from outside).
-    //
-    // Topology (looking from outside, north pole on top):
-    //   pole_N (deg 5) — cn[0..4] (deg 5) — rng[0][0..4] (deg 6) — ... — rng[last][0..4] (deg 6) — cs[0..4] (deg 5) — pole_S (deg 5)
-    //
-    // Edges from ring j down to ring j+1: rng(j,i)—rng(j+1,i) and rng(j,i)—rng(j+1,i+1).
-    // Same pattern for cn→rng(0) and rng(last)→cs.
+    // Build edge set (unordered — Triangulation constructor will orient)
+    set<pair<int,int>> edges;
+    auto add = [&](int u, int v) {
+        int a = std::min(u,v), b = std::max(u,v);
+        edges.insert(make_pair(a, b));
+    };
 
-    Graph adj(N, GRAPH_DMAX);
+    // Pole N connects to all cap_N
+    for (int i = 0; i < 5; i++) add(pole_N, cn(i));
 
-    // pole_N: CCW from outside = cn(0), cn(1), ..., cn(4)
-    for (int i = 0; i < 5; i++) adj.push_back(pole_N, cn(i));
+    // Cap_N ring: cap_N[i] -- cap_N[(i+1)%5]
+    for (int i = 0; i < 5; i++) add(cn(i), cn((i+1)%5));
 
-    // cn(i) (deg 5): CCW from outside
-    //   Triangles around cn(i): (cn(i), pole_N, cn(i+1)), (cn(i), cn(i+1), rng(0,i+1)),
-    //     (cn(i), rng(0,i+1), rng(0,i)), (cn(i), rng(0,i), cn(i-1)), (cn(i), cn(i-1), pole_N)
-    for (int i = 0; i < 5; i++)
-        adj.assign_row(cn(i), {pole_N, cn(i+1), rng(0, i+1), rng(0, i), cn(i-1)});
-
-    // rng(0, i) (deg 6): connected up to cn(i-1), cn(i) and within ring 0
-    //   Triangles: (rng(0,i), cn(i-1), cn(i)), (rng(0,i), cn(i), rng(0,i+1)),
-    //     (rng(0,i), rng(0,i+1), <below_right>), (rng(0,i), <below_right>, <below>),
-    //     (rng(0,i), <below>, rng(0,i-1)), (rng(0,i), rng(0,i-1), cn(i-1))
-    if (n_rings == 1) {
-        // rng(0,i) connects down to cs instead of rng(1)
-        for (int i = 0; i < 5; i++)
-            adj.assign_row(rng(0, i), {cn(i-1), cn(i), rng(0, i+1), cs(i+1), cs(i), rng(0, i-1)});
-    } else {
-        for (int i = 0; i < 5; i++)
-            adj.assign_row(rng(0, i), {cn(i-1), cn(i), rng(0, i+1), rng(1, i+1), rng(1, i), rng(0, i-1)});
+    // Cap_N to ring_0: each cap_N[i] connects to ring_0[i] and ring_0[(i+1)%5]
+    for (int i = 0; i < 5; i++) {
+        add(cn(i), rng(0, i));
+        add(cn(i), rng(0, (i+1)%5));
     }
 
-    // Interior rings: rng(j, i) for 1 <= j <= last-1 (only if n_rings >= 3)
-    //   Connected to: rng(j-1,i-1), rng(j-1,i) above; rng(j,i-1), rng(j,i+1) same ring;
-    //                 rng(j+1,i), rng(j+1,i+1) below.
-    for (int j = 1; j < last; j++)
+    // Ring_j to ring_j: ring_j[i] -- ring_j[(i+1)%5]
+    for (int j = 0; j < n_rings; j++)
         for (int i = 0; i < 5; i++)
-            adj.assign_row(rng(j, i), {rng(j-1, i-1), rng(j-1, i), rng(j, i+1), rng(j+1, i+1), rng(j+1, i), rng(j, i-1)});
+            add(rng(j, i), rng(j, (i+1)%5));
 
-    // rng(last, i): connects down to cs instead of rng(last+1)
-    if (n_rings >= 2)
-        for (int i = 0; i < 5; i++)
-            adj.assign_row(rng(last, i), {rng(last-1, i-1), rng(last-1, i), rng(last, i+1), cs(i+1), cs(i), rng(last, i-1)});
+    // Ring_j to ring_{j+1}: each ring_j[i] connects to ring_{j+1}[i] and ring_{j+1}[(i+1)%5]
+    for (int j = 0; j + 1 < n_rings; j++)
+        for (int i = 0; i < 5; i++) {
+            add(rng(j, i), rng(j+1, i));
+            add(rng(j, i), rng(j+1, (i+1)%5));
+        }
 
-    // cs(i) (deg 5): connected up to rng(last,i-1) and rng(last,i), plus cs(i-1), cs(i+1), pole_S.
-    //   (rng(last,i) connects down to cs(i) and cs(i+1), so cs(i) receives from rng(last,i-1) and rng(last,i).)
-    //
-    //   Triangles around cs(i) CCW from outside:
-    //     (cs(i), pole_S, cs(i-1)), (cs(i), cs(i-1), rng(last,i-1)),
-    //     (cs(i), rng(last,i-1), rng(last,i)), (cs(i), rng(last,i), cs(i+1)),
-    //     (cs(i), cs(i+1), pole_S)
-    for (int i = 0; i < 5; i++)
-        adj.assign_row(cs(i), {pole_S, cs(i-1), rng(last, i-1), rng(last, i), cs(i+1)});
+    // Ring_{last} to cap_S: each ring_last[i] connects to cap_S[i] and cap_S[(i+1)%5]
+    for (int i = 0; i < 5; i++) {
+        add(rng(n_rings-1, i), cs(i));
+        add(rng(n_rings-1, i), cs((i+1)%5));
+    }
 
-    // pole_S (deg 5): looking from outside (below), CCW = cs(4), cs(3), ..., cs(0)
-    for (int i = 4; i >= 0; i--) adj.push_back(pole_S, cs(i));
+    // Cap_S ring: cap_S[i] -- cap_S[(i+1)%5]
+    for (int i = 0; i < 5; i++) add(cs(i), cs((i+1)%5));
 
-    Graph G(adj);
-    assert(G.is_consistently_oriented());
-    return G;
+    // Pole S connects to all cap_S
+    for (int i = 0; i < 5; i++) add(pole_S, cs(i));
+
+    // Verify edge count: should be 3*N - 6 for triangulation of sphere
+    assert((int)edges.size() == 3 * N - 6);
+
+    // Build unoriented adjacency from edge set
+    Graph adj(N, 6);
+    for (const auto& [u, v] : edges) {
+        adj.push_back(u, v);
+        adj.push_back(v, u);
+    }
+
+    // Use Triangulation constructor to orient the neighbour lists
+    Triangulation T(adj);
+    return static_cast<const Graph&>(T);
 }
 
 // =====================================================================
@@ -836,7 +835,6 @@ TEST(DeltahedronGeometry, NanotubeBuilderVerify) {
     // n_rings=1 should be C30 (the seed itself)
     Graph G1 = makeNanotubeDual(1);
     EXPECT_EQ(G1.N, 17) << "n_rings=1 should give C30 dual (17 vertices)";
-    EXPECT_TRUE(G1.is_consistently_oriented()) << "Should be oriented";
 
     // Verify it's a valid triangulation
     Triangulation T1(G1);
@@ -985,20 +983,21 @@ static double min_convexity_height(const Deltahedron& D) {
     double min_h = INFINITY;
     for (int v = 0; v < D.N; v++) {
         int d = D.degree(v);
+        auto nv = D.nbrs(v);
         if (d > 6) continue;
         bool all_low = true;
         for (int i = 0; i < d; i++)
-            if (D.degree(D.nbrs(v)[i]) > 6) { all_low = false; break; }
+            if (D.degree(nv[i]) > 6) { all_low = false; break; }
         if (!all_low) continue;
 
         coord3d centroid(0,0,0);
-        for (int i = 0; i < d; i++) centroid += D.points[D.nbrs(v)[i]];
+        for (int i = 0; i < d; i++) centroid += D.points[nv[i]];
         centroid /= (double)d;
 
         coord3d n_fan(0,0,0);
         for (int i = 0; i < d; i++) {
-            coord3d e1 = D.points[D.nbrs(v)[i]] - D.points[v];
-            coord3d e2 = D.points[D.nbrs(v)[(i+1)%d]] - D.points[v];
+            coord3d e1 = D.points[nv[i]] - D.points[v];
+            coord3d e2 = D.points[nv[(i+1)%d]] - D.points[v];
             n_fan += e1.cross(e2);
         }
         double n_len = n_fan.norm();
@@ -1014,20 +1013,21 @@ static vector<int> concave_vertices(const Deltahedron& D, double tol = 1e-6) {
     vector<int> result;
     for (int v = 0; v < D.N; v++) {
         int d = D.degree(v);
+        auto nv = D.nbrs(v);
         if (d > 6) continue;
         bool all_low = true;
         for (int i = 0; i < d; i++)
-            if (D.degree(D.nbrs(v)[i]) > 6) { all_low = false; break; }
+            if (D.degree(nv[i]) > 6) { all_low = false; break; }
         if (!all_low) continue;
 
         coord3d centroid(0,0,0);
-        for (int i = 0; i < d; i++) centroid += D.points[D.nbrs(v)[i]];
+        for (int i = 0; i < d; i++) centroid += D.points[nv[i]];
         centroid /= (double)d;
 
         coord3d n_fan(0,0,0);
         for (int i = 0; i < d; i++) {
-            coord3d e1 = D.points[D.nbrs(v)[i]] - D.points[v];
-            coord3d e2 = D.points[D.nbrs(v)[(i+1)%d]] - D.points[v];
+            coord3d e1 = D.points[nv[i]] - D.points[v];
+            coord3d e2 = D.points[nv[(i+1)%d]] - D.points[v];
             n_fan += e1.cross(e2);
         }
         double n_len = n_fan.norm();
@@ -1097,35 +1097,26 @@ struct ConvexityStats {
         s.iters = D.iterations_used;
 
         // Edge lengths
-        double sum = 0, sum2 = 0;
-        int ne = 0;
+        vector<double> edge_lens;
         for (int u = 0; u < D.N; u++)
-            for (int v : D.nbrs(u))
-                if (v > u) {
-                    double l = (D.points[u] - D.points[v]).norm();
-                    sum += l; sum2 += l*l; ne++;
-                }
-        double L_mean = sum / ne;
-        double L_var = sum2/ne - L_mean*L_mean;
-        s.L_cv = (L_mean > 0) ? sqrt(max(0.0, L_var)) / L_mean : 0;
+            for (int v : D[u])
+                if (v > u) edge_lens.push_back((D.points[u] - D.points[v]).norm());
+        s.L_cv = cv_twopass(edge_lens);
 
         // Triangle angles
-        double asum = 0, asum2 = 0;
-        int na = 0;
+        auto tris = D.triangles();
+        vector<double> angles;
         s.ang_min = 180; s.ang_max = 0;
-        for (const auto& tri : D.triangles()) {
+        for (const auto& tri : tris)
             for (int c = 0; c < 3; c++) {
                 coord3d va = D.points[tri[(c+1)%3]] - D.points[tri[c]];
                 coord3d vb = D.points[tri[(c+2)%3]] - D.points[tri[c]];
                 double ang = coord3d::angle(va, vb) * 180.0 / M_PI;
-                asum += ang; asum2 += ang*ang;
+                angles.push_back(ang);
                 s.ang_min = min(s.ang_min, ang);
                 s.ang_max = max(s.ang_max, ang);
-                na++;
             }
-        }
-        double ang_mean = asum / na;
-        s.ang_std = sqrt(max(0.0, asum2/na - ang_mean*ang_mean));
+        s.ang_std = stddev_twopass(angles);
 
         // Convexity
         s.h_min = min_convexity_height(D);
@@ -1134,7 +1125,7 @@ struct ConvexityStats {
 
         // Signed volume from triangle fan (no Polyhedron construction needed)
         double vol = 0;
-        for (const auto& tri : D.triangles()) {
+        for (const auto& tri : tris) {
             const coord3d &a = D.points[tri[0]], &b = D.points[tri[1]], &c = D.points[tri[2]];
             vol += a.dot(b.cross(c));
         }
@@ -1371,24 +1362,25 @@ static void test_extpath_convexity_size(int N) {
         int nd = count_orientation_defects(D);
 
         // Edge CV
-        double sum = 0, sum2 = 0; int ne = 0;
+        vector<double> edge_lens;
         for (int u = 0; u < D.N; u++)
-            for (int v : D.nbrs(u))
-                if (v > u) { double l = (D.points[u] - D.points[v]).norm(); sum += l; sum2 += l*l; ne++; }
-        double L_mean = sum / ne;
-        double cv = sqrt(max(0.0, sum2/ne - L_mean*L_mean)) / L_mean;
+            for (int v : D[u])
+                if (v > u) edge_lens.push_back((D.points[u] - D.points[v]).norm());
+        double cv = cv_twopass(edge_lens);
 
         // Triangle angles
-        double ang_min = 180, ang_max = 0, asum = 0, asum2 = 0; int na = 0;
-        for (const auto& tri : D.triangles())
+        auto tris = D.triangles();
+        vector<double> angles;
+        double ang_min = 180, ang_max = 0;
+        for (const auto& tri : tris)
             for (int c = 0; c < 3; c++) {
                 coord3d va = D.points[tri[(c+1)%3]] - D.points[tri[c]];
                 coord3d vb = D.points[tri[(c+2)%3]] - D.points[tri[c]];
                 double ang = coord3d::angle(va, vb) * 180.0 / M_PI;
-                asum += ang; asum2 += ang*ang; na++;
+                angles.push_back(ang);
                 ang_min = min(ang_min, ang); ang_max = max(ang_max, ang);
             }
-        double ang_std = sqrt(max(0.0, asum2/na - (asum/na)*(asum/na)));
+        double ang_std = stddev_twopass(angles);
 
         worst_h = min(worst_h, h);
         worst_cv = max(worst_cv, cv);
@@ -1401,7 +1393,7 @@ static void test_extpath_convexity_size(int N) {
     }
     BuckyGen::stop(Q);
 
-    fprintf(stderr, "  C%-3d %5d isomers  L_cv=%8.5f  h_min=%+8.4f  ang=[%.2f,%.2f] std=%.3f  concave=%d  odef=%d\n",
+    fprintf(stderr, "  C%-3d %5d isomers  L_cv=%9.2e  h_min=%+8.4f  ang=[%.2f,%.2f] std=%.2e  concave=%d  odef=%d\n",
            N, idx, worst_cv, worst_h, worst_ang_min, worst_ang_max, worst_ang_std,
            n_concave, n_defects);
 
@@ -1450,7 +1442,7 @@ TEST(ExtPathConvexity, C60_Ih) {
     {
         vector<double> lens;
         for (int u = 0; u < D_exact.N; u++)
-            for (int v : D_exact.nbrs(u))
+            for (int v : D_exact[u])
                 if (v > u) lens.push_back((D_exact.points[u] - D_exact.points[v]).norm());
         sort(lens.begin(), lens.end());
         double L_min = lens.front(), L_max = lens.back();
@@ -1483,7 +1475,7 @@ TEST(ExtPathConvexity, C60_Ih) {
     {
         vector<double> lens;
         for (int u = 0; u < D.N; u++)
-            for (int v : D.nbrs(u))
+            for (int v : D[u])
                 if (v > u) lens.push_back((D.points[u] - D.points[v]).norm());
         sort(lens.begin(), lens.end());
         double L_min = lens.front(), L_max = lens.back();
@@ -1538,7 +1530,7 @@ TEST(ExtPathConvexity, C60_Ih) {
         // Sorted edge lengths (rotation-invariant comparison)
         vector<double> e_exact;
         for (int u = 0; u < D_exact.N; u++)
-            for (int v : D_exact.nbrs(u))
+            for (int v : D_exact[u])
                 if (v > u) e_exact.push_back((D_exact.points[u] - D_exact.points[v]).norm());
         sort(e_exact.begin(), e_exact.end());
 
@@ -1566,9 +1558,9 @@ TEST(ExtPathConvexity, C60_Ih) {
 
 TEST(ExtPathConvexity, NanotubeSeries) {
     fprintf(stderr, "\n  (5,0) nanotube series via ExtPath (N iters/step):\n");
-    fprintf(stderr, "  %6s %5s %5s | %8s %8s %7s %7s %7s %4s %4s %8s\n",
+    fprintf(stderr, "  %6s %5s %5s | %9s %8s %7s %7s %9s %4s %4s %8s\n",
             "C_N", "N_dv", "steps", "L_cv", "h_min", "ang_min", "ang_max", "ang_std", "conc", "odef", "ms");
-    fprintf(stderr, "  %s\n", string(90, '-').c_str());
+    fprintf(stderr, "  %s\n", string(92, '-').c_str());
 
     for (int n_rings : {2, 3, 5, 8, 10, 15, 20, 30, 48}) {
         int N_ful = 20 + 10 * n_rings;
@@ -1593,26 +1585,26 @@ TEST(ExtPathConvexity, NanotubeSeries) {
         int nc = (int)concave_vertices(D).size();
         int nd = count_orientation_defects(D);
 
-        double sum = 0, sum2 = 0; int ne = 0;
+        vector<double> edge_lens;
         for (int u = 0; u < D.N; u++)
-            for (int v : D.nbrs(u))
-                if (v > u) { double l = (D.points[u] - D.points[v]).norm(); sum += l; sum2 += l*l; ne++; }
-        double L_mean = sum / ne;
-        double cv = sqrt(max(0.0, sum2/ne - L_mean*L_mean)) / L_mean;
+            for (int v : D[u])
+                if (v > u) edge_lens.push_back((D.points[u] - D.points[v]).norm());
+        double cv = cv_twopass(edge_lens);
 
-        // Triangle angles
-        double ang_min = 180, ang_max = 0, asum = 0, asum2 = 0; int na = 0;
-        for (const auto& tri : D.triangles())
+        auto tris = D.triangles();
+        vector<double> angles;
+        double ang_min = 180, ang_max = 0;
+        for (const auto& tri : tris)
             for (int c = 0; c < 3; c++) {
                 coord3d va = D.points[tri[(c+1)%3]] - D.points[tri[c]];
                 coord3d vb = D.points[tri[(c+2)%3]] - D.points[tri[c]];
                 double ang = coord3d::angle(va, vb) * 180.0 / M_PI;
-                asum += ang; asum2 += ang*ang; na++;
+                angles.push_back(ang);
                 ang_min = min(ang_min, ang); ang_max = max(ang_max, ang);
             }
-        double ang_std = sqrt(max(0.0, asum2/na - (asum/na)*(asum/na)));
+        double ang_std = stddev_twopass(angles);
 
-        fprintf(stderr, "  C%-4d %5d %5zu | %8.5f %+8.4f %7.2f %7.2f %7.3f %4d %4d %8.0f\n",
+        fprintf(stderr, "  C%-4d %5d %5zu | %9.2e %+8.4f %7.2f %7.2f %9.2e %4d %4d %8.0f\n",
                N_ful, N_dv, ep.steps.size(), cv, h, ang_min, ang_max, ang_std, nc, nd, ms);
 
         EXPECT_EQ(nd, 0) << "C" << N_ful << " nanotube: orientation defects";
@@ -1639,9 +1631,9 @@ TEST(ExtPathConvexity, GCSeries) {
     ico.optimize(ico.points);
 
     fprintf(stderr, "\n  GC fullerenes via ExtPath (N iters/step):\n");
-    fprintf(stderr, "  %-10s %6s %5s %5s | %8s %8s %7s %7s %7s %4s %4s %8s\n",
+    fprintf(stderr, "  %-10s %6s %5s %5s | %9s %8s %7s %7s %9s %4s %4s %8s\n",
             "source", "C_N", "N_dv", "steps", "L_cv", "h_min", "ang_min", "ang_max", "ang_std", "conc", "odef", "ms");
-    fprintf(stderr, "  %s\n", string(100, '-').c_str());
+    fprintf(stderr, "  %s\n", string(102, '-').c_str());
 
     // Icosahedral GC(k,0) series
     for (int k : {2, 3, 5, 7}) {
@@ -1667,26 +1659,26 @@ TEST(ExtPathConvexity, GCSeries) {
         int nc = (int)concave_vertices(D).size();
         int nd = count_orientation_defects(D);
 
-        double sum = 0, sum2 = 0; int ne = 0;
+        vector<double> edge_lens;
         for (int u = 0; u < D.N; u++)
-            for (int v : D.nbrs(u))
-                if (v > u) { double l = (D.points[u] - D.points[v]).norm(); sum += l; sum2 += l*l; ne++; }
-        double L_mean = sum / ne;
-        double cv = sqrt(max(0.0, sum2/ne - L_mean*L_mean)) / L_mean;
+            for (int v : D[u])
+                if (v > u) edge_lens.push_back((D.points[u] - D.points[v]).norm());
+        double cv = cv_twopass(edge_lens);
 
-        // Triangle angles
-        double ang_min = 180, ang_max = 0, asum = 0, asum2 = 0; int na = 0;
-        for (const auto& tri : D.triangles())
+        auto d_tris = D.triangles();
+        vector<double> angles;
+        double ang_min = 180, ang_max = 0;
+        for (const auto& tri : d_tris)
             for (int c = 0; c < 3; c++) {
                 coord3d va = D.points[tri[(c+1)%3]] - D.points[tri[c]];
                 coord3d vb = D.points[tri[(c+2)%3]] - D.points[tri[c]];
                 double ang = coord3d::angle(va, vb) * 180.0 / M_PI;
-                asum += ang; asum2 += ang*ang; na++;
+                angles.push_back(ang);
                 ang_min = min(ang_min, ang); ang_max = max(ang_max, ang);
             }
-        double ang_std = sqrt(max(0.0, asum2/na - (asum/na)*(asum/na)));
+        double ang_std = stddev_twopass(angles);
 
-        fprintf(stderr, "  GC(%d,0)    C%-4d %5d %5zu | %8.5f %+8.4f %7.2f %7.2f %7.3f %4d %4d %8.0f\n",
+        fprintf(stderr, "  GC(%d,0)    C%-4d %5d %5zu | %9.2e %+8.4f %7.2f %7.2f %9.2e %4d %4d %8.0f\n",
                k, N_ful, N_dv, ep.steps.size(), cv, h, ang_min, ang_max, ang_std, nc, nd, ms);
 
         EXPECT_EQ(nd, 0) << "GC(" << k << ",0) orientation defects";
@@ -1727,26 +1719,27 @@ TEST(ExtPathConvexity, GCSeries) {
         int nc = (int)concave_vertices(D).size();
         int nd = count_orientation_defects(D);
 
-        double sum = 0, sum2 = 0; int ne = 0;
+        vector<double> edge_lens;
         for (int u = 0; u < D.N; u++)
-            for (int v : D.nbrs(u))
-                if (v > u) { double l = (D.points[u] - D.points[v]).norm(); sum += l; sum2 += l*l; ne++; }
-        double L_mean = sum / ne;
-        double cv = sqrt(max(0.0, sum2/ne - L_mean*L_mean)) / L_mean;
+            for (int v : D[u])
+                if (v > u) edge_lens.push_back((D.points[u] - D.points[v]).norm());
+        double cv = cv_twopass(edge_lens);
 
         // Triangle angles
-        double ang_min = 180, ang_max = 0, asum = 0, asum2 = 0; int na = 0;
-        for (const auto& tri : D.triangles())
+        auto d_tris = D.triangles();
+        vector<double> angles;
+        double ang_min = 180, ang_max = 0;
+        for (const auto& tri : d_tris)
             for (int c = 0; c < 3; c++) {
                 coord3d va = D.points[tri[(c+1)%3]] - D.points[tri[c]];
                 coord3d vb = D.points[tri[(c+2)%3]] - D.points[tri[c]];
                 double ang = coord3d::angle(va, vb) * 180.0 / M_PI;
-                asum += ang; asum2 += ang*ang; na++;
+                angles.push_back(ang);
                 ang_min = min(ang_min, ang); ang_max = max(ang_max, ang);
             }
-        double ang_std = sqrt(max(0.0, asum2/na - (asum/na)*(asum/na)));
+        double ang_std = stddev_twopass(angles);
 
-        fprintf(stderr, "  C%d+GC(2) C%-4d %5d %5zu | %8.5f %+8.4f %7.2f %7.2f %7.3f %4d %4d %8.0f\n",
+        fprintf(stderr, "  C%d+GC(2) C%-4d %5d %5zu | %9.2e %+8.4f %7.2f %7.2f %9.2e %4d %4d %8.0f\n",
                baseN, gc_N_ful, gc_N_dv, ep_gc.steps.size(), cv, h, ang_min, ang_max, ang_std, nc, nd, ms);
 
         EXPECT_EQ(nd, 0) << "C" << baseN << "+GC(2,0) orientation defects";
