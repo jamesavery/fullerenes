@@ -1117,15 +1117,15 @@ static Deltahedron make_deltahedron_from_db(int N, const IsomerDB::Entry& entry)
 // Tests all (or up to max_isomers) isomers for the given N.
 // Only prints per-isomer rows for non-converged or problematic isomers (verbose=true prints all).
 static void test_optimize_fullerene_duals(int N, int max_isomers = -1, bool IPR = true,
-                                          int max_iter = 3000, bool verbose = false) {
+                                          long long max_work = 0, bool verbose = false) {
   IsomerDB db = IsomerDB::readPDB(N, IPR);
   ASSERT_GT(db.entries.size(), 0u) << "No isomers found for C" << N;
 
   int n_test = (max_isomers > 0) ? min(max_isomers, (int)db.entries.size())
                                  : (int)db.entries.size();
 
-  printf("\nC%d%s (%d isomers, V_dual=%d, max_iter=%d):\n",
-         N, IPR ? " IPR" : "", n_test, N/2+2, max_iter);
+  printf("\nC%d%s (%d isomers, V_dual=%d):\n",
+         N, IPR ? " IPR" : "", n_test, N/2+2);
   OptStats::print_header();
   vector<OptStats> all_stats;
   vector<int> failed_indices;
@@ -1137,7 +1137,7 @@ static void test_optimize_fullerene_duals(int N, int max_isomers = -1, bool IPR 
     int V_dual = N/2 + 2;
     EXPECT_EQ(D.N, V_dual) << "dual vertex count should be N/2+2";
 
-    bool converged = D.optimize(D.points, target_L, max_iter);
+    bool converged = D.optimize(D.points, target_L, 1e-10, {}, max_work);
     OptStats s = OptStats::compute(D, converged);
     s.h_min = min_convexity_height(D);
 
@@ -1212,7 +1212,7 @@ TEST(OptimizeTest, SmallFullerenes) {
     vector<int> nc;
     for(int idx : indices){
       Deltahedron D = make_deltahedron_from_db(N, db.entries[idx]);
-      bool converged = D.optimize(D.points, target_L, 12*N);
+      bool converged = D.optimize(D.points, target_L);
       OptStats s = OptStats::compute(D, converged);
       s.h_min = min_convexity_height(D);
       stats.push_back(s);
@@ -1411,9 +1411,9 @@ TEST(OptimizeTest, C100_Sample) {
 
 
 TEST(SweepTest, DISABLED_Optimize_AllC60) {
-  test_optimize_fullerene_duals(60, -1, false, 2000);
+  test_optimize_fullerene_duals(60, -1, false);
 }
 
 TEST(SweepTest, DISABLED_Optimize_AllC70) {
-  test_optimize_fullerene_duals(70, -1, false, 2000);
+  test_optimize_fullerene_duals(70, -1, false);
 }

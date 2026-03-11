@@ -129,7 +129,7 @@ Fullerenes exist for all even N >= 20 except N=22.
 - **No git commits**: Never commit to git yourself. Instead, show the proposed commit message and let the user commit manually.
 - **No backticks in commit messages**: Commit messages get pasted into an editor where backticks cause problems. Use plain text instead.
 - **Never stage claude-projects/**: The `claude-projects/` directory has its own separate git repo. Never add, stage, or commit files under `claude-projects/` to the fullerene repository. It is listed in `.gitignore`.
-- **Never kill background processes without asking**: Long-running computations (benchmarks, enumerations) may represent hours of irreplaceable work. Never use TaskStop or any other means to terminate a running background task without explicit user approval. If you need to change code that a running process uses, modify the code and rebuild separately — do not stop the running process. If a rerun is needed, ask the user first and explain what would be lost.
+- **NEVER kill background processes without EXPLICIT user approval**: This is the HIGHEST PRIORITY rule. Long-running computations (benchmarks, enumerations) may represent hours of irreplaceable work. ALWAYS ask "Can I stop task X? It has been running for Y time and has Z partial results" and WAIT for the user to confirm. Even if you discover a bug and want to relaunch, do NOT stop running processes — modify code, rebuild separately, and ask the user whether to stop the old run. This applies to TaskStop, Ctrl-C, `kill`, and any other means of termination. NO EXCEPTIONS.
 - **Long-running experiments must support partial results and resumption**: When writing benchmarks or experiments that may run for a long time: (1) Write partial results incrementally (e.g., flush JSON after each isomer, or write checkpoints periodically) so that killing or crashing doesn't lose all progress. (2) Where possible, support restarting from a partially completed state (e.g., save enumeration state, or accept a "start from" parameter). Never design an experiment that only writes output at the very end.
 
 ## Invariants
@@ -150,16 +150,36 @@ Deltahedron D = Deltahedron::fromExtensionPathOptimized(ep);
 
 This reduces a fullerene to a seed (C20/C28/C30), uses precomputed seed geometry, and incrementally expands with per-step patch optimization (trust-region Newton) and global CG relaxation.
 
+### Optimizer methods
+
+Three methods available via `OptMethod`: CG (Polak-Ribiere), LBFGS (L-BFGS with m=7), ST (Steihaug trust-region with Hessian-vector products). `fromExtensionPathOptimized` takes both `method` (per-step) and `final_method` (final polish) parameters, allowing mixed configs like LBFGS+ST.
+
+### Work budget
+
+The optimizer uses a unified work budget: `n_energy + 2*n_grad + 7*n_hv` (calibrated cost ratios). Default: 400*Nv^2 where Nv = dual vertex count = N/2+2. Phase 1 (E_flat) gets 1/4 of budget.
+
+### Post-reflect CG polish
+
+After optimization, `reflect_concave` ensures convexity. If any vertices were reflected, a 50-iteration CG polish recovers angle quality (reflection can degrade angles by 80x). A final reflect pass catches any CG-reintroduced concavity.
+
+### Stagnation detection
+
+When angle_tol is set, the optimizer tracks whether energy decreases meaningfully. After 50 iterations without improvement, it breaks early (stuck at local minimum).
+
 ### Benchmark and diagnostic tools (benchmarks/)
 
 - **bench_epopt** — Batch quality benchmark. Generates M random isomers of size N via buckygen + reservoir sampling, runs fromExtensionPathOptimized on each, outputs JSON with per-isomer quality stats (edge_cv, edge_relerr_max, h_min, n_concave, ang_min/max/std, ang_relerr_max, gmax_L, iters, ms) and summary statistics. Supports resumption from partial JSON output.
   Usage: `bench_epopt N M output.json`
+- **bench_quality_pipeline** — Multi-method pipeline benchmark. Tests different method/tolerance configs across buckygen-enumerated isomers. Supports `--method` (CG/LBFGS/ST), `--final-method`, `--step-tol`, `--final-tol`, `--work-factor`, `--angle-tol`. Outputs CSV with per-isomer metrics.
+  Usage: `bench_quality_pipeline N M output.csv [--method LBFGS --final-method ST ...]`
 - **bench_report.py** — Formats bench_epopt JSON output as markdown tables with summary across sizes and worst-5 outliers.
   Usage: `python3 bench_report.py bench_C60.json bench_C70.json ...`
-- **patch_diag** — Per-expansion-step diagnostic (GTest). Replays the expansion pipeline manually, dumping mol2 after each sub-phase (lift, patch optimize, full CG). Prints per-vertex h values, edge lengths, signed triangle volumes. Edit target isomer (N, buckygen index) before use.
+- **patch_diag** — Per-expansion-step diagnostic (GTest). Replays the expansion pipeline manually, dumping mol2 after each sub-phase (lift, patch optimize, full CG). Prints per-vertex h values, edge lengths, signed triangle volumes. Takes N and buckygen_idx as CLI args.
+  Usage: `patch_diag N idx` or `patch_diag nanotube N`
 - **step_mol2** — Step-by-step quality evolution. Builds partial ExtensionPaths (first k steps) and shows quality stats at each intermediate size.
+- **difficult_isomers.json** — 78 difficult isomers (C200/C250/C300) that fail to converge under LBFGS+ST with default budget. Contains spiral representations for instant reconstruction without buckygen enumeration.
 
-Build (from build2/): `cmake --build . --target bench_epopt` (or patch_diag, step_mol2).
+Build (from build2/): `cmake --build . --target bench_epopt` (or bench_quality_pipeline, patch_diag, step_mol2).
 
 ## Recent Development Notes
 

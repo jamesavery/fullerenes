@@ -26,6 +26,14 @@ public:
   int n_hv_evals = 0;       // Set by optimize(): number of Hessian-vector products
   FILE* opt_log = nullptr;  // If set, optimize() writes periodic diagnostics here
   double opt_k_flat = 2.0;  // E_flat coefficient for optimize(). Set to 0 to skip phase 1.
+  double opt_k_conv = 0;   // E_conv coefficient for optimize(). Quadratic one-sided penalty:
+                            // E_conv = k * sum_v max(0, -h_v)^2.  Zero at any convex geometry,
+                            // pushes concave vertices toward convexity.  Set to ~10 in the
+                            // extension path pipeline.  See CONVEX-BFGS-design.md.
+  bool opt_convex_constraint = false;  // Steihaug rejects steps that make convex vertices
+                                       // concave (hard constraint). Use with k_conv=0.
+  bool opt_skip_post_reflect = false;   // Skip post-optimization reflect_concave + CG polish.
+                                        // Use when a subsequent phase will handle convexity.
   OptMethod opt_method = OptMethod::CG;  // Optimization method for optimize()
 
   // Constructors
@@ -37,20 +45,21 @@ public:
   // Uses tridiagonal Laplacian to place strip vertices at each step.
   static Deltahedron fromExtensionPath(const buckinverse::ExtensionPath& ep);
 
-  // Build from extension path with per-step CG optimization.
+  // Build from extension path with per-step optimization.
   // Same as fromExtensionPath, but calls optimize() after each expansion
   // step to relax geometry before the next strip is placed.
-  // max_iter_per_step: CG iterations per expansion step (default 200).
-  // max_iter_per_step: CG iterations per expansion step. 0 (default) = use 2*D.N.
-  // After all steps, runs a final 12*N optimization pass.
-  static Deltahedron fromExtensionPathOptimized(const buckinverse::ExtensionPath& ep, int max_iter_per_step = 0, FILE* log = nullptr,
+  // max_work_per_step: work budget per optimize() call. 0 = default (20*N^3).
+  static Deltahedron fromExtensionPathOptimized(const buckinverse::ExtensionPath& ep, FILE* log = nullptr,
                                                   StepCallback diag = nullptr,
-                                                  OptMethod method = OptMethod::CG,
-                                                  double step_tol = 1e-3,
-                                                  double final_tol = 1e-5,
+                                                  OptMethod method = OptMethod::LBFGS,
+                                                  double step_tol = 1e-4,
+                                                  double final_tol = 1e-11,
                                                   long long max_work_per_step = 0,
                                                   double step_angle_tol = 0,
-                                                  double final_angle_tol = 0);
+                                                  double final_angle_tol = 0,
+                                                  OptMethod final_method = OptMethod::STEIHAUG,
+                                                  double patch_grad_tol = 1e-10,
+                                                  bool global_post_patch_reflect = false);
 
   // Quality metrics
   double max_angle_relerr() const;  // max over face angles of |theta - pi/3| / (pi/3)
@@ -69,14 +78,16 @@ public:
   // Optimize geometry toward equilateral triangles.
   // Replaces this->points with optimized coordinates.
   // target_L: desired edge length (0 = compute from mean of initial edges).
-  // max_iter: maximum CG iterations (default 3000).
   // grad_tol: dimensionless convergence tolerance (default 1e-10).
   //           Convergence is declared when max_i(||g_i|| * L) < grad_tol,
   //           i.e. the largest per-vertex force in dimensionless units is
   //           below this threshold.  This is scale-invariant: the same
   //           tolerance gives the same geometric quality regardless of N or L.
-  // Returns true if converged.
-  bool optimize(const vector<coord3d>& initial_geometry, double target_L = 0, int max_iter = 3000, double grad_tol = 1e-10,
+  // max_work: work budget = n_energy + N*n_grad + N*n_hv. 0 = default (20*N^3).
+  // angle_tol: if > 0, converge when max_angle_relerr() < angle_tol and no concave vertices.
+  // Returns true if converged (vs budget exhaustion).
+  bool optimize(const vector<coord3d>& initial_geometry, double target_L = 0,
+                double grad_tol = 1e-10,
                 const vector<bool>& fixed = {},
                 long long max_work = 0,
                 double angle_tol = 0);
@@ -95,7 +106,8 @@ public:
                       const vector<bool>& interior_mask = {},
                       double target_L = 0,
                       int max_iter = 150,
-                      double grad_tol = 1e-6);
+                      double grad_tol = 1e-6,
+                      bool convex_constraint = true);
 
   // Reflect concave vertices through their neighbor centroid plane.
   // Vertices with h < -threshold are reflected (h = signed height above
@@ -104,6 +116,11 @@ public:
   // Returns number of vertices reflected.
   int reflect_concave(vector<coord3d>& pts, double threshold = 0,
                       const vector<bool>& fixed = {}) const;
+
+  // Repeatedly reflect concave vertices until none remain (or 20-pass limit).
+  // Returns total number of vertices reflected across all passes.
+  int reflect_all_concave(vector<coord3d>& pts, double threshold = 0,
+                          const vector<bool>& fixed = {}) const;
 
   // Finite-difference gradient check. Returns max relative error.
   // Uses the given geometry (or this->points if empty).
