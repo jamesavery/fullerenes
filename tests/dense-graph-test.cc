@@ -246,3 +246,26 @@ TEST_P(ToVectorsRoundTrip, CubicGraph) {
 }
 
 INSTANTIATE_TEST_SUITE_P(Sizes, ToVectorsRoundTrip, ::testing::Values(20, 60, 80));
+
+// ---------------------------------------------------------------------------
+// Degree overflow guard: must abort with a clear message, not segfault
+// ---------------------------------------------------------------------------
+
+TEST(DenseOverflowDeathTest, PushBackOverflow) {
+    S::OwnedDenseGraph<> g(1, 3);
+    g.push_back(0, 1);
+    g.push_back(0, 2);
+    g.push_back(0, 3);
+    // Vertex 0 is now full (deg=3, dmax=3). Next push_back must abort.
+    EXPECT_DEATH(g.push_back(0, 4),
+                 "degree overflow at vertex 0.*deg=3.*dmax=3");
+}
+
+TEST(DenseOverflowDeathTest, InsertAtOverflow) {
+    S::OwnedDenseGraph<> g(2, 2);
+    g.push_back(1, 10);
+    g.push_back(1, 20);
+    // Vertex 1 is now full (deg=2, dmax=2). insert_at must abort.
+    EXPECT_DEATH(g.insert_at(1, 30, 1),
+                 "degree overflow at vertex 1.*deg=2.*dmax=2");
+}
