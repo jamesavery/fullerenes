@@ -64,13 +64,21 @@ struct DenseGraph {
     // --- Per-row mutation (no reallocation) ---
 
     void push_back(K u, K v) {
-        assert(deg[u] < dmax);
+        if (deg[u] >= dmax) {
+            std::cerr << "DenseGraph::push_back: degree overflow at vertex " << u
+                      << " (deg=" << int(deg[u]) << ", dmax=" << dmax << ")\n";
+            std::abort();
+        }
         values[u * dmax + deg[u]] = v;
         deg[u]++;
     }
 
     void insert_at(K u, K v, int pos) {
-        assert(deg[u] < dmax);
+        if (deg[u] >= dmax) {
+            std::cerr << "DenseGraph::insert_at: degree overflow at vertex " << u
+                      << " (deg=" << int(deg[u]) << ", dmax=" << dmax << ")\n";
+            std::abort();
+        }
         K* row = values.data() + u * dmax;
         int d = deg[u];
         for (int i = d; i > pos; --i)
