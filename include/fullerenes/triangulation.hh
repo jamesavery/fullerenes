@@ -127,6 +127,7 @@ public:
   vector<vector<node_t>> quads_of_the_line(node_t u0, int i, int a, int b) const;  
 
   Triangulation sort_nodes() const;
+  Triangulation sort_flat_last() const;
 };
 
 

@@ -1246,6 +1246,29 @@ Triangulation Triangulation::sort_nodes() const
   return Triangulation(new_neighbours);
 }
 
+Triangulation Triangulation::sort_flat_last() const
+{
+  // Sort vertices so cone points (degree != 6) come first in original order,
+  // then flat (degree-6) vertices in original order.  This is the correct
+  // ordering for iDT vertex removal, which removes from the back.
+  vector< pair<int,int> > keys(N);
+  for(int u=0;u<N;u++) keys[u] = make_pair((degree(u) == 6) ? 1 : 0, u);
+  sort(keys.begin(), keys.end());
+
+  vector<int> newname(N), oldname(N);
+  for(node_t u_new=0;u_new<N;u_new++){
+    newname[keys[u_new].second] = u_new;
+    oldname[u_new] = keys[u_new].second;
+  }
+
+  neighbours_t new_neighbours(N);
+  for(int u=0;u<N;u++)
+    for(size_t i=0;i<neighbours[u].size();i++)
+      new_neighbours[newname[u]].push_back(newname[neighbours[u][i]]);
+
+  return Triangulation(new_neighbours);
+}
+
 spiral_nomenclature FullereneDual::name(bool rarest_start) const
 {
   return spiral_nomenclature(dual_graph(), spiral_nomenclature::FULLERENE,

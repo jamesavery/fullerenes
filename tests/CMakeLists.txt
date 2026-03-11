@@ -42,4 +42,8 @@ add_test(NAME convex-hull-test COMMAND convex-hull-test)
 
 add_executable(delaunay-test delaunay-test.cc)
 target_link_libraries(delaunay-test fullerenes GTest::GTest GTest::Main)
+target_compile_definitions(delaunay-test PRIVATE FULLERENE_ROOT="${CMAKE_SOURCE_DIR}")
 add_test(NAME delaunay-test COMMAND delaunay-test)
+add_executable(extract-graph extract_graph.cc)
+target_link_libraries(extract-graph fullerenes)
+target_compile_definitions(extract-graph PRIVATE FULLERENE_ROOT="${CMAKE_SOURCE_DIR}")
