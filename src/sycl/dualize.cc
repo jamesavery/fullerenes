@@ -28,7 +28,7 @@ struct DeviceDualGraph{
         }
 
         assert(false);
-	return -1;		// Make compiler happy
+    	return std::numeric_limits<K>::max();		// Make compiler happy
     }
     K arc_ix(const node2& e){ return arc_ix(e[0], e[1]); }
 
