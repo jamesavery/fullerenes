@@ -4,6 +4,11 @@
 #define TEMPLATE_TYPEDEFS(T,K) FLOAT_TYPEDEFS(T) INT_TYPEDEFS(K)
 #define SEMINARIO_FORCE_CONSTANTS 0
 
+template <typename T, int Dims = 1>
+inline T* get_raw_ptr(const sycl::local_accessor<T, Dims>& accessor) {
+	return accessor.template get_multi_ptr<sycl::access::decorated::no>().get();
+}
+
 #include "coord3d.cc"
 #include "sym-mat3.cc"
 #include "cubic-graph.cc"
