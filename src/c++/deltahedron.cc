@@ -1166,9 +1166,12 @@ Deltahedron Deltahedron::fromExtensionPath(const ExtensionPath& ep) {
 
     // 3. For each expansion step: compute coords, expand topology, enforce convexity
     for (const auto& step : ep.steps) {
+        if (step.kind.type == ExpKind::F_type)
+            shiftForFRing(rd, step, points);
         computeStripCoords(step, points);
         rd.expand(step);
-        liftStripToSurface(step, rd, points);
+        if (step.kind.type != ExpKind::F_type)
+            liftStripToSurface(step, rd, points);
     }
 
     // 4. Extract compact Graph with renumbered coordinates
@@ -1316,7 +1319,8 @@ Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, FIL
                                                      OptMethod method, double step_tol, double final_tol, long long max_work_per_step,
                                                      double step_angle_tol, double final_angle_tol,
                                                      OptMethod final_method, double patch_grad_tol,
-                                                     bool global_post_patch_reflect) {
+                                                     bool global_post_patch_reflect,
+                                                     IterCallback iter_diag, int iter_interval) {
     int full_N = ep.full_N;
     vector<coord3d> points(full_N);
 
@@ -1469,6 +1473,8 @@ Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, FIL
         D.opt_k_conv = 0;   // pure quality; reflect handles convexity
         D.opt_skip_post_reflect = true;  // we handle reflect in the loop
         D.opt_method = method;
+        D.opt_iter_callback = iter_diag;
+        D.opt_iter_interval = iter_interval;
         int n_steps = (int)ep.steps.size();
         bool log_this = log && (step_idx <= 2 || step_idx == n_steps/2 || step_idx >= n_steps - 2);
 
@@ -1529,6 +1535,8 @@ Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, FIL
     D.opt_convex_constraint = false;
     D.opt_skip_post_reflect = true;  // we handle reflect in the loop
     D.opt_method = final_method;
+    D.opt_iter_callback = iter_diag;
+    D.opt_iter_interval = iter_interval;
     int total_final_iters = 0;
 
     for(int round = 0; round < 10; round++){
@@ -2593,6 +2601,14 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
                 iter, E, vec_norm(grad), compute_gmax(grad), alpha, edge_cv(),
                 max_angle_relerr(), phase);
 
+      // Iteration callback for live visualization
+      if(opt_iter_callback && (iter % opt_iter_interval == 0)){
+        final_gmax_L = compute_gmax(grad);
+        final_angle_relerr = max_angle_relerr();
+        final_n_concave = count_concave();
+        opt_iter_callback(iter, final_gmax_L, final_angle_relerr, final_n_concave, *this);
+      }
+
       // Polak-Ribiere beta
       double gg_old = vec_dot(grad_old, grad_old);
       double beta = 0.0;
@@ -2721,6 +2737,14 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
         fprintf(opt_log, "  LB %4d: E=%.6f |g|=%.4e gmax*L=%.4e a=%.3e cv=%.4f ang=%.2e hmin=%+.4f ph=%d h=%d\n",
                 iter, E, vec_norm(grad), compute_gmax(grad), alpha, edge_cv(),
                 max_angle_relerr(), h_min_log, phase, (int)S.size());
+      }
+
+      // Iteration callback for live visualization
+      if(opt_iter_callback && (iter % opt_iter_interval == 0)){
+        final_gmax_L = compute_gmax(grad);
+        final_angle_relerr = max_angle_relerr();
+        final_n_concave = count_concave();
+        opt_iter_callback(iter, final_gmax_L, final_angle_relerr, final_n_concave, *this);
       }
     }
   }
@@ -2883,6 +2907,14 @@ bool Deltahedron::optimize(const vector<coord3d>& initial_geometry, double targe
         fprintf(opt_log, "  ST %4d: E=%.6f |g|=%.4e gmax*L=%.4e |z|=%.2e D=%.2e rho=%.2f ang=%.2e in=%d ph=%d %s\n",
                 iter, E, vec_norm(grad), compute_gmax(grad), znorm, Delta, rho,
                 max_angle_relerr(), inner_iters, phase, accepted ? "acc" : "REJ");
+
+      // Iteration callback for live visualization
+      if(opt_iter_callback && accepted && (iter % opt_iter_interval == 0)){
+        final_gmax_L = compute_gmax(grad);
+        final_angle_relerr = max_angle_relerr();
+        final_n_concave = count_concave();
+        opt_iter_callback(iter, final_gmax_L, final_angle_relerr, final_n_concave, *this);
+      }
     }
   }
 

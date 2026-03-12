@@ -245,6 +245,7 @@ message("FLAGS: " ${FLAGS})
 add_subdirectory(programs)
 add_subdirectory(benchmarks)
 add_subdirectory(tests)
+add_subdirectory(src/gui/viewer)
 
 
 

@@ -16,6 +16,14 @@ public:
   // Phases: "seed", "placed", "reflected", "patched", "cg", "final".
   // "patched" = after patch optimize, BEFORE full-graph CG (the key one).
   using StepCallback = std::function<void(int step, const char* phase, const Deltahedron& D)>;
+
+  // Per-iteration callback for optimize(). If set, called every opt_iter_interval
+  // iterations with a snapshot of the current geometry. For real-time visualization.
+  // Args: (iteration, gmax_L, angle_relerr, n_concave, deltahedron_with_current_points).
+  using IterCallback = std::function<void(int iter, double gmax_L, double angle_relerr, int n_concave, const Deltahedron& D)>;
+  IterCallback opt_iter_callback;
+  int opt_iter_interval = 1;  // Call opt_iter_callback every N iterations
+
   vector<coord3d> points;
   int iterations_used = 0;  // Set by optimize()
   double final_gmax_L = 0;  // Set by optimize(): max_i(||g_i||*L) at final iteration
@@ -59,7 +67,9 @@ public:
                                                   double final_angle_tol = 0,
                                                   OptMethod final_method = OptMethod::STEIHAUG,
                                                   double patch_grad_tol = 1e-10,
-                                                  bool global_post_patch_reflect = false);
+                                                  bool global_post_patch_reflect = false,
+                                                  IterCallback iter_diag = nullptr,
+                                                  int iter_interval = 1);
 
   // Quality metrics
   double max_angle_relerr() const;  // max over face angles of |theta - pi/3| / (pi/3)
