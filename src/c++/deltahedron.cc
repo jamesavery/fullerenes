@@ -1779,7 +1779,7 @@ static double deltahedron_energy_and_gradient(
     double k_angle,
     double k_curv,
     double k_flat,
-    double k_conv,
+    double k_conv, double sigma_conv = 0,  // sigma_conv>0: softplus E_conv, 0: quadratic
     const vector<bool>& conv_mask = {})  // if non-empty, restrict E_conv to these vertices
 {
   const int N = D.N;
@@ -1892,9 +1892,11 @@ static double deltahedron_energy_and_gradient(
     }
   }
 
-  // E_conv: quadratic one-sided convexity penalty.
-  // E_conv = k_conv * sum_v max(0, -h_v)^2.
-  // Identically zero at any convex geometry (all h_v > 0).
+  // E_conv: convexity penalty.
+  // sigma_conv > 0: softplus  E = k * sigma * log(1 + exp(-h/sigma)).
+  //                 Smooth (C-inf), linear for h << -sigma, zero for h >> sigma.
+  // sigma_conv == 0: quadratic  E = k * h^2 for h < 0.
+  //                 Simpler, C1 at h=0 (discontinuous Hessian).
   if(k_conv > 0){
     for(int v = 0; v < N; v++){
       int d = D.degree(v);
@@ -1903,14 +1905,31 @@ static double deltahedron_energy_and_gradient(
 
       auto vd = grad ? VertexHData::compute_derivs(D, x, v)
                      : VertexHData::compute_h(D, x, v);
-      if(!vd.valid || vd.h >= 0) continue;  // h >= 0: zero energy, skip
+      if(!vd.valid) continue;
 
-      energy += k_conv * vd.h * vd.h;
+      double dEdh;
+      if(sigma_conv > 0){
+        // Softplus: E = k * sigma * log(1 + exp(-h/sigma))
+        double z = vd.h / sigma_conv;
+        double sig = (z > 20) ? 0.0 : (z < -20) ? 1.0 : 1.0 / (1.0 + exp(z));
+        if(sig < 1e-15) continue;  // h >> sigma: numerically zero
 
-      if(grad){
-        double dEdh = 2.0 * k_conv * vd.h;  // negative for h<0 (pushes toward h>0)
-        vd.scatter_dhdx(dEdh, *grad);
+        // log(1+exp(-z)) overflows for z << -20; use -z asymptote there
+        if(z < -20)
+          energy += k_conv * (-vd.h);  // k * sigma * (-z) = -k * h
+        else
+          energy += k_conv * sigma_conv * log1p(exp(-z));
+
+        dEdh = -k_conv * sig;
+      } else {
+        // Quadratic: E = k * h^2 for h < 0
+        if(vd.h >= 0) continue;
+        energy += k_conv * vd.h * vd.h;
+        dEdh = 2.0 * k_conv * vd.h;
       }
+
+      if(grad)
+        vd.scatter_dhdx(dEdh, *grad);
     }
   }
 
@@ -1961,7 +1980,7 @@ static void deltahedron_hv_product(
     double L,
     double k_bond, double k_angle, double k_curv, double k_flat,
     const vector<bool>& fixed = {},
-    double k_conv = 0)
+    double k_conv = 0, double sigma_conv = 0)
 {
   const int N = D.N;
   const matrix3d I = matrix3d::unit_matrix();
@@ -2031,19 +2050,30 @@ static void deltahedron_hv_product(
     }
   }
 
-  // --- E_conv Hv --- quadratic one-sided: E = k * h² for h<0, 0 for h>=0.
+  // --- E_conv Hv ---
+  // sigma_conv > 0: softplus E = k*sigma*log(1+exp(-h/sigma)).
+  // sigma_conv == 0: quadratic E = k*h² for h<0, 0 for h>=0.
   // Exact Hv = d²E/dh² * (dh/dx ⊗ dh/dx) * v  +  dE/dh * d²h/dx² * v.
-  // Identically zero for h >= 0.  C1 at h=0.
   if(k_conv > 0){
     for(int vertex = 0; vertex < N; vertex++){
       int d = D.degree(vertex);
       if(d > 6) continue;
 
       auto vd = VertexHData::compute_derivs(D, x, vertex);
-      if(!vd.valid || vd.h >= 0) continue;
+      if(!vd.valid) continue;
 
-      double dEdh   = 2.0 * k_conv * vd.h;
-      double d2Edh2 = 2.0 * k_conv;
+      double dEdh, d2Edh2;
+      if(sigma_conv > 0){
+        double z = vd.h / sigma_conv;
+        double sig = (z > 20) ? 0.0 : (z < -20) ? 1.0 : 1.0 / (1.0 + exp(z));
+        if(sig < 1e-15) continue;
+        dEdh   = -k_conv * sig;
+        d2Edh2 = (k_conv / sigma_conv) * sig * (1.0 - sig);
+      } else {
+        if(vd.h >= 0) continue;
+        dEdh   = 2.0 * k_conv * vd.h;
+        d2Edh2 = 2.0 * k_conv;
+      }
 
       // Rank-1: Hv += d²E/dh² * (dh/dx · v) * dh/dx
       vd.scatter_dhdx(d2Edh2 * vd.dhdx_dot(v), Hv);
@@ -2084,9 +2114,10 @@ static double deltahedron_energy_only(
     const vector<edge_t>& edges,
     std::span<const coord3d> x,
     double L, double k_bond, double k_angle, double k_curv, double k_flat, double k_conv,
+    double sigma_conv = 0,
     const vector<bool>& conv_mask = {})
 {
-  return deltahedron_energy_and_gradient(D, edges, x, nullptr, L, k_bond, k_angle, k_curv, k_flat, k_conv, conv_mask);
+  return deltahedron_energy_and_gradient(D, edges, x, nullptr, L, k_bond, k_angle, k_curv, k_flat, k_conv, sigma_conv, conv_mask);
 }
 
 // Compute signed convexity height h for all vertices.
@@ -2252,11 +2283,13 @@ bool Deltahedron::optimize_patch(std::span<const coord3d> initial_geometry,
   // Lambdas wrapping energy/gradient computation.
   // interior_mask restricts E_conv to vertices with full neighbor sets in the
   // patch — boundary vertices have truncated degree and produce bogus h values.
+  // sigma_conv matches assemble_patch_hessian's softplus E_conv formulation.
+  const double sigma_conv = 0.2 * L;
   auto energy_fn = [&](std::span<const coord3d> x) -> double {
-    return deltahedron_energy_only(*this, edges, x, L, k_bond, k_angle, k_curv, k_flat, k_conv, interior_mask);
+    return deltahedron_energy_only(*this, edges, x, L, k_bond, k_angle, k_curv, k_flat, k_conv, sigma_conv, interior_mask);
   };
   auto grad_fn = [&](std::span<const coord3d> x, vector<coord3d>& g) -> double {
-    return deltahedron_energy_and_gradient(*this, edges, x, &g, L, k_bond, k_angle, k_curv, k_flat, k_conv, interior_mask);
+    return deltahedron_energy_and_gradient(*this, edges, x, &g, L, k_bond, k_angle, k_curv, k_flat, k_conv, sigma_conv, interior_mask);
   };
 
   // Extract free-vertex gradient components into flat vector
@@ -3391,7 +3424,7 @@ double Deltahedron::hessian_check(std::span<const coord3d> geometry,
   auto grad_fn = [&](const vector<coord3d>& xx, vector<double>& gf){
     vector<coord3d> g(N, coord3d(0,0,0));
     deltahedron_energy_and_gradient(*this, edges, xx, &g, L,
-                                    k_bond, k_angle, k_curv, k_flat, k_conv, interior_mask);
+                                    k_bond, k_angle, k_curv, k_flat, k_conv, sigma, interior_mask);
     gf.resize(ndof);
     for(int k = 0; k < nfree; k++)
       for(int c = 0; c < 3; c++)

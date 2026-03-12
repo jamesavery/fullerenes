@@ -148,19 +148,19 @@ The `Deltahedron` class (`include/fullerenes/deltahedron.hh`, `src/c++/deltahedr
 Deltahedron D = Deltahedron::fromExtensionPathOptimized(ep);
 ```
 
-This reduces a fullerene to a seed (C20/C28/C30), uses precomputed seed geometry, and incrementally expands with per-step patch optimization (trust-region Newton) and global CG relaxation.
+This reduces a fullerene to a seed (C20/C28/C30), uses precomputed seed geometry, and incrementally expands with per-step patch optimization (trust-region Newton) and reflect-optimize loops. See PATCH-GEOMETRY.md for the full pipeline description.
 
 ### Optimizer methods
 
-Three methods available via `OptMethod`: CG (Polak-Ribiere), LBFGS (L-BFGS with m=7), ST (Steihaug trust-region with Hessian-vector products). `fromExtensionPathOptimized` takes both `method` (per-step) and `final_method` (final polish) parameters, allowing mixed configs like LBFGS+ST.
+Three methods available via `OptMethod`: CG (Polak-Ribiere), LBFGS (L-BFGS with m=10), STEIHAUG (trust-region Newton-CG with Hessian-vector products). `fromExtensionPathOptimized` takes both `method` (per-step) and `final_method` (final polish) parameters, allowing mixed configs like LBFGS+STEIHAUG.
 
 ### Work budget
 
-The optimizer uses a unified work budget: `n_energy + 2*n_grad + 7*n_hv` (calibrated cost ratios). Default: 400*Nv^2 where Nv = dual vertex count = N/2+2. Phase 1 (E_flat) gets 1/4 of budget.
+The optimizer uses a unified work budget: `n_energy + 2*n_grad + 7*n_hv` (calibrated cost ratios). Default: 400*Nv^2 where Nv = dual vertex count = N/2+2. Phase 1 (E_flat) gets 1/4 of budget in standalone optimize(); E_flat is always OFF (k_flat=0) in the extension path pipeline.
 
-### Post-reflect CG polish
+### Convexity: reflect-optimize loops
 
-After optimization, `reflect_concave` ensures convexity. If any vertices were reflected, a 50-iteration CG polish recovers angle quality (reflection can degrade angles by 80x). A final reflect pass catches any CG-reintroduced concavity.
+Convexity is maintained by reflect-optimize loops at every level, not by energy penalties. `reflect_all_concave` mirrors concave vertices through their neighbor centroid plane (basin-switching, up to 20 passes), then the optimizer converges in the convex basin. Both the patch optimizer and full-graph optimizer use this loop: optimize freely (no hard constraint) → reflect concave on full graph → re-optimize if anything was reflected. The final phase uses constrained Steihaug (h>=0 trust region) to lock in convexity. E_conv (softplus, k=5) is used in the patch optimizer for smooth guidance but is NOT used in the full-graph optimizer (k_conv=0) because its Hessian dominates and corrupts angle quality.
 
 ### Stagnation detection
 
@@ -180,6 +180,12 @@ When angle_tol is set, the optimizer tracks whether energy decreases meaningfull
 - **difficult_isomers.json** — 78 difficult isomers (C200/C250/C300) that fail to converge under LBFGS+ST with default budget. Contains spiral representations for instant reconstruction without buckygen enumeration.
 
 Build (from build2/): `cmake --build . --target bench_epopt` (or bench_quality_pipeline, patch_diag, step_mol2).
+
+## Delaunay Geometry Initial Embedding (Active Sub-project)
+
+Using the intrinsic Delaunay triangulation (iDT) to produce initial 3D geometries for the Deltahedron optimizer. Pipeline: compute iDT between the 12 cone points (exact surface geodesics) -> optimize a 12-vertex polyhedron to match those distances -> unfold the original triangulation into per-iDT-triangle charts -> place degree-6 vertices via barycentric interpolation -> relax with the full optimizer. See `claude-projects/delaunay-geometry/PROGRESS.md` for detailed task breakdown.
+
+Key files: `include/fullerenes/delaunay.hh`, `src/c++/delaunay.cc` (iDT computation), `include/fullerenes/unfold.hh`, `src/c++/unfold.cc` and `src/c++/fold.cc` (Eisenstein grid unfold/fold machinery).
 
 ## Recent Development Notes
 
