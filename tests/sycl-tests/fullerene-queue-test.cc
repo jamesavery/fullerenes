@@ -4,6 +4,25 @@
 #include <numeric>
 #include <gtest/gtest.h>
 
+namespace {
+
+bool same_neighbours(const neighbours_t& lhs, const neighbours_t& rhs) {
+    if (lhs.size() != rhs.size()) {
+        return false;
+    }
+    for (node_t u = 0; u < lhs.size(); ++u) {
+        if (lhs[u].size() != rhs[u].size()) {
+            return false;
+        }
+        if (!std::equal(lhs[u].begin(), lhs[u].end(), rhs[u].begin())) {
+            return false;
+        }
+    }
+    return true;
+}
+
+}
+
 
 class PushBackTest : public ::testing::TestWithParam<int> {
 protected:
@@ -14,7 +33,7 @@ protected:
     
     int N = GetParam();
     int n_max_isomers = IsomerDB::number_isomers(N);
-    Graph G(N/2 + 2, GRAPH_DMAX);
+    Graph G{node_t(N), GRAPH_DMAX};
     FullereneBatch batch = FullereneBatch(N, std::min(1,n_max_isomers));
     FullereneQueue queue = FullereneQueue(N, std::min(1,n_max_isomers));
 
@@ -70,14 +89,14 @@ TEST_P(PushBackTest, PushGraphFromBuckygenToFullereneBatch) {
     batch.push_back(G, 0);
     Graph G_batch(batch[0]);
     // Assert that the data is correctly transferred from Buckygen to batch and back
-    EXPECT_EQ(static_cast<const neighbours_t&>(G_batch), static_cast<const neighbours_t&>(G));
+    EXPECT_TRUE(same_neighbours(static_cast<const neighbours_t&>(G_batch), static_cast<const neighbours_t&>(G)));
 }
 
 TEST_P(PushBackTest, PushGraphFromBuckygenToFullereneQueue) {
     queue.push_back(G, 0);
     Graph G_queue(queue.front());
     // Assert that the data is correctly transferred from Buckygen to queue and back
-    EXPECT_EQ(static_cast<const neighbours_t&>(G_queue), static_cast<const neighbours_t&>(G));
+    EXPECT_TRUE(same_neighbours(static_cast<const neighbours_t&>(G_queue), static_cast<const neighbours_t&>(G)));
 }
 
 TEST_P(PushBackTest, PushMoreGraphsThanOriginalCapacityOfBatch) {
@@ -167,7 +186,7 @@ TEST_P(FullereneBatchTest, IndexOperator) {
     Fullerene fullerene = batch[0];
     Graph G_batch(fullerene);
     EXPECT_EQ(fullerene.N_, N);
-    EXPECT_EQ(static_cast<const neighbours_t&>(G_batch), static_cast<const neighbours_t&>(G));
+    EXPECT_TRUE(same_neighbours(static_cast<const neighbours_t&>(G_batch), static_cast<const neighbours_t&>(G)));
 }
 
 TEST_P(FullereneBatchTest, EqualityOperator) {
@@ -216,7 +235,7 @@ TEST_P(FullereneQueueTest, PushQueueToBatch) {
     EXPECT_EQ(queue2.size(), 2);
     EXPECT_EQ(batch.size(), 3);
     for (int i = 0; i < 3; i++) {
-        EXPECT_EQ(static_cast<const neighbours_t&>(Graph(batch[i])), static_cast<const neighbours_t&>(G));
+        EXPECT_TRUE(same_neighbours(static_cast<const neighbours_t&>(Graph(batch[i])), static_cast<const neighbours_t&>(G)));
     }
 }
 
@@ -352,7 +371,7 @@ TEST_P(FullereneQueueTest, QueueManipulation) {
     
     for (int i = 0; i < 12; i++) {
         EXPECT_EQ(queue[i].m_.ID_.get(), expected_queue_IDs_3[i]);
-        EXPECT_EQ(static_cast<const neighbours_t&>(Graph(queue[i])), static_cast<const neighbours_t&>(G));
+        EXPECT_TRUE(same_neighbours(static_cast<const neighbours_t&>(Graph(queue[i])), static_cast<const neighbours_t&>(G)));
     }
 
 }
@@ -463,7 +482,7 @@ TEST_P(FullereneQueueTest, IndexOperator) {
     Fullerene fullerene = queue[0];
     Graph G_queue(fullerene);
     EXPECT_EQ(fullerene.N_, N);
-    EXPECT_EQ(static_cast<const neighbours_t&>(G_queue), static_cast<const neighbours_t&>(G));
+    EXPECT_TRUE(same_neighbours(static_cast<const neighbours_t&>(G_queue), static_cast<const neighbours_t&>(G)));
 }
 
 TEST_P(FullereneQueueTest, EqualityOperator) {

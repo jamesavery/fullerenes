@@ -238,7 +238,7 @@ void FullereneQueue<T,K>::resize(size_t new_capacity) {
 }
 template <typename T, typename K>
 void FullereneBatch<T,K>::prepare_for_push_back(const neighbours_t& neighbours){
-    bool is_cubic = neighbours.at(0).size() == 3;
+    bool is_cubic = neighbours[0].size() == 3;
     if(N_ == 0 || Nf_ == 0) {
         if(is_cubic) {N_ = neighbours.size(); Nf_ = N_/2 + 2;}
         else{ Nf_ = neighbours.size(); N_ = 2*Nf_ - 4;}
@@ -254,17 +254,17 @@ void FullereneBatch<T,K>::push_back(const neighbours_t& neighbours, const int ID
 
 template <typename T, typename K>
 void FullereneBatch<T,K>::push_back(const Graph& G, const int ID) {
-    push_back(G.neighbours, ID);
+    push_back(static_cast<const neighbours_t&>(G), ID);
 }
 
 template <typename T, typename K>
 void FullereneBatch<T,K>::push_back(const PlanarGraph& G, const int ID) {
-    push_back(G.neighbours, ID);
+    push_back(static_cast<const neighbours_t&>(G), ID);
 }
 
 template <typename T, typename K>
 void FullereneBatch<T,K>::push_back(const Polyhedron& P, const int ID) {
-    prepare_for_push_back(P.neighbours);
+    prepare_for_push_back(static_cast<const neighbours_t&>(P));
     (*this)[size_++] = std::tuple<std::reference_wrapper<const Polyhedron>, size_t>(std::cref(P), static_cast<size_t>(ID));
 }
 

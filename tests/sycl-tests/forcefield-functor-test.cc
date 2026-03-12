@@ -16,7 +16,7 @@ protected:
     
     int N = GetParam();
     int n_max_isomers = IsomerDB::number_isomers(N);
-    Graph G(N/2 + 2, GRAPH_DMAX);
+    Graph G{node_t(N), GRAPH_DMAX};
     FullereneBatch batch = FullereneBatch(N, std::min(1,n_max_isomers));
     FullereneQueue queue = FullereneQueue(N, std::min(1,n_max_isomers));
 

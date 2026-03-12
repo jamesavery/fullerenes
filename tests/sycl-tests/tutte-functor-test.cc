@@ -14,7 +14,7 @@ protected:
     using T = float;
     using K = uint16_t;
     int N = GetParam();
-    Graph G(N/2 + 2, GRAPH_DMAX);
+    Graph G{node_t(N), GRAPH_DMAX};
     BuckyGen::buckygen_queue BQ = BuckyGen::start(N, false, false);
     FullereneBatch<float, uint16_t> batch;
     void SetUp() override {
@@ -44,14 +44,14 @@ protected:
     TutteFunctor<T, uint16_t> tutte16;
     SphericalProjectionFunctor<T, K> spherical_projection;
     SphericalProjectionFunctor<T, uint16_t> spherical_projection16;
-    Graph G(N/2 + 2, GRAPH_DMAX);
+    Graph G{node_t(N), GRAPH_DMAX};
     FullereneBatch<T, K> bigbatch;
     FullereneBatch<T, uint16_t> batch;
 
     void SetUp() override {
         BuckyGen::next_fullerene(BQ, G);
         Triangulation C21888(spiral_nomenclature("C21888-[3300,3494,4574,4792,8540,8740,9990,10096,10295,10395,10491,10942]-fullerene"));
-        bigbatch.push_back(Graph(static_cast<const neighbours_t&>(C21888), true), 0);
+        bigbatch.push_back(Graph(static_cast<const neighbours_t&>(C21888)), 0);
         batch.push_back(G, 0);
         batch.push_back(G, 1);
     }
@@ -68,7 +68,7 @@ protected:
     using K = uint16_t;
     BuckyGen::buckygen_queue BQ = BuckyGen::start(N, false, false);
     FullereneBatch<T, K> batch;
-    Graph G(N/2 + 2, GRAPH_DMAX);
+    Graph G{node_t(N), GRAPH_DMAX};
     
     
     void SetUp() override {
