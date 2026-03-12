@@ -9,10 +9,8 @@
 
 class FullereneGraph : public CubicGraph {
 public:
-  FullereneGraph(const Graph& g, const vector<coord2d>& layout = vector<coord2d>()) : CubicGraph(g,layout) { if(N>0) fullerene_check();  }
-  FullereneGraph(const PlanarGraph& g) : CubicGraph(g,g.layout2d) { if(N>0) fullerene_check(); }
-  FullereneGraph(const set<edge_t>& edges=set<edge_t>(), const vector<coord2d>& layout = vector<coord2d>()) 
-    : CubicGraph(Graph(edges),layout) { if(N>0) fullerene_check(); }
+  FullereneGraph(const Graph& g) : CubicGraph(g) { if(N>0) fullerene_check();  }
+  FullereneGraph(const PlanarGraph& g) : CubicGraph(g) { if(N>0) fullerene_check(); }
 
   FullereneGraph(const int N, const vector<int>& spiral_indices, const jumplist_t& jumps = jumplist_t()); 
   FullereneGraph(const spiral_nomenclature &fsn){
@@ -45,17 +43,17 @@ public:
   matrix<int> pentagon_distance_mtx() const;
 
   vector<coord3d> zero_order_geometry(double scalerad=4) const;
-  vector<coord3d> optimized_geometry(const vector<coord3d>& initial_geometry, int opt_method = 3, double ftol = 1e-12) const;
+  vector<coord3d> optimized_geometry(std::span<const coord3d> initial_geometry, int opt_method = 3, double ftol = 1e-12) const;
 
   static FullereneGraph C20() {
     // CW-oriented neighbour lists for dodecahedral C20, obtained from buckygen
-    return FullereneGraph(Graph(neighbours_t{
+    return FullereneGraph(Graph{
       {1,4,7},   {2,0,9},    {3,1,10},   {4,2,13},
       {5,0,3},   {6,4,14},   {7,5,16},   {8,0,6},
       {9,7,17},  {12,1,8},   {11,2,12},  {13,10,19},
       {10,9,18}, {14,3,11},  {15,5,13},  {16,14,19},
       {17,6,15}, {18,8,16},  {19,12,17}, {15,11,18}
-    }, true));
+    });
   }
 };
 

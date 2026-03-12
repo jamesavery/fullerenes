@@ -48,9 +48,7 @@ int main(int ac, char **av)
   for(int i=0; i!=graphs_per_file; i++){
     FullereneGraph fg = FullereneGraph(i, input);
 
-//    cout << 0 << fg.neighbours[0][0] <<  fg.neighbours[0][1] << endl;
-    fg.layout2d = fg.tutte_layout(fg.neighbours[0][0],0, fg.neighbours[0][1]);
-    //fg.layout2d = fg.tutte_layout();
+//    cout << 0 << fg[0][0] <<  fg[0][1] << endl;
 //    cout << "fg: " << fg << endl;
 
     bool pentagon_start = false;

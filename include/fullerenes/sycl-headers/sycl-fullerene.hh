@@ -55,16 +55,16 @@ struct Fullerene
     explicit operator Graph() const {
         ConditionFunctor cond(StatusEnum::FULLERENEGRAPH_PREPARED);
         bool is_cubic = cond(m_.flags_.get());
-        Graph G(neighbours_t(is_cubic ? N_ : Nf_));
         auto A = is_cubic ? d_.A_cubic_.template as_span<K>() : d_.A_dual_.template as_span<K>();
         auto count = is_cubic ? N_ : Nf_;
+        Graph adj(count, GRAPH_DMAX);
         for (size_t i = 0; i < count; i++) {
             auto degree = is_cubic ? 3 : d_.deg_[i];
             for (size_t j = 0; j < degree; j++) {
-                G.neighbours[i].push_back(A[i * (is_cubic ? 3 : 6) + j]);
+                adj[i].push_back(A[i * (is_cubic ? 3 : 6) + j]);
             }
         }
-        return G;
+        return Graph(adj);
     }
     
     explicit operator Polyhedron() const {
@@ -77,7 +77,7 @@ struct Fullerene
         Polyhedron P;
         using points_t = decltype(P.points);
         points_t points(N_);
-        neighbours_t neighbours(N_);
+        Graph neighbours(N_, GRAPH_DMAX);
         auto& A = d_.A_cubic_;
         for (size_t i = 0; i < N_; i++) {
             for (size_t j = 0; j < 3; j++) {
@@ -85,7 +85,7 @@ struct Fullerene
                 points[i][j] = d_.X_cubic_[i][j];
             }
         }
-        return Polyhedron(PlanarGraph(Graph(neighbours,true)), points);
+        return Polyhedron(PlanarGraph(Graph(neighbours)), points);
     }
 
 
@@ -157,27 +157,27 @@ struct Fullerene
     }
 
     Fullerene<T, K> &operator=(const Graph &G) {
-        *this = G.neighbours;
+        *this = static_cast<const neighbours_t&>(G);
         return *this;
     }
 
     Fullerene<T, K> &operator=(const PlanarGraph &PG) {
-        *this = std::make_tuple(std::cref(PG.neighbours), std::cref(PG.layout2d));
+        *this = static_cast<const neighbours_t&>(PG);
         return *this;
     }
 
     Fullerene<T, K> &operator=(const FullereneGraph &FG) {
-        *this = std::make_tuple(std::cref(FG.neighbours), std::cref(FG.layout2d));
+        *this = static_cast<const neighbours_t&>(FG);
         return *this;
     }
 
     Fullerene<T, K> &operator=(const FullereneDual &FD) {
-        *this = std::make_tuple(std::cref(FD.neighbours), std::cref(FD.layout2d));
+        *this = static_cast<const neighbours_t&>(FD);
         return *this;
     }
 
     Fullerene<T, K> &operator=(const Polyhedron &P) {
-        *this = P.neighbours;
+        *this = static_cast<const neighbours_t&>(P);
         auto is_cubic = P.points.size() == N_;
         auto dst_ptr = is_cubic ? d_.X_cubic_.data() : d_.X_dual_.data();
         if constexpr (std::is_same_v<decltype(d_.X_cubic_[0]), decltype(P.points[0])>) {
@@ -202,21 +202,21 @@ struct Fullerene
 
     Fullerene<T, K>& operator=(const std::tuple<std::reference_wrapper<const Graph>, size_t>& Graph_and_ID){
         auto& [G, ID] = Graph_and_ID;
-        *this = G.get().neighbours;
+        *this = static_cast<const neighbours_t&>(G.get());
         m_.ID_.get() = ID;
         return *this;
     }
 
     Fullerene<T, K>& operator=(const std::tuple<std::reference_wrapper<const PlanarGraph>, size_t>& PlanarGraph_and_ID){
         auto& [PG, ID] = PlanarGraph_and_ID;
-        *this = PG.get().neighbours;
+        *this = static_cast<const neighbours_t&>(PG.get());
         m_.ID_.get() = ID;
         return *this;
     }
 
     Fullerene<T, K>& operator=(const std::tuple<std::reference_wrapper<const FullereneGraph>, size_t>& FullereneGraph_and_ID){
         auto& [FG, ID] = FullereneGraph_and_ID;
-        *this = FG.get().neighbours;
+        *this = static_cast<const neighbours_t&>(FG.get());
         m_.ID_.get() = ID;
         return *this;
     }

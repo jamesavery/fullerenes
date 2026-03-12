@@ -31,7 +31,7 @@ static void verify_reduced(const FulleroidDelaunay& D, int expected_verts, int N
   int V = D.N;
   int E = 0;
   for (node_t u = 0; u < D.N; u++)
-    E += D.neighbours[u].size();
+    E += D.degree(u);
   E /= 2;
 
   if (expected_verts == 12) {
@@ -43,7 +43,7 @@ static void verify_reduced(const FulleroidDelaunay& D, int expected_verts, int N
 
   // All vertices have degree >= 3
   for (node_t u = 0; u < D.N; u++)
-    EXPECT_GE((int)D.neighbours[u].size(), 3) << "Vertex " << u << " has degree < 3";
+    EXPECT_GE((int)D.degree(u), 3) << "Vertex " << u << " has degree < 3";
 
   // Consistent orientation
   EXPECT_TRUE(D.is_consistently_oriented()) << "Orientation is broken";
@@ -55,14 +55,14 @@ static void verify_reduced(const FulleroidDelaunay& D, int expected_verts, int N
 
   // Positive
   for (node_t u = 0; u < D.N; u++)
-    for (node_t v : D.neighbours[u])
+    for (node_t v : D[u])
       EXPECT_GT(D.get_length(u, v), 0) << "Edge (" << u << "," << v << ") has non-positive length";
 
   // Edge-adjacency consistency: edge_lengths(u,v) > 0 iff v in neighbours[u]
   for (node_t u = 0; u < D.N; u++)
     for (node_t v = 0; v < D.N; v++) {
-      bool is_neighbour = std::find(D.neighbours[u].begin(), D.neighbours[u].end(), v)
-                          != D.neighbours[u].end();
+      bool is_neighbour = std::find(D[u].begin(), D[u].end(), v)
+                          != D[u].end();
       if (is_neighbour)
         EXPECT_GT(D.get_length(u, v), 0) << "Neighbour (" << u << "," << v << ") has zero length";
       else if (u != v)
@@ -76,7 +76,7 @@ static void verify_reduced(const FulleroidDelaunay& D, int expected_verts, int N
   {
     int non_del = 0;
     for (node_t u = 0; u < D.N; u++)
-      for (node_t v : D.neighbours[u])
+      for (node_t v : D[u])
         if (u < v && !D.is_delaunay_edge(u, v))
           non_del++;
     EXPECT_LE(non_del, 2) << non_del << " non-Delaunay edges (max 2 allowed for blocked flips)";
@@ -86,9 +86,9 @@ static void verify_reduced(const FulleroidDelaunay& D, int expected_verts, int N
 
   // Triangle inequality: every triangle must satisfy strict triangle inequality
   for (node_t u = 0; u < D.N; u++)
-    for (size_t j = 0; j < D.neighbours[u].size(); j++) {
-      node_t v = D.neighbours[u][j];
-      node_t w = D.neighbours[u][(j + 1) % D.neighbours[u].size()];
+    for (size_t j = 0; j < D[u].size(); j++) {
+      node_t v = D[u][j];
+      node_t w = D[u][(j + 1) % D[u].size()];
       if (u < v && u < w) {  // each triangle once
         double a = D.get_length(u, v);
         double b = D.get_length(v, w);
@@ -101,9 +101,9 @@ static void verify_reduced(const FulleroidDelaunay& D, int expected_verts, int N
 
   // Triangle angle sum = pi for each triangle
   for (node_t u = 0; u < D.N; u++)
-    for (size_t j = 0; j < D.neighbours[u].size(); j++) {
-      node_t v = D.neighbours[u][j];
-      node_t w = D.neighbours[u][(j + 1) % D.neighbours[u].size()];
+    for (size_t j = 0; j < D[u].size(); j++) {
+      node_t v = D[u][j];
+      node_t w = D[u][(j + 1) % D[u].size()];
       if (u < v && u < w) {
         double a = D.get_length(v, w);  // opposite u
         double b = D.get_length(u, w);  // opposite v
@@ -126,7 +126,7 @@ static void verify_reduced(const FulleroidDelaunay& D, int expected_verts, int N
   // Cone angle at each vertex = 5*pi/3 (angle deficit = pi/3)
   for (node_t u = 0; u < D.N; u++) {
     double total_angle = 0;
-    const auto& nbrs = D.neighbours[u];
+    auto nbrs = D[u];
     int k = nbrs.size();
     for (int j = 0; j < k; j++) {
       node_t v = nbrs[j];
@@ -150,9 +150,9 @@ static void verify_reduced(const FulleroidDelaunay& D, int expected_verts, int N
   double expected_area = N_original * sqrt(3.0) / 4.0;
   double actual_area = 0;
   for (node_t u = 0; u < D.N; u++)
-    for (size_t j = 0; j < D.neighbours[u].size(); j++) {
-      node_t v = D.neighbours[u][j];
-      node_t w = D.neighbours[u][(j + 1) % D.neighbours[u].size()];
+    for (size_t j = 0; j < D[u].size(); j++) {
+      node_t v = D[u][j];
+      node_t w = D[u][(j + 1) % D[u].size()];
       if (u < v && u < w) {
         // Heron's formula
         double a = D.get_length(u, v);
@@ -327,7 +327,7 @@ TEST(IntrinsicDelaunay, C20_AllEquilateral) {
   D.remove_flat_vertices();
 
   for (node_t u = 0; u < D.N; u++)
-    for (node_t v : D.neighbours[u])
+    for (node_t v : D[u])
       EXPECT_DOUBLE_EQ(D.get_length(u, v), 1.0);
 }
 
@@ -349,7 +349,7 @@ static void verify_reduced_general(const FulleroidDelaunay& D,
   int V = D.N;
   int E = 0;
   for (node_t u = 0; u < D.N; u++)
-    E += D.neighbours[u].size();
+    E += D[u].size();
   E /= 2;
 
   // Euler: V - E + F = 2 for genus 0, F = 2V - 4, E = 3V - 6
@@ -358,7 +358,7 @@ static void verify_reduced_general(const FulleroidDelaunay& D,
 
   // All vertices have degree >= 3
   for (node_t u = 0; u < D.N; u++)
-    EXPECT_GE((int)D.neighbours[u].size(), 3) << "Vertex " << u << " has degree < 3";
+    EXPECT_GE((int)D[u].size(), 3) << "Vertex " << u << " has degree < 3";
 
   // Consistent orientation
   EXPECT_TRUE(D.is_consistently_oriented()) << "Orientation is broken";
@@ -367,14 +367,14 @@ static void verify_reduced_general(const FulleroidDelaunay& D,
   EXPECT_TRUE(D.edge_lengths_are_symmetric());
 
   for (node_t u = 0; u < D.N; u++)
-    for (node_t v : D.neighbours[u])
+    for (node_t v : D[u])
       EXPECT_GT(D.get_length(u, v), 0) << "Edge (" << u << "," << v << ") has non-positive length";
 
   // --- Delaunay criterion ---
   {
     int non_del = 0;
     for (node_t u = 0; u < D.N; u++)
-      for (node_t v : D.neighbours[u])
+      for (node_t v : D[u])
         if (u < v && !D.is_delaunay_edge(u, v))
           non_del++;
     EXPECT_LE(non_del, 2) << non_del << " non-Delaunay edges";
@@ -382,9 +382,9 @@ static void verify_reduced_general(const FulleroidDelaunay& D,
 
   // --- Triangle inequality ---
   for (node_t u = 0; u < D.N; u++)
-    for (size_t j = 0; j < D.neighbours[u].size(); j++) {
-      node_t v = D.neighbours[u][j];
-      node_t w = D.neighbours[u][(j + 1) % D.neighbours[u].size()];
+    for (size_t j = 0; j < D[u].size(); j++) {
+      node_t v = D[u][j];
+      node_t w = D[u][(j + 1) % D[u].size()];
       if (u < v && u < w) {
         double a = D.get_length(u, v);
         double b = D.get_length(v, w);
@@ -397,9 +397,9 @@ static void verify_reduced_general(const FulleroidDelaunay& D,
 
   // --- Angle sum = pi per triangle ---
   for (node_t u = 0; u < D.N; u++)
-    for (size_t j = 0; j < D.neighbours[u].size(); j++) {
-      node_t v = D.neighbours[u][j];
-      node_t w = D.neighbours[u][(j + 1) % D.neighbours[u].size()];
+    for (size_t j = 0; j < D[u].size(); j++) {
+      node_t v = D[u][j];
+      node_t w = D[u][(j + 1) % D[u].size()];
       if (u < v && u < w) {
         double a = D.get_length(v, w);
         double b = D.get_length(u, w);
@@ -428,7 +428,7 @@ static void verify_reduced_general(const FulleroidDelaunay& D,
   for (node_t u = 0; u < D.N; u++) {
     double expected_angle = cone_degrees[u] * M_PI / 3.0;
     double total_angle = 0;
-    const auto& nbrs = D.neighbours[u];
+    const auto& nbrs = D[u];
     int k = nbrs.size();
     for (int j = 0; j < k; j++) {
       node_t v = nbrs[j];
@@ -448,9 +448,9 @@ static void verify_reduced_general(const FulleroidDelaunay& D,
   double expected_area = N_original_faces * sqrt(3.0) / 4.0;
   double actual_area = 0;
   for (node_t u = 0; u < D.N; u++)
-    for (size_t j = 0; j < D.neighbours[u].size(); j++) {
-      node_t v = D.neighbours[u][j];
-      node_t w = D.neighbours[u][(j + 1) % D.neighbours[u].size()];
+    for (size_t j = 0; j < D[u].size(); j++) {
+      node_t v = D[u][j];
+      node_t w = D[u][(j + 1) % D[u].size()];
       if (u < v && u < w) {
         double a = D.get_length(u, v);
         double b = D.get_length(v, w);
@@ -474,7 +474,7 @@ TEST(IntrinsicDelaunay, C60_Ih_IcosahedralSymmetry) {
   // Collect all edge lengths
   double first_len = -1;
   for (node_t u = 0; u < D.N; u++)
-    for (node_t v : D.neighbours[u])
+    for (node_t v : D[u])
       if (u < v) {
         double len = D.get_length(u, v);
         if (first_len < 0) first_len = len;
@@ -500,7 +500,7 @@ static void verify_embedding(const FulleroidDelaunay& D, const vector<coord3d>& 
   double sum_sq_err = 0;
   int n_edges = 0;
   for (node_t u = 0; u < D.N; u++)
-    for (node_t v : D.neighbours[u])
+    for (node_t v : D[u])
       if (u < v) {
         double target = D.get_length(u, v);
         double actual = (coords[u] - coords[v]).norm();
@@ -519,7 +519,7 @@ static void verify_embedding(const FulleroidDelaunay& D, const vector<coord3d>& 
   int n_concave = 0;
   double h_min = 1e30;
   for (node_t u = 0; u < D.N; u++) {
-    const auto& nbrs = D.neighbours[u];
+    const auto& nbrs = D[u];
     int k = nbrs.size();
     coord3d centroid;
     for (int j = 0; j < k; j++) centroid += coords[nbrs[j]];
@@ -560,7 +560,7 @@ TEST(DelaunayEmbed, C20_Icosahedron) {
 
   // For a regular icosahedron with edge length 1, all edges should be exactly 1.
   for (node_t u = 0; u < D.N; u++)
-    for (node_t v : D.neighbours[u])
+    for (node_t v : D[u])
       if (u < v) {
         double dist = (coords[u] - coords[v]).norm();
         EXPECT_NEAR(dist, 1.0, 1e-6)
@@ -598,7 +598,7 @@ TEST(DelaunayEmbed, SmallFullerenes) {
       // Check edge distance matching
       double max_rel_err = 0;
       for (node_t u = 0; u < D.N; u++)
-        for (node_t v : D.neighbours[u])
+        for (node_t v : D[u])
           if (u < v) {
             double target = D.get_length(u, v);
             double actual = (coords[u] - coords[v]).norm();
@@ -642,7 +642,7 @@ TEST(DelaunayEmbed, C60_AllIsomers) {
 
     double max_rel_err = 0;
     for (node_t u = 0; u < D.N; u++)
-      for (node_t v : D.neighbours[u])
+      for (node_t v : D[u])
         if (u < v) {
           double target = D.get_length(u, v);
           double actual = (coords[u] - coords[v]).norm();
@@ -699,7 +699,7 @@ static void test_embed_all_isomers(int N) {
 
     double max_rel_err = 0;
     for (node_t u = 0; u < D.N; u++)
-      for (node_t v : D.neighbours[u])
+      for (node_t v : D[u])
         if (u < v) {
           double target = D.get_length(u, v);
           double actual = (coords[u] - coords[v]).norm();
@@ -829,7 +829,7 @@ TEST(DelaunayEmbed, InvestigateOutliers) {
 
     double max_rel_err = 0, stress = 0;
     for (node_t u = 0; u < D.N; u++)
-      for (node_t v : D.neighbours[u])
+      for (node_t v : D[u])
         if (u < v) {
           double target = D.get_length(u, v);
           double actual = (coords[u] - coords[v]).norm();
@@ -843,7 +843,7 @@ TEST(DelaunayEmbed, InvestigateOutliers) {
     int n_concave = 0;
     double h_min = 1e30;
     for (node_t u = 0; u < D.N; u++) {
-      const auto& nbrs = D.neighbours[u];
+      const auto& nbrs = D[u];
       int k = nbrs.size();
       coord3d centroid;
       for (int j = 0; j < k; j++) centroid += coords[nbrs[j]];
@@ -867,7 +867,7 @@ TEST(DelaunayEmbed, InvestigateOutliers) {
     // 4. Print edge length range and degree sequence
     double L_min = 1e30, L_max = 0;
     for (node_t u = 0; u < D.N; u++)
-      for (node_t v : D.neighbours[u])
+      for (node_t v : D[u])
         if (u < v) {
           double L = D.get_length(u, v);
           L_min = std::min(L_min, L);
@@ -878,7 +878,7 @@ TEST(DelaunayEmbed, InvestigateOutliers) {
 
     std::cout << "Degrees:";
     for (node_t u = 0; u < D.N; u++)
-      std::cout << " " << D.neighbours[u].size();
+      std::cout << " " << D[u].size();
     std::cout << std::endl;
   }
 }
@@ -1412,8 +1412,8 @@ static void compare_mds_vs_bfs(int N) {
     // MDS pipeline
     {
       auto t0 = std::chrono::high_resolution_clock::now();
-      auto x0 = mds_placement(D.N, D.neighbours, D.edge_lengths);
-      auto res = run_steihaug(x0, D.N, D.neighbours, D.edge_lengths);
+      auto x0 = mds_placement(D.N, static_cast<const neighbours_t&>(D), D.edge_lengths);
+      auto res = run_steihaug(x0, D.N, static_cast<const neighbours_t&>(D), D.edge_lengths);
       auto t1 = std::chrono::high_resolution_clock::now();
       double us = std::chrono::duration<double, std::micro>(t1 - t0).count();
       mds_stats.results.push_back({idx, res.max_rel_err, us, res.iters, res.h_min, res.n_concave});
@@ -1422,8 +1422,8 @@ static void compare_mds_vs_bfs(int N) {
     // Face-BFS pipeline
     {
       auto t0 = std::chrono::high_resolution_clock::now();
-      auto x0 = face_bfs_placement_c(D.N, D.neighbours, D.edge_lengths);
-      auto res = run_steihaug(x0, D.N, D.neighbours, D.edge_lengths);
+      auto x0 = face_bfs_placement_c(D.N, static_cast<const neighbours_t&>(D), D.edge_lengths);
+      auto res = run_steihaug(x0, D.N, static_cast<const neighbours_t&>(D), D.edge_lengths);
       auto t1 = std::chrono::high_resolution_clock::now();
       double us = std::chrono::duration<double, std::micro>(t1 - t0).count();
       bfs_stats.results.push_back({idx, res.max_rel_err, us, res.iters, res.h_min, res.n_concave});
@@ -1564,7 +1564,7 @@ TEST(IntrinsicDelaunay, Plantri15_AllTriangulations) {
     // Record original degrees before sort_flat_last reorders
     vector<int> orig_degrees(g.N);
     for (int u = 0; u < g.N; u++)
-      orig_degrees[u] = g.neighbours[u].size();
+      orig_degrees[u] = g[u].size();
 
     for (int d : orig_degrees)
       max_degree_seen = std::max(max_degree_seen, d);
@@ -1580,7 +1580,7 @@ TEST(IntrinsicDelaunay, Plantri15_AllTriangulations) {
     // Number of original faces: for triangulation on N vertices, F = 2N - 4
     int N_original_faces = 2 * g.N - 4;
 
-    Triangulation T(g, true);  // already oriented from planar_code
+    Triangulation T(g);  // already oriented from planar_code
 
     // Validate input triangulation
     if (!T.is_consistently_oriented()) {
@@ -1615,7 +1615,7 @@ TEST(IntrinsicDelaunay, Plantri15_AllTriangulations) {
     // than fullerene duals due to multi-edge/self-loop constraints
     int non_del = 0;
     for (node_t u = 0; u < D.N; u++)
-      for (node_t v : D.neighbours[u])
+      for (node_t v : D[u])
         if (u < v && !D.is_delaunay_edge(u, v))
           non_del++;
     if (non_del > 4) {
@@ -1632,7 +1632,7 @@ TEST(IntrinsicDelaunay, Plantri15_AllTriangulations) {
       for (node_t u = 0; u < D.N; u++) {
         double expected_angle = cone_degrees[u] * M_PI / 3.0;
         double total_angle = 0;
-        const auto& nbrs = D.neighbours[u];
+        const auto& nbrs = D[u];
         int k = nbrs.size();
         for (int j = 0; j < k; j++) {
           node_t v = nbrs[j];
@@ -1658,9 +1658,9 @@ TEST(IntrinsicDelaunay, Plantri15_AllTriangulations) {
     double expected_area = N_original_faces * sqrt(3.0) / 4.0;
     double actual_area = 0;
     for (node_t u = 0; u < D.N; u++)
-      for (size_t j = 0; j < D.neighbours[u].size(); j++) {
-        node_t v = D.neighbours[u][j];
-        node_t w = D.neighbours[u][(j + 1) % D.neighbours[u].size()];
+      for (size_t j = 0; j < D[u].size(); j++) {
+        node_t v = D[u][j];
+        node_t w = D[u][(j + 1) % D[u].size()];
         if (u < v && u < w) {
           double a = D.get_length(u, v);
           double b = D.get_length(v, w);

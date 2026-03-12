@@ -1,6 +1,7 @@
 #pragma once
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/geometry.hh"
+#include "fullerenes/span_vector.hh"
 #include <functional>
 #include <cstdint>
 
@@ -120,7 +121,7 @@ public:
   // Phases: "seed", "placed", "reflected", "patched", "cg", "final".
   // "patched" = after patch optimize, BEFORE full-graph CG (the key one).
   using StepCallback = std::function<void(int step, const char* phase, const Deltahedron& D)>;
-  vector<coord3d> points;
+  Spanify::SpanVector<coord3d> points;
   int iterations_used = 0;  // Set by optimize()
   double final_gmax_L = 0;  // Set by optimize(): max_i(||g_i||*L) at final iteration
   double final_angle_relerr = 0;  // Set by optimize(): max per-angle |theta-pi/3|/(pi/3)
@@ -148,6 +149,7 @@ public:
   // Constructors
   Deltahedron() = default;
   Deltahedron(const Triangulation& T, const vector<coord3d>& points);
+  Deltahedron(const Triangulation& T, std::span<const coord3d> points);
   Deltahedron(const Polyhedron& P);  // must be a triangulation
 
   // Build from extension path with incremental geometry.
@@ -196,7 +198,7 @@ public:
   // max_work: work budget = n_energy + N*n_grad + N*n_hv. 0 = default (20*N^3).
   // angle_tol: if > 0, converge when max_angle_relerr() < angle_tol and no concave vertices.
   // Returns OptResult indicating why the optimizer stopped.
-  OptResult optimize(const vector<coord3d>& initial_geometry, double target_L = 0,
+  OptResult optimize(std::span<const coord3d> initial_geometry, double target_L = 0,
                      double grad_tol = 1e-10,
                      const vector<bool>& fixed = {},
                      long long max_work = 0,
@@ -211,7 +213,7 @@ public:
   // which naturally handles indefinite Hessians.
   // target_L: desired edge length (0 = compute from boundary edges).
   // Returns true if converged.
-  bool optimize_patch(const vector<coord3d>& initial_geometry,
+  bool optimize_patch(std::span<const coord3d> initial_geometry,
                       const vector<bool>& free_mask,
                       const vector<bool>& interior_mask = {},
                       double target_L = 0,
@@ -224,7 +226,7 @@ public:
   // centroid along fan normal; h < 0 = concave).
   // If fixed is non-empty, fixed[v]=true vertices are skipped.
   // Returns number of vertices reflected.
-  int reflect_concave(vector<coord3d>& pts, double threshold = 0,
+  int reflect_concave(std::span<coord3d> pts, double threshold = 0,
                       const vector<bool>& fixed = {},
                       vector<bool>* reflected_mask = nullptr) const;
 
@@ -232,7 +234,7 @@ public:
   // Returns total number of vertices reflected across all passes.
   // If reflected_mask is non-null, sets reflected_mask[v]=true for every vertex
   // that was reflected in any pass (must be pre-sized to N).
-  int reflect_all_concave(vector<coord3d>& pts, double threshold = 0,
+  int reflect_all_concave(std::span<coord3d> pts, double threshold = 0,
                           const vector<bool>& fixed = {},
                           vector<bool>* reflected_mask = nullptr) const;
 
@@ -241,16 +243,16 @@ public:
   // and moves each to the nearest point on the hull surface.
   // Preserves graph topology — only coordinates change.
   // Returns number of vertices projected.
-  int project_onto_convex_hull(vector<coord3d>& pts) const;
+  int project_onto_convex_hull(std::span<coord3d> pts) const;
 
   // Finite-difference gradient check. Returns max relative error.
   // Uses the given geometry (or this->points if empty).
-  double gradient_check(const vector<coord3d>& geometry, double target_L = 0, double eps = 1e-6) const;
+  double gradient_check(std::span<const coord3d> geometry, double target_L = 0, double eps = 1e-6) const;
 
   // Finite-difference Hessian check for optimize_patch's analytical Hessian.
   // Compares assemble_patch_hessian against FD of the gradient.
   // Returns max relative error. Prints worst entries if verbose.
-  double hessian_check(const vector<coord3d>& geometry,
+  double hessian_check(std::span<const coord3d> geometry,
                        const vector<bool>& free_mask,
                        const vector<bool>& interior_mask = {},
                        double target_L = 0,

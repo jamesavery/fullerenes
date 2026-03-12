@@ -8,7 +8,6 @@ TEST(ConvexHull, C20IsOriented) {
   Polyhedron P = Polyhedron::C20();
   Polyhedron CH = P.convex_hull();
 
-  EXPECT_TRUE(CH.is_oriented);
   EXPECT_TRUE(CH.is_consistently_oriented());
   EXPECT_EQ(CH.N, P.N);
 }
@@ -26,7 +25,6 @@ TEST(ConvexHull, IcosahedronIsOriented) {
   Polyhedron ico = Polyhedron::C20().dual();
   Polyhedron CH = ico.convex_hull();
 
-  EXPECT_TRUE(CH.is_oriented);
   EXPECT_TRUE(CH.is_consistently_oriented());
   EXPECT_EQ(CH.N, ico.N);
   EXPECT_GT(CH.volume(), 0);
@@ -37,8 +35,9 @@ TEST(ConvexHull, IcosahedronIsOriented) {
 TEST(ConvexHull, FacesAreTriangles) {
   Polyhedron CH = Polyhedron::C20().convex_hull();
 
-  EXPECT_FALSE(CH.faces.empty());
-  for (const auto& f : CH.faces)
+  auto fs = CH.faces();
+  EXPECT_FALSE(fs.empty());
+  for (const auto& f : fs)
     EXPECT_EQ(f.size(), 3u);
 }
 
@@ -48,6 +47,6 @@ TEST(ConvexHull, EulerFormula) {
 
   int V = CH.N;
   int E = CH.count_edges();
-  int F = CH.faces.size();
+  int F = CH.faces().size();
   EXPECT_EQ(V - E + F, 2);
 }

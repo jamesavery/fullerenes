@@ -60,11 +60,11 @@ int main(int argc, char** argv) {
         auto more = BuckyGen::next_fullerene(BuckyQ, G);
         for (size_t j = 0; j < Nf; j++)
         {
-            for(size_t k = 0; k < G.neighbours[j].size(); k++)
+            for(size_t k = 0; k < G.degree(j); k++)
             {
-                acc_dual[ii*Nf + j][k] = G.neighbours[j][k];
+                acc_dual[ii*Nf + j][k] = G.nbrs(j)[k];
             } 
-            if(G.neighbours[j].size() == 5){
+            if(G.degree(j) == 5){
                 acc_dual[ii*Nf + j][5] = std::numeric_limits<node_t>::max();
                 acc_degs[ii*Nf + j] = 5;
             } else {
@@ -74,13 +74,12 @@ int main(int argc, char** argv) {
         }
         FullereneDual FD(G);
         auto T0 = std::chrono::steady_clock::now(); ftime += std::chrono::duration<double, std::nano>(T0 - start).count();
-        FD.update();
         PlanarGraph pG = FD.dual_graph();
 
         for (size_t j = 0; j < N; j++){
             for (size_t k = 0; k < 3; k++)
             {
-                acc_cubic[ii*N + j][k] = pG.neighbours[j][k];
+                acc_cubic[ii*N + j][k] = pG.nbrs(j)[k];
             }
             
         }

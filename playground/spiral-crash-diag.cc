@@ -15,18 +15,18 @@ int test_triple(const Triangulation& T, node_t u, node_t v, node_t w, bool gener
 void diagnose_isomer(const Triangulation& T, int N, int idx)
 {
   fprintf(stderr, "\n  Diagnosing N=%d isomer #%d (N_tri=%d, N_vert=%zu):\n",
-          N, idx, T.N, T.triangles.size());
+          N, idx, T.N, T.triangles().size());
 
   // Print degree sequence
   fprintf(stderr, "  Degrees:");
   for(node_t u = 0; u < T.N; u++)
-    if(T.neighbours[u].size() != 6) fprintf(stderr, " %d(%zu)", u, T.neighbours[u].size());
+    if(T[u].size() != 6) fprintf(stderr, " %d(%zu)", u, T[u].size());
   fprintf(stderr, "\n");
 
   // Try every starting triple individually in a forked process
   int triple_count = 0, crash_count = 0;
   for(node_t u = 0; u < T.N; u++){
-    for(node_t v : T.neighbours[u]){
+    for(node_t v : T[u]){
       node_t w_prev = T.prev(v, u);
       node_t w_next = T.next(v, u);
 

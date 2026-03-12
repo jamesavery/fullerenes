@@ -207,7 +207,13 @@ vector<int> Folding::identify_nodes(const IDCounter<Eisenstein>& grid, const vec
   vector<int> same(grid.nextid);
   for(size_t i=0;i<grid.nextid;i++) same[i] = i;
 
-  Graph S(same_as);
+  // Build graph from edge set for connected_components
+  Graph same_nb(grid.nextid, GRAPH_DMAX);
+  for(const edge_t& e: same_as){
+    same_nb.push_back(e.first, e.second);
+    same_nb.push_back(e.second, e.first);
+  }
+  Graph S(same_nb);
   vector<vector<node_t> > components(S.connected_components());
 
   for(auto& c: components){
@@ -364,15 +370,15 @@ Triangulation Folding::fold()
   // Step 5: Build neighbour lists directly from dir_nb in CW order.
   // Eisenstein directions 0-5 go CCW, so scanning 5→4→3→2→1→0 gives CW order,
   // which is what Triangulation's next_on_face (= prev) convention requires.
-  neighbours_t neighbours(N);
+  Graph neighbours(N, GRAPH_DMAX);
   for(node_t u = 0; u < N; u++){
     for(int d = 5; d >= 0; d--){
       if(dir_nb[u][d] >= 0)
-        neighbours[u].push_back(dir_nb[u][d]);
+        neighbours.push_back(u, dir_nb[u][d]);
     }
   }
 
-  Triangulation T(neighbours, true);
+  Triangulation T(neighbours);
   return T;
 }
 

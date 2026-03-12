@@ -25,7 +25,7 @@ static bool isValidTriangulation(const Graph& g, string& err) {
 
         set<node_t> seen;
         for (int i = 0; i < d; ++i) {
-            node_t v = g.neighbours[u][i];
+            node_t v = g.nbrs(u)[i];
             if (v == u) { err = "self-loop at " + to_string(u); return false; }
             if (v < 0 || v >= g.N) {
                 err = "invalid neighbour " + to_string(v) + " at " + to_string(u);
@@ -38,7 +38,7 @@ static bool isValidTriangulation(const Graph& g, string& err) {
         }
 
         for (int i = 0; i < d; ++i) {
-            node_t v = g.neighbours[u][i];
+            node_t v = g.nbrs(u)[i];
             if (g.arc_ix(v, u) < 0) {
                 err = "asymmetric: " + to_string(u) + " adj " + to_string(v)
                     + " but not vice versa";
@@ -176,7 +176,7 @@ TEST(BuckinversePhase3, ReduceToSeed) {
             }
 
             if (success) {
-                Triangulation t(current.neighbours, true);
+                Triangulation t(static_cast<const neighbours_t&>(current));
                 SeedType seed = identifySeed(t);
                 if (seed == SeedType::NotASeed) {
                     auto sites = allInvSites(current, 5);
@@ -191,7 +191,7 @@ TEST(BuckinversePhase3, ReduceToSeed) {
                                 }
                             }
                         }
-                        t = Triangulation(current.neighbours, true);
+                        t = Triangulation(static_cast<const neighbours_t&>(current));
                         seed = identifySeed(t);
                     }
                 }

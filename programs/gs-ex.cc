@@ -10,7 +10,7 @@ int testRSPI[12] = {1,2,3,4,5,6,37,38,39,40,41,42};
 Graph example1()
 {
   int M = 6, N = 18;
-  neighbours_t neighbours(N,vector<node_t>(3));
+  Graph neighbours(N, vector<node_t>(3));
 
   for(int i=0;i<3;i++){
     // Outer triangle
@@ -46,7 +46,7 @@ Graph example1()
 // Tutte graph
 Graph example2(){
   const int M=3, N=46;
-  neighbours_t neighbours(N,vector<node_t>(3));
+  Graph neighbours(N, vector<node_t>(3));
 
   for(int i=0; i!=3; ++i){
     neighbours[i][0] = 45;
@@ -121,7 +121,7 @@ Graph example2(){
 // smallest non-spiral graph with face sizes less/equal 6
 Graph example3(){
   const int M=3, N=36;
-  neighbours_t neighbours(N,vector<node_t>(3));
+  Graph neighbours(N, vector<node_t>(3));
 
   for(int i=0; i!=3; ++i){
     neighbours[i][0] = (i+1)%M;
@@ -180,7 +180,7 @@ Graph example3(){
 // smallest (?) polyhedron with only pentagons and heptagons
 Graph example4(){
   const int M=7, N=28;
-  neighbours_t neighbours(N,vector<node_t>(3));
+  Graph neighbours(N, vector<node_t>(3));
 
   for(int i=0; i!=7; ++i){
     neighbours[i][0] = (i+1)%M;
@@ -226,11 +226,12 @@ int main(int ac, char **av)
   output.flush();
 
   printf("Computing planar layout\n");
+  vector<coord2d> g_layout;
   if(Nex <= outer_faces.size()){
-    g.outer_face = outer_faces[Nex-1]+(-1);
-    g.layout2d = g.tutte_layout(g.outer_face);
-  } else 
-    g.layout2d = g.tutte_layout();
+    face_t of = outer_faces[Nex-1]+(-1);
+    g_layout = g.tutte_layout(of);
+  } else
+    g_layout = g.tutte_layout();
 
   g.orient_neighbours();
 
@@ -238,7 +239,7 @@ int main(int ac, char **av)
   PlanarGraph dg(g.dual_graph(10,true));
 
   printf("Computing planar layour of dual\n");
-  dg.layout2d = dg.tutte_layout();
+  vector<coord2d> dg_layout = dg.tutte_layout();
 
   output << "g2d  = " << g << ";\n";
   output << "dg2d = " << dg << ";\n";  
@@ -253,7 +254,7 @@ int main(int ac, char **av)
   
   bool dual_is_triangulation = true, graph_is_cubic = true;
   for(auto &f: dfaces) if(f.size() != 3) dual_is_triangulation = false;
-  for(auto &n: g.neighbours) if(n.size() != 3) graph_is_cubic = false;
+  for(int u=0; u<g.N; u++) if(g.degree(u) != 3) graph_is_cubic = false;
 
   if(graph_is_cubic != dual_is_triangulation){
     fprintf(stderr,"Graph is %scubic, but dual is %striangulation.\n",

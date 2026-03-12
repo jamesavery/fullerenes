@@ -24,7 +24,7 @@ struct Quality {
 Quality measure(Deltahedron& D, OptMethod method, const vector<coord3d>& init_pts, int budget_mult) {
   D.opt_method = method;
   D.opt_k_flat = 0;
-  D.points = init_pts;
+  D.points = vector<coord3d>(init_pts);
   int Nv = D.N;
   // Convert iteration budget to work budget: each iter ~ N work (one gradient)
   long long max_work = (long long)budget_mult * Nv * Nv;
@@ -49,10 +49,10 @@ Quality measure(Deltahedron& D, OptMethod method, const vector<coord3d>& init_pt
   vector<double> angle_sums(Nv, 0.0);
 
   for(int v = 0; v < Nv; v++){
-    int deg = (int)D.neighbours[v].size();
+    int deg = (int)D.degree(v);
     for(int j = 0; j < deg; j++){
-      int a = D.neighbours[v][j];
-      int b = D.neighbours[v][(j+1)%deg];
+      int a = D.nbrs(v)[j];
+      int b = D.nbrs(v)[(j+1)%deg];
       coord3d ea = D.points[a] - D.points[v];
       coord3d eb = D.points[b] - D.points[v];
       double cos_th = ea.dot(eb) / (ea.norm() * eb.norm());
@@ -73,7 +73,7 @@ Quality measure(Deltahedron& D, OptMethod method, const vector<coord3d>& init_pt
   double K_err_sum = 0, K_ref_sum = 0, K_total = 0;
   vector<double> K_devs;
   for(int v = 0; v < Nv; v++){
-    int deg = (int)D.neighbours[v].size();
+    int deg = (int)D.degree(v);
     double K = 2.0 * M_PI - angle_sums[v];
     double K_target = 2.0 * M_PI - deg * M_PI / 3.0;
     K_total += K;
@@ -91,14 +91,14 @@ Quality measure(Deltahedron& D, OptMethod method, const vector<coord3d>& init_pt
   double h_min = 1e30;
   int n_concave = 0;
   for(int v = 0; v < Nv; v++){
-    int deg = (int)D.neighbours[v].size();
+    int deg = (int)D.degree(v);
     coord3d centroid(0,0,0);
-    for(int nb : D.neighbours[v]) centroid = centroid + D.points[nb];
+    for(int nb : D.nbrs(v)) centroid = centroid + D.points[nb];
     centroid = centroid * (1.0 / deg);
     coord3d fan_normal(0,0,0);
     for(int j = 0; j < deg; j++){
-      coord3d e1 = D.points[D.neighbours[v][j]] - D.points[v];
-      coord3d e2 = D.points[D.neighbours[v][(j+1)%deg]] - D.points[v];
+      coord3d e1 = D.points[D.nbrs(v)[j]] - D.points[v];
+      coord3d e2 = D.points[D.nbrs(v)[(j+1)%deg]] - D.points[v];
       fan_normal = fan_normal + e1.cross(e2);
     }
     double nn = fan_normal.norm();
@@ -210,7 +210,7 @@ int main(int argc, char** argv) {
 
       Deltahedron D0 = Deltahedron::fromExtensionPathOptimized(ep);
       int Nv = D0.N;
-      vector<coord3d> init = D0.points;
+      vector<coord3d> init(D0.points.begin(), D0.points.end());
 
       Deltahedron D1(D0), D2(D0), D3(D0);
       Quality q_cg = measure(D1, OptMethod::CG, init, budget_mult);

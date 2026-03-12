@@ -7,12 +7,12 @@ char LIST_CLOSE=']';
 bool Graph::remove_edge(const edge_t& e)
 {
   node_t u = e.first, v = e.second;
-  vector<node_t> &nu(neighbours[u]), &nv(neighbours[v]);
-
   bool value = false;
 
-  for(int i=0;i<nu.size();i++) if(nu[i] == v){ nu.erase(nu.begin()+i); value = true; break; }
-  for(int i=0;i<nv.size();i++) if(nv[i] == u){ nv.erase(nv.begin()+i); value = true; break; }
+  int pos_uv = find(u, v);
+  if(pos_uv >= 0){ erase_at(u, pos_uv); value = true; }
+  int pos_vu = find(v, u);
+  if(pos_vu >= 0){ erase_at(v, pos_vu); value = true; }
 
   return value;
 }
@@ -27,25 +27,30 @@ bool Graph::insert_edge(const arc_t& e, const node_t suc_uv, const node_t suc_vu
   const node_t u = e.first, v = e.second;
 
   assert(u>=0 && v>=0);
-  vector<node_t> &nu(neighbours[u]), &nv(neighbours[v]);
+  int oldsize_u = degree(u), oldsize_v = degree(v);
 
-  size_t oldsize[2] = {nu.size(),nv.size()};
-  
-  vector<node_t>::iterator pos_uv = suc_uv<0? nu.end() : find(nu.begin(),nu.end(),suc_uv);
-  vector<node_t>::iterator pos_vu = suc_vu<0? nv.end() : find(nv.begin(),nv.end(),suc_vu);
+  if(suc_uv < 0) push_back(u, v);
+  else {
+    int pos = find(u, suc_uv);
+    insert_at(u, v, pos >= 0 ? pos : degree(u));
+  }
 
-  nu.insert(pos_uv,v);
-  if(u!=v) nv.insert(pos_vu,u);
-  
-  assert(nu.size() == oldsize[0]+1 && nv.size() == oldsize[1]+1);
+  if(u != v){
+    if(suc_vu < 0) push_back(v, u);
+    else {
+      int pos = find(v, suc_vu);
+      insert_at(v, u, pos >= 0 ? pos : degree(v));
+    }
+  }
+
+  assert(degree(u) == oldsize_u+1 && degree(v) == oldsize_v+1);
 
   return false;
 }
 
 bool Graph::edge_exists(const edge_t& e) const
 {
-  const vector<node_t> &nu(neighbours[e.first]);
-  return find(nu.begin(),nu.end(),e.second) != nu.end();
+  return find(e.first, e.second) >= 0;
 }
 
 // remove all vertices without edges from graph
@@ -54,15 +59,15 @@ void Graph::remove_isolated_vertices(){
 
   int u_new = 0;
   for(int u=0; u<N; u++)
-    if(!neighbours[u].empty())
+    if(!(*this)[u].empty())
       new_id[u] = u_new++;
 
   int N_new = u_new;
-  Graph g(N_new);
+  Graph g(N_new, dmax);
   // cerr << "n new: " << N_new << endl;
   for(int u=0; u<N; u++)
-    for(int v: neighbours[u])
-      g.neighbours[new_id[u]].push_back(new_id[v]);
+    for(int v: (*this)[u])
+      g.push_back(new_id[u], new_id[v]);
 
   *this = g;
 }
@@ -71,8 +76,8 @@ void Graph::remove_isolated_vertices(){
 void Graph::remove_vertices(set<int> &sv){
   const int N_naught(N);
   for(int u: sv){
-    while(neighbours[u].size()){
-      const int v = neighbours[u][0];
+    while((*this)[u].size()){
+      const int v = (*this)[u][0];
       remove_edge({u,v});
     }
   }
@@ -88,16 +93,13 @@ void Graph::remove_vertices(set<int> &sv){
 
 int  Graph::arc_ix(node_t u, node_t v) const
 {
-  const vector<node_t>& nu(neighbours[u]);
-  for(int j=0;j<nu.size(); j++)
-    if(nu[j] == v) return j; 
-  return -1;            // u-v is not an edge in a triangulation  
+  return find(u, v);
 }
 
 // Successor to v in oriented neigbhours of u
 node_t Graph::next(node_t u, node_t v) const
 {
-  const auto &nu(neighbours[u]);
+  const auto &nu((*this)[u]);
   int j = arc_ix(u,v);
   if(j>=0) return nu[(j+1)%nu.size()];
   else return -1;
@@ -106,7 +108,7 @@ node_t Graph::next(node_t u, node_t v) const
 // Predecessor to v in oriented neigbhours of u
 node_t Graph::prev(node_t u, node_t v) const
 {
-  const auto &nu(neighbours[u]);  
+  const auto &nu((*this)[u]);  
   int j = arc_ix(u,v);
   if(j>=0) return nu[(j-1+nu.size())%nu.size()];
   return -1;            // u-v is not an edge in a triangulation
@@ -130,7 +132,7 @@ bool Graph::is_consistently_oriented() const
 
   set<arc_t> work;
   for(node_t u=0;u<N;u++)
-    for(auto v: neighbours[u])
+    for(auto v: (*this)[u])
       work.insert({u,v});
 
   while(!work.empty()){
@@ -159,11 +161,11 @@ bool Graph::is_consistently_oriented() const
 // TODO: Doesn't need to be planar and oriented, but is easier to write if it is. Make it work in general.
 bool Graph::has_separating_triangles() const
 {
-  assert(is_oriented);
+  assert(is_consistently_oriented());
 
   for(node_t u=0;u<N;u++){
-    const vector<node_t> &nu(neighbours[u]);
-    
+    auto nu = (*this)[u];
+
     for(int i=0;i<nu.size();i++){
       node_t t = nu[i];
       node_t v = prev(u,t), w = next(u,t); // edges: u--t, u--v, u--w
@@ -177,9 +179,9 @@ bool Graph::has_separating_triangles() const
 bool Graph::adjacency_is_symmetric() const
 {
   for(node_t u=0;u<N;u++){
-    const vector<node_t> &nu = neighbours[u];
+    auto nu = (*this)[u];
     for(int i=0;i<nu.size();i++){
-      const vector<node_t> &nv = neighbours[nu[i]];
+      auto nv = (*this)[nu[i]];
 
       bool symmetric = false;
       for(int j=0;j<nv.size();j++) if(nv[j] == u) symmetric = true;
@@ -202,7 +204,7 @@ bool Graph::is_connected(const set<node_t> &subgraph) const
 
   } else {
     node_t s = 0; // Pick a node that is part of an edge
-    for(;neighbours[s].empty();s++) ;
+    for(;(*this)[s].empty();s++) ;
     assert(s < N);
 
     single_source_shortest_paths(s,&dist[0]);
@@ -227,7 +229,7 @@ vector<vector<node_t>> Graph::connected_components() const
       done[u] = true;
       component.push_back(u);
       queue<node_t> Q;
-      for(auto v: neighbours[u]) Q.push(v);
+      for(auto v: (*this)[u]) Q.push(v);
 
       while(!Q.empty()){
 	node_t v = Q.front(); Q.pop();
@@ -235,8 +237,8 @@ vector<vector<node_t>> Graph::connected_components() const
 	  done[v] = true;
 	  component.push_back(v);
 	  
-	  for(int i=0;i<neighbours[v].size();i++)
-	    if(!done[neighbours[v][i]]) Q.push(neighbours[v][i]);
+	  for(int i=0;i<(*this)[v].size();i++)
+	    if(!done[(*this)[v][i]]) Q.push((*this)[v][i]);
 	}
       }
       sort(component.begin(), component.end());
@@ -258,7 +260,7 @@ void Graph::single_source_shortest_paths(node_t source, int *distances, size_t m
   while(!queue.empty()){
     node_t u = queue.pop_front();
     
-    for(node_t v: neighbours[u]){
+    for(node_t v: (*this)[u]){
       if(distances[v] == INT_MAX){ // Node is not previously visited
 	distances[v] = distances[u] + 1; 
 	if(distances[v] < max_depth) queue.push_back(v);
@@ -284,7 +286,7 @@ matrix<int> Graph::all_pairs_shortest_paths(const unsigned int max_depth) const
       node_t v = queue.pop_front();
 
       // Process children w of node v
-      for(node_t w: neighbours[v]){
+      for(node_t w: (*this)[v]){
 	if(d(u,w) == INT_MAX){ // Node is not previously visited
 	  int distance = d(u,v)+1;
 	  d(u,w)  = distance;
@@ -321,7 +323,7 @@ matrix<int> Graph::all_pairs_shortest_paths(const vector<node_t> &V,
       node_t u = queue.pop_front();
 
       // Process children of node u
-      for(node_t v: neighbours[u]){
+      for(node_t v: (*this)[u]){
 	if(d[v] == INT_MAX){ 	// Node is not previously visited
 	  d[v] = d[u]+1;
 	  if(d[v] < max_depth) queue.push_back(v);
@@ -341,7 +343,7 @@ vector<node_t> Graph::shortest_cycle(node_t s, const int max_depth) const
 {
   face_t cycle;
   int Lmin = INT_MAX;
-  for(node_t t: neighbours[s]){
+  for(node_t t: (*this)[s]){
     face_t c(shortest_cycle({s,t},max_depth));
     if(c.size() < Lmin){ Lmin = c.size(); cycle = c; }
   }
@@ -365,7 +367,7 @@ vector<node_t> Graph::shortest_cycle(const vector<node_t>& prefix, const int max
     switch(prefix.size()){
     case 2:
       // t must have a neighbor r that neighbours s
-      for(node_t r: neighbours[t])
+      for(node_t r: (*this)[t])
 	if(edge_exists({r,s})) return {s,t,r};
       return {};
     case 3:
@@ -391,7 +393,7 @@ vector<node_t> Graph::shortest_cycle(const vector<node_t>& prefix, const int max
   node_t u = s, v = -1;
   for(unsigned int i=0;i<distances[s]+1;i++){
     unsigned int dmin = INT_MAX;
-    for(node_t w: neighbours[u])
+    for(node_t w: (*this)[u])
       if(distances[w] < dmin && (edge_t(u,w) != edge_t(s,t))){
   	dmin = distances[w];
   	v = w;
@@ -418,7 +420,7 @@ vector<int> Graph::multiple_source_shortest_paths(const vector<node_t>& sources,
   while(!queue.empty()){
     node_t v = queue.pop_front();
       
-    for(node_t w: neighbours[v]){
+    for(node_t w: (*this)[v]){
       const edge_t edge(v,w);
       if(distances[w] == INT_MAX){ // Node not previously visited
 	distances[w] = distances[v] + 1;
@@ -430,55 +432,32 @@ vector<int> Graph::multiple_source_shortest_paths(const vector<node_t>& sources,
 }
 
 
+void Graph::flip_all_orientations()
+{
+  for(node_t u=0;u<N;u++) reverse((*this)[u].begin(), (*this)[u].end());
+}
+
 int Graph::max_degree() const
 {
   int max_d = 0;
-  for(node_t u=0;u<N;u++) if(neighbours[u].size() > max_d) max_d = neighbours[u].size();
+  for(node_t u=0;u<N;u++) if(degree(u) > max_d) max_d = degree(u);
   return max_d;
 }
 
-int Graph::degree(node_t u) const { 
-  return neighbours[u].size(); 
-}
-
-void Graph::update_from_edgeset(const set<edge_t>& edge_set) 
-{
-  // Instantiate auxiliary data strutures: sparse adjacency matrix and edge existence map.
-  map<node_t,set<node_t> > ns;
-  //  fprintf(stderr,"Initializing edge map.\n");
-
-  // Update node count
-  N = 0;
-  for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
-    N = max(N,max(e->first,e->second)+1);
-  }
-
-  neighbours.resize(N);
-
-  for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
-    ns[e->first].insert(e->second);
-    ns[e->second].insert(e->first);
-  }
-
-  //  fprintf(stderr,"Initializing adjacencies\n");
-  for(int u=0;u<N;u++)
-    neighbours[u] = vector<node_t>(ns[u].begin(),ns[u].end());
-
-}
 
 vector<edge_t> Graph::undirected_edges() const {
   set<edge_t> edges;
   for(node_t u=0;u<N;u++)
-    for(int i=0;i<neighbours[u].size();i++)
-      edges.insert(edge_t(u,neighbours[u][i]));
+    for(int i=0;i<(*this)[u].size();i++)
+      edges.insert(edge_t(u,(*this)[u][i]));
   return vector<edge_t>(edges.begin(),edges.end());
 }
 
 vector<arc_t> Graph::directed_edges() const {
   set<arc_t> edges;
   for(node_t u=0;u<N;u++)
-    for(int i=0;i<neighbours[u].size();i++)
-      edges.insert(arc_t(u,neighbours[u][i]));
+    for(int i=0;i<(*this)[u].size();i++)
+      edges.insert(arc_t(u,(*this)[u][i]));
   return vector<arc_t>(edges.begin(),edges.end());
 }
 
@@ -486,7 +465,7 @@ size_t Graph::count_edges() const {
   // Don't use edge_set -- it's slow
   size_t twoE = 0;
   for(node_t u=0;u<N;u++)
-    twoE += neighbours[u].size();
+    twoE += (*this)[u].size();
 
   return twoE/2;
 }

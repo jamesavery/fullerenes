@@ -1,6 +1,23 @@
 #include "fullerenes/spiral.hh"
 #include "fullerenes/fullerenegraph.hh"
 #include "fullerenes/polyhedron.hh"
+#include "fullerenes/layout2d.hh"
+
+// Helper: build an oriented PlanarGraph from an adjacency matrix.
+// Adjacency matrices have no orientation info, so we use planar_orient
+// to compute a correct planar embedding.
+static PlanarGraph oriented_graph_from_adjacency(int Nmax, int N, const int *adjacency) {
+  Graph nb(N, GRAPH_DMAX);
+  for(int i=0;i<N;i++)
+    for(int j=i+1;j<N;j++)
+      if(adjacency[i*Nmax+j]) {
+        nb.push_back(i, j);
+        nb.push_back(j, i);
+      }
+  Graph G(nb);
+  layout2d::planar_orient(G);
+  return PlanarGraph(G);
+}
 
  // Exported interface
 extern "C" {
@@ -97,34 +114,20 @@ void adjacency_matrix_(const graph_ptr *g, const int *outer_dim, int *adjacency)
   memset(adjacency,0,N*N*sizeof(int));
 
   for(node_t u=0;u<G.N;u++){
-    const vector<node_t> &ns(G.neighbours[u]);
+    auto ns = G.nbrs(u);
     for(unsigned int i=0;i<ns.size();i++)
       adjacency[u*N+ns[i]] = 1;
   }
 }
 
 graph_ptr new_graph_(const int *nmax, const int *n, const int *adjacency){
-  const int Nmax(*nmax), N(*n);
-  set<edge_t> edge_set;
-
-  for(unsigned int i=0;i<N;i++)
-    for(int j=i+1;j<N;j++)
-      if(adjacency[i*Nmax+j])  edge_set.insert(edge_t(i,j));
-
-  return new PlanarGraph(edge_set);
+  return new PlanarGraph(oriented_graph_from_adjacency(*nmax, *n, adjacency));
 }
 
 void delete_graph_(graph_ptr *g){  delete (*g); }
 
 fullerene_graph_ptr new_fullerene_graph_(const int *nmax, const int *n, const int *adjacency){
-  const int Nmax(*nmax), N(*n);
-  set<edge_t> edge_set;
-
-  for(node_t i=0;i<N;i++)
-    for(node_t j=i+1;j<N;j++)
-      if(adjacency[i*Nmax+j]) edge_set.insert(edge_t(i,j));
-
-  return new FullereneGraph(Graph(edge_set));
+  return new FullereneGraph(oriented_graph_from_adjacency(*nmax, *n, adjacency));
 }
 
 string fortran_string(const char *s, int max)
@@ -192,11 +195,9 @@ void delete_polyhedron_(polyhedron_ptr *P){ delete *P; }
 
 // The Fortran call to dual_graph() assumes that g is either a fullerene
 // or a fullerene dual.
-graph_ptr dual_graph_(const graph_ptr *g){  
-  (*g)->layout2d = (*g)->tutte_layout();
-  bool is_fullerene = (*g)->neighbours[0].size() == 3;
+graph_ptr dual_graph_(const graph_ptr *g){
+  bool is_fullerene = (*g)->degree(0) == 3;
   graph_ptr pg = new PlanarGraph((*g)->dual_graph(is_fullerene? 6 : 3));
-  pg->layout2d = pg->tutte_layout();
   return pg;
 }
 //int hamiltonian_count_(const graph_ptr *g){ return (*g)->hamiltonian_count(); }
@@ -204,8 +205,7 @@ int perfect_match_count_(const graph_ptr *g){ return (*g)->count_perfect_matchin
 
 fullerene_graph_ptr halma_fullerene_(const fullerene_graph_ptr *g, const int *n)
 {
-  bool has_layout = (*g)->layout2d.size() == (*g)->N;
-  return new FullereneGraph((*g)->halma_fullerene(*n,has_layout));
+  return new FullereneGraph((*g)->halma_fullerene(*n));
 }
 
 fullerene_graph_ptr leapfrog_fullerene_(const fullerene_graph_ptr *g, const int *n_leaps)
@@ -219,9 +219,7 @@ fullerene_graph_ptr leapfrog_fullerene_(const fullerene_graph_ptr *g, const int 
 
 fullerene_graph_ptr goldberg_coxeter_(const fullerene_graph_ptr *g, const int *k, const int *l)
 {
-  FullereneGraph fg(**g);
-  fg.layout2d = fg.tutte_layout(); // FIXME remove, and pass argument to GCtransform?
-  return new FullereneGraph(fg.GCtransform(*k,*l));
+  return new FullereneGraph((*g)->GCtransform(*k,*l));
 }
 
 
@@ -236,10 +234,10 @@ void tutte_layout_b_(graph_ptr *g, int *s, int *t, int *r, double *LAYOUT)
 {
   //  fprintf(stderr,"tutte_layout_b(%d,%d,%d)\n",*s,*t,*r);
   PlanarGraph &G(**g);
-  G.layout2d = G.tutte_layout(*s-1,*t-1,*r-1);
+  vector<coord2d> layout = G.tutte_layout(*s-1,*t-1,*r-1);
   for(unsigned int i=0;i<G.N;i++){
-    LAYOUT[i*2]   = G.layout2d[i].first;
-    LAYOUT[i*2+1] = G.layout2d[i].second;
+    LAYOUT[i*2]   = layout[i].first;
+    LAYOUT[i*2+1] = layout[i].second;
   }
   //  ofstream f("output/tutte.m");
   //  f << "g = " << G << ";\n";
@@ -248,8 +246,9 @@ void tutte_layout_b_(graph_ptr *g, int *s, int *t, int *r, double *LAYOUT)
 
 void spherical_layout_(const graph_ptr *g, double *LAYOUT3D)
 {
-  PlanarGraph G(**g,(*g)->tutte_layout()); // TODO: Reducer antallet af gange, tl kaldes.
-  vector<coord2d> angles(G.spherical_projection());
+  const PlanarGraph& G(**g);
+  vector<coord2d> layout = G.tutte_layout();
+  vector<coord2d> angles(layout2d::spherical_projection(G, layout));
   
   for(int i=0;i<G.N;i++){
     double theta = angles[i].first, phi = angles[i].second;
@@ -280,8 +279,9 @@ double shortest_planar_distance_(const graph_ptr *g)
 {
   const PlanarGraph& G(*(*g));
 
-  const vector<double> lengths(G.edge_lengths());
-  
+  vector<coord2d> layout = G.tutte_layout();
+  const vector<double> lengths(layout2d::edge_lengths(G, layout));
+
   return *min_element(lengths.begin(),lengths.end());
 }
 
@@ -310,23 +310,21 @@ void get_layout3d_(const polyhedron_ptr *p, double *points)
 void get_layout2d_(const graph_ptr *g, double *points)
 {
   const PlanarGraph& G(*(*g));
+  vector<coord2d> layout = G.tutte_layout();
   for(node_t u=0;u<G.N;u++){
-    const coord2d &x(G.layout2d[u]);
-      points[u*2+0] = x.first;
-      points[u*2+1] = x.second;
+    points[u*2+0] = layout[u].first;
+    points[u*2+1] = layout[u].second;
   }
 }
 
-void set_layout2d_(graph_ptr *g, const double *layout2d)
+void set_layout2d_(graph_ptr *g, const double *layout_data)
 {
   PlanarGraph& G(*(*g));
-
-  G.layout2d.resize(G.N);
-
+  vector<coord2d> layout(G.N);
   for(node_t u=0;u<G.N;u++){
-    G.layout2d[u] = coord2d(layout2d[u*2],layout2d[u*2+1]);
+    layout[u] = coord2d(layout_data[u*2],layout_data[u*2+1]);
   }
-  G.orient_neighbours();
+  layout2d::orient_neighbours(G, layout);
 }
 
 
@@ -361,13 +359,13 @@ void draw_graph_(const graph_ptr *g, const char *filename_, const char *format, 
 //   cout << endl;
 //   cout << **g << endl;
 
+  vector<coord2d> layout = (*g)->tutte_layout();
   ofstream graph_file(filename.c_str(),ios::out | ios::binary);
   if        (fmt == "tex"){
-    graph_file <<  (*g)->to_latex(dimensions[0],dimensions[1],*show_dual,*show_labels,true,*line_colour,0,*vertex_colour,*line_width,0,*vertex_diameter,0,0);
+    graph_file <<  layout2d::to_latex(**g, layout, dimensions[0],dimensions[1],*show_dual,*show_labels,true,*line_colour,0,*vertex_colour,*line_width,0,*vertex_diameter,0,0);
   } else if (fmt == "pov"){
-    graph_file << (*g)->to_povray(dimensions[0],dimensions[1],*line_colour,*vertex_colour,*line_width,*vertex_diameter);
+    graph_file << layout2d::to_povray(**g, layout, dimensions[0],dimensions[1],*line_colour,*vertex_colour,*line_width,*vertex_diameter);
   }
-//  cout << "write done" << endl;
   graph_file.close();
 }
 
@@ -381,12 +379,13 @@ void draw_graph_with_path_(const graph_ptr *g, const char *filename_, const char
   int path[*Npath];// Change from Fortran 1-indexing to C/C++ 0-indexing
   for(int i=0;i<*Npath;i++) path[i] = path_[i]-1;
 
+  vector<coord2d> layout = (*g)->tutte_layout();
   ofstream graph_file(filename.c_str(),ios::out | ios::binary);
   if        (fmt == "tex"){
-    graph_file <<  (*g)->to_latex(dimensions[0],dimensions[1],false,true,true,*edge_colour,*path_colour,
+    graph_file <<  layout2d::to_latex(**g, layout, dimensions[0],dimensions[1],false,true,true,*edge_colour,*path_colour,
 				  *vertex_colour,*edge_width,*path_width,*vertex_diameter,*Npath,path);
-  } 
-  graph_file.close();  
+  }
+  graph_file.close();
 }
 void draw_polyhedron_(const polyhedron_ptr *P, const char *filename_, const char *format, 
 		      const int *edge_colour, const int *node_colour, const int *face_colour,
@@ -416,7 +415,7 @@ void edge_list_(const graph_ptr *g, int *edges, int *length)
 // Assumes k-regular graph, since fortran handles non-flat data structures poorly.
 void adjacency_list_(const fullerene_graph_ptr *g, const int *k, int *neighbours)
 {
-  const neighbours_t& ns((*g)->neighbours);
+  const neighbours_t& ns(**g);
   
   for(node_t u=0;u<ns.size();u++)
     for(int i=0;i<*k;i++)
@@ -425,7 +424,7 @@ void adjacency_list_(const fullerene_graph_ptr *g, const int *k, int *neighbours
 
 void compute_fullerene_faces_(const fullerene_graph_ptr *g, int *pentagons, int *hexagons)
 {
-  vector<face_t> faces((*g)->compute_faces(6,true));
+  vector<face_t> faces((*g)->compute_faces(6));
   int NH = (*g)->N/2-10;
 
   int i_p=0,i_h=0;
@@ -468,7 +467,6 @@ void get_face_distance_mtx_(const fullerene_graph_ptr *fg, int *face_distances){
 // rspi_a and jumps_a start counting at 1
 void get_general_spiral_(const fullerene_graph_ptr* fg, int rspi_a[12], int jumps_a[100], const bool *pentagon_start){
 //  12 will always be 12, 100 is just an arbitrary magic number
-  assert((*fg)->layout2d.size() == (*fg)->N);
   vector<int> rspi_v;
   jumplist_t jumps_v;
   const bool canonical=true, general=true;

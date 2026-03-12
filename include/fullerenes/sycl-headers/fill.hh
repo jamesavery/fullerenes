@@ -11,10 +11,7 @@ void fill(FullereneBatch<T,K>& B, int mytask_id = 0, int ntasks = 1) {
   auto dual_neighbours_acc = B.d_.A_dual_;
   auto statuses_acc = B.m_.flags_;
   BuckyGen::buckygen_queue BuckyQ = BuckyGen::start(N,false, false, mytask_id, ntasks);
-  Graph G;
-
-  G.neighbours = neighbours_t(Nf, std::vector<node_t>(6,-1));
-  G.N = Nf;
+  Graph G(Nf, std::vector<node_t>(6,-1));
   int num_generated = 0;
   for (int i = 0; i < N_graphs; ++i) {
     bool more_isomers = BuckyGen::next_fullerene(BuckyQ, G);

@@ -16,7 +16,7 @@ public:
 
     int    i = s.second;
     node_t p = s.first;
-    node_t v = g.neighbours[p][i];
+    node_t v = g.nbrs(p)[i];
     node_t w = g.next(p,v);
     node_t q = g.prev(v,w);
 
@@ -37,7 +37,7 @@ public:
 
     int    i = s.second;
     node_t p = s.first;
-    node_t v = g.neighbours[p][i];
+    node_t v = g.nbrs(p)[i];
     node_t x = g.next(p,v);
     node_t y = g.prev(v,x);
     node_t w = g.next(x,y);
@@ -64,7 +64,7 @@ public:
 
     int    i = s.second;
     node_t p = s.first;
-    node_t v = g.neighbours[p][i];
+    node_t v = g.nbrs(p)[i];
     node_t x1 = g.next(p,v);
     node_t y1 = g.prev(v,x1);
     node_t x2 = g.next(x1,y1);
@@ -95,7 +95,7 @@ public:
 
     int    i = s.second;
     node_t p = s.first;
-    node_t v = g.neighbours[p][i];
+    node_t v = g.nbrs(p)[i];
     node_t x1 = g.next(p,v); 	    // deg ?
     node_t y1 = g.prev(v,x1); 	    // deg ?
     node_t x2 = g.next(x1,y1); 	    // deg ?
@@ -240,7 +240,7 @@ public:
     for(node_t p=0;p<g.N;p++){
       if(g.degree(p) == 5)
 	for(int i=0;i<5;i++){
-	  node_t v = g.neighbours[p][i];
+	  node_t v = g.nbrs(p)[i];
 	  if(swmatch(p,v)) sites.push_back({p,v});
 	}
     }
@@ -252,7 +252,7 @@ public:
     for(node_t p=0;p<g.N;p++){
       if(g.degree(p) == 5)
 	for(int i=0;i<5;i++){
-	  node_t v = g.neighbours[p][i];
+	  node_t v = g.nbrs(p)[i];
 	  if(swmatch1(p,v)) sites.push_back({p,v});
 	}
     }
@@ -264,7 +264,7 @@ public:
     for(node_t p=0;p<g.N;p++){
       if(g.degree(p) == 5)
 	for(int i=0;i<5;i++){
-	  node_t v = g.neighbours[p][i];
+	  node_t v = g.nbrs(p)[i];
 	  if(swmatch2(p,v)) sites.push_back({p,v});
 	}
     }
@@ -276,7 +276,7 @@ public:
     for(node_t p=0;p<g.N;p++){
       if(g.degree(p) == 5)
 	for(int i=0;i<5;i++) {
-	  node_t v = g.neighbours[p][i];
+	  node_t v = g.nbrs(p)[i];
 	  if(swmatch3(p,v)) sites.push_back({p,v});
 	}
     }
@@ -288,7 +288,7 @@ public:
     for(node_t p=0;p<g.N;p++){
       if(g.degree(p) == 5)
 	for(int i=0;i<5;i++){
-	  node_t v = g.neighbours[p][i];
+	  node_t v = g.nbrs(p)[i];
 	  if(swmatch(p,v,d)) sites.push_back({p,v});
 	}
     }
@@ -322,7 +322,7 @@ public:
       node_t  u  = workstack.back(); workstack.pop_back();
       coord2d ux = coords[u];
       
-      const vector<node_t> &nu(g.neighbours[u]);
+      auto nu = g.nbrs(u);
       matrix2d rot = rotate_ccw[nu.size()==5];
 
       // Place unplaced vertices with placed predecessors
@@ -337,7 +337,7 @@ public:
 
     set<edge_t> placed_edges;
     for(node_t u=0;u<g.N;u++)
-      for(node_t v: g.neighbours[u])
+      for(node_t v: g.nbrs(u))
 	if(placed[u] && placed[v]) placed_edges.insert(edge_t{u,v});
 
     return PlanarGraph(Graph(placed_edges), coords);

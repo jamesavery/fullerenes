@@ -55,7 +55,6 @@ int main(int ac, char **av)
   FullereneGraph fg(n, pentagon_indices_input, jumps_input);
   //  fg.get_canonical_general_spiral_from_fg(pentagon_indices_output,jumps_output);
   fg = fg.halma_fullerene(1);
-  fg.layout2d = fg.tutte_layout();
   Triangulation dual(fg.dual_graph(6,true));
 
   bool found_spiral = FullereneDual(dual).get_fullerene_rspi(pentagon_indices_output2,jumps_output2,true);

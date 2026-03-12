@@ -13,4 +13,5 @@ add_executable(GCnew GCnew.cc)
 add_executable(simple-spiral simple-spiral.cc)
 add_executable(symmetry-buckygen-test symmetry-buckygen-test.cc)
 add_executable(spiral-crash-diag spiral-crash-diag.cc)
-add_subdirectory(spanify)
+# spanify prototype now lives in include/fullerenes/ and tests/csr-test.cc
+# add_subdirectory(spanify)

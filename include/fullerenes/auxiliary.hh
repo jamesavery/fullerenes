@@ -18,7 +18,10 @@ extern char LIST_CLOSE;
 using namespace std;
 
 typedef int node_t;
-typedef vector< vector<node_t> > neighbours_t;
+
+#include "dense_graph.hh"
+constexpr int GRAPH_DMAX = 10;
+using neighbours_t = Spanify::DenseGraph<node_t>;
 typedef vector< bool > edges_t;
 
 template <typename S, typename T> ostream& operator<<(ostream& s, const pair<S,T>& p);
@@ -38,6 +41,17 @@ template <typename S, typename T> ostream& operator<<(ostream& s, const pair<S,T
 container_output(vector);
 container_output(list);
 container_output(set);
+
+template<typename T> ostream& operator<<(ostream& s, std::span<T> v)
+{
+  s << LIST_OPEN;
+  for(size_t i=0;i<v.size();i++){
+    if(i) s << ",";
+    s << v[i];
+  }
+  s << LIST_CLOSE;
+  return s;
+}
 
 
 // Directed edge is an ordered pair of nodes

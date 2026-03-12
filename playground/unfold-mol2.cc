@@ -13,14 +13,13 @@ int main(int ac, char **av)
   
   dual = dual.sort_nodes();
   
-  dual.layout2d = dual.tutte_layout();
   Unfolding uf(dual,true);
 
   ofstream output("output/C"+to_string(P.N)+"-unfold.m");
   output
     << "dual      = " << dual << ";\n"
     << "outline   = " << uf.outline << ";\n"
-    << "triangles = " << dual.triangles << ";\n"
+    << "triangles = " << dual.triangles() << ";\n"
     << "P         = " << P << ";\n"
     << "PD        = " << dP << ";\n"
     << "arcs    = " << get_keys(uf.edgecoords) << ";\n"

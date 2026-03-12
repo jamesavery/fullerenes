@@ -65,7 +65,7 @@ TEST(BuckinversePhase2, FollowStraight) {
     int found = 0;
     for (node_t u : deg5vertices(c28)) {
         for (int ni = 0; ni < c28.degree(u); ++ni) {
-            node_t v = c28.neighbours[u][ni];
+            node_t v = c28.nbrs(u)[ni];
             if (c28.degree(v) == 5) continue;
 
             auto ep = followStraightToFive(c28, u, v, 5);

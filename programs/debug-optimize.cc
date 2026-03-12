@@ -3,6 +3,7 @@
 #include "fullerenes/polyhedron.hh"
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/isomerdb.hh"
+#include "fullerenes/layout2d.hh"
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -22,10 +23,10 @@ int main(int ac, char **av)
   fclose(file);
 
   PlanarGraph g(N);
-  for(node_t u=0;u<N;u++) g.neighbours[u] = {neighbours_flat[3*u],neighbours_flat[3*u+1],neighbours_flat[3*u+2]};
+  for(node_t u=0;u<N;u++) g.assign_row(u, {neighbours_flat[3*u],neighbours_flat[3*u+1],neighbours_flat[3*u+2]});
   
-  g.layout2d = g.tutte_layout();
-  cout << g.to_latex(10, 10, true, true, true) << "\n";
+  vector<coord2d> layout = g.tutte_layout();
+  cout << layout2d::to_latex(g, layout, 10, 10, true, true, true) << "\n";
     
   Polyhedron P0(g,g.zero_order_geometry(),6);
   string basename("polyhedron-"+to_string(N));
@@ -63,11 +64,6 @@ int main(int ac, char **av)
   // output << "P0 = " << P0 << ";\n";
   // output << "P = " << P << ";\n";
 
-  // Polyhedron D(P.dual());
-  // D.layout2d = D.tutte_layout();
-  // D.faces    = D.compute_faces(3,true);
-  // D.face_max = 3;
-  // D.optimize();
   // output << "PD = " << D << ";\n";
   
   // output.close();

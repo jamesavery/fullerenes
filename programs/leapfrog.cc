@@ -12,7 +12,7 @@ extern "C" void optgraph_(const int *N, const int *iop, const int *iout,
 			  const int *is, const int *mdist, const int *maxl, 
 			  const double *scalePPG, double *xs);
 
-vector<coord2d> OptGraph(const PlanarGraph &g, int method, double scalePPG)
+vector<coord2d> OptGraph(const PlanarGraph &g, const vector<coord2d>& layout, const face_t& outer_face, int method, double scalePPG)
 {
   vector<double> xs(2*g.N);
   int iout=3;
@@ -32,13 +32,13 @@ vector<coord2d> OptGraph(const PlanarGraph &g, int method, double scalePPG)
   cout << "maxdist = " << maxdist << ";\n";
 
   // Copy outer face to IS
-  assert(g.outer_face.size() >= 5);
-  for(int i=0;i<g.outer_face.size();i++) IS[i] = g.outer_face[i]+1;
+  assert(outer_face.size() >= 5);
+  for(int i=0;i<outer_face.size();i++) IS[i] = outer_face[i]+1;
 
   // Copy coordinates to Fortran order
   for(unsigned int i=0;i<g.N;i++){
-    xs[i*2]   = g.layout2d[i].first;
-    xs[i*2+1] = g.layout2d[i].second;
+    xs[i*2]   = layout[i].first;
+    xs[i*2+1] = layout[i].second;
   }
 
 
@@ -50,8 +50,8 @@ vector<coord2d> OptGraph(const PlanarGraph &g, int method, double scalePPG)
   for(int i=0;i<g.N;i++)
     result[i] = coord2d(xs[i*2],xs[i*2+1]);
 
-  cout << "Any changes? " << (result == g.layout2d? "No.":"Yes!") << endl;
-  
+  cout << "Any changes? " << (result == layout? "No.":"Yes!") << endl;
+
   return result;
 }
 
@@ -72,9 +72,9 @@ int main(int ac, char **av)
   FullereneGraph g(N, rspi, jumps);
   //  PlanarGraph  leap(g.dual_graph(6));
 
-  g.layout2d = g.tutte_layout();
-  //  g.layout2d = OptGraph(g,3,1.9);
-  //  g.layout2d = OptGraph(g,1,1.4);
+  vector<coord2d> layout = g.tutte_layout();
+  //  layout = OptGraph(g,layout,3,1.9);
+  //  layout = OptGraph(g,layout,1,1.4);
 
   ofstream mathfile(string("output/leapfrog"+to_string(Nleap)+"-C" + to_string(N)+".m").c_str());
   mathfile << "g = " << g << ";\n";

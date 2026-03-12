@@ -59,16 +59,15 @@ int main(int ac, char **av)
 
   FullereneGraph fg(n, rspi_in, jumps);
   cout << "graph created" << endl;
-  fg.layout2d = fg.tutte_layout();
   cout << "layout created" << endl;
 
 //  cout << "fg = " << fg << endl;
 //  cout << "number of faces: " << fg.N << endl;
 //  cout << "number of edges: " << fg.edge_set.size() << endl;
 //  int j=0;
-//  for (vector<vector<node_t> >::iterator it(fg.neighbours.begin()); it!=fg.neighbours.end(); ++it, ++j){
+//  for (int j=0; j<fg.N; ++j){
 //    cout << j+1 << " ";
-//    for (vector<node_t>::iterator jt(fg.neighbours[j].begin()); jt!=fg.neighbours[j].end(); ++jt){
+//    for (auto jt=fg[j].begin(); jt!=fg[j].end(); ++jt){
 //      cout << *jt+1 << " "; 
 //    }
 //    cout << endl;

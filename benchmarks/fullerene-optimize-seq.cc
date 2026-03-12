@@ -38,8 +38,7 @@ int main(int argc, char** argv){
             T_polys(N_runs,chrono::nanoseconds(0));
         
         auto Nf = N /2 + 2;
-        G.neighbours = neighbours_t(Nf, std::vector<node_t>(6));
-        G.N = Nf;
+        static_cast<Graph&>(G) = Graph(Nf, std::vector<node_t>(6));
 
         auto path = "isomerspace_samples/dual_layout_" + to_string(N) + "_seed_42";
         ifstream isomer_sample(path,std::ios::binary);
@@ -56,23 +55,22 @@ int main(int argc, char** argv){
         for (int l = 0; l < N_runs; l++){
             for (int i = 0; i < N_samples; ++i){
                 for (size_t j = 0; j < Nf; j++){
-                    G.neighbours[j].clear();
+                    G.clear_row(j);
                     for (size_t k = 0; k < 6; k++) {
                         auto u = input_buffer[id_subset[i]*Nf*6 + j*6 +k];
-                        if(u != UINT16_MAX) G.neighbours[j].push_back(u);
+                        if(u != UINT16_MAX) G.push_back(j, u);
                     }
                 }
                     auto T1 = high_resolution_clock::now(); 
-                G.update();
                 PlanarGraph pG = G.dual_graph();
                     auto T2 = high_resolution_clock::now(); T_duals[l] += T2 - T1; 
                 Polyhedron P(pG);
                     auto T3 = high_resolution_clock::now(); T_polys[l] += T3 - T2;
 
 
-                P.layout2d  = P.tutte_layout();
+                {auto tutte_layout = P.tutte_layout();}
                     auto T4 = high_resolution_clock::now(); T_tuttes[l] += T4 - T3;
-                P.points    = P.zero_order_geometry();
+                P.points = P.zero_order_geometry();
                     auto T5 = high_resolution_clock::now(); T_X0s[l] += T5 - T4;
                 P.optimize();
                     auto T6 = high_resolution_clock::now(); T_opts[l] += T6 - T5;

@@ -12,7 +12,6 @@ Polyhedron fullerene_dual_polyhedron(const Triangulation& dg)
   cout << "pg = " << pg << endl;
 
   FullereneGraph g(pg);
-  g.layout2d = g.tutte_layout();
 
   vector<coord3d> points = g.zero_order_geometry();
   points = g.optimized_geometry(points);
@@ -20,9 +19,9 @@ Polyhedron fullerene_dual_polyhedron(const Triangulation& dg)
   vector<coord3d> dual_points(dg.N);
 
   vector<face_t> faces(dg.N);
-  for(int i=0;i<dg.triangles.size();i++)
+  for(int i=0;i<dg.triangles().size();i++)
     for(int j=0;j<3;j++)
-      faces[dg.triangles[i][j]].push_back(i);
+      faces[dg.triangles()[i][j]].push_back(i);
 
   for(int i=0;i<faces.size();i++)
     dual_points[i] = faces[i].centroid(points);
@@ -169,7 +168,6 @@ int main(int ac, char **av)
   Triangulation dual(spiral);
   dual = dual.sort_nodes();
   
-  dual.layout2d = dual.tutte_layout();
   Unfolding uf(dual);
 
   ofstream output("output/C"+to_string(N)+"-unfold.m");

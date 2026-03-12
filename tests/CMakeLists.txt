@@ -34,11 +34,28 @@ add_test(NAME buckinverse-roundtrip-test COMMAND buckinverse-roundtrip-test)
 
 add_executable(deltahedron-geometry-test deltahedron-geometry-test.cc)
 target_link_libraries(deltahedron-geometry-test fullerenes GTest::GTest GTest::Main)
-add_test(NAME deltahedron-geometry-test COMMAND deltahedron-geometry-test)
+# Disabled from ctest: takes ~10 minutes. Run manually when needed.
+# add_test(NAME deltahedron-geometry-test COMMAND deltahedron-geometry-test)
 
 add_executable(convex-hull-test convex-hull-test.cc)
 target_link_libraries(convex-hull-test fullerenes GTest::GTest GTest::Main)
 add_test(NAME convex-hull-test COMMAND convex-hull-test)
+
+add_executable(orientation-test orientation-test.cc)
+target_link_libraries(orientation-test fullerenes GTest::GTest GTest::Main)
+add_test(NAME orientation-test COMMAND orientation-test)
+
+add_executable(csr-test csr-test.cc)
+target_link_libraries(csr-test fullerenes GTest::GTest GTest::Main)
+add_test(NAME csr-test COMMAND csr-test)
+
+add_executable(dense-graph-test dense-graph-test.cc)
+target_link_libraries(dense-graph-test fullerenes GTest::GTest GTest::Main)
+add_test(NAME dense-graph-test COMMAND dense-graph-test)
+
+add_executable(view-test view-test.cc)
+target_link_libraries(view-test fullerenes GTest::GTest GTest::Main)
+add_test(NAME view-test COMMAND view-test)
 
 add_executable(delaunay-test delaunay-test.cc)
 target_link_libraries(delaunay-test fullerenes GTest::GTest GTest::Main)

@@ -11,9 +11,9 @@ void open_closed(const Graph& g, bool &open, int &qualifier, double &HOMO, doubl
 {
   DenseSqrMatrix A(g.N);
   for(node_t u=0;u<g.N;u++)
-    for(int i=0;i<g.neighbours[u].size();i++){
-      A(u,g.neighbours[u][i]) = 1;
-      A(g.neighbours[u][i],u) = 1;
+    for(int i=0;i<g.degree(u);i++){
+      A(u,g.nbrs(u)[i]) = 1;
+      A(g.nbrs(u)[i],u) = 1;
     }
 
   vector<double> lambda = A.eigenvalues(g.N/2-1,g.N/2);

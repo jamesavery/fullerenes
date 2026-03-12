@@ -39,7 +39,7 @@ int main(int ac, char **av)
   
   
   PlanarGraph   g = t.dual_graph();
-  g.layout2d = g.tutte_layout();
+  vector<coord2d> tutte = g.tutte_layout();
   Polyhedron P0(g,g.zero_order_geometry());
   Polyhedron P = P0;
   P.optimize();
@@ -47,14 +47,14 @@ int main(int ac, char **av)
   int N = g.N, Nf = t.N;
   
   vector<face_t> pentagons(12), hexagons(Nf-12);
-  neighbours_t next_on_face(N,vector<node_t>(3));
-  neighbours_t prev_on_face(N,vector<node_t>(3));
-  neighbours_t face_right(N,vector<node_t>(3));
+  Graph next_on_face(N, vector<node_t>(3));
+  Graph prev_on_face(N, vector<node_t>(3));
+  Graph face_right(N, vector<node_t>(3));
 
   
   for(node_t u=0;u<N;u++){
     for(int j=0;j<3;j++){
-      node_t v = g.neighbours[u][j];
+      node_t v = g.nbrs(u)[j];
       next_on_face[u][j] = g.next_on_face(u,v);
       prev_on_face[u][j] = g.prev_on_face(u,v);
       face_right[u][j]  = face_size(g,u,v);
@@ -66,7 +66,7 @@ int main(int ac, char **av)
 
   
   for(int f=0,p=0,h=0;f<Nf;f++){
-    int df = faces[f].size(), dd = t.neighbours[f].size();
+    int df = faces[f].size(), dd = t.degree(f);
     //    if(f<12) assert(dd==5); // NEJ! MUST BE IN SPIRAL ORDER, OR SYMMETRY CALC BREAKS
 
     if(df == 5) pentagons[p++] = faces[f];
@@ -76,10 +76,10 @@ int main(int ac, char **av)
   // Dual node coordinates
   vector<coord3d> dual_coords(Nf);
   
-  assert(t.triangles.size() == N);
+  assert(t.triangles().size() == N);
 
   for(node_t u=0;u<N;u++){
-    tri_t triangle = t.triangles[u];    
+    tri_t triangle = t.triangles()[u];    
     coord3d triangle_center = P.points[u];
     
     for(int i=0;i<3;i++)
@@ -102,7 +102,7 @@ int main(int ac, char **av)
   cerr << "equivalent_faces = " << S.equivalence_classes(S.G) << ";\n";
   //  cerr << "equivalent_edges = " << S.equivalence_classes(S.Gedge) << ";\n";    // TODO: Needs to be arcs in correct order
   cerr << "# Cubic graph, its faces, 3D embedding, and 2D Tutte-embedding\n";
-  cerr << "cubic_neighbours  = array(" << g.neighbours << ");\n\n";
+  cerr << "cubic_neighbours  = array(" << static_cast<const neighbours_t&>(g) << ");\n\n";
   cerr << "pentagons    = array(" << pentagons  << ");\n\n"; // TODO
   cerr << "hexagons     = array(" << hexagons   << ");\n\n"; // TODO
   cerr << "next_on_face = array(" << next_on_face << ");\n\n";
@@ -110,11 +110,11 @@ int main(int ac, char **av)
   cerr << "face_right   = array(" << face_right << ");\n\n"; 
   cerr << "points_start = array(" << P0.points << ");\n\n";
   cerr << "points_opt   = array(" << P.points << ");\n\n";   
-  cerr << "tutte_layout = array(" << g.layout2d << ");\n\n";
+  cerr << "tutte_layout = array(" << tutte << ");\n\n";
   cerr << "# Dual graph and its faces\n";
-  cerr << "dual_neighbours   = " << t.neighbours << ";\n\n";
+  cerr << "dual_neighbours   = " << static_cast<const neighbours_t&>(t) << ";\n\n";
   //  cerr << "next_on_tri       = array(" << next_on_tri << ");\n\n";  
-  cerr << "triangles         = array(" << t.triangles << ");\n\n";
+  cerr << "triangles         = array(" << t.triangles() << ");\n\n";
   cerr << "dual_points     = array(" << dual_coords << ");\n\n";  
   cerr << "# prev_on_tri is the same as next_on_tri\n";
 

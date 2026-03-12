@@ -13,13 +13,21 @@ struct CubicGraph : public PlanarGraph {
   CubicGraph() {}
   CubicGraph(const PlanarGraph& g) : PlanarGraph(g) {
     for(node_t u=0;u<N;u++)
-      if(neighbours[u].size() != 3){
-        fprintf(stderr,"Graph not cubic: deg(%d) = %d\n",u,int(neighbours[u].size()));
+      if((*this)[u].size() != 3){
+        fprintf(stderr,"Graph not cubic: deg(%d) = %d\n",u,int((*this)[u].size()));
         abort();
       }
+    if(N > 0 && dmax != 3) static_cast<Graph&>(*this) = restride(3);
   }
 
-  CubicGraph(const Graph& g, const vector<coord2d>& layout) : PlanarGraph(g,layout) {}
+  CubicGraph(const Graph& g) : PlanarGraph(g) {
+    for(node_t u=0;u<N;u++)
+      if((*this)[u].size() != 3){
+        fprintf(stderr,"Graph not cubic: deg(%d) = %d\n",u,int((*this)[u].size()));
+        abort();
+      }
+    if(N > 0 && dmax != 3) static_cast<Graph&>(*this) = restride(3);
+  }
   CubicGraph(const int N, const vector<int>& spiral_string, const jumplist_t& jumps = jumplist_t());
   CubicGraph(const spiral_nomenclature &fsn);
 

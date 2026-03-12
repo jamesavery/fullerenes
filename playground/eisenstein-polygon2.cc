@@ -44,7 +44,6 @@ int main(int ac, char **av)
   
   FullereneGraph cubic = G.dual_graph();
 
-  cubic.layout2d = cubic.tutte_layout();
   Polyhedron P(cubic,cubic.zero_order_geometry(),6);
   P.points = cubic.optimized_geometry(P.points);
 
@@ -61,8 +60,8 @@ int main(int ac, char **av)
     cout << "arc " << keys[i] << " at " << values[i] << endl;
   }
   
-  cout << "dual_neighours = " << G.neighbours << ";\n\n";
-  cout << "cubic_neighbours = " << G.dual_graph().neighbours << ";\n\n";
+  cout << "dual_neighours = " << static_cast<const neighbours_t&>(G) << ";\n\n";
+  cout << "cubic_neighbours = " << static_cast<const neighbours_t&>(G.dual_graph()) << ";\n\n";
   cout << "triangles = " << G.compute_faces() << ";\n\n";  
   cout << "dual_arc_list = " << get_keys(U.arc_coords) << ";\n\n";
   cout << "dual_arc_coordinates = " << get_values(U.arc_coords) << ";\n\n";  

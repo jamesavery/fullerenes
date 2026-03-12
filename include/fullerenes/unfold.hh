@@ -60,7 +60,7 @@ public:
   //    u is outline[0], v is outline[0]+(1,0), and w is outline[0]+(0,1).
   Unfolding(const Triangulation& G, const polygon& outline_polygon, const tri_t T0) : graph(G), degrees(G.N) 
   {   
-    for(int u=0;u<G.N;u++) degrees[u] = G.neighbours[u].size();     // Store degrees of each node
+    for(int u=0;u<G.N;u++) degrees[u] = G.degree(u);     // Store degrees of each node
     arc_coords = unfold(G,outline_polygon,T0);
     //    outline    = get_outline(arc_coords);
   }

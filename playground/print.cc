@@ -5,8 +5,9 @@ int main(int ac, char **av)
 {
   CubicGraph g(stdin);
 
+  vector<coord2d> layout;
   if(ac>=2 && string(av[1]) == "do_layout")
-    g.layout2d = g.tutte_layout();
+    layout = g.tutte_layout();
 
   bool is_fullerene = g.this_is_a_fullerene();
   cerr << "Graph is "<<(is_fullerene?"":"not ")<<"a fullerene.\n";

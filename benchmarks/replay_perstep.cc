@@ -130,7 +130,7 @@ static string step_kind_str(const ExpKind& k) {
 }
 
 static void write_mol2(const Deltahedron& D, const string& path) {
-    Polyhedron P(static_cast<const PlanarGraph&>(D), D.points);
+    Polyhedron P(static_cast<const PlanarGraph&>(D), vector<coord3d>(D.points.begin(), D.points.end()));
     Polyhedron::to_file(P, path);
 }
 
@@ -146,15 +146,15 @@ static void print_vertex_detail(const Deltahedron& D, int N, int bucky_idx, int 
     struct VH { int id; double h; };
     vector<VH> all_vh;
     for (int v = 0; v < D.N; v++) {
-        int d = (int)D.neighbours[v].size();
+        int d = D.degree(v);
         if (d > 6) continue;
         coord3d cen(0,0,0);
-        for (int i = 0; i < d; i++) cen += D.points[D.neighbours[v][i]];
+        for (int i = 0; i < d; i++) cen += D.points[D[v][i]];
         cen /= (double)d;
         coord3d nf(0,0,0);
         for (int i = 0; i < d; i++) {
-            coord3d e1 = D.points[D.neighbours[v][i]] - D.points[v];
-            coord3d e2 = D.points[D.neighbours[v][(i+1)%d]] - D.points[v];
+            coord3d e1 = D.points[D[v][i]] - D.points[v];
+            coord3d e2 = D.points[D[v][(i+1)%d]] - D.points[v];
             nf += e1.cross(e2);
         }
         double nl = nf.norm();
@@ -183,11 +183,11 @@ static void print_vertex_detail(const Deltahedron& D, int N, int bucky_idx, int 
     for (auto& vh : all_vh) {
         if (vh.h >= 0 && printed >= 5) break;
         int v = vh.id;
-        int d = (int)D.neighbours[v].size();
+        int d = D.degree(v);
         // Edge lengths to neighbors
         fprintf(stderr, "    v%-3d deg%d %-5s h=%+.6f  edges:", v, d, classify(v), vh.h);
         for (int i = 0; i < d; i++) {
-            int nb = D.neighbours[v][i];
+            int nb = D[v][i];
             double elen = (D.points[v] - D.points[nb]).norm();
             fprintf(stderr, " %.4f(%s)", elen, classify(nb));
         }
@@ -233,10 +233,10 @@ static double strip_local_angle_relerr(const Deltahedron& D, const set<int>& str
     if (strip_set.empty()) return 0;
     double max_re = 0;
     for (int u = 0; u < D.N; u++) {
-        int d = (int)D.neighbours[u].size();
+        int d = D.degree(u);
         for (int i = 0; i < d; i++) {
-            int v = D.neighbours[u][i];
-            int w = D.neighbours[u][(i + 1) % d];
+            int v = D[u][i];
+            int w = D[u][(i + 1) % d];
             if (v < u || w < u) continue; // avoid counting each face 3x
             // Check if any vertex of this face is in strip_set
             if (strip_set.count(u) || strip_set.count(v) || strip_set.count(w)) {
@@ -257,22 +257,22 @@ static PhaseSnap snap_quality(const Deltahedron& D, const set<int>& strip_compac
     // Edge CV
     vector<double> lens;
     for (int u = 0; u < D.N; u++)
-        for (int v : D.neighbours[u])
+        for (int v : D[u])
             if (v > u) lens.push_back((D.points[u] - D.points[v]).norm());
     s.edge_cv = cv_twopass(lens);
 
     // h_min
     s.h_min = 1e30;
     for (int v = 0; v < D.N; v++) {
-        int d = (int)D.neighbours[v].size();
+        int d = D.degree(v);
         if (d > 6) continue;
         coord3d cen(0,0,0);
-        for (int i = 0; i < d; i++) cen += D.points[D.neighbours[v][i]];
+        for (int i = 0; i < d; i++) cen += D.points[D[v][i]];
         cen /= (double)d;
         coord3d nf(0,0,0);
         for (int i = 0; i < d; i++) {
-            coord3d e1 = D.points[D.neighbours[v][i]] - D.points[v];
-            coord3d e2 = D.points[D.neighbours[v][(i+1)%d]] - D.points[v];
+            coord3d e1 = D.points[D[v][i]] - D.points[v];
+            coord3d e2 = D.points[D[v][(i+1)%d]] - D.points[v];
             nf += e1.cross(e2);
         }
         double nl = nf.norm();

@@ -64,7 +64,6 @@ int main(int ac, char **av)
 
   vector<coord3d> coordinates(readxyz(filename));
   FullereneGraph G(connect_neighbours(1.6,coordinates));
-  G.layout2d = G.tutte_layout();
   vector<face_t> faces(G.compute_faces_flat(6,true));
   Polyhedron P(G,coordinates,6,faces);
 

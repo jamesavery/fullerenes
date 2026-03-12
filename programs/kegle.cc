@@ -256,7 +256,7 @@ namespace clustering {
 matrix<clustering::distance_t> pentagon_graph_distance(const Triangulation &G)
 {
   vector<int> pentagon_indices(12);
-  for(int u=0, i=0;u<G.N;u++) if(G.neighbours[u].size() == 5) pentagon_indices[i++] = u;
+  for(int u=0, i=0;u<G.N;u++) if(G.degree(u) == 5) pentagon_indices[i++] = u;
 
   auto D = G.all_pairs_shortest_paths(pentagon_indices);
   for(int i=0;i<D.m*D.n;i++) D[i] *= D[i];
@@ -267,7 +267,7 @@ matrix<clustering::distance_t> pentagon_graph_distance(const Triangulation &G)
 matrix<int> pentagon_surface_distance(const Triangulation& G)
 {
   vector<int> pentagon_indices(12);
-  for(int u=0, i=0;u<G.N;u++) if(G.neighbours[u].size() == 5) pentagon_indices[i++] = u;
+  for(int u=0, i=0;u<G.N;u++) if(G.degree(u) == 5) pentagon_indices[i++] = u;
 								
   return G.simple_square_surface_distances(pentagon_indices);
 }
@@ -275,7 +275,7 @@ matrix<int> pentagon_surface_distance(const Triangulation& G)
 auto pentagon_geodesics(const Triangulation& G)
 {
   vector<int> pentagon_indices(12);
-  for(int u=0, i=0;u<G.N;u++) if(G.neighbours[u].size() == 5) pentagon_indices[i++] = u;
+  for(int u=0, i=0;u<G.N;u++) if(G.degree(u) == 5) pentagon_indices[i++] = u;
 								
   return G.simple_geodesics(pentagon_indices,true);
 }
@@ -386,7 +386,6 @@ int main(int ac, char **argv)
       //   if(max_length(pentagon_distance(dualG)) >= 10){
       //	cout << i << endl;
 	
-      dualG.update();		            // Update metadata
       FullereneGraph G = dualG.dual_graph();  // Construct fullerene graph
       vector<int> RSPI;
       jumplist_t jumps;

@@ -17,7 +17,7 @@ vector<coord3d> map_surface(const vector<coord2d>& angles)
 int main()
 {
   FullereneGraph g(stdin);
-  g.layout2d = g.tutte_layout();
+  auto layout = g.tutte_layout();
   
   cout << "g = " << g << endl;
 

@@ -43,7 +43,7 @@ int main(int argc, char **argv)
   vector<int> involutions = g.involutions();
   printf("Number of involutions=%d\n",int(involutions.size()));
   
-  cout << "g = " << g.neighbours << ";\n";
+  cout << "g = " << static_cast<const neighbours_t&>(g) << ";\n";
 
   vector<int> 
     mF = g.site_symmetry_counts(g.G),

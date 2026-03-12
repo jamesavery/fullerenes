@@ -130,15 +130,12 @@ bool next_fullerene(const buckygen_queue& Q, Graph& G)
     fprintf(stderr,"In BuckyGen::next_fullerene: %s\n",strerror(errno));
     return false;
   } else if(msg.mtype == GRAPH_READY) {	// Completed graph
-    G.N = Q.Nvertices;
-    G.neighbours.resize(G.N);
-
-    for(int u=0;u<Q.Nvertices;u++){
-      G.neighbours[u].clear();
+    Graph adj(Q.Nvertices, GRAPH_DMAX);
+    for(int u=0;u<Q.Nvertices;u++)
       for(int i=0; 6>i && (msg.neighbours[u*6+i] != -1); i++)
-	G.neighbours[u].push_back(msg.neighbours[u*6+i]);
-    }
-    G.is_oriented = true; // Buckygen's e->next traversal preserves cyclic planar order.
+	adj.push_back(u, msg.neighbours[u*6+i]);
+    // Buckygen's e->next traversal preserves cyclic planar order.
+    G = Graph(adj);
 
     return true;
   } else if(msg.mtype == WORKER_FINISHED) {	// No more graphs to generate
@@ -225,15 +222,12 @@ bool next_fullerene(const buckygen_queue& Q, Graph& G)
 	fprintf(stderr,"In BuckyHerd::next_fullerene: %s\n",strerror(errno));
 	return false;
       } else if(msg.mtype == GRAPH_READY) {	// Completed graph
-	G.N = H.Nvertices;
-	G.neighbours.resize(G.N);
-	
-	for(int u=0;u<H.Nvertices;u++){
-	  G.neighbours[u].clear();
+	Graph adj(H.Nvertices, GRAPH_DMAX);
+	for(int u=0;u<H.Nvertices;u++)
 	  for(int i=0; 6>i && (msg.neighbours[u*6+i] != -1); i++)
-	    G.neighbours[u].push_back(msg.neighbours[u*6+i]);
-	}
-	G.is_oriented = true; // Buckygen's e->next traversal preserves cyclic planar order.
+	    adj.push_back(u, msg.neighbours[u*6+i]);
+	// Buckygen's e->next traversal preserves cyclic planar order.
+	G = Graph(adj);
 
 	return true;
       } else if(msg.mtype == WORKER_FINISHED) {	 // A worker finished!

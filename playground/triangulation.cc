@@ -1,13 +1,13 @@
 #include "libgraph/fullerenegraph.hh"
+#include "libgraph/layout2d.hh"
 using namespace std;
 
 int main()
 {
   FullereneGraph g(stdin);
-  g.layout2d = g.tutte_layout();
-  g.spherical_layout = g.spherical_projection(g.layout2d);
+  vector<coord2d> layout = g.tutte_layout();
+  auto spherical_layout = layout2d::spherical_projection(g, layout);
   Graph triangles(g.triangulation(6));
-  triangles.layout2d = g.layout2d;
 
   cout << "g = " << g << ";\n";
   cout << "gT = " << triangles << ";\n";

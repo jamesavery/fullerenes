@@ -19,16 +19,16 @@ int test_all(int N)
 
     // --- Triangulation sanity ---
     int expected_tris = 2 * (T.N - 2);
-    if((int)T.triangles.size() != expected_tris){
+    if((int)T.triangles().size() != expected_tris){
       fprintf(stderr, "  TRI FAIL: N=%d #%d: got %zu expected %d\n",
-              N, count, T.triangles.size(), expected_tris);
+              N, count, T.triangles().size(), expected_tris);
       fails++;
       continue;
     }
 
     // --- Single-triple spiral extraction ---
     {
-      node_t u = 0, v = T.neighbours[u][0], w = T.next(u, v);
+      node_t u = 0, v = T[u][0], w = T.next(u, v);
       vector<int> spiral;
       jumplist_t jumps;
       vector<node_t> perm;
@@ -93,7 +93,7 @@ int test_all(int N)
 
         // Check permutation preserves adjacency
         for(int u = 0; u < T.N; u++)
-          for(node_t v : T.neighbours[u])
+          for(node_t v : T[u])
             if(T.arc_ix(perms[i][u], perms[i][v]) < 0){
               fprintf(stderr, "  SYMMETRY FAIL (perm %zu breaks adj %d->%d => %d->%d): N=%d #%d\n",
                       i, u, v, perms[i][u], perms[i][v], N, count);

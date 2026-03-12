@@ -53,9 +53,9 @@ int main(int argc, char** argv) {
             host_accessor Deg_in_acc(Deg_in, write_only);
 
             for (int i = 0; i < T.N; i++) {
-                Deg_in_acc[i] = T.neighbours[i].size();
-                for (int j = 0; j < T.neighbours[i].size(); j++) {
-                    G_in_acc[i*6+j] = T.neighbours[i][j];
+                Deg_in_acc[i] = T.degree(i);
+                for (int j = 0; j < T.degree(i); j++) {
+                    G_in_acc[i*6+j] = T.nbrs(i)[j];
                 }            
             }
         }
@@ -76,7 +76,7 @@ int main(int argc, char** argv) {
         PlanarGraph Gref = T.dual_graph();
         auto ElapsedRefMicro = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - T0).count();
 
-        neighbours_t neighbours((T.N-2)*2);
+        Graph neighbours((T.N-2)*2, GRAPH_DMAX);
         {
             host_accessor G_out_acc(G_out, read_only);
             host_accessor Deg_out_acc(Deg_out, read_only);
@@ -110,7 +110,7 @@ int main(int argc, char** argv) {
         PlanarGraph Gref2 = Gref.dual_graph();
         auto ElapsedRefMicro2 = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - T2).count();
 
-        neighbours_t neighbours2(T.N);
+        Graph neighbours2(T.N);
         {
             host_accessor G_in_acc(G_in, read_only);
             host_accessor Deg_in_acc(Deg_in, read_only);
@@ -136,7 +136,7 @@ int main(int argc, char** argv) {
     /* 
     
     BuckyGen::next_fullerene(BQ, Gr);
-    std::cout << "Gr has " << Gr.neighbours.size() << " vertices" << std::endl;
+    std::cout << "Gr has " << Gr.size() << " vertices" << std::endl;
  */
     //BuckyGen::buckygen_queue BQ = BuckyGen::start(20, false, false);
     pid_t pid = fork();

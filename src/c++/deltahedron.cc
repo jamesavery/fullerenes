@@ -44,22 +44,22 @@ struct VertexHData {
   bool has_derivs = false;
 
   // Compute basic h data for vertex v.
-  static VertexHData compute_h(const Deltahedron& D, const vector<coord3d>& x, int v) {
+  static VertexHData compute_h(const Deltahedron& D, std::span<const coord3d> x, int v) {
     VertexHData vd;
     vd.vertex = v;
-    vd.d = (int)D.neighbours[v].size();
+    vd.d = D.degree(v);
     vd.has_derivs = false;
 
     // Neighbor centroid
     vd.centroid = coord3d(0,0,0);
-    for(int j = 0; j < vd.d; j++) vd.centroid += x[D.neighbours[v][j]];
+    for(int j = 0; j < vd.d; j++) vd.centroid += x[D[v][j]];
     vd.centroid /= (double)vd.d;
 
     // Fan normal (unnormalized)
     coord3d N_fan(0,0,0);
     for(int j = 0; j < vd.d; j++){
-      coord3d e1 = x[D.neighbours[v][j]] - x[v];
-      coord3d e2 = x[D.neighbours[v][(j+1)%vd.d]] - x[v];
+      coord3d e1 = x[D[v][j]] - x[v];
+      coord3d e2 = x[D[v][(j+1)%vd.d]] - x[v];
       N_fan += e1.cross(e2);
     }
     vd.N_len = N_fan.norm();
@@ -72,7 +72,7 @@ struct VertexHData {
   }
 
   // Compute full derivative data (extends basic h data).
-  static VertexHData compute_derivs(const Deltahedron& D, const vector<coord3d>& x, int v) {
+  static VertexHData compute_derivs(const Deltahedron& D, std::span<const coord3d> x, int v) {
     VertexHData vd = compute_h(D, x, v);
     if(!vd.valid) return vd;
     vd.has_derivs = true;
@@ -82,9 +82,9 @@ struct VertexHData {
 
     vd.nb.resize(vd.d);
     for(int j = 0; j < vd.d; j++){
-      vd.nb[j].id = D.neighbours[v][j];
-      coord3d ej_prev = x[D.neighbours[v][(j+vd.d-1)%vd.d]] - x[v];
-      coord3d ej_next = x[D.neighbours[v][(j+1)%vd.d]]       - x[v];
+      vd.nb[j].id = D[v][j];
+      coord3d ej_prev = x[D[v][(j+vd.d-1)%vd.d]] - x[v];
+      coord3d ej_next = x[D[v][(j+1)%vd.d]]       - x[v];
       vd.nb[j].De  = ej_prev - ej_next;
       vd.nb[j].g   = vd.n_hat * (-1.0/vd.d) + vd.r_perp.cross(vd.nb[j].De) / vd.N_len;
       vd.nb[j].w   = vd.r_perp.cross(vd.nb[j].De) / vd.N_len;
@@ -202,7 +202,7 @@ struct EdgeBondData {
   double r, dev;      // |d|, r - L
   bool valid;
 
-  static EdgeBondData compute(const vector<coord3d>& x, int u, int v, double L) {
+  static EdgeBondData compute(std::span<const coord3d> x, int u, int v, double L) {
     EdgeBondData ed;
     ed.u = u; ed.v = v;
     ed.d = x[u] - x[v];
@@ -257,7 +257,7 @@ struct CornerAngleData {
   coord3d ua, uc;           // unit arm vectors
   bool valid;
 
-  static CornerAngleData compute(const vector<coord3d>& x, int a, int b, int d) {
+  static CornerAngleData compute(std::span<const coord3d> x, int a, int b, int d) {
     CornerAngleData ca;
     ca.a = a; ca.b = b; ca.d = d;
 
@@ -350,6 +350,12 @@ Deltahedron::Deltahedron(const Triangulation& T, const vector<coord3d>& points)
   assert((int)points.size() == N);
 }
 
+Deltahedron::Deltahedron(const Triangulation& T, std::span<const coord3d> points)
+  : Triangulation(T), points(vector<coord3d>(points.begin(), points.end()))
+{
+  assert((int)points.size() == N);
+}
+
 Deltahedron::Deltahedron(const Polyhedron& P)
   : Triangulation(static_cast<const Graph&>(P)), points(P.points)
 {
@@ -357,16 +363,17 @@ Deltahedron::Deltahedron(const Polyhedron& P)
 }
 
 vector<face_t> Deltahedron::compute_dual_faces() const {
-  vector<face_t> faces(triangles.size());
-  for(size_t i = 0; i < triangles.size(); i++)
-    faces[i] = face_t(triangles[i]);
+  auto tris = triangles();
+  vector<face_t> faces(tris.size());
+  for(size_t i = 0; i < tris.size(); i++)
+    faces[i] = face_t(tris[i]);
   return faces;
 }
 
 double Deltahedron::max_angle_relerr() const {
   double max_re = 0;
   const double target = M_PI / 3.0;
-  for (const auto& t : triangles) {
+  for (const auto& t : triangles()) {
     for (int c = 0; c < 3; c++) {
       coord3d ea = points[t[(c+1)%3]] - points[t[c]];
       coord3d eb = points[t[(c+2)%3]] - points[t[c]];
@@ -395,8 +402,8 @@ void Deltahedron::smooth(double q) {
   vector<coord3d> new_points(N);
   for(node_t u = 0; u < N; u++){
     coord3d avg;
-    for(node_t v : neighbours[u]) avg += points[v];
-    avg /= neighbours[u].size();
+    for(node_t v : (*this)[u]) avg += points[v];
+    avg /= degree(u);
     new_points[u] = points[u]*(1.0-q) + avg*q;
   }
   points = new_points;
@@ -414,9 +421,10 @@ Deltahedron Deltahedron::halma_transform(int m) const {
     // point({a,b}) = (n-b)*P[T[0]] + (b-a)*P[T[1]] + a*P[T[2]]
     // Weights sum to n=k, so corner vertices get k*P_original.
     vector<coord3d> new_points(T_new.N);
+    auto tris = triangles();
 
-    for(int i = 0; i < (int)triangles.size(); i++){
-      const face_t& T = triangles[i];
+    for(int i = 0; i < (int)tris.size(); i++){
+      const face_t& T = tris[i];
       const auto& grid = face_grids[i];
 
       for(const auto& [ab, node_id] : grid){
@@ -461,9 +469,10 @@ Deltahedron Deltahedron::GCtransform(unsigned k, unsigned l) const {
   //    Boundary points get identical coords from adjacent faces.
 
   vector<coord3d> new_points(T_new.N);
+  auto tris = triangles();
 
-  for(int i = 0; i < (int)triangles.size(); i++){
-    const tri_t& tri = triangles[i];
+  for(int i = 0; i < (int)tris.size(); i++){
+    const tri_t& tri = tris[i];
     node_t nu = tri[0], nv = tri[1], nw = tri[2];
 
     // Scaled Eisenstein corners of this face
@@ -854,7 +863,7 @@ static void liftStripToSurface(const ExtensionStep& step,
 // =====================================================================
 
 // C20 dual (icosahedron): 12 vertices, all degree-5
-static const neighbours_t C20_seed_neighbours = {
+static const Graph C20_seed_neighbours = {
     {5, 3, 2, 1, 4},
     {11, 4, 0, 2, 10},
     {10, 1, 0, 3, 8},
@@ -884,7 +893,7 @@ static const vector<coord3d> C20_seed_points = {
 };
 
 // C28 dual (Td): 16 vertices, 12 deg-5 + 4 deg-6
-static const neighbours_t C28_seed_neighbours = {
+static const Graph C28_seed_neighbours = {
     {6, 4, 3, 2, 1, 5},
     {9, 5, 0, 2, 8},
     {8, 1, 0, 3, 7},
@@ -922,7 +931,7 @@ static const vector<coord3d> C28_seed_points = {
 };
 
 // C30 dual (D5h): 17 vertices, 12 deg-5 + 5 deg-6
-static const neighbours_t C30_seed_neighbours = {
+static const Graph C30_seed_neighbours = {
     {11, 3, 2, 1, 4},
     {5, 4, 0, 2, 6},
     {6, 1, 0, 3, 7},
@@ -962,7 +971,7 @@ static const vector<coord3d> C30_seed_points = {
 };
 
 // Get precomputed seed data by type
-static const neighbours_t& seedNeighbours(buckinverse::SeedType s) {
+static const Graph& seedNeighbours(buckinverse::SeedType s) {
     switch (s) {
         case buckinverse::SeedType::C20: return C20_seed_neighbours;
         case buckinverse::SeedType::C28: return C28_seed_neighbours;
@@ -987,13 +996,13 @@ static const vector<coord3d>& seedPoints(buckinverse::SeedType s) {
 // Returns mapping: precomputed_vertex -> ep_vertex_id.
 //TODO: Is this still needed?
 static vector<int> matchSeedViaSpiralImpl(
-    const neighbours_t& precomp,
+    const Graph& precomp,
     const ExtensionPath& ep)
 {
     int seed_N = (int)precomp.size();
 
     // 1. Canonical spiral of precomputed seed graph
-    Triangulation T_pre(precomp, true);
+    Triangulation T_pre(precomp);
     vector<int> spiral_pre;
     jumplist_t jumps_pre;
     vector<vector<node_t>> perms_pre;
@@ -1012,18 +1021,18 @@ static vector<int> matchSeedViaSpiralImpl(
         to_compact[ep_ids[i]] = i;
 
     // Build compact adjacency
-    neighbours_t compact_adj(seed_N);
+    Graph compact_adj(seed_N, 6);
     for (const auto& sv : ep.seed_state) {
         int ci = to_compact[sv.id];
         uint8_t m = sv.active;
         for (int p = 0; p < 6; p++) {
             if (m & (1 << p))
-                compact_adj[ci].push_back(to_compact[sv.nbr[p]]);
+                compact_adj.push_back(ci, to_compact[sv.nbr[p]]);
         }
     }
 
     // 3. Canonical spiral of ep seed graph
-    Triangulation T_ep(compact_adj, true);
+    Triangulation T_ep(compact_adj);
     vector<int> spiral_ep;
     jumplist_t jumps_ep;
     vector<vector<node_t>> perms_ep;
@@ -1041,7 +1050,7 @@ static vector<int> matchSeedViaSpiralImpl(
 // Fallback: BFS-based graph isomorphism between precomputed seed and ep seed state.
 // Returns mapping: precomputed_vertex -> ep_vertex_id.
 static vector<int> matchSeedViaBFS(
-    const neighbours_t& precomp,
+    const Graph& precomp,
     const ExtensionPath& ep)
 {
     int seed_N = (int)precomp.size();
@@ -1179,17 +1188,17 @@ Deltahedron Deltahedron::fromExtensionPath(const ExtensionPath& ep) {
     for (int u = 0; u < full_N; u++)
         if (rd.alive(u)) remap[u] = id++;
 
-    neighbours_t adj(id);
+    Graph adj(id, 6);
     vector<coord3d> compact_points(id);
     for (int u = 0; u < full_N; u++) {
         if (!rd.alive(u)) continue;
         compact_points[remap[u]] = points[u];
         uint8_t m = rd.V[u].active;
         for (; m; m &= m - 1)
-            adj[remap[u]].push_back(remap[rd.V[u].nbr[__builtin_ctz(m)]]);
+            adj.push_back(remap[u], remap[rd.V[u].nbr[__builtin_ctz(m)]]);
     }
 
-    return Deltahedron(Triangulation(adj, true), compact_points);
+    return Deltahedron(Triangulation(adj), compact_points);
 }
 
 // Helper: extract compact Deltahedron from ReducibleDual state + full points array.
@@ -1205,17 +1214,17 @@ static Deltahedron extractCompact(
     for (int u = 0; u < full_N; u++)
         if (rd.alive(u)) remap[u] = id++;
 
-    neighbours_t adj(id);
+    Graph adj(id, 6);
     vector<coord3d> compact_pts(id);
     for (int u = 0; u < full_N; u++) {
         if (!rd.alive(u)) continue;
         compact_pts[remap[u]] = points[u];
         uint8_t m = rd.V[u].active;
         for (; m; m &= m - 1)
-            adj[remap[u]].push_back(remap[rd.V[u].nbr[__builtin_ctz(m)]]);
+            adj.push_back(remap[u], remap[rd.V[u].nbr[__builtin_ctz(m)]]);
     }
 
-    return Deltahedron(Triangulation(adj, true), compact_pts);
+    return Deltahedron(Triangulation(adj), compact_pts);
 }
 
 // Helper: extract a small patch sub-Deltahedron containing only the vertices
@@ -1282,13 +1291,13 @@ static Deltahedron extractPatch(
     int m = id;
 
     // 4. Build adjacency for the sub-graph (only edges within patch)
-    neighbours_t adj(m);
+    Graph adj(m, 6);
     for (int u : patch_set) {
         uint8_t mask = rd.V[u].active;
         for (; mask; mask &= mask - 1) {
             int nb = rd.V[u].nbr[__builtin_ctz(mask)];
             if (remap[nb] >= 0)
-                adj[remap[u]].push_back(remap[nb]);
+                adj.push_back(remap[u], remap[nb]);
         }
     }
 
@@ -1303,7 +1312,7 @@ static Deltahedron extractPatch(
     interior_mask.assign(m, false);
     for (int u : patch_set) {
         int graph_deg = rd.degree(u);
-        int patch_deg = (int)adj[remap[u]].size();
+        int patch_deg = adj.degree(remap[u]);
         interior_mask[remap[u]] = (patch_deg == graph_deg);
     }
 
@@ -1311,7 +1320,7 @@ static Deltahedron extractPatch(
     vector<coord3d> patch_pts(m);
     for (int v : patch_set) patch_pts[remap[v]] = points[v];
 
-    return Deltahedron(Triangulation(adj, true), patch_pts);
+    return Deltahedron(Triangulation(adj), patch_pts);
 }
 
 Deltahedron Deltahedron::fromExtensionPathOptimized(const ExtensionPath& ep, FILE* log, StepCallback diag,
@@ -1763,7 +1772,7 @@ static pair<double,coord3d> smallest_eigenpair_3x3(const matrix3d& A)
 static double deltahedron_energy_and_gradient(
     const Deltahedron& D,
     const vector<edge_t>& edges,
-    const vector<coord3d>& x,
+    std::span<const coord3d> x,
     vector<coord3d>* grad,
     double L,           // target edge length
     double k_bond,
@@ -1789,7 +1798,7 @@ static double deltahedron_energy_and_gradient(
   }
 
   // --- E_angle = (k/2) Sum_corners (theta - pi/3)^2 ---
-  for(const auto& tri : D.triangles){
+  for(const auto& tri : D.triangles()){
     for(int c = 0; c < 3; c++){
       auto ca = CornerAngleData::compute(x, tri[(c+2)%3], tri[c], tri[(c+1)%3]);
       if(!ca.valid) continue;
@@ -1802,13 +1811,13 @@ static double deltahedron_energy_and_gradient(
   // K(v) = 2pi - angle_sum(v), K_target = 2pi - deg*pi/3.
   // dev = K - K_target = deg*pi/3 - angle_sum.
   for(int v = 0; v < N; v++){
-    int d = (int)D.neighbours[v].size();
+    int d = D.degree(v);
 
     // Compute per-fan-angle data
     double angle_sum = 0;
     vector<CornerAngleData> fan(d);
     for(int i = 0; i < d; i++){
-      fan[i] = CornerAngleData::compute(x, D.neighbours[v][i], v, D.neighbours[v][(i+1)%d]);
+      fan[i] = CornerAngleData::compute(x, D[v][i], v, D[v][(i+1)%d]);
       if(fan[i].valid) angle_sum += fan[i].theta;
     }
 
@@ -1829,15 +1838,15 @@ static double deltahedron_energy_and_gradient(
   // E_flat = (k_flat/2) * Sum_v lambda_0(v)
   if(k_flat > 0){
     for(int v = 0; v < N; v++){
-      int d = (int)D.neighbours[v].size();
+      int d = D.degree(v);
       if(d > 6) continue;
 
       // 1. Compute face centroids and their mean
       vector<coord3d> fc(d);
       coord3d c_bar(0,0,0);
       for(int i = 0; i < d; i++){
-        int ni  = D.neighbours[v][i];
-        int ni1 = D.neighbours[v][(i+1) % d];
+        int ni  = D[v][i];
+        int ni1 = D[v][(i+1) % d];
         fc[i] = (x[v] + x[ni] + x[ni1]) / 3.0;
         c_bar += fc[i];
       }
@@ -1877,7 +1886,7 @@ static double deltahedron_energy_and_gradient(
           int jprev = (j + d - 1) % d;
           coord3d fj    = n * fc[j].dot(n)    - fc[j]    * ratio;
           coord3d fjpre = n * fc[jprev].dot(n) - fc[jprev] * ratio;
-          (*grad)[D.neighbours[v][j]] += (fj + fjpre) * (scale / 3.0);
+          (*grad)[D[v][j]] += (fj + fjpre) * (scale / 3.0);
         }
       }
     }
@@ -1888,7 +1897,7 @@ static double deltahedron_energy_and_gradient(
   // Identically zero at any convex geometry (all h_v > 0).
   if(k_conv > 0){
     for(int v = 0; v < N; v++){
-      int d = (int)D.neighbours[v].size();
+      int d = D.degree(v);
       if(d > 6) continue;
       if(!conv_mask.empty() && !conv_mask[v]) continue;
 
@@ -1946,7 +1955,7 @@ static void vec_zero(vector<coord3d>& a){
 static void deltahedron_hv_product(
     const Deltahedron& D,
     const vector<edge_t>& edges,
-    const vector<coord3d>& x,
+    std::span<const coord3d> x,
     const vector<coord3d>& v,
     vector<coord3d>& Hv,
     double L,
@@ -1974,7 +1983,7 @@ static void deltahedron_hv_product(
 
   // --- E_angle Hv ---
   if(k_angle > 0){
-    for(const auto& tri : D.triangles){
+    for(const auto& tri : D.triangles()){
       for(int c = 0; c < 3; c++){
         auto ca = CornerAngleData::compute(x, tri[(c+2)%3], tri[c], tri[(c+1)%3]);
         if(!ca.valid) continue;
@@ -1989,14 +1998,14 @@ static void deltahedron_hv_product(
   // Correction: sum of per-fan-angle Hessian blocks (same as E_angle).
   if(k_curv > 0){
     for(int vertex = 0; vertex < N; vertex++){
-      int deg = (int)D.neighbours[vertex].size();
+      int deg = D.degree(vertex);
 
       // Compute per-fan-angle data
       double angle_sum = 0;
       vector<CornerAngleData> fan(deg);
       for(int i = 0; i < deg; i++){
-        fan[i] = CornerAngleData::compute(x, D.neighbours[vertex][i], vertex,
-                                          D.neighbours[vertex][(i+1)%deg]);
+        fan[i] = CornerAngleData::compute(x, D[vertex][i], vertex,
+                                          D[vertex][(i+1)%deg]);
         if(fan[i].valid) angle_sum += fan[i].theta;
       }
       double dev = deg * M_PI / 3.0 - angle_sum;
@@ -2027,7 +2036,7 @@ static void deltahedron_hv_product(
   // Identically zero for h >= 0.  C1 at h=0.
   if(k_conv > 0){
     for(int vertex = 0; vertex < N; vertex++){
-      int d = (int)D.neighbours[vertex].size();
+      int d = D.degree(vertex);
       if(d > 6) continue;
 
       auto vd = VertexHData::compute_derivs(D, x, vertex);
@@ -2073,7 +2082,7 @@ static void deltahedron_hv_product(
 static double deltahedron_energy_only(
     const Deltahedron& D,
     const vector<edge_t>& edges,
-    const vector<coord3d>& x,
+    std::span<const coord3d> x,
     double L, double k_bond, double k_angle, double k_curv, double k_flat, double k_conv,
     const vector<bool>& conv_mask = {})
 {
@@ -2082,13 +2091,13 @@ static double deltahedron_energy_only(
 
 // Compute signed convexity height h for all vertices.
 // h > 0 = convex, h < 0 = concave.  Fixed or high-degree vertices get h = 1.0.
-static void compute_h_values(const Deltahedron& D, const vector<coord3d>& x,
+static void compute_h_values(const Deltahedron& D, std::span<const coord3d> x,
                               vector<double>& h, const vector<bool>& fixed = {})
 {
   int N = D.N;
   h.resize(N);
   for(int v = 0; v < N; v++){
-    int d = (int)D.neighbours[v].size();
+    int d = D.degree(v);
     if(d > 6 || (!fixed.empty() && fixed[v])){
       h[v] = 1.0;
       continue;
@@ -2100,7 +2109,7 @@ static void compute_h_values(const Deltahedron& D, const vector<coord3d>& x,
 
 // Check convexity constraint: h(v) >= -tau*L for all free/interior vertices.
 // Returns true if all constraints satisfied.
-static bool check_convexity(const Deltahedron& D, const vector<coord3d>& x,
+static bool check_convexity(const Deltahedron& D, std::span<const coord3d> x,
                             const vector<bool>& free_mask, double L, double tau = 0.05,
                             const vector<bool>& interior_mask = {})
 {
@@ -2119,7 +2128,7 @@ static bool check_convexity(const Deltahedron& D, const vector<coord3d>& x,
 static void assemble_patch_hessian(
     const Deltahedron& D,
     const vector<edge_t>& edges,
-    const vector<coord3d>& x,
+    std::span<const coord3d> x,
     vector<vector<double>>& H,
     const vector<int>& free_idx,
     double L,
@@ -2153,7 +2162,7 @@ static void assemble_patch_hessian(
 
   // --- E_angle = (k/2) Sum_corners (theta - pi/3)^2 ---
   if(k_angle > 0){
-    for(const auto& tri : D.triangles){
+    for(const auto& tri : D.triangles()){
       for(int c = 0; c < 3; c++){
         auto ca = CornerAngleData::compute(x, tri[(c+2)%3], tri[c], tri[(c+1)%3]);
         if(!ca.valid) continue;
@@ -2167,7 +2176,7 @@ static void assemble_patch_hessian(
   // where d²E/dh² = (k/sigma²) * sig * (1 - sig),  dE/dh = -(k/sigma) * sig.
   if(k_conv > 0){
     for(int v = 0; v < D.N; v++){
-      int d = (int)D.neighbours[v].size();
+      int d = D.degree(v);
       if(d > 6) continue;
       if(!conv_mask.empty() && !conv_mask[v]) continue;
 
@@ -2190,7 +2199,7 @@ static void assemble_patch_hessian(
   }
 }
 
-bool Deltahedron::optimize_patch(const vector<coord3d>& initial_geometry,
+bool Deltahedron::optimize_patch(std::span<const coord3d> initial_geometry,
                                  const vector<bool>& free_mask,
                                  const vector<bool>& interior_mask,
                                  double target_L, int max_iter, double grad_tol,
@@ -2198,7 +2207,7 @@ bool Deltahedron::optimize_patch(const vector<coord3d>& initial_geometry,
 {
   assert((int)initial_geometry.size() == N);
   assert((int)free_mask.size() == N);
-  points = initial_geometry;
+  points = vector<coord3d>(initial_geometry.begin(), initial_geometry.end());
 
   vector<edge_t> edges = undirected_edges();
 
@@ -2243,10 +2252,10 @@ bool Deltahedron::optimize_patch(const vector<coord3d>& initial_geometry,
   // Lambdas wrapping energy/gradient computation.
   // interior_mask restricts E_conv to vertices with full neighbor sets in the
   // patch — boundary vertices have truncated degree and produce bogus h values.
-  auto energy_fn = [&](const vector<coord3d>& x) -> double {
+  auto energy_fn = [&](std::span<const coord3d> x) -> double {
     return deltahedron_energy_only(*this, edges, x, L, k_bond, k_angle, k_curv, k_flat, k_conv, interior_mask);
   };
-  auto grad_fn = [&](const vector<coord3d>& x, vector<coord3d>& g) -> double {
+  auto grad_fn = [&](std::span<const coord3d> x, vector<coord3d>& g) -> double {
     return deltahedron_energy_and_gradient(*this, edges, x, &g, L, k_bond, k_angle, k_curv, k_flat, k_conv, interior_mask);
   };
 
@@ -2399,7 +2408,7 @@ bool Deltahedron::optimize_patch(const vector<coord3d>& initial_geometry,
     }
 
     // Trial point
-    vector<coord3d> x_trial = points;
+    vector<coord3d> x_trial(points.begin(), points.end());
     for(int k = 0; k < nfree; k++)
       for(int c = 0; c < 3; c++)
         x_trial[free_idx[k]][c] = points[free_idx[k]][c] + delta[3*k+c];
@@ -2441,20 +2450,20 @@ bool Deltahedron::optimize_patch(const vector<coord3d>& initial_geometry,
 
     if(opt_log){
       // Compute h_min over interior vertices of the current (possibly trial) geometry
-      const vector<coord3d>& xlog = accepted ? points : x_trial;
+      std::span<const coord3d> xlog = accepted ? std::span<const coord3d>(points) : std::span<const coord3d>(x_trial);
       double h_min_log = 1e30;
       double ang_log = 0;
       for(int v = 0; v < N; v++){
         bool is_int = !interior_mask.empty() && interior_mask[v];
         if(!free_mask[v] && !is_int) continue;
-        int d = (int)neighbours[v].size();
+        int d = degree(v);
         coord3d cen(0,0,0);
-        for(int j = 0; j < d; j++) cen += xlog[neighbours[v][j]];
+        for(int j = 0; j < d; j++) cen += xlog[(*this)[v][j]];
         cen /= (double)d;
         coord3d nf(0,0,0);
         for(int j = 0; j < d; j++){
-          coord3d e1 = xlog[neighbours[v][j]] - xlog[v];
-          coord3d e2 = xlog[neighbours[v][(j+1)%d]] - xlog[v];
+          coord3d e1 = xlog[(*this)[v][j]] - xlog[v];
+          coord3d e2 = xlog[(*this)[v][(j+1)%d]] - xlog[v];
           nf += e1.cross(e2);
         }
         double nl = nf.norm();
@@ -2471,7 +2480,7 @@ bool Deltahedron::optimize_patch(const vector<coord3d>& initial_geometry,
   return false;  // didn't converge
 }
 
-int Deltahedron::reflect_concave(vector<coord3d>& pts, double threshold,
+int Deltahedron::reflect_concave(std::span<coord3d> pts, double threshold,
                                   const vector<bool>& fixed,
                                   vector<bool>* reflected_mask) const
 {
@@ -2479,7 +2488,7 @@ int Deltahedron::reflect_concave(vector<coord3d>& pts, double threshold,
   int count = 0;
   for(int v = 0; v < N; v++){
     if(has_fixed && fixed[v]) continue;
-    int d = (int)neighbours[v].size();
+    int d = degree(v);
     if(d > 6) continue;
 
     auto vd = VertexHData::compute_h(*this, pts, v);
@@ -2493,7 +2502,7 @@ int Deltahedron::reflect_concave(vector<coord3d>& pts, double threshold,
   return count;
 }
 
-int Deltahedron::reflect_all_concave(vector<coord3d>& pts, double threshold,
+int Deltahedron::reflect_all_concave(std::span<coord3d> pts, double threshold,
                                       const vector<bool>& fixed,
                                       vector<bool>* reflected_mask) const
 {
@@ -2561,7 +2570,7 @@ static coord3d closest_point_on_triangle(const coord3d& p,
 // Incremental convex hull returning just the triangle list.
 // Each triangle is an array of 3 vertex indices into the pts array.
 // Triangles are oriented with outward normals.
-static vector<array<int,3>> build_convex_hull(const vector<coord3d>& pts)
+static vector<array<int,3>> build_convex_hull(std::span<coord3d> pts)
 {
   int n = (int)pts.size();
   if(n < 4) return {};
@@ -2640,12 +2649,7 @@ static vector<array<int,3>> build_convex_hull(const vector<coord3d>& pts)
 
     on_hull[i] = true;
 
-    // Find horizon edges: edges shared between one visible and one invisible face
-    // An edge (a,b) in a visible triangle: check if the reverse edge (b,a) is in
-    // any visible triangle. If not, it's a horizon edge.
-    set<int> vis_set(visible.begin(), visible.end());
-
-    // Build directed edge → face map for visible faces
+    // Build directed edge -> face map for visible faces
     map<pair<int,int>, int> edge_face;
     for(int fi : visible){
       auto& t = tris[fi];
@@ -2674,7 +2678,7 @@ static vector<array<int,3>> build_convex_hull(const vector<coord3d>& pts)
   return tris;
 }
 
-int Deltahedron::project_onto_convex_hull(vector<coord3d>& pts) const
+int Deltahedron::project_onto_convex_hull(std::span<coord3d> pts) const
 {
   // 1. Identify concave vertices
   vector<int> concave;
@@ -2740,13 +2744,13 @@ const char* PipelineDiag::flag_name(uint32_t f) {
   return "unknown";
 }
 
-OptResult Deltahedron::optimize(const vector<coord3d>& initial_geometry, double target_L,
+OptResult Deltahedron::optimize(std::span<const coord3d> initial_geometry, double target_L,
                                 double grad_tol, const vector<bool>& fixed,
                                 long long max_work, double angle_tol)
 {
   assert((int)initial_geometry.size() == N);
   assert(fixed.empty() || (int)fixed.size() == N);
-  points = initial_geometry;
+  points = vector<coord3d>(initial_geometry.begin(), initial_geometry.end());
   const bool has_fixed = !fixed.empty();
   opt_diag_flags = 0;  // Reset per-call optimizer diagnostics
 
@@ -3054,15 +3058,15 @@ OptResult Deltahedron::optimize(const vector<coord3d>& initial_geometry, double 
         double h_min_log = 1e30;
         for(int v = 0; v < N; v++){
           if(has_fixed && fixed[v]) continue;
-          int d = (int)neighbours[v].size();
+          int d = degree(v);
           if(d > 6) continue;
           coord3d cen(0,0,0);
-          for(int j = 0; j < d; j++) cen += points[neighbours[v][j]];
+          for(int j = 0; j < d; j++) cen += points[(*this)[v][j]];
           cen /= (double)d;
           coord3d nf(0,0,0);
           for(int j = 0; j < d; j++){
-            coord3d e1 = points[neighbours[v][j]] - points[v];
-            coord3d e2 = points[neighbours[v][(j+1)%d]] - points[v];
+            coord3d e1 = points[(*this)[v][j]] - points[v];
+            coord3d e2 = points[(*this)[v][(j+1)%d]] - points[v];
             nf += e1.cross(e2);
           }
           double nl = nf.norm();
@@ -3296,9 +3300,9 @@ OptResult Deltahedron::optimize(const vector<coord3d>& initial_geometry, double 
   return final_opt_result;
 }
 
-double Deltahedron::gradient_check(const vector<coord3d>& geometry, double target_L, double eps) const
+double Deltahedron::gradient_check(std::span<const coord3d> geometry, double target_L, double eps) const
 {
-  vector<coord3d> x = geometry;
+  vector<coord3d> x(geometry.begin(), geometry.end());
   vector<edge_t> edges = undirected_edges();
 
   double L = target_L;
@@ -3341,12 +3345,12 @@ double Deltahedron::gradient_check(const vector<coord3d>& geometry, double targe
   return max_rel_err;
 }
 
-double Deltahedron::hessian_check(const vector<coord3d>& geometry,
+double Deltahedron::hessian_check(std::span<const coord3d> geometry,
                                   const vector<bool>& free_mask,
                                   const vector<bool>& interior_mask,
                                   double target_L, double eps, bool verbose) const
 {
-  vector<coord3d> x = geometry;
+  vector<coord3d> x(geometry.begin(), geometry.end());
   vector<edge_t> edges = undirected_edges();
 
   // Same force constants as optimize_patch

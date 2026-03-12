@@ -11,7 +11,7 @@ struct Deltahedron {
   vector<coord3d> points;
 
   vector<face_t> faces(){
-    const vector<tri_t> &tris = g.triangles;
+    const vector<tri_t> &tris = g.triangles();
     vector<face_t> faces(tris.size());
     for(int i=0;i<tris.size();i++)
       faces[i] = vector<node_t>{tris[i][0],tris[i][1],tris[i][1]};
@@ -24,7 +24,7 @@ struct Deltahedron {
     
     for(node_t u=0;u<g.N;u++){
       coord3d x = points[u]*(1-q);
-      for(node_t v: g.neighbours[u]) x += points[v]*q/g.neighbours[u].size();
+      for(node_t v: g.nbrs(u)) x += points[v]*q/g.degree(u);
       new_points[u] = x;
     }
     points = new_points;
@@ -72,7 +72,7 @@ Deltahedron halma_triangulation(const Deltahedron &P, int m=1) {
   }
 
   // For every triangle, we create and connect a halma-type grid
-  const vector<tri_t> triangles = P.g.triangles;
+  const vector<tri_t> triangles = P.g.triangles();
   for(size_t i=0;i<triangles.size();i++){
     map<edge_t,node_t> grid;
     const tri_t& T(triangles[i]);
@@ -116,7 +116,6 @@ Deltahedron halma_triangulation(const Deltahedron &P, int m=1) {
       }
   }
 
-  Phalma.g.update(false);
   return Phalma;
 }
 
@@ -165,12 +164,10 @@ int main(int ac, char **av)
     P0 = Polyhedron::from_file(av[1]);
     N = P0.N;
     g = P0;
-    g.layout2d = g.tutte_layout(-1,-1,-1,8);
   } else {
     Triangulation T(spiral,jumps);
-    
+
     g = T.dual_graph();
-    g.layout2d = g.tutte_layout();
     P0 = Polyhedron(g,g.zero_order_geometry(),6);
   }
 
@@ -185,7 +182,7 @@ int main(int ac, char **av)
   {
     P.move_to_origin();
     matrix3d If(P.principal_axes());
-    P.points = If*P.points;
+    for(node_t u=0;u<P.N;u++) P.points[u] = If * P.points[u];
 
     Polyhedron::to_file(P,"output/"+basename+"-if.mol2");
 
@@ -209,13 +206,9 @@ int main(int ac, char **av)
   // output << "P = " << P << ";\n";
 
   Polyhedron D(P.dual());
-  // D.layout2d = D.tutte_layout();
-  // D.faces    = D.compute_faces_flat(3,true);
-  // D.face_max = 3;
-  // //   D.optimize();
   // output << "PD = " << D << ";\n";
 
-  Deltahedron DD{D,D.points};
+  Deltahedron DD{D,vector<coord3d>(D.points.begin(), D.points.end())};
   DD.smooth(.8);
   Deltahedron HD(halma_triangulation(DD,1)); // Might as well roll all this into polyhedron (but assert graph is triangulation)/
   HD = halma_triangulation(HD,1); // Might as well roll all this into polyhedron (but assert graph is triangulation)/
@@ -225,7 +218,7 @@ int main(int ac, char **av)
   HD2.smooth(.8);
   HD2.smooth(.8);
 
-  Polyhedron  PHD(HD.g,HD.points,3,HD.faces());  
+  Polyhedron  PHD(HD.g,HD.points,3);
   //  Polyhedron  PHD2(HD2.g,HD2.points,3,HD2.faces());
   Polyhedron  PH(PHD.dual());
 

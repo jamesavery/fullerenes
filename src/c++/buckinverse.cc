@@ -160,7 +160,7 @@ static std::vector<node_t> nonPathStripNbrs(const Graph& g, node_t u,
         const std::set<node_t>& pathSet, const std::set<node_t>& stripSet) {
     std::vector<node_t> result;
     for (int i = 0; i < g.degree(u); ++i) {
-        node_t n = g.neighbours[u][i];
+        node_t n = g.nbrs(u)[i];
         if (!pathSet.count(n) && !stripSet.count(n))
             result.push_back(n);
     }
@@ -273,7 +273,7 @@ static bool stripTopologyClean(const Graph& g,
 
     for (node_t s : strip) {
         for (int i = 0; i < g.degree(s); ++i) {
-            node_t n = g.neighbours[s][i];
+            node_t n = g.nbrs(s)[i];
             if (!validSet.count(n)) return false;
         }
     }
@@ -300,7 +300,7 @@ std::vector<InvSite> findL0InvSites(const Graph& g) {
 
     for (node_t s0 : d5) {
         for (int ni = 0; ni < g.degree(s0); ++ni) {
-            node_t s1 = g.neighbours[s0][ni];
+            node_t s1 = g.nbrs(s0)[ni];
             if (g.degree(s1) != 5) continue;
             if (s1 <= s0) continue;  // each pair once
 
@@ -371,7 +371,7 @@ static std::vector<InvSite> findLiInvSites(const Graph& g, int maxRedLen) {
 
     for (node_t s0 : d5) {
         for (int ni = 0; ni < g.degree(s0); ++ni) {
-            node_t s1 = g.neighbours[s0][ni];
+            node_t s1 = g.nbrs(s0)[ni];
             if (g.degree(s1) != 6) continue;
 
             // Walk strip chain through degree-6 vertices
@@ -480,12 +480,12 @@ static std::vector<InvSite> findB00InvSites(const Graph& g) {
 
     for (node_t a : d5) {
         for (int ni = 0; ni < g.degree(a); ++ni) {
-            node_t b = g.neighbours[a][ni];
+            node_t b = g.nbrs(a)[ni];
             if (g.degree(b) != 6) continue;
 
             // Find degree-5 neighbors of b (candidates for c)
             for (int bi = 0; bi < g.degree(b); ++bi) {
-                node_t c = g.neighbours[b][bi];
+                node_t c = g.nbrs(b)[bi];
                 if (c == a) continue;
                 if (g.degree(c) != 5) continue;
                 // a must NOT be adjacent to c (otherwise it's L-type)
@@ -591,7 +591,7 @@ std::vector<InvSite> findFRingInvSites(const Graph& g) {
 
     for (node_t u : deg6) {
         for (int ni = 0; ni < g.degree(u); ++ni) {
-            node_t v = g.neighbours[u][ni];
+            node_t v = g.nbrs(u)[ni];
             if (g.degree(v) != 6) continue;
 
             // Trace 5-cycle via straight-ahead (advanceCW 3 at degree 6)
@@ -622,7 +622,7 @@ std::vector<InvSite> findFRingInvSites(const Graph& g) {
             for (int i = 0; i < 5 && stripOK; ++i) {
                 int j = (i + 1) % 5;
                 for (int k = 0; k < g.degree(ring[i]); ++k) {
-                    node_t w = g.neighbours[ring[i]][k];
+                    node_t w = g.nbrs(ring[i])[k];
                     if (ringSet.count(w)) continue;
                     if (g.degree(w) == 6 && g.arc_ix(ring[j], w) >= 0) {
                         strip[i] = w; break;
@@ -646,7 +646,7 @@ std::vector<InvSite> findFRingInvSites(const Graph& g) {
             bool extrasOK = true;
             for (int i = 0; i < 5 && extrasOK; ++i) {
                 for (int k = 0; k < g.degree(strip[i]); ++k) {
-                    node_t w = g.neighbours[strip[i]][k];
+                    node_t w = g.nbrs(strip[i])[k];
                     if (!ringSet.count(w) && !stripSet.count(w))
                         extras[i].push_back(w);
                 }
@@ -720,7 +720,7 @@ Graph invertReduction(const Graph& g, const InvSite& site) {
 
     // Copy adjacency lists
     adj_t adj(g.N);
-    for (int i = 0; i < g.N; ++i) adj[i] = g.neighbours[i];
+    for (int i = 0; i < g.N; ++i) adj[i].assign(g[i].begin(), g[i].end());
 
     if (site.kind.type == ExpKind::L_type) {
         if (!reconnectStraight(adj, path, strip, tp))
@@ -765,13 +765,13 @@ Graph invertReduction(const Graph& g, const InvSite& site) {
         if (!stripSet.count(i)) old_to_new[i] = new_id++;
 
     int new_N = g.N - numStrip;
-    neighbours_t new_adj(new_N);
+    Graph new_adj(new_N, GRAPH_DMAX);
     for (int i = 0; i < g.N; ++i) {
         if (old_to_new[i] < 0) continue;
         for (node_t nbr : adj[i])
-            new_adj[old_to_new[i]].push_back(old_to_new[nbr]);
+            new_adj.push_back(old_to_new[i], old_to_new[nbr]);
     }
-    return Graph(new_adj, true);
+    return Graph(new_adj);
 }
 
 // Apply reconnection for a straight reduction (L_0 and L_i).
@@ -883,7 +883,7 @@ Graph applyReduction(const Graph& g, const Reduction& red) {
 
         // Copy adjacency and reconnect
         adj_t adj(g.N);
-        for (int i = 0; i < g.N; ++i) adj[i] = g.neighbours[i];
+        for (int i = 0; i < g.N; ++i) adj[i].assign(g[i].begin(), g[i].end());
         if (!reconnectStraight(adj, path, strip, tp))
             return Graph();
 
@@ -905,13 +905,13 @@ Graph applyReduction(const Graph& g, const Reduction& red) {
             if (!stripSet.count(i)) old_to_new[i] = new_id++;
 
         int new_N = g.N - numStrip;
-        neighbours_t new_adj(new_N);
+        Graph new_adj(new_N, GRAPH_DMAX);
         for (int i = 0; i < g.N; ++i) {
             if (old_to_new[i] < 0) continue;
             for (node_t nbr : adj[i])
-                new_adj[old_to_new[i]].push_back(old_to_new[nbr]);
+                new_adj.push_back(old_to_new[i], old_to_new[nbr]);
         }
-        return Graph(new_adj, true);
+        return Graph(new_adj);
 
     } else if (kind.type == ExpKind::B_type) {
         // Bent reduction B_{i,j}
@@ -941,7 +941,7 @@ Graph applyReduction(const Graph& g, const Reduction& red) {
 
         // Copy adjacency and reconnect
         adj_t adj(g.N);
-        for (int i = 0; i < g.N; ++i) adj[i] = g.neighbours[i];
+        for (int i = 0; i < g.N; ++i) adj[i].assign(g[i].begin(), g[i].end());
         if (!reconnectBent(adj, path, strip, tp, bentPos, bentLen))
             return Graph();
 
@@ -962,13 +962,13 @@ Graph applyReduction(const Graph& g, const Reduction& red) {
             if (!stripSet.count(i)) old_to_new[i] = new_id++;
 
         int new_N = g.N - numStrip;
-        neighbours_t new_adj(new_N);
+        Graph new_adj(new_N, GRAPH_DMAX);
         for (int i = 0; i < g.N; ++i) {
             if (old_to_new[i] < 0) continue;
             for (node_t nbr : adj[i])
-                new_adj[old_to_new[i]].push_back(old_to_new[nbr]);
+                new_adj.push_back(old_to_new[i], old_to_new[nbr]);
         }
-        return Graph(new_adj, true);
+        return Graph(new_adj);
 
     } else {
         assert(false && "F-type reductions not supported");
@@ -1126,7 +1126,7 @@ std::vector<Reduction> allReductions(const Graph& g, int maxRedLen) {
     // L0 reductions
     for (node_t u : d5) {
         for (int ni = 0; ni < g.degree(u); ++ni) {
-            node_t v = g.neighbours[u][ni];
+            node_t v = g.nbrs(u)[ni];
             if (g.degree(v) != 5) continue;
             for (Dir d : {Dir::DLeft, Dir::DRight}) {
                 if (!isValidL0Direction(g, u, v, d)) continue;
@@ -1142,7 +1142,7 @@ std::vector<Reduction> allReductions(const Graph& g, int maxRedLen) {
     if (maxRedLen >= 2) {
         for (node_t u : d5) {
             for (int ni = 0; ni < g.degree(u); ++ni) {
-                node_t v = g.neighbours[u][ni];
+                node_t v = g.nbrs(u)[ni];
                 if (g.degree(v) == 5) continue;  // L0 handled above
                 auto ep = followStraightToFive(g, u, v, maxRedLen);
                 if (!ep) continue;
@@ -1163,7 +1163,7 @@ std::vector<Reduction> allReductions(const Graph& g, int maxRedLen) {
     if (maxRedLen >= 2) {
         for (node_t u : d5) {
             for (int ni = 0; ni < g.degree(u); ++ni) {
-                node_t v = g.neighbours[u][ni];
+                node_t v = g.nbrs(u)[ni];
                 for (Dir d : {Dir::DLeft, Dir::DRight}) {
                     if (isValidB00Reduction(g, u, v, d))
                         result.push_back({Bk(0, 0), u, v, d});
@@ -1176,7 +1176,7 @@ std::vector<Reduction> allReductions(const Graph& g, int maxRedLen) {
     if (maxRedLen >= 3) {
         for (node_t u : d5) {
             for (int ni = 0; ni < g.degree(u); ++ni) {
-                node_t v = g.neighbours[u][ni];
+                node_t v = g.nbrs(u)[ni];
                 for (Dir d : {Dir::DLeft, Dir::DRight}) {
                     for (int bentLen = 1; bentLen <= maxRedLen - 2; ++bentLen) {
                         for (int bentPos = 0; bentPos <= bentLen; ++bentPos) {
@@ -1204,7 +1204,7 @@ ReducibleDual::ReducibleDual(const Graph& g)
         assert(d <= D_MAX);
         V[u].active = (1u << d) - 1;
         for (int i = 0; i < d; i++)
-            V[u].nbr[i] = g.neighbours[u][i];
+            V[u].nbr[i] = g.nbrs(u)[i];
         if (d == 5) deg5.insert(u);
     }
 }
@@ -2161,14 +2161,14 @@ Graph ReducibleDual::toGraph() const {
     for (int u = 0; u < (int)V.size(); u++)
         if (alive(u)) remap[u] = id++;
 
-    neighbours_t adj(id);
+    Graph adj(id, GRAPH_DMAX);
     for (int u = 0; u < (int)V.size(); u++) {
         if (!alive(u)) continue;
         uint8_t m = V[u].active;
         for (; m; m &= m - 1)
-            adj[remap[u]].push_back(remap[V[u].nbr[__builtin_ctz(m)]]);
+            adj.push_back(remap[u], remap[V[u].nbr[__builtin_ctz(m)]]);
     }
-    return Graph(adj, true);
+    return Graph(adj);
 }
 
 Graph graphFromExtensionPath(const ExtensionPath& ep) {

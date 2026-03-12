@@ -35,7 +35,7 @@ protected:
 TEST_F(DeltahedronTest, ConstructionFromPolyhedron) {
   EXPECT_EQ(ico.N, V0);
   EXPECT_EQ((int)ico.points.size(), V0);
-  EXPECT_EQ((int)ico.triangles.size(), F0);
+  EXPECT_EQ((int)ico.triangles().size(), F0);
 }
 
 TEST_F(DeltahedronTest, ConstructionFromTriangulationAndPoints) {
@@ -127,7 +127,7 @@ TEST_F(DeltahedronTest, GC_2_0_SurfacePreservation) {
   // Every new vertex should have zero distance to some parent triangle
   for(int u = ico.N; u < result.N; u++){
     double min_dist = INFINITY;
-    for(const auto& tri : ico.triangles){
+    for(const auto& tri : ico.triangles()){
       Tri3D T(ico.points[tri[0]], ico.points[tri[1]], ico.points[tri[2]]);
       double d = T.distance(result.points[u]);
       if(d < min_dist) min_dist = d;
@@ -135,7 +135,7 @@ TEST_F(DeltahedronTest, GC_2_0_SurfacePreservation) {
     // The point lies on the surface scaled by k=2, so check against
     // the scaled triangles instead
     min_dist = INFINITY;
-    for(const auto& tri : ico.triangles){
+    for(const auto& tri : ico.triangles()){
       Tri3D T(ico.points[tri[0]]*2, ico.points[tri[1]]*2, ico.points[tri[2]]*2);
       double d = T.distance(result.points[u]);
       if(d < min_dist) min_dist = d;
@@ -152,9 +152,9 @@ TEST_F(DeltahedronTest, GC_2_0_TopologyMatchesHalma) {
   Triangulation topo = ico.halma_transform(1);  // halma_transform(k-1)
 
   EXPECT_EQ(result.N, topo.N);
-  EXPECT_EQ(result.triangles.size(), topo.triangles.size());
+  EXPECT_EQ(result.triangles().size(), topo.triangles().size());
   for(int u = 0; u < result.N; u++){
-    EXPECT_EQ(result.neighbours[u].size(), topo.neighbours[u].size())
+    EXPECT_EQ(result.degree(u), topo.degree(u))
       << "degree mismatch at node " << u;
   }
 }
@@ -164,7 +164,7 @@ TEST_F(DeltahedronTest, GC_3_0_TopologyMatchesHalma) {
   Triangulation topo = ico.halma_transform(2);
 
   EXPECT_EQ(result.N, topo.N);
-  EXPECT_EQ(result.triangles.size(), topo.triangles.size());
+  EXPECT_EQ(result.triangles().size(), topo.triangles().size());
 }
 
 // ===== Face-interior harmonic property =====
@@ -182,7 +182,7 @@ TEST_F(DeltahedronTest, GC_3_0_FaceInteriorHarmonicProperty) {
 
   // Identify face-interior vertices: grid points (a,b) with a>0, b<m+1, a<b
   vector<bool> is_face_interior(D.N, false);
-  for(int i = 0; i < (int)ico.triangles.size(); i++){
+  for(int i = 0; i < (int)ico.triangles().size(); i++){
     for(const auto& [ab, node_id] : face_grids[i]){
       int a = ab.first, b = ab.second;
       if(a > 0 && b < m+1 && a < b)
@@ -194,10 +194,10 @@ TEST_F(DeltahedronTest, GC_3_0_FaceInteriorHarmonicProperty) {
   for(int u = 0; u < D.N; u++){
     if(!is_face_interior[u]) continue;
     n_tested++;
-    ASSERT_EQ((int)D.neighbours[u].size(), 6) << "face-interior vertex " << u << " should have degree 6";
+    ASSERT_EQ(D.degree(u), 6) << "face-interior vertex " << u << " should have degree 6";
 
     coord3d avg;
-    for(int v : D.neighbours[u]) avg += D.points[v];
+    for(int v : D.nbrs(u)) avg += D.points[v];
     avg /= 6.0;
 
     for(int d = 0; d < 3; d++){
@@ -216,7 +216,7 @@ TEST_F(DeltahedronTest, GC_5_0_FaceInteriorHarmonicProperty) {
   Deltahedron D = ico.GCtransform(k, 0);
 
   vector<bool> is_face_interior(D.N, false);
-  for(int i = 0; i < (int)ico.triangles.size(); i++){
+  for(int i = 0; i < (int)ico.triangles().size(); i++){
     for(const auto& [ab, node_id] : face_grids[i]){
       int a = ab.first, b = ab.second;
       if(a > 0 && b < m+1 && a < b)
@@ -230,8 +230,8 @@ TEST_F(DeltahedronTest, GC_5_0_FaceInteriorHarmonicProperty) {
     n_tested++;
 
     coord3d avg;
-    for(int v : D.neighbours[u]) avg += D.points[v];
-    avg /= D.neighbours[u].size();
+    for(int v : D.nbrs(u)) avg += D.points[v];
+    avg /= D.degree(u);
 
     for(int d = 0; d < 3; d++){
       EXPECT_NEAR(avg[d], D.points[u][d], 1e-12)
@@ -333,7 +333,7 @@ TEST_F(DeltahedronTest, GC_1_1_SurfacePreservation) {
 
   for(int u = 0; u < result.N; u++){
     double min_dist = INFINITY;
-    for(const auto& tri : ico.triangles){
+    for(const auto& tri : ico.triangles()){
       Tri3D T(ico.points[tri[0]]*sqrtT, ico.points[tri[1]]*sqrtT, ico.points[tri[2]]*sqrtT);
       double d = T.distance(result.points[u]);
       if(d < min_dist) min_dist = d;
@@ -350,7 +350,7 @@ TEST_F(DeltahedronTest, GC_1_1_TopologyConsistency) {
   Triangulation topo = ico.Triangulation::GCtransform(1, 1);
 
   EXPECT_EQ(result.N, topo.N);
-  EXPECT_EQ(result.triangles.size(), topo.triangles.size());
+  EXPECT_EQ(result.triangles().size(), topo.triangles().size());
 }
 
 TEST_F(DeltahedronTest, GC_2_1_TopologyConsistency) {
@@ -358,7 +358,7 @@ TEST_F(DeltahedronTest, GC_2_1_TopologyConsistency) {
   Triangulation topo = ico.Triangulation::GCtransform(2, 1);
 
   EXPECT_EQ(result.N, topo.N);
-  EXPECT_EQ(result.triangles.size(), topo.triangles.size());
+  EXPECT_EQ(result.triangles().size(), topo.triangles().size());
 }
 
 // ===== No NaN or zero-norm coordinates =====
@@ -423,7 +423,6 @@ static Deltahedron make_C44_deltahedron(int idx) {
   // Reconstruct triangulation and fullerene graph from spiral
   Triangulation T(spiral);
   FullereneGraph G = T.dual_graph();
-  G.layout2d = G.tutte_layout();
   // scalerad * 1.5 = average cubic edge length.
   // Want cubic edge ~ target_L / sqrt(3) = 1.45 Angstrom.
   double scalerad = target_L / (1.5 * sqrt(3.0));
@@ -499,7 +498,7 @@ TEST(C44DeltahedronTest, AllC44_GC_2_0_TopologyConsistency) {
     Deltahedron result = D.GCtransform(2, 0);
     Triangulation topo = D.halma_transform(1);  // halma_transform(k-1)
     EXPECT_EQ(result.N, topo.N);
-    EXPECT_EQ(result.triangles.size(), topo.triangles.size());
+    EXPECT_EQ(result.triangles().size(), topo.triangles().size());
   }
 }
 
@@ -510,7 +509,7 @@ TEST(C44DeltahedronTest, AllC44_GC_1_1_TopologyConsistency) {
     Deltahedron result = D.GCtransform(1, 1);
     Triangulation topo = D.Triangulation::GCtransform(1, 1);
     EXPECT_EQ(result.N, topo.N);
-    EXPECT_EQ(result.triangles.size(), topo.triangles.size());
+    EXPECT_EQ(result.triangles().size(), topo.triangles().size());
   }
 }
 
@@ -524,7 +523,7 @@ TEST(C44DeltahedronTest, AllC44_GC_2_0_SurfacePreservation) {
 
     for(int u = 0; u < result.N; u++){
       double min_dist = INFINITY;
-      for(const auto& tri : D.triangles){
+      for(const auto& tri : D.triangles()){
         Tri3D T(D.points[tri[0]]*2, D.points[tri[1]]*2, D.points[tri[2]]*2);
         double d = T.distance(result.points[u]);
         if(d < min_dist) min_dist = d;
@@ -544,7 +543,7 @@ TEST(C44DeltahedronTest, AllC44_GC_1_1_SurfacePreservation) {
 
     for(int u = 0; u < result.N; u++){
       double min_dist = INFINITY;
-      for(const auto& tri : D.triangles){
+      for(const auto& tri : D.triangles()){
         Tri3D T(D.points[tri[0]]*sqrtT, D.points[tri[1]]*sqrtT, D.points[tri[2]]*sqrtT);
         double d = T.distance(result.points[u]);
         if(d < min_dist) min_dist = d;
@@ -624,12 +623,12 @@ static void check_C44_GC(int k, int l, const char* label) {
     // Topology consistency with Triangulation::GCtransform
     Triangulation topo = D.Triangulation::GCtransform(k, l);
     EXPECT_EQ(result.N, topo.N);
-    EXPECT_EQ(result.triangles.size(), topo.triangles.size());
+    EXPECT_EQ(result.triangles().size(), topo.triangles().size());
 
     // Surface preservation: every vertex lies on a scaled parent triangle
     for(int u = 0; u < result.N; u++){
       double min_dist = INFINITY;
-      for(const auto& tri : D.triangles){
+      for(const auto& tri : D.triangles()){
         Tri3D T(D.points[tri[0]]*scale, D.points[tri[1]]*scale, D.points[tri[2]]*scale);
         double d = T.distance(result.points[u]);
         if(d < min_dist) min_dist = d;
@@ -740,7 +739,7 @@ struct OptStats {
     double asum = 0, asum2 = 0;
     int na = 0;
     s.ang_min = 180; s.ang_max = 0;
-    for(const auto& tri : D.triangles){
+    for(const auto& tri : D.triangles()){
       for(int c = 0; c < 3; c++){
         coord3d va = D.points[tri[(c+1)%3]] - D.points[tri[c]];
         coord3d vb = D.points[tri[(c+2)%3]] - D.points[tri[c]];
@@ -801,20 +800,20 @@ struct OptStats {
 static double min_convexity_height(const Deltahedron& D) {
   double min_h = INFINITY;
   for(int v = 0; v < D.N; v++){
-    int d = (int)D.neighbours[v].size();
+    int d = D.degree(v);
     if(d > 6) continue;
     bool all_low = true;
     for(int i = 0; i < d; i++)
-      if((int)D.neighbours[D.neighbours[v][i]].size() > 6){ all_low = false; break; }
+      if(D.degree(D.nbrs(v)[i]) > 6){ all_low = false; break; }
     if(!all_low) continue;
 
     coord3d centroid(0,0,0);
-    for(int i = 0; i < d; i++) centroid += D.points[D.neighbours[v][i]];
+    for(int i = 0; i < d; i++) centroid += D.points[D.nbrs(v)[i]];
     centroid /= (double)d;
     coord3d n_fan(0,0,0);
     for(int i = 0; i < d; i++){
-      coord3d e1 = D.points[D.neighbours[v][i]] - D.points[v];
-      coord3d e2 = D.points[D.neighbours[v][(i+1)%d]] - D.points[v];
+      coord3d e1 = D.points[D.nbrs(v)[i]] - D.points[v];
+      coord3d e2 = D.points[D.nbrs(v)[(i+1)%d]] - D.points[v];
       n_fan += e1.cross(e2);
     }
     double n_len = n_fan.norm();
@@ -828,26 +827,26 @@ static double min_convexity_height(const Deltahedron& D) {
 // Check that all deg<=6 vertices (with all deg<=6 neighbors) are convex.
 static void check_convexity(const Deltahedron& D, double tol = 1e-6) {
   for(int v = 0; v < D.N; v++){
-    int d = (int)D.neighbours[v].size();
+    int d = D.degree(v);
     if(d > 6) continue;
 
     // Skip if any neighbor has deg > 6
     bool all_low = true;
     for(int i = 0; i < d; i++)
-      if((int)D.neighbours[D.neighbours[v][i]].size() > 6){ all_low = false; break; }
+      if(D.degree(D.nbrs(v)[i]) > 6){ all_low = false; break; }
     if(!all_low) continue;
 
     // Neighbor centroid
     coord3d centroid(0,0,0);
     for(int i = 0; i < d; i++)
-      centroid += D.points[D.neighbours[v][i]];
+      centroid += D.points[D.nbrs(v)[i]];
     centroid /= (double)d;
 
     // Average outward normal from triangle fan
     coord3d n_fan(0,0,0);
     for(int i = 0; i < d; i++){
-      int ni  = D.neighbours[v][i];
-      int ni1 = D.neighbours[v][(i+1) % d];
+      int ni  = D.nbrs(v)[i];
+      int ni1 = D.nbrs(v)[(i+1) % d];
       coord3d e1 = D.points[ni]  - D.points[v];
       coord3d e2 = D.points[ni1] - D.points[v];
       n_fan += e1.cross(e2);
@@ -866,7 +865,7 @@ static void check_convexity(const Deltahedron& D, double tol = 1e-6) {
 
 TEST_F(DeltahedronTest, GradientCheck_Icosahedron) {
   // Perturbed icosahedron ensures all gradient terms are exercised
-  vector<coord3d> noisy(ico.points);
+  vector<coord3d> noisy(ico.points.begin(), ico.points.end());
   srand(123);
   for(int u = 0; u < ico.N; u++)
     for(int d = 0; d < 3; d++)
@@ -879,7 +878,7 @@ TEST_F(DeltahedronTest, GradientCheck_Icosahedron) {
 
 TEST_F(DeltahedronTest, GradientCheck_LargePerturbation) {
   // Large perturbation creates concavities, exercising E_conv gradient
-  vector<coord3d> noisy(ico.points);
+  vector<coord3d> noisy(ico.points.begin(), ico.points.end());
   srand(789);
   for(int u = 0; u < ico.N; u++)
     for(int d = 0; d < 3; d++)
@@ -895,7 +894,7 @@ TEST_F(DeltahedronTest, GradientCheck_LargePerturbation) {
 
 TEST_F(DeltahedronTest, HessianCheck_Icosahedron) {
   // All vertices free, small perturbation
-  vector<coord3d> noisy(ico.points);
+  vector<coord3d> noisy(ico.points.begin(), ico.points.end());
   srand(456);
   for(int u = 0; u < ico.N; u++)
     for(int d = 0; d < 3; d++)
@@ -909,7 +908,7 @@ TEST_F(DeltahedronTest, HessianCheck_Icosahedron) {
 
 TEST_F(DeltahedronTest, HessianCheck_PartiallyFixed) {
   // Fix half the vertices (boundary), free the other half
-  vector<coord3d> noisy(ico.points);
+  vector<coord3d> noisy(ico.points.begin(), ico.points.end());
   srand(789);
   for(int u = 0; u < ico.N; u++)
     for(int d = 0; d < 3; d++)
@@ -924,7 +923,7 @@ TEST_F(DeltahedronTest, HessianCheck_PartiallyFixed) {
 
 TEST_F(DeltahedronTest, HessianCheck_WithConcavity) {
   // Large perturbation to create concavities, exercising E_conv Hessian
-  vector<coord3d> noisy(ico.points);
+  vector<coord3d> noisy(ico.points.begin(), ico.points.end());
   srand(321);
   for(int u = 0; u < ico.N; u++)
     for(int d = 0; d < 3; d++)
@@ -956,7 +955,7 @@ TEST_F(DeltahedronTest, Optimize_PerturbedIcosahedron) {
   Deltahedron D = ico;
 
   // Add noise to the coordinates
-  vector<coord3d> noisy(ico.points);
+  vector<coord3d> noisy(ico.points.begin(), ico.points.end());
   srand(42);
   for(int u = 0; u < D.N; u++){
     for(int d = 0; d < 3; d++)
@@ -981,20 +980,20 @@ TEST_F(DeltahedronTest, Optimize_PerturbedIcosahedron) {
 static vector<double> vertex_convexity_heights(const Deltahedron& D) {
   vector<double> heights(D.N, NAN);
   for(int v = 0; v < D.N; v++){
-    int d = (int)D.neighbours[v].size();
+    int d = D.degree(v);
     if(d > 6) continue;
     bool all_low = true;
     for(int i = 0; i < d; i++)
-      if((int)D.neighbours[D.neighbours[v][i]].size() > 6){ all_low = false; break; }
+      if(D.degree(D.nbrs(v)[i]) > 6){ all_low = false; break; }
     if(!all_low) continue;
 
     coord3d centroid(0,0,0);
-    for(int i = 0; i < d; i++) centroid += D.points[D.neighbours[v][i]];
+    for(int i = 0; i < d; i++) centroid += D.points[D.nbrs(v)[i]];
     centroid /= (double)d;
     coord3d n_fan(0,0,0);
     for(int i = 0; i < d; i++){
-      coord3d e1 = D.points[D.neighbours[v][i]] - D.points[v];
-      coord3d e2 = D.points[D.neighbours[v][(i+1)%d]] - D.points[v];
+      coord3d e1 = D.points[D.nbrs(v)[i]] - D.points[v];
+      coord3d e2 = D.points[D.nbrs(v)[(i+1)%d]] - D.points[v];
       n_fan += e1.cross(e2);
     }
     double n_len = n_fan.norm();
@@ -1010,15 +1009,15 @@ static void dump_geometry(const Deltahedron& D, const string& filename) {
   if(!f) return;
   vector<double> h = vertex_convexity_heights(D);
   // Header
-  fprintf(f, "%d %d\n", D.N, (int)D.triangles.size());
+  fprintf(f, "%d %d\n", D.N, (int)D.triangles().size());
   // Vertices: x y z degree h
   for(int v = 0; v < D.N; v++){
     fprintf(f, "%.12f %.12f %.12f %d %.12f\n",
             D.points[v][0], D.points[v][1], D.points[v][2],
-            (int)D.neighbours[v].size(), std::isnan(h[v]) ? 999.0 : h[v]);
+            D.degree(v), std::isnan(h[v]) ? 999.0 : h[v]);
   }
   // Triangles: v0 v1 v2
-  for(const auto& tri : D.triangles)
+  for(const auto& tri : D.triangles())
     fprintf(f, "%d %d %d\n", tri[0], tri[1], tri[2]);
   fclose(f);
 }
@@ -1102,8 +1101,6 @@ TEST(C44DeltahedronTest, Optimize_AllC44) {
 // the deltahedron optimizer can handle a poor initial geometry.
 static Deltahedron make_deltahedron_from_db(int N, const IsomerDB::Entry& entry) {
   FullereneGraph G = IsomerDB::makeIsomer(N, entry);
-  if(G.layout2d.empty())
-    G.layout2d = G.tutte_layout();
   // scalerad * 1.5 = average cubic edge length.
   // Want cubic edge ~ target_L / sqrt(3) = 1.45 Angstrom.
   double scalerad = target_L / (1.5 * sqrt(3.0));
@@ -1335,7 +1332,7 @@ TEST(OptimizeTest, C60_IPR) {
   int n5 = 0, n6 = 0;
   for(int v = 0; v < D.N; v++){
     double r = (D.points[v] - cm).norm();
-    if((int)D.neighbours[v].size() == 5){ r5_sum += r; n5++; }
+    if(D.degree(v) == 5){ r5_sum += r; n5++; }
     else                                 { r6_sum += r; n6++; }
   }
   ASSERT_EQ(n5, 12);

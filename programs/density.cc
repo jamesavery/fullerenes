@@ -171,11 +171,9 @@ int main(int ac, char **av)
     P0 = Polyhedron::from_file(av[1]);
     N = P0.N;
     g = P0;
-    g.layout2d = g.tutte_layout(-1,-1,-1,8);
   } else {
     Triangulation T(spiral,jumps);
     g = T.dual_graph();
-    g.layout2d = g.tutte_layout();
     P0 = Polyhedron(g,g.zero_order_geometry(),6);
   }
 

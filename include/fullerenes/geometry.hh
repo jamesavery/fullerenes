@@ -13,8 +13,7 @@
 
 using namespace std;
 
-typedef int node_t;
-typedef vector< vector<node_t> > neighbours_t;
+// node_t and neighbours_t defined in auxiliary.hh (included above)
 typedef vector< bool > edges_t;
 
 struct matrix3d; // required for coord3d.outer(coord3d)
@@ -425,7 +424,7 @@ struct tri_t {
   node_t& u(const unsigned int i)  { return x_[i]; }
   const node_t& u(const unsigned int i) const  { return x_[i]; }
 
-  coord3d centroid(const vector<coord3d>& points) const { return (points[u(0)]+points[u(1)]+points[u(2)])/3.0; }
+  coord3d centroid(std::span<const coord3d> points) const { return (points[u(0)]+points[u(1)]+points[u(2)])/3.0; }
   coord2d centroid(const vector<coord2d>& points) const { return (points[u(0)]+points[u(1)]+points[u(2)])/3.0; }
   void flip(){ node_t t = u(1); u(1) = u(2); u(2) = t; }
 
@@ -477,7 +476,7 @@ struct face_t : public vector<node_t> {
     for(size_t i=0;i<size();i++) c += layout[(*this)[i]];
     return c/size();
   }
-  coord3d centroid(const vector<coord3d>& layout) const { 
+  coord3d centroid(std::span<const coord3d> layout) const {
     coord3d c;
     for(size_t i=0;i<size();i++) c += layout[(*this)[i]];
     return c/size();
@@ -551,7 +550,7 @@ struct Tri3D {
   double plane_intersection(const segment_t& segment) const { 
     return n.dot(a-segment.first)/n.dot(segment.second-segment.first);
   }
-  Tri3D(const vector<coord3d>& points, const tri_t& t) : a(points[t[0]]),b(points[t[1]]),c(points[t[2]]), u(b-a), v(c-a), n(u.cross(v)) {}
+  Tri3D(std::span<const coord3d> points, const tri_t& t) : a(points[t[0]]),b(points[t[1]]),c(points[t[2]]), u(b-a), v(c-a), n(u.cross(v)) {}
 
   double distance(const coord3d& x) const {
     return fabs((x-a).dot(n))/n.norm();

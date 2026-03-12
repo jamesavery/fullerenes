@@ -1,4 +1,5 @@
 #include "fullerenes/polyhedron.hh"
+#include "fullerenes/layout2d.hh"
 
 //////////////////////////// FORMAT MULTIPLEXING ////////////////////////////
 vector<string> Polyhedron::formats{{"ascii","planarcode","xyz","mol2","mathematica","latex","cc1","turbomole","gaussian","wavefront","spiral"}};
@@ -33,7 +34,6 @@ Polyhedron Polyhedron::from_file(FILE *file, string format)
       cerr << "Input format is '"<<format<<"'; must be one of: " << input_formats << " or " << PlanarGraph::input_formats << "\n";
       abort();
     } else {
-      G.layout2d = G.tutte_layout();
       Polyhedron P(G,G.zero_order_geometry(),6);
       P.optimize();
 
@@ -91,7 +91,7 @@ bool Polyhedron::to_file(const Polyhedron &G, string filename)
 
 ////////////////////////////// OUTPUT ROUTINES //////////////////////////////
 bool Polyhedron::to_ascii(const Polyhedron &P, FILE *file)  {
-  string s = LIST_OPEN + to_string(P.neighbours) + "," + to_string(P.points) + "," + to_string(P.faces) + LIST_CLOSE;
+  string s = LIST_OPEN + to_string(static_cast<const neighbours_t&>(P)) + "," + to_string(P.points) + "," + to_string(P.faces()) + LIST_CLOSE;
   fputs(s.c_str(),file);
   return ferror(file) == 0;
 }
@@ -133,7 +133,7 @@ bool Polyhedron::to_gaussian(const Polyhedron &P, FILE *file, string header)  {
 
   // Connectivity section
   for(node_t u=0; u<P.N;u++){
-    auto nu = P.neighbours[u];
+    auto nu = P.nbrs(u);
     for(auto v: nu) fprintf(file,"%d %d B\n",u+1, v+1);
   }
 
@@ -156,7 +156,7 @@ bool Polyhedron::to_wavefront_obj(const Polyhedron &P, FILE *file)
   for(auto p: P.points)
     fprintf(file,"v %f %f %f\n",p[0],p[1],p[2]);
 
-  for(auto f: P.faces){
+  for(auto f: P.faces()){
     fprintf(file,"f ");
     for(auto v: f) fprintf(file,"%d ",v);
     fprintf(file,"\n");
@@ -197,7 +197,7 @@ bool Polyhedron::to_mol2(const Polyhedron &P, FILE *file)
   fprintf(file,"@<TRIPOS>BOND\r\n");
   int i = 1;
   for(node_t u=0;u<P.N;u++){
-    for(node_t v: P.neighbours[u])
+    for(node_t v: P.nbrs(u))
       if(v>=u)
 	fprintf(file,"%d\t %d\t %d\t un\r\n",i++,u+1,v+1);
   }
@@ -215,7 +215,7 @@ bool Polyhedron::to_cc1(const Polyhedron &P, FILE *file)
     const coord3d p         = P.points[u];
     
     fprintf(file,"C\t %d\t %f\t %f\t %f\t %d", u+1,p[0],p[1],p[2],weird_constant);
-    for(node_t v: P.neighbours[u])
+    for(node_t v: P.nbrs(u))
       fprintf(file,"\t%d",v);
     fprintf(file,"\r\n");
   }
@@ -272,9 +272,10 @@ string Polyhedron::to_latex(bool show_dual, bool number_vertices, bool include_l
 
   if(show_dual){
     PlanarGraph dual(dual_graph(face_max));        // TODO: This breaks for everything else than fullerenes
+    vector<coord2d> dual_layout = dual.tutte_layout();
     s << "\\foreach \\place/\\name/\\lbl in {";
     for(node_t u=0;u<dual.N;u++){
-      const coord2d& xs(dual.layout2d[u]);
+      const coord2d& xs(dual_layout[u]);
       s << "{(" << xs.first << "," << xs.second << ")/v" << u << "/$" << u << "$}" << (u+1<dual.N? ", ":"}\n\t");
     }    
     s << "\\node[dualvertex] (\\name) at \\place {"<<(number_vertices?"\\lbl":"")<<"};\n";
@@ -306,27 +307,31 @@ string Polyhedron::to_povray(double w_cm, double h_cm,
   s << "#declare facecolour=color rgb <"<<((face_colour>>16)&0xff)/256.<<","<<((face_colour>>8)&0xff)/256.<<","<<(face_colour&0xff)/256.<<">;\n";
   s << "#declare faceopacity="<<face_opacity<<";\n\n";
 
-  s << PlanarGraph(*this).to_povray(w_cm,h_cm,line_colour,vertex_colour,line_width,vertex_diameter);
+  {
+    vector<coord2d> pov_layout = tutte_layout();
+    s << layout2d::to_povray(*this, pov_layout, w_cm,h_cm,line_colour,vertex_colour,line_width,vertex_diameter);
+  }
   s << "#declare layout3D=array["<<N<<"][3]" << points <<";\n\n";
 
-  s << "#declare faces   =array["<<faces.size()<<"]["<<(face_max+1)<<"]{"; 
-  for(int i=0;i<faces.size();i++) {
-    const face_t& f(faces[i]);
+  auto fs = faces();
+  s << "#declare faces   =array["<<fs.size()<<"]["<<(face_max+1)<<"]{";
+  for(int i=0;i<int(fs.size());i++) {
+    const face_t& f(fs[i]);
     s << "{";
-    for(int j=0;j<f.size();j++) s << f[j] << ",";
+    for(int j=0;j<int(f.size());j++) s << f[j] << ",";
     for(int j=f.size();j<face_max;j++) s << "-1,";
-    s << "-1}" << (i+1<faces.size()? ",":"}\n\n");
+    s << "-1}" << (i+1<int(fs.size())? ",":"}\n\n");
   }
-  s << "#declare facelength=array["<<faces.size()<<"]{";for(int i=0;i<faces.size();i++) s<< faces[i].size() << (i+1<faces.size()?",":"}\n\n");
+  s << "#declare facelength=array["<<fs.size()<<"]{";for(int i=0;i<int(fs.size());i++) s<< fs[i].size() << (i+1<int(fs.size())?",":"}\n\n");
 
 
-  vector<tri_t>   tris(centroid_triangulation(faces));
+  vector<tri_t>   tris(centroid_triangulation(fs));
   vector<int>     triface;
   vector<coord3d> centroid_points(points.begin(),points.end());
-  vector<coord3d> trinormals(tris.size()), facenormals(faces.size()), vertexnormals(points.size()+faces.size());
+  vector<coord3d> trinormals(tris.size()), facenormals(fs.size()), vertexnormals(points.size()+fs.size());
 
-  for(int i=0;i<faces.size();i++)
-    centroid_points.push_back(faces[i].centroid(points));
+  for(int i=0;i<int(fs.size());i++)
+    centroid_points.push_back(fs[i].centroid(points));
 
   for(int i=0;i<tris.size();i++){
     coord3d n(Tri3D(centroid_points[tris[i][0]],centroid_points[tris[i][1]],centroid_points[tris[i][2]]).n);
@@ -350,13 +355,13 @@ string Polyhedron::to_povray(double w_cm, double h_cm,
   if(V<0)                        // Calculated normals are pointing inwards!
     for(int i=0;i<tris.size();i++) trinormals[i] *= -1;
 
-  for(int i=0;i<faces.size();i++) {
+  for(int i=0;i<int(fs.size());i++) {
     coord3d normal;
-    if(faces[i].size()>3){
-      for(int j=0;j<faces[i].size();j++){
+    if(fs[i].size()>3){
+      for(int j=0;j<int(fs[i].size());j++){
         triface.push_back(i);
         normal += trinormals[triface.size()-1];
-      } 
+      }
       facenormals[i] = normal/normal.norm();
     } else {
       triface.push_back(i);
@@ -369,11 +374,11 @@ string Polyhedron::to_povray(double w_cm, double h_cm,
   s << "#declare Ntris = "<<tris.size()<<";\n";
   s << "#declare tris = array["<<tris.size()<<"][3]" << tris << ";\n\n";
   s << "#declare triface = array["<<triface.size()<<"]" << triface << ";\n\n";
-    
-  s << "#declare cpoints=array["<<centroid_points.size()<<"][3]" << centroid_points << ";\n\n"; 
+
+  s << "#declare cpoints=array["<<centroid_points.size()<<"][3]" << centroid_points << ";\n\n";
   s << "#declare vertexnormals =array["<<vertexnormals.size()<<"][3]" << vertexnormals << ";\n\n";
   s << "#declare trinormals =array["<<tris.size()<<"][3]" << trinormals << ";\n\n";
-  s << "#declare facenormals=array["<<faces.size()<<"][3]" << facenormals << ";\n\n";
+  s << "#declare facenormals=array["<<fs.size()<<"][3]" << facenormals << ";\n\n";
 
   //  s << "#include \"drawpolyhedron.pov\"\n\n";
   return s.str();
@@ -471,13 +476,14 @@ Polyhedron Polyhedron::from_mol2(FILE *file)
     //    cerr << "Edge " << i << " of " << Nedges << ": Read line "<< line <<endl;
   }
 
-  Polyhedron P;  
-  P.N = G.N;
-  P.neighbours = G.neighbours;
-  P.points = points;
-  P.layout2d = P.tutte_layout();
-  P.orient_neighbours();
-  P.faces = P.compute_faces();
+  Polyhedron P;
+  static_cast<Graph&>(P) = static_cast<const Graph&>(G);
+  P.points = std::move(points);
+  {
+    vector<coord2d> layout = P.tutte_layout();
+    layout2d::orient_neighbours(P, layout);
+  }
+  // faces are now computed on demand via P.faces()
   //  cout << "faces = " << P.faces << "\n";
   
   return P;

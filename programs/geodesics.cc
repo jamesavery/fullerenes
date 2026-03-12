@@ -273,7 +273,7 @@ matrix<double> self_distances(const Triangulation &G, const vector<node_t> &node
       node_T U = nodes_inverse[u];
 
       // We want to explore all triangular slices with (1,0) along each edge of u
-      for(int axis=0;axis<neighbours[u].size();axis++){
+      for(int axis=0;axis<G[u].size();axis++){
 	int a = 0, b = 1, c = 1, d = M[U];
 
 	// The simple geodesics correspond to the coprime pairs (a,b), a>=b.
@@ -319,7 +319,7 @@ matrix<double> self_distances(const Triangulation &G, const vector<node_t> &node
     }
     
   for(node_t u: nodes){
-    for(int i=0;i<neighbours[u].size();i++){
+    for(int i=0;i<G[u].size();i++){
       node_t U  = nodes_inverse[u];
 
       for(int a=1; a<M[U]; a++){	
@@ -354,7 +354,7 @@ matrix<double> self_distances(const Triangulation &G, const vector<node_t> &node
 matrix<clustering::distance_t> pentagon_graph_distance(const Triangulation &G)
 {
   vector<int> pentagon_indices(12);
-  for(int u=0, i=0;u<G.N;u++) if(G.neighbours[u].size() == 5) pentagon_indices[i++] = u;
+  for(int u=0, i=0;u<G.N;u++) if(G.degree(u) == 5) pentagon_indices[i++] = u;
 
   auto D = G.all_pairs_shortest_paths(pentagon_indices);
   for(int i=0;i<D.m*D.n;i++) D[i] *= D[i];
@@ -365,7 +365,7 @@ matrix<clustering::distance_t> pentagon_graph_distance(const Triangulation &G)
 matrix<int> pentagon_surface_distance(const Triangulation& G)
 {
   vector<int> pentagon_indices(12);
-  for(int u=0, i=0;u<G.N;u++) if(G.neighbours[u].size() == 5) pentagon_indices[i++] = u;
+  for(int u=0, i=0;u<G.N;u++) if(G.degree(u) == 5) pentagon_indices[i++] = u;
 								
   auto Hsqr = G.simple_square_surface_distances(pentagon_indices,true);
   cerr << "Hsqr = " << Hsqr << ";\n";  
@@ -378,7 +378,7 @@ matrix<int> pentagon_surface_distance(const Triangulation& G)
 auto pentagon_geodesics(const Triangulation& G)
 {
   vector<int> pentagon_indices(12);
-  for(int u=0, i=0;u<G.N;u++) if(G.neighbours[u].size() == 5) pentagon_indices[i++] = u;
+  for(int u=0, i=0;u<G.N;u++) if(G.degree(u) == 5) pentagon_indices[i++] = u;
 								
   return G.simple_geodesics(pentagon_indices,true);
 }
@@ -416,7 +416,7 @@ vector< pair<arc_t,float> > crossings(const Triangulation& dG, const node_t u, c
   int Nruns = quad_runs.size();
 
   // No matter what, we start in node u. 
-  node_t q = u, r = dG.neighbours[u][geo.axis];
+  node_t q = u, r = dG.nbrs(u)[geo.axis];
   result.push_back({{q,r},0});
   
   // Deal with degenerate case first
@@ -533,8 +533,6 @@ int main(int ac, char **argv)
   BuckyGen::buckygen_queue Q = BuckyGen::start(N,IPR,only_nontrivial);  
   while(BuckyGen::next_fullerene(Q,dualG)) if((++i) == pick_number) {      
       cerr << "isomer "<< i << endl;
-      dualG.update();
-      
       Polyhedron P  = Polyhedron::fullerene_polyhedron(dualG.dual_graph());
       Polyhedron dP = P.dual();
 
@@ -543,8 +541,8 @@ int main(int ac, char **argv)
       
       ofstream output_file("output/geodesics.m");
       LIST_OPEN = '{'; LIST_CLOSE = '}';
-      output_file << "neighbours = " << dP.neighbours << "+1;\n"
-      		  << "faces      = " << dP.faces      << "+1;\n"
+      output_file << "neighbours = " << static_cast<const neighbours_t&>(dP) << "+1;\n"
+      		  << "faces      = " << dP.faces()      << "+1;\n"
 		  << "points     = " << dP.points     << ";\n";
 
       dualG = FullereneDual(dP);

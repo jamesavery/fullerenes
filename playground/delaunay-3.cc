@@ -23,17 +23,15 @@ Polyhedron fullerene_dual_polyhedron(const Triangulation& dg)
   cout << "pg = " << pg << endl;
 
   FullereneGraph g(pg);
-  g.layout2d = g.tutte_layout();
-
   vector<coord3d> points = g.zero_order_geometry();
   points = g.optimized_geometry(points);
 
   vector<coord3d> dual_points(dg.N);
 
   vector<face_t> faces(dg.N);
-  for(int i=0;i<dg.triangles.size();i++)
+  for(int i=0;i<dg.triangles().size();i++)
     for(int j=0;j<3;j++)
-      faces[dg.triangles[i][j]].push_back(i);
+      faces[dg.triangles()[i][j]].push_back(i);
 
   for(int i=0;i<faces.size();i++)
     dual_points[i] = faces[i].centroid(points);
@@ -82,7 +80,7 @@ int main(int ac, char **av)
 
   {
     node_t v = M-1;
-    vector<node_t> hole(DY.neighbours[v]);
+    vector<node_t> hole(DY[v]);
     int n = hole.size();
 
     cout << "hole = " << hole << ";\n";
@@ -98,7 +96,7 @@ int main(int ac, char **av)
 
 
     output << "g0 = " << DY << ";\n";
-    cout   << "degree"<<(v+1)<<" = " << DY.neighbours[v].size();
+    cout   << "degree"<<(v+1)<<" = " << DY[v].size();
     DY.remove_flat_vertex(v);
     output << "g1 = " << DY << ";\n";
     //    Debug::channel_verbosity["Delaunay"] = Debug::WARNING;
@@ -106,9 +104,9 @@ int main(int ac, char **av)
     while(v>12){
       v--;
 
-      vector<node_t> hole(DY.neighbours[v]);
+      vector<node_t> hole(DY[v]);
       int n = hole.size();
-      cout << "degree"<<(v+1)<<" = " << DY.neighbours[v].size() <<";\n";
+      cout << "degree"<<(v+1)<<" = " << DY[v].size() <<";\n";
       cout << "hole = " << hole << ";\n";
 
       vector<double> angles(n);

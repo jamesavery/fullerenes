@@ -17,6 +17,7 @@ using namespace std;
 struct params_t
 {
   PlanarGraph *graph;
+  face_t outer_face;
   vector<double> *zero_values_dist;
   vector<double> *k_dist;
   vector<double> *k_angle;
@@ -30,6 +31,7 @@ double layout_pot(const gsl_vector* coordinates, void* parameters)
 
   params_t &params = *static_cast<params_t*>(parameters);
   PlanarGraph &graph = *params.graph;
+  const face_t &outer_face = params.outer_face;
   vector<double> &zero_values_dist = *params.zero_values_dist;
   vector<double> &k_dist = *params.k_dist;
   vector<double> &k_angle = *params.k_angle;
@@ -68,9 +70,9 @@ double layout_pot(const gsl_vector* coordinates, void* parameters)
   int i=0;
   for(const edge_t &e: edge_set){
     vector<node_t>::const_iterator it1, it2;
-    it1 = find (graph.outer_face.begin(), graph.outer_face.end(), e.first);
-    it2 = find (graph.outer_face.begin(), graph.outer_face.end(), e.second);
-    if (it1 != graph.outer_face.end() && it2 != graph.outer_face.end() && ( it1 == it2+1 || it1 == it2-1 || (it1 == graph.outer_face.begin() && it2 == graph.outer_face.end()-1) || (it1 == graph.outer_face.end()-1 && it2 == graph.outer_face.begin()))){
+    it1 = find (outer_face.begin(), outer_face.end(), e.first);
+    it2 = find (outer_face.begin(), outer_face.end(), e.second);
+    if (it1 != outer_face.end() && it2 != outer_face.end() && ( it1 == it2+1 || it1 == it2-1 || (it1 == outer_face.begin() && it2 == outer_face.end()-1) || (it1 == outer_face.end()-1 && it2 == outer_face.begin()))){
 //      cout << "omitting " << *it1 << "-" << *it2 << endl;
       continue; // edge is part of outer face
     }
@@ -112,15 +114,15 @@ double layout_pot(const gsl_vector* coordinates, void* parameters)
 //
   // find area of outer face:
   double A_tot=0;
-  const double bx = gsl_vector_get(coordinates, 2* graph.outer_face[0]);
-  const double by = gsl_vector_get(coordinates, 2* graph.outer_face[0] +1);
+  const double bx = gsl_vector_get(coordinates, 2* outer_face[0]);
+  const double by = gsl_vector_get(coordinates, 2* outer_face[0] +1);
   // iterate over nodes in face
-  for (int i=1; i<graph.outer_face.size()-1; ++i){
+  for (int i=1; i<outer_face.size()-1; ++i){
 //    cout << " 3 nodes: " << (*jt)[(i+ it->first -1) % it->first] << ", " << (*jt)[i] <<", " <<  (*jt)[(i+1) % it->first] << endl;
-    const double ax = gsl_vector_get(coordinates, 2* graph.outer_face[i]  );
-    const double ay = gsl_vector_get(coordinates, 2* graph.outer_face[i]+1);
-    const double cx = gsl_vector_get(coordinates, 2* graph.outer_face[i+1]  );
-    const double cy = gsl_vector_get(coordinates, 2* graph.outer_face[i+1]+1);
+    const double ax = gsl_vector_get(coordinates, 2* outer_face[i]  );
+    const double ay = gsl_vector_get(coordinates, 2* outer_face[i]+1);
+    const double cx = gsl_vector_get(coordinates, 2* outer_face[i+1]  );
+    const double cy = gsl_vector_get(coordinates, 2* outer_face[i+1]+1);
 
     A_tot += ((ax-bx)*(cy-by) - (ay-by)*(cx-bx))/2;
 //    cout << "area of one triangle: " << ((ax-bx)*(cy-by) - (ay-by)*(cx-bx))/2 << endl;
@@ -166,6 +168,7 @@ void layout_grad(const gsl_vector* coordinates, void* parameters, gsl_vector* gr
 //
   params_t &params = *static_cast<params_t*>(parameters);
   PlanarGraph &graph = *params.graph;
+  const face_t &outer_face = params.outer_face;
   vector<double> &zero_values_dist = *params.zero_values_dist;
   vector<double> &k_dist = *params.k_dist;
   vector<double> &k_angle = *params.k_angle;
@@ -252,14 +255,14 @@ void layout_grad(const gsl_vector* coordinates, void* parameters, gsl_vector* gr
  //
    // find area of outer face:
    double A_tot=0;
-   const double bx = gsl_vector_get(coordinates, 2* graph.outer_face[0]);
-   const double by = gsl_vector_get(coordinates, 2* graph.outer_face[0] +1);
+   const double bx = gsl_vector_get(coordinates, 2* outer_face[0]);
+   const double by = gsl_vector_get(coordinates, 2* outer_face[0] +1);
    // iterate over nodes in face
-   for (int i=1; i+1<graph.outer_face.size(); ++i){
-     const double ax = gsl_vector_get(coordinates, 2* graph.outer_face[i  ]  );
-     const double ay = gsl_vector_get(coordinates, 2* graph.outer_face[i  ]+1);
-     const double cx = gsl_vector_get(coordinates, 2* graph.outer_face[i+1]  );
-     const double cy = gsl_vector_get(coordinates, 2* graph.outer_face[i+1]+1);
+   for (int i=1; i+1<outer_face.size(); ++i){
+     const double ax = gsl_vector_get(coordinates, 2* outer_face[i  ]  );
+     const double ay = gsl_vector_get(coordinates, 2* outer_face[i  ]+1);
+     const double cx = gsl_vector_get(coordinates, 2* outer_face[i+1]  );
+     const double cy = gsl_vector_get(coordinates, 2* outer_face[i+1]+1);
  
      A_tot += ((ax-bx)*(cy-by) - (ay-by)*(cx-bx))/2;
      //cout << "area of one triangle: " << ((ax-bx)*(cy-by) - (ay-by)*(cx-bx))/2 << endl;
@@ -309,8 +312,8 @@ void layout_grad(const gsl_vector* coordinates, void* parameters, gsl_vector* gr
 
 // fix outer face
 //  cout << "d: " << derivatives << endl;
-//  cout << "outer face: " << graph.outer_face << endl;
-  for(vector<node_t>::iterator it = graph.outer_face.begin(); it != graph.outer_face.end(); ++it){
+//  cout << "outer face: " << outer_face << endl;
+  for(vector<node_t>::iterator it = outer_face.begin(); it != outer_face.end(); ++it){
     derivatives[*it].first = 0;
     derivatives[*it].second = 0;
   }
@@ -364,6 +367,7 @@ bool PlanarGraph::optimize_layout(const double zv_dist_inp, const double k_dist_
 
   params_t params;
   params.graph = this;
+  params.outer_face = layout2d::find_outer_face(*this, layout2d);
   params.zero_values_dist = &zero_values_dist;
   params.k_dist = &k_dist;
   params.k_angle = &k_angle;

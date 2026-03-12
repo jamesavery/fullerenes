@@ -6,77 +6,8 @@
 pair<node_t,node_t> Triangulation::adjacent_tris(const arc_t& e) const
 {
   node_t u  = e.first, v = e.second;
-  node_t w1=-1, w2=-1;
-
-  if(is_oriented) {
-    w1 = next_on_face(u,v), w2 = next_on_face(v,u);
-  } else {
-    vector<node_t> ws;
-    auto is_in = [](const vector<node_t> &v, node_t x)
-      { return find(v.begin(),v.end(),x) != v.end(); };
-
-    for(node_t w: neighbours[u])
-      if(is_in(neighbours[w],u) && is_in(neighbours[w],v)) ws.push_back(w);
-
-    if(ws.size() != 2){
-      cerr <<  "Error in triangulation: Edge " << edge_t{u,v} << " is adjacent to "<<ws.size()<<" != 2 vertices.\n"
-           <<  "ws = " << ws << "+1;\n"
-           <<  "neighbours = " << neighbours << "+1;\n";
-      abort();
-    }
-    w1 = ws[0], w2 = ws[1];
-  }
-
+  node_t w1 = next_on_face(u,v), w2 = next_on_face(v,u);
   return make_pair(w1,w2);
-}
-
-vector<tri_t> Triangulation::compute_faces() const
-// Does not assume graph is oriented
-// Produces oriented triangles
-// TODO: Fails in the presence of separating triangles. Make sure spiral-windup produces oriented graph.
-{
-  if(is_oriented) return compute_faces_oriented();
-
-  unordered_set<tri_t> triangle_set;
-
-  for(node_t u=0;u<N;u++)
-    for(node_t v: neighbours[u]){
-      pair<node_t,node_t> ws(adjacent_tris({u,v}));
-
-      triangle_set.insert(tri_t{u,v,ws.first }.sorted());
-      triangle_set.insert(tri_t{u,v,ws.second}.sorted());
-    }
-
-
-  vector<tri_t> triangles(triangle_set.begin(),triangle_set.end());
-  orient_triangulation(triangles);
-
-  return triangles;
-}
-
-
-
-void Triangulation::orient_neighbours()
-{
-  map<arc_t,node_t> next;
-
-  for(int i=0;i<triangles.size();i++){
-    const tri_t& t(triangles[i]);
-    next[arc_t(t[0],t[1])] = t[2];
-    next[arc_t(t[1],t[2])] = t[0];
-    next[arc_t(t[2],t[0])] = t[1];
-  }
-  for(node_t u=0;u<N;u++){
-    int d = neighbours[u].size();
-
-    node_t v = neighbours[u][0];
-    for(int i=1;i<d;i++){
-      node_t w = next[arc_t(u,v)];
-      neighbours[u][i] = w;
-      v = w;
-    }
-  }
-  is_oriented = true;
 }
 
 vector<tri_t> Triangulation::compute_faces_oriented() const
@@ -87,7 +18,7 @@ vector<tri_t> Triangulation::compute_faces_oriented() const
   triangles.reserve(2*(N-2));        // Most common case is cubic dual, but we no longer know it for sure.
 
   for(node_t u=0;u<N;u++){
-    const vector<node_t>& nu(neighbours[u]);
+    auto nu = nbrs(u);
     for(int i=0;i<nu.size();i++){
       const node_t& v(nu[i]);    // Process directed edge u->v
       const arc_t uv(u,v);
@@ -96,8 +27,8 @@ vector<tri_t> Triangulation::compute_faces_oriented() const
         node_t w = next_on_face(u,v);
 	if(w==-1){
 	  printf("next_on_face(%d,%d) = prev(%d,%d) = -1\n",u,v,v,u);
-	  printf("\tneibhours[%d] = ",u); cout << neighbours[u] << endl;
-	  printf("\tneibhours[%d] = ",v); cout << neighbours[v] << endl;	  
+	  printf("\tneighbours[%d] = ",u); for(auto x: (*this)[u]) cout << x << ' '; cout << endl;
+	  printf("\tneighbours[%d] = ",v); for(auto x: (*this)[v]) cout << x << ' '; cout << endl;	  
 	  assert(w != -1);
 	}
         //Is This Condition necessary? 
@@ -135,7 +66,7 @@ void Triangulation::compute_lookup_tables(const PlanarGraph&            cubic_gr
   size_t Nc = 2*(N-2);		// This function assumes the triangulation is the dual of a cubic graph 
 
   assert(triangles.size() == Nc); // Make sure triangles array is initialized before calling
-  assert(is_oriented());	  // We don't bother with non-oriented surfaces
+  assert(is_consistently_oriented());	  // We don't bother with non-oriented surfaces
 
   if(Fmax<1) Fmax = max_degree(); // Calculate fmax
   
@@ -159,8 +90,8 @@ void Triangulation::compute_lookup_tables(const PlanarGraph&            cubic_gr
 	if((wa<0) || (wb<0)){
 	  printf("next_on_face(%d,%d) = prev(%d,%d) = -1\n",u,v,v,u);
 	  printf("next_on_face(%d,%d) = prev(%d,%d) = -1\n",v,u,u,v);
-	  printf("\tneibhours[%d] = ",u); cout << neighbours[u] << endl;
-	  printf("\tneibhours[%d] = ",v); cout << neighbours[v] << endl;	  
+	  printf("\tneighbours[%d] = ",u); for(auto x: (*this)[u]) cout << x << ' '; cout << endl;
+	  printf("\tneighbours[%d] = ",v); for(auto x: (*this)[v]) cout << x << ' '; cout << endl;	  
 	  assert((wa<0) || (wb<0));
 	}
 
@@ -189,16 +120,17 @@ unordered_map<arc_t,arc_t> Triangulation::arc_translation() const
 {
   // TODO: Common metadata, calculate once
   IDCounter<tri_t> tri_numbers;
-  unordered_map<arc_t,arc_t> arc_translate(triangles.size()*3);
+  auto tris = triangles();
+  unordered_map<arc_t,arc_t> arc_translate(tris.size()*3);
 
-  if(triangles.size() != (N-2)*2){
-    cout << "triangles = " << triangles << endl;
-    assert(triangles.size() == (N-2)*2);
+  if(tris.size() != (N-2)*2){
+    cout << "triangles = " << tris << endl;
+    assert(tris.size() == (N-2)*2);
   }
   
   // Dual arcs
   for(node_t u=0;u<N;u++)
-    for(node_t v: neighbours[u]){
+    for(node_t v: nbrs(u)){
       node_t wa = next_on_face(u,v), wb = next_on_face(v,u);
       tri_t  Ta = {u,v,wa}, Tb = {v,u,wb};
       node_t  a = tri_numbers(Ta.sorted()), b = tri_numbers(Tb.sorted());
@@ -214,17 +146,18 @@ PlanarGraph Triangulation::dual_graph() const
 {
   IDCounter<tri_t> tri_numbers;
 
-  //assert(triangles.size() == (N-2)*2);
-  if(triangles.size() != (N-2)*2){
-    cout << "triangles = " << triangles << endl;
-    assert(triangles.size() == (N-2)*2);
+  auto tris = triangles();
+  //assert(tris.size() == (N-2)*2);
+  if(tris.size() != (N-2)*2){
+    cout << "triangles = " << tris << endl;
+    assert(tris.size() == (N-2)*2);
   }
-  for(int i=0;i<triangles.size();i++) tri_numbers.insert(triangles[i].sorted());
+  for(int i=0;i<tris.size();i++) tri_numbers.insert(tris[i].sorted());
 
-  neighbours_t A(triangles.size(),vector<node_t>(3));
+  Graph A(tris.size(), vector<node_t>(3));
 
-  for(node_t U=0;U<triangles.size();U++){
-    const tri_t& t(triangles[U]);
+  for(node_t U=0;U<tris.size();U++){
+    const tri_t& t(tris[U]);
 
     for(int i=0;i<3;i++){
       const node_t& u(t[i]), v(t[(i+1)%3]);
@@ -240,9 +173,7 @@ PlanarGraph Triangulation::dual_graph() const
     }
   }
   //  cerr << "A = " << A << endl;
-  Graph G(A,true);
-  // G must be consistently oriented, or something went wrong.
-  // assert(G.is_consistently_oriented());
+  Graph G(A);
   return PlanarGraph(G);
 };
 
@@ -252,10 +183,11 @@ vector<face_t> Triangulation::cubic_faces() const
   vector<face_t> dfaces(N);
 
   IDCounter<tri_t> tri_numbers;
-  for(int i=0;i<triangles.size();i++) tri_numbers.insert(triangles[i].sorted());
+  auto tris = triangles();
+  for(int i=0;i<tris.size();i++) tri_numbers.insert(tris[i].sorted());
 
   for(node_t u=0;u<N;u++){
-    const vector<node_t> &nu(neighbours[u]);
+    auto nu = nbrs(u);
     face_t f(nu.size());
     for(int i=0;i<nu.size();i++){
       node_t v=nu[i], w = nu[(i+1)%nu.size()]; // next_on_face(u,v);
@@ -436,8 +368,6 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
     remove_isolated_vertices();
   }
 
-  is_oriented = true;
-  update(is_oriented);
 }
 
 
@@ -468,12 +398,13 @@ Triangulation Triangulation::halma_transform(int m, vector<map<edge_t,node_t>>* 
   }
 
   // Build per-face halma grids and create interior nodes.
-  int n_faces = triangles.size();
+  auto tris = triangles();
+  int n_faces = tris.size();
   vector<map<edge_t,node_t>> face_grid(n_faces);
 
   for(int i = 0; i < n_faces; i++){
     auto& grid = face_grid[i];
-    const face_t& T = triangles[i];
+    const face_t& T = tris[i];
     const vector<node_t>& ns0(arc_nodes[{T[0],T[1]}]);
     const vector<node_t>& ns1(arc_nodes[{T[1],T[2]}]);
     const vector<node_t>& ns2(arc_nodes[{T[0],T[2]}]);
@@ -536,17 +467,17 @@ Triangulation Triangulation::halma_transform(int m, vector<map<edge_t,node_t>>* 
   }
 
   // Build CW neighbour lists by chaining next_on_face.
-  neighbours_t neighbours(N_new);
+  Graph neighbours(N_new, GRAPH_DMAX);
   for(node_t u = 0; u < N_new; u++){
     node_t v = first_nb[u];
     node_t w = v;
     do {
-      neighbours[u].push_back(w);
+      neighbours.push_back(u, w);
       w = nof.at({u,w});
     } while(w != v);
   }
 
-  return Triangulation(neighbours, true);
+  return Triangulation(neighbours);
 }
 
 
@@ -580,7 +511,7 @@ struct RemainingGraph {
   {
     assert(t.max_degree() <= 16);
     for(int u = 0; u < count; u++)
-      active[u] = (1u << t.neighbours[u].size()) - 1;
+      active[u] = (1u << t.degree(u)) - 1;
   }
 
   // Remove v from the graph: clear v's bit in each active neighbour's
@@ -588,11 +519,11 @@ struct RemainingGraph {
   // Caches an arbitrary active neighbour before clearing — this becomes
   // the final node when only one remains.
   void remove(node_t v) {
-    last_nbr = tri.neighbours[v][__builtin_ctz(active[v])];
+    last_nbr = tri.nbrs(v)[__builtin_ctz(active[v])];
     count--;
     for(uint16_t m = active[v]; m; m &= m-1) {
       int    i = __builtin_ctz(m);
-      node_t w = tri.neighbours[v][i];
+      node_t w = tri.nbrs(v)[i];
       active[w] &= ~(1u << tri.arc_ix(w, v));
     }
     active[v] = 0;
@@ -612,7 +543,7 @@ struct RemainingGraph {
     node_t nbrs[16];
     int k = 0;
     for(uint16_t t = m; t; t &= t-1)
-      nbrs[k++] = tri.neighbours[v][__builtin_ctz(t)];
+      nbrs[k++] = tri.nbrs(v)[__builtin_ctz(t)];
 
     int edges = 0;
     for(int i = 0; i < k; i++) {
@@ -660,7 +591,7 @@ struct SpiralState {
     return CCW || R.tri.prev(f1,f2) == f3;
   }
 
-  int deg(node_t v) const { return R.tri.neighbours[v].size(); }
+  int deg(node_t v) const { return R.tri.degree(v); }
 
   // The apex is the unplaced node completing the triangle between the
   // boundary endpoints. Which side of the (back→front) arc it lies on
@@ -772,13 +703,13 @@ void Triangulation::get_all_spirals(vector<vector<int>>& spirals, vector<jumplis
   vector<node_t> permutation;
 
   // Prefer special nodes. TODO: Automatic renumber in order of degrees.
-  for(node_t u=0;u<N;u++) if(neighbours[u].size() != 6) node_starts.push_back(u);
+  for(node_t u=0;u<N;u++) if(degree(u) != 6) node_starts.push_back(u);
   for(node_t u=0;u<N;u++)
-    if(!only_special && neighbours[u].size() == 6) node_starts.push_back(u);
+    if(!only_special && degree(u) == 6) node_starts.push_back(u);
 
   for(int i=0; i<node_starts.size(); i++){ // Looks like O(N^3), is O(N)
     const node_t u=node_starts[i];
-    const vector<node_t>& nu(neighbours[u]);
+    auto nu = nbrs(u);
 
     for(int j=0;j<nu.size();j++){
       node_t v=nu[j], w[2];
@@ -823,9 +754,9 @@ bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, vector<ve
   vector<node_t> node_starts;
   if(only_rarest_special){
     int max_deg = 0;
-    for(node_t u = 0; u < N; u++) max_deg = max(max_deg, (int)neighbours[u].size());
+    for(node_t u = 0; u < N; u++) max_deg = max(max_deg, (int)degree(u));
     vector<int> count(max_deg + 1, 0);
-    for(node_t u = 0; u < N; u++) count[neighbours[u].size()]++;
+    for(node_t u = 0; u < N; u++) count[degree(u)]++;
 
     int rarest_deg = 0, rarest_count = INT_MAX;
     for(int d = 0; d <= max_deg; d++)
@@ -833,7 +764,7 @@ bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, vector<ve
         { rarest_deg = d; rarest_count = count[d]; }
 
     for(node_t u = 0; u < N; u++)
-      if((int)neighbours[u].size() == rarest_deg) node_starts.push_back(u);
+      if((int)degree(u) == rarest_deg) node_starts.push_back(u);
   } else {
     for(node_t u = 0; u < N; u++) node_starts.push_back(u);
   }
@@ -849,7 +780,7 @@ bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, vector<ve
   auto tryAllTriples = [&](bool use_general) -> bool {
     bool found = false;
     for(node_t u : node_starts) {
-      for(node_t v : neighbours[u]) {
+      for(node_t v : nbrs(u)) {
         node_t w[2];
         int n_tries;
         if(CW_only) { w[0] = prev(u,v); n_tries = 1; }          // CW only: prev(f1,f2)==f3
@@ -960,7 +891,7 @@ node_t Triangulation::end_of_the_line(node_t u0, int i, int a, int b) const
 
   // Square one
   q = u0;                         // (0,0)
-  r = neighbours[u0][i];        // (1,0)
+  r = nbrs(u0)[i];        // (1,0)
   s = next(q,r);        // (0,1)
   t = next(s,r);        // (1,1)
 
@@ -1027,7 +958,7 @@ vector<vector<node_t>> Triangulation::quads_of_the_line(node_t u0, int i, int a,
 
   // Square one
   q = u0;                         // (0,0)
-  r = neighbours[u0][i];          // (1,0)
+  r = nbrs(u0)[i];          // (1,0)
   s = next(q,r);                  // (0,1)
   t = next(s,r);                  // (1,1)
 
@@ -1075,7 +1006,7 @@ vector<vector<node_t>> Triangulation::quads_of_the_line(node_t u0, int i, int a,
 
 matrix<int> Triangulation::pentagon_distance_mtx() const {
   vector<int> pentagon_indices(12);
-  for(int u=0, i=0;u<N;u++) if(neighbours[u].size() == 5) pentagon_indices[i++] = u;  
+  for(int u=0, i=0;u<N;u++) if(degree(u) == 5) pentagon_indices[i++] = u;
   return all_pairs_shortest_paths(pentagon_indices);
 }
 
@@ -1119,7 +1050,7 @@ Triangulation::simple_geodesics(vector<node_t> nodes,
   //  cout << "M = " << M << endl;
 
   for(node_t u: nodes){
-    for(int i=0;i<neighbours[u].size();i++){
+    for(int i=0;i<degree(u);i++){
       node_t U  = nodes_inverse[u];
 
       for(int a=1; a<M[U]; a++){	
@@ -1187,7 +1118,7 @@ matrix<int> Triangulation::simple_square_surface_distances(vector<node_t> nodes,
     node_t U = nodes_inverse[u];
     const int Mu = M[U];
     
-    for(int i=0;i<neighbours[u].size();i++)
+    for(int i=0;i<degree(u);i++)
       for(int a=1; a<Mu; a++)
 	for(int b=1; a*a + a*b + b*b < Mu*Mu; b++){
 	  const node_t v = end_of_the_line(u,i,a,b);
@@ -1231,17 +1162,17 @@ Triangulation Triangulation::sort_nodes() const
 
   vector<int> newname(N), oldname(N);
 
-  int degree, u_old;
+  int deg_val, u_old;
   for(node_t u_new=0;u_new<N;u_new++){
-    tie(degree,u_old) = degrees[u_new];
+    tie(deg_val,u_old) = degrees[u_new];
     newname[u_old] = u_new;
     oldname[u_new] = u_old;
   }
 
-  neighbours_t new_neighbours(N);
+  Graph new_neighbours(N, GRAPH_DMAX);
   for(int u=0;u<N;u++)
-    for(int i=0;i<neighbours[u].size();i++)
-      new_neighbours[newname[u]].push_back(newname[neighbours[u][i]]);
+    for(int i=0;i<degree(u);i++)
+      new_neighbours.push_back(newname[u], newname[nbrs(u)[i]]);
 
   return Triangulation(new_neighbours);
 }
@@ -1261,12 +1192,12 @@ Triangulation Triangulation::sort_flat_last() const
     oldname[u_new] = keys[u_new].second;
   }
 
-  neighbours_t new_neighbours(N);
+  Graph new_graph(N, dmax);
   for(int u=0;u<N;u++)
-    for(size_t i=0;i<neighbours[u].size();i++)
-      new_neighbours[newname[u]].push_back(newname[neighbours[u][i]]);
+    for(int i=0;i<degree(u);i++)
+      new_graph.push_back(newname[u], newname[(*this)[u][i]]);
 
-  return Triangulation(new_neighbours);
+  return Triangulation(Graph(new_graph));
 }
 
 spiral_nomenclature FullereneDual::name(bool rarest_start) const
@@ -1350,13 +1281,13 @@ vector<node_t> Triangulation::vertex_numbers(vector<vector<node_t>> &permutation
 // the resulting planar graph is oriented because the input is oriented und we only remove vertices
 PlanarGraph Triangulation::inverse_leapfrog_dual() const
 {
-  assert(is_oriented);
+  assert(is_consistently_oriented());
   PlanarGraph PG(*this);
   set<int> face_vertices, to_do_set;
 
   // find all vertices with degree < 6 (one could additionally find the vertices with odd degree)
-  for(int v=0; v<neighbours.size(); v++){
-    if(neighbours[v].size() < 6){
+  for(int v=0; v<size(); v++){
+    if(degree(v) < 6){
       face_vertices.insert(v);
       to_do_set.insert(v);
     }
@@ -1367,7 +1298,7 @@ PlanarGraph Triangulation::inverse_leapfrog_dual() const
     const int u = *(to_do_set.begin());
     to_do_set.erase(to_do_set.begin());
 
-    for(int v: neighbours[u]){
+    for(int v: nbrs(u)){
       const int w = next(u,v);
       const int s = face_vertices.size();
       const int x = next(w,v);
@@ -1420,7 +1351,7 @@ vector<general_spiral> FullereneDual::isomer_search(const Triangulation::predica
   }
   BuckyGen::stop(Q);
 
-  if(verbose_level>0) fprintf(stderr,"Generated %ld %d-vertex graphs.\n",i,int(g.neighbours.size()));
+  if(verbose_level>0) fprintf(stderr,"Generated %ld %d-vertex graphs.\n",i,int(g.size()));
   
   return spirals; 
 }

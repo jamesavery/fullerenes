@@ -126,7 +126,7 @@ Fullerenes exist for all even N >= 20 except N=22.
 
 ## Rules
 
-- **No git commits**: Never commit to git yourself. Instead, show the proposed commit message and let the user commit manually.
+- **No git commits**: Never commit to git yourself. Stage the changed files with git add and propose a commit message. The user always reviews and commits manually.
 - **No backticks in commit messages**: Commit messages get pasted into an editor where backticks cause problems. Use plain text instead.
 - **Never stage claude-projects/**: The `claude-projects/` directory has its own separate git repo. Never add, stage, or commit files under `claude-projects/` to the fullerene repository. It is listed in `.gitignore`.
 - **NEVER kill background processes without EXPLICIT user approval**: This is the HIGHEST PRIORITY rule. Long-running computations (benchmarks, enumerations) may represent hours of irreplaceable work. ALWAYS ask "Can I stop task X? It has been running for Y time and has Z partial results" and WAIT for the user to confirm. Even if you discover a bug and want to relaunch, do NOT stop running processes — modify code, rebuild separately, and ask the user whether to stop the old run. This applies to TaskStop, Ctrl-C, `kill`, and any other means of termination. NO EXCEPTIONS.

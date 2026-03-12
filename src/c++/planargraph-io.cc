@@ -91,16 +91,26 @@ PlanarGraph PlanarGraph::read_hog_planarcode(FILE *file)
   };
 
   N = read_int();
+  if(feof(file)) return Graph();
   if(N == 0){ number_length=2; N = read_int(); }
-  
-  Graph g(N,true);
+  if(feof(file) || N <= 0) return Graph();
+
+  // First pass: collect adjacency lists to find max degree.
+  vector<vector<node_t>> adj_lists(N);
   for(node_t u=0; u<N && !feof(file); ++u){
     int v=0;
     do{
       v = read_int();
-      if(v!=0) g.neighbours[u].push_back(v-1); // In oriented order
+      if(v!=0) adj_lists[u].push_back(v-1); // In oriented order
     } while(v!=0 && !feof(file));
   }
+  int dmax = GRAPH_DMAX;
+  for(int u=0; u<N; u++) dmax = std::max(dmax, (int)adj_lists[u].size());
+
+  Graph adj(N, dmax);
+  for(int u=0; u<N; u++)
+    for(node_t v : adj_lists[u]) adj.push_back(u, v);
+  Graph g(adj);
   
   // Check graph. TODO: does this belong here?
   // for(node_t u=0;u<N;u++){
@@ -185,7 +195,7 @@ bool PlanarGraph::to_planarcode(const PlanarGraph &G, FILE *file)
   write_int(G.N);
 
   for(uint16_t u=0;u<G.N;u++){
-    for(uint16_t v: G.neighbours[u])
+    for(uint16_t v: G.nbrs(u))
       write_int(v+1);		// planar_code is 1-indexed; 0 is the terminator
     write_int(0);
   }
@@ -197,7 +207,7 @@ bool PlanarGraph::to_ascii(const PlanarGraph &G, FILE *file)
 {
   // Neighbour list is unique representation of graph that preserves orientation.
   // N is length of list.
-  string s = to_string(G.neighbours);
+  string s = to_string(static_cast<const neighbours_t&>(G));
   fputs(s.c_str(),file);
 
   return ferror(file) == 0;

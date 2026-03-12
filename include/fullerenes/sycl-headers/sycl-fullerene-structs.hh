@@ -192,13 +192,13 @@ struct FullereneQueue : public FullereneBatch<T,K>
     }
 
     void push_back(const Graph &G, const int ID = -1, const StatusEnum status = StatusEnum(0)) {
-        queue_prepare_push_back(G.neighbours);
+        queue_prepare_push_back(static_cast<const neighbours_t&>(G));
         (*this)[size_ - 1] = static_cast<std::tuple<std::reference_wrapper<const Graph>, size_t>>(std::tuple{std::ref(G), ID});
         (*this)[size_ - 1].m_.flags_.get() |= status;
     }
     
     void push_back(const Polyhedron& P, const int ID = -1, const StatusEnum status = StatusEnum(0)){
-        queue_prepare_push_back(P.neighbours);
+        queue_prepare_push_back(static_cast<const neighbours_t&>(P));
         (*this)[size_ - 1] = static_cast<std::tuple<std::reference_wrapper<const Polyhedron>, size_t>>(std::tuple{std::ref(P), ID});
         (*this)[size_ - 1].m_.flags_.get() |= status;
     }

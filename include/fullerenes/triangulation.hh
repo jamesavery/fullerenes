@@ -14,8 +14,6 @@ class Triangulation : public PlanarGraph {
 public:
   typedef function<bool(Triangulation)> predicate_t;
 
-  vector<tri_t> triangles;	// Faces 
-
   // Operations:
   //  1. Orient triangulation
   //  2. Unfold (assert deg(v) <= 6 for all v)
@@ -23,14 +21,9 @@ public:
   //  4. Spirals (constructor + all_spirals + canonical_spiral)
   //  5. Embed in 2D
   //  6. Embed in 3D
-  Triangulation(int N) : PlanarGraph(Graph(N,true)) {}
-  Triangulation(const Graph& g = Graph()) : PlanarGraph(g) { update(g.is_oriented); }
-  Triangulation(const Graph& g, bool already_oriented) : PlanarGraph(g) { update(already_oriented); }
-  Triangulation(const Graph& g, const vector<tri_t>& tris) : PlanarGraph(g), triangles(tris) { 
-    orient_triangulation(triangles);
-    orient_neighbours();
-  }
-  Triangulation(const neighbours_t& neighbours, bool already_oriented = true) : PlanarGraph(Graph(neighbours, already_oriented)) { update(already_oriented); }
+  Triangulation(int N) : PlanarGraph(N, 6) {}
+  Triangulation(const Graph& g = Graph()) : PlanarGraph(g) {}
+  Triangulation(const neighbours_t& neighbours) : PlanarGraph(Graph(neighbours)) {}
 
   Triangulation(const vector<int>& spiral_string, const jumplist_t& jumps = jumplist_t(), const bool best_effort=false); // and the opposite of 'best-effort' is 'fast and robust'
   Triangulation(const spiral_nomenclature &fsn): Triangulation(fsn.spiral.spiral_code, fsn.spiral.jumps, true){} // best_effort = true
@@ -40,15 +33,15 @@ public:
   unordered_map<arc_t,arc_t> arc_translation() const;
   
   size_t max_degree() const {
-    size_t max_degree = 0;
-    for(auto &nu: neighbours) max_degree = std::max(max_degree, nu.size());
-    return max_degree;
+    size_t max_deg = 0;
+    for(node_t u=0; u<N; u++) max_deg = std::max(max_deg, (size_t)degree(u));
+    return max_deg;
   }
 
   vector<uint8_t> n_degrees() const {
-    vector<uint8_t> n_degrees(max_degree(),0);
-    for(auto &nu: neighbours) n_degrees[nu.size()-1]++;
-    return n_degrees;
+    vector<uint8_t> nd(max_degree(),0);
+    for(node_t u=0; u<N; u++) nd[degree(u)-1]++;
+    return nd;
   }
   
   // takes a triangulation, and returns a dual of the inverse leapfrog
@@ -57,9 +50,7 @@ public:
   
   pair<node_t,node_t> adjacent_tris(const arc_t &e) const;
 
-  vector<tri_t> compute_faces() const;          // Returns non-oriented triangles
   vector<tri_t> compute_faces_oriented() const; // Compute oriented triangles given oriented neighbours
-  void          orient_neighbours();		// Ensures that neighbours are ordered consistently
   
   //  Unfolding unfold() const;
   Triangulation GCtransform(unsigned k=1, unsigned l=0) const;
@@ -88,18 +79,8 @@ public:
 
   vector<node_t> vertex_numbers(vector<vector<node_t>> &perms, const vector<node_t> &loc) const;
   
-  void update(bool already_oriented=true) {
-    //    renumber(); // TODO!
-    if(count_edges() > 0){
-      if(already_oriented){
-        triangles = compute_faces_oriented();
-      }
-      else {
-        triangles = compute_faces();
-        orient_neighbours();
-      }
-    }
-  }
+  vector<tri_t> triangles() const { return compute_faces_oriented(); }
+  int n_triangles() const { return 2*N - 4; }
 
   struct simple_geodesic {
     Eisenstein g;
@@ -170,11 +151,11 @@ class CubicPair {
     
   CubicPair(const Triangulation &T) : G(T.dual_graph()), CtoD(G.N,vector<arc_t>(3)), DtoC(T.N)
   {
-    for(const auto &t: T.triangles) triangle_id.insert(t.sorted());
+    for(const auto &t: T.triangles()) triangle_id.insert(t.sorted());
   
     for(node_t u=0;u<T.N;u++){
-      const auto& nu = T.neighbours[u];
-      DtoC[u].resize(nu.size()); 
+      auto nu = T.nbrs(u);
+      DtoC[u].resize(nu.size());
 
       // For each directed edge v->u
       for(size_t i=0;i<nu.size();i++){

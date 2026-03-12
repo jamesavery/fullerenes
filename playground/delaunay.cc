@@ -25,21 +25,21 @@ Triangulation Delaunayify(Triangulation T, double distances[12][12]){
 
   auto flip = [&](){
     delaunay_flips++;
-    T.neighbours[A].erase(find(T.neighbours[A].begin(), T.neighbours[A].end(), C));
-    T.neighbours[C].erase(find(T.neighbours[C].begin(), T.neighbours[C].end(), A));
-    insert_before(T.neighbours[B], A, D);
-    insert_before(T.neighbours[D], C, B);
+    T[A].erase(find(T[A].begin(), T[A].end(), C));
+    T[C].erase(find(T[C].begin(), T[C].end(), A));
+    insert_before(T[B], A, D);
+    insert_before(T[D], C, B);
   };
 
   while(delaunay_flips != 0){
     delaunay_flips=0;
     for(node_t u=0; u<T.N; ++u){
-      for(int j=0; j<T.neighbours[u].size(); ++j){
+      for(int j=0; j<T[u].size(); ++j){
 
         A = u;
-        C = T.neighbours[u][j];
-        B = T.neighbours[u][(j+1)%T.neighbours[u].size()];
-        D = T.neighbours[u][(j+2)%T.neighbours[u].size()];
+        C = T[u][j];
+        B = T[u][(j+1)%T[u].size()];
+        D = T[u][(j+2)%T[u].size()];
         const double a = distances[A][B],
                      b = distances[B][C],
                      c = distances[C][D],

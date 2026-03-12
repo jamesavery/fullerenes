@@ -1,4 +1,5 @@
 #include "libgraph/fullerenegraph.hh"
+#include "libgraph/layout2d.hh"
 using namespace std;
 
 int main(int ac, char **av)
@@ -19,14 +20,12 @@ int main(int ac, char **av)
 
   CubicGraph g(stdin);
 
-  if(g.layout2d.size() != g.N){
-    g.layout2d = g.tutte_layout();
-  }
+  vector<coord2d> layout = g.tutte_layout();
 
-  coord2d wh(g.width_height());
-  g.scale(coord2d(1.0/wh.first,1.0/wh.second));
+  coord2d wh(layout2d::width_height(layout));
+  layout2d::scale(layout, coord2d(1.0/wh.first,1.0/wh.second));
 
-  cout << g.to_latex(width_cm, height_cm,
+  cout << layout2d::to_latex(g, layout, width_cm, height_cm,
 		     show_dual,number_vertices,include_latex_header) << endl;
   
   return 0;

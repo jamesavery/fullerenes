@@ -44,17 +44,15 @@ int main(int ac, char **av)
   for(int i=0;i<12;i++) spiral[RSPI[i]] = 5;
 
   Polyhedron P0;
-  FullereneGraph g;
+  FullereneGraph g(20); // placeholder, will be reassigned
   if(from_file){
     P0 = Polyhedron::from_file(av[1]);
     N = P0.N;
-    g = P0;
-    g.layout2d = g.tutte_layout(-1,-1,-1,8);
+    g = FullereneGraph(static_cast<const PlanarGraph&>(P0));
   } else {
     Triangulation T(spiral,jumps);
-    
+
     g = T.dual_graph();
-    g.layout2d = g.tutte_layout();
     P0 = Polyhedron(g,g.zero_order_geometry(),6);
   }
 
@@ -82,7 +80,7 @@ int main(int ac, char **av)
 
   ofstream output(("output/"+basename+".m").c_str());
 
-  vector<face_t> faces(g.compute_faces(8,true));
+  vector<face_t> faces(g.compute_faces(8));
   output << "g = " << g << ";\n";
   output << "coordinates0 = " << P0.points << ";\n";
   output << "coordinates = "  << P.points << ";\n";
@@ -96,15 +94,13 @@ int main(int ac, char **av)
 
   Polyhedron::to_file(D,"output/"+basename+"-dual.mol2");
   
-  D.layout2d = D.tutte_layout();
-  D.faces    = D.compute_faces(3,true);
   D.face_max = 3;
   //   D.optimize();
   output << "PD = " << D << ";\n";
   
   output.close();
 
-  cout << "graph  = "<<g.neighbours << "\n";
+  cout << "graph  = "<<static_cast<const neighbours_t&>(g) << "\n";
   cout << "faces  = "<<P.compute_faces()<<"\n";  
   cout << "P0 = "<<P0.points << "\n";
   cout << "P  = "<<P.points << "\n";  

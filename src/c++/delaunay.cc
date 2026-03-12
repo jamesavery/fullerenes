@@ -76,8 +76,17 @@ double Diamond::flipped_length() const
 FulleroidDelaunay::FulleroidDelaunay(const Triangulation& T)
   : Triangulation(T.sort_flat_last()), edge_lengths(N, N, 0)
 {
+  // Edge flips during vertex removal can temporarily push vertex degrees
+  // well above 6 (the max for fullerene duals). Restride to give headroom.
+  if (dmax < 20) {
+    auto restrided = restride(20);
+    owned_values = std::move(restrided.owned_values);
+    owned_deg = std::move(restrided.owned_deg);
+    dmax = 20;
+    repoint();
+  }
   for (node_t u = 0; u < N; u++)
-    for (node_t v : neighbours[u])
+    for (node_t v : (*this)[u])
       edge_lengths(u, v) = 1.0;
 }
 
@@ -113,6 +122,17 @@ bool FulleroidDelaunay::flip_edge(node_t u, node_t v)
   double f = d.flipped_length();
   if (!std::isfinite(f) || f <= 0) return false;
 
+  // Check area conservation before flip
+  double area_before = 0;
+  {
+    // Triangle (u, v, B): sides e, a, b
+    double s = (d.e + d.a + d.b) / 2;
+    area_before += sqrt(max(0.0, s*(s-d.e)*(s-d.a)*(s-d.b)));
+    // Triangle (u, v, D): sides e, c, d_side
+    s = (d.e + d.c + d.d) / 2;
+    area_before += sqrt(max(0.0, s*(s-d.e)*(s-d.c)*(s-d.d)));
+  }
+
   // Execute flip: remove diagonal u-v, insert diagonal B-D.
   // insert_edge(arc(B,D), u, v) places D before u in neighbours[B]
   // and B before v in neighbours[D], preserving CCW orientation.
@@ -120,6 +140,21 @@ bool FulleroidDelaunay::flip_edge(node_t u, node_t v)
   set_length(u, v, 0);
   Graph::insert_edge(arc_t(B, D), u, v);
   set_length(B, D, f);
+
+  // Check area conservation after flip
+  double area_after = 0;
+  {
+    // Triangle (B, D, u): sides f, a, c
+    double s = (f + d.a + d.c) / 2;
+    area_after += sqrt(max(0.0, s*(s-f)*(s-d.a)*(s-d.c)));
+    // Triangle (B, D, v): sides f, b, d_side
+    s = (f + d.b + d.d) / 2;
+    area_after += sqrt(max(0.0, s*(s-f)*(s-d.b)*(s-d.d)));
+  }
+  if (abs(area_before - area_after) > 1e-10)
+    fprintf(stderr, "FLIP_AREA: u=%d v=%d B=%d D=%d area_before=%.10g area_after=%.10g diff=%.6g\n",
+            u, v, B, D, area_before, area_after, area_after - area_before);
+
   return true;
 }
 
@@ -130,7 +165,7 @@ int FulleroidDelaunay::flip_to_delaunay()
   stack<edge_t> S;
 
   for (node_t u = 0; u < N; u++)
-    for (node_t v : neighbours[u])
+    for (node_t v : (*this)[u])
       if (u < v) {
         edge_t e(u, v);
         if (!in_stack[e]) { S.push(e); in_stack[e] = true; }
@@ -159,7 +194,7 @@ int FulleroidDelaunay::flip_to_delaunay()
 bool FulleroidDelaunay::is_delaunay() const
 {
   for (node_t u = 0; u < N; u++)
-    for (node_t v : neighbours[u])
+    for (node_t v : (*this)[u])
       if (u < v && !is_delaunay_edge(u, v))
         return false;
   return true;
@@ -173,21 +208,23 @@ void FulleroidDelaunay::remove_flat_vertex(node_t v)
 {
   // Phase 1: Reduce v's degree via incident edge flips.
   // Stop at degree 4 — the ear clipping in Phase 2 handles degree >= 4.
-  while ((int)neighbours[v].size() > 4) {
+  while (degree(v) > 4) {
     bool progress = false;
-    for (node_t u : vector<node_t>(neighbours[v]))
+    vector<node_t> vnbrs((*this)[v].begin(), (*this)[v].end());
+    for (node_t u : vnbrs)
       if (flip_edge(v, u)) { progress = true; break; }
     if (!progress) break;
   }
 
-  int deg = (int)neighbours[v].size();
+  int deg = degree(v);
 
   // Phase 2: Star retriangulation for degree >= 4 via intrinsic ear clipping.
   // Uses angle accumulation + law of cosines for diagonal lengths, avoiding
   // 2D polygon unfolding (which self-intersects when fan angle > 2π).
   if (deg >= 4) {
     int k = deg;
-    vector<node_t> nb(neighbours[v].begin(), neighbours[v].end());
+    auto row = (*this)[v];
+    vector<node_t> nb(row.begin(), row.end());
 
     // Gather spoke and rim lengths.
     vector<double> spokes(k), rims(k);
@@ -264,43 +301,137 @@ void FulleroidDelaunay::remove_flat_vertex(node_t v)
       if (!found) return;  // stuck — should not happen for flat vertices
     }
 
+    // Validate area conservation: sum of fan triangles = sum of ear + final.
+    {
+      double fan_area = 0;
+      for (int i = 0; i < k; i++) {
+        double s = (spokes[i] + spokes[(i+1)%k] + rims[i]) / 2;
+        fan_area += sqrt(max(0.0, s*(s-spokes[i])*(s-spokes[(i+1)%k])*(s-rims[i])));
+      }
+      double ear_area = 0;
+      // Each ear has sides: poly_edge[jm], poly_edge[j], len (but we don't
+      // have those anymore). Instead, recompute from the stored diag info.
+      // Ear triangles: for each diagonal {pp, pi, pn, len}, the triangle has
+      // vertices nb[pp], nb[pi], nb[pn] with sides:
+      //   nb[pp]-nb[pi] edge, nb[pi]-nb[pn] edge, and len=nb[pp]-nb[pn] diagonal.
+      // But we need the actual edge lengths between these vertices.
+      // We can compute: each ear triangle covers fan triangles from pp to pn
+      // going through pi. The sub-fan area = sum of those fan triangles.
+      for (auto& d : diagonals) {
+        // Fan triangles from d.prev_idx to d.next_idx going through d.ear_idx
+        int from = d.prev_idx, to = d.next_idx;
+        double sub_area = 0;
+        for (int i = from; i != to; i = (i+1)%k) {
+          double s = (spokes[i] + spokes[(i+1)%k] + rims[i]) / 2;
+          sub_area += sqrt(max(0.0, s*(s-spokes[i])*(s-spokes[(i+1)%k])*(s-rims[i])));
+        }
+        // Now compute the ear triangle area from its side lengths
+        // sides: edge(nb[pp],nb[pi]) and edge(nb[pi],nb[pn]) and diagonal len
+        // These are not easy to get from the current state, so let's compute
+        // the triangle area differently: use diag_len for the third side
+        // Actually, the sides are diag_len(pp,pi), diag_len(pi,pn), and d.len
+        double a = diag_len(d.prev_idx, d.ear_idx);
+        double b = diag_len(d.ear_idx, d.next_idx);
+        double c = d.len;  // = diag_len(d.prev_idx, d.next_idx)
+        double s = (a + b + c) / 2;
+        double tri_area = sqrt(max(0.0, s*(s-a)*(s-b)*(s-c)));
+        if (abs(tri_area - sub_area) > 1e-8)
+          fprintf(stderr, "EAR_AREA v=%d diag pp=%d pi=%d pn=%d: sub_fan=%.10g ear_tri=%.10g diff=%.6g\n",
+                  v, d.prev_idx, d.ear_idx, d.next_idx, sub_area, tri_area, tri_area - sub_area);
+        ear_area += tri_area;
+      }
+      // Last triangle (the remaining 3 polygon vertices)
+      {
+        int p0 = poly[0], p1 = poly[1], p2 = poly[2];
+        double a = diag_len(p0, p1);
+        double b = diag_len(p1, p2);
+        double c = diag_len(p2, p0);
+        double s = (a + b + c) / 2;
+        ear_area += sqrt(max(0.0, s*(s-a)*(s-b)*(s-c)));
+      }
+      fprintf(stderr, "AREA_CHECK v=%d deg=%d: fan=%.10g ears=%.10g diff=%.6g\n",
+              v, k, fan_area, ear_area, ear_area - fan_area);
+    }
+
     // Remove all spoke edges.
     for (int i = 0; i < k; i++) set_length(v, nb[i], 0);
     for (int i = k - 1; i >= 0; i--) Graph::remove_edge(edge_t(v, nb[i]));
 
     // Insert ear diagonals.
-    for (auto& d : diagonals) {
+    for (size_t di = 0; di < diagonals.size(); di++) {
+      auto& d = diagonals[di];
       node_t p_prev = nb[d.prev_idx];
       node_t p_ear  = nb[d.ear_idx];
       node_t p_next = nb[d.next_idx];
-      Graph::insert_edge(arc_t(p_prev, p_next), next(p_prev, p_ear), p_ear);
+      node_t suc_uv = next(p_prev, p_ear);
+      node_t suc_vu = p_ear;
+      // Debug: verify that the face (p_prev, p_ear, p_next) will be created
+      // i.e., after insert: next(p_prev, p_ear) should be p_next... wait, no.
+      // insert_edge(arc(p_prev, p_next), suc_uv, suc_vu):
+      //   p_next inserted before suc_uv in p_prev's list
+      //   p_prev inserted before suc_vu=p_ear in p_next's list
+      // After insertion: next(p_prev, p_next) should give the right successor.
+      // Before insertion: verify p_ear is in p_next's neighbor list
+      if (find(p_next, p_ear) < 0) {
+        fprintf(stderr, "FATAL: p_ear=%d not in p_next=%d's neighbors at diag %zu for v=%d\n",
+                p_ear, p_next, di, v);
+        // Print p_next's neighbors
+        auto pn_row = (*this)[p_next];
+        fprintf(stderr, "  p_next neighbors:");
+        for (node_t x : pn_row) fprintf(stderr, " %d", x);
+        fprintf(stderr, "\n");
+        // Also print expected structure
+        fprintf(stderr, "  diag: prev=%d(nb[%d]) ear=%d(nb[%d]) next=%d(nb[%d]) len=%.6g\n",
+                p_prev, d.prev_idx, p_ear, d.ear_idx, p_next, d.next_idx, d.len);
+        return;
+      }
+      Graph::insert_edge(arc_t(p_prev, p_next), suc_uv, suc_vu);
       set_length(p_prev, p_next, d.len);
+
+      // Verify the new face orientation: next(p_prev, p_ear) should be p_next
+      // (the ear triangle is p_prev -> p_ear -> p_next -> p_prev)
+      // Wait, the face should be (p_prev, p_ear, p_next) if the ear is CCW.
+      // After inserting p_prev-p_next:
+      //   next(p_prev, p_ear) should still be the old successor (not p_next)
+      //   next(p_prev, p_next) should be suc_uv
+      // The face (p_prev, p_ear, p_next) requires next(p_prev, p_ear) = p_next.
+      // But we inserted p_next BEFORE suc_uv in p_prev's list. If p_ear was
+      // just before suc_uv, then p_next is now between p_ear and suc_uv,
+      // so next(p_prev, p_ear) = p_next. ✓
+      node_t check = next(p_prev, p_ear);
+      if (check != p_next) {
+        fprintf(stderr, "ORIENT_ERR: next(%d,%d)=%d but expected %d at diag %zu for v=%d\n",
+                p_prev, p_ear, check, p_next, di, v);
+        auto pp_row = (*this)[p_prev];
+        fprintf(stderr, "  p_prev neighbors:");
+        for (node_t x : pp_row) fprintf(stderr, " %d", x);
+        fprintf(stderr, "\n");
+      }
     }
 
-    assert(v == N - 1 && neighbours[v].empty());
-    neighbours.pop_back();
-    N--;
+    assert(v == N - 1 && degree(v) == 0);
+    pop_back();
     return;
   }
 
   // Phase 3: Degree 3 — the three surrounding triangles collapse into one.
   assert(deg == 3);
-  node_t a = neighbours[v][0], b = neighbours[v][1], c = neighbours[v][2];
+  auto vrow = (*this)[v];
+  node_t a = vrow[0], b = vrow[1], c = vrow[2];
   set_length(v, a, 0); set_length(v, b, 0); set_length(v, c, 0);
   Graph::remove_edge(edge_t(v, a));
   Graph::remove_edge(edge_t(v, b));
   Graph::remove_edge(edge_t(v, c));
 
   assert(v == N - 1);
-  neighbours.pop_back();
-  N--;
+  pop_back();
 }
 
 void FulleroidDelaunay::remove_flat_vertices()
 {
   vector<int> original_degrees(N);
   for (node_t v = 0; v < N; v++)
-    original_degrees[v] = neighbours[v].size();
+    original_degrees[v] = degree(v);
 
   while (N > 0 && original_degrees[N - 1] == 6) {
     int old_N = N;
@@ -344,7 +475,7 @@ matrix<double> FulleroidDelaunay::all_pairs_distances() const
 
   for (node_t u = 0; u < N; u++) {
     D(u, u) = 0;
-    for (node_t v : neighbours[u])
+    for (node_t v : (*this)[u])
       D(u, v) = get_length(u, v);
   }
 
@@ -660,7 +791,7 @@ vector<coord3d> FulleroidDelaunay::embed_3d() const
   auto eval = [&](const V3& pos, V3& g) -> double {
     double E = 0;
     g.zero();
-    for_each_edge(N, neighbours, edge_lengths, pos, [&](const EdgeStressData& ed) {
+    for_each_edge(N, *this, edge_lengths, pos, [&](const EdgeStressData& ed) {
       E += ed.energy();
       ed.scatter_gradient(g);
     });
@@ -670,7 +801,7 @@ vector<coord3d> FulleroidDelaunay::embed_3d() const
 
   auto hv_prod = [&](const V3& pos, const V3& dir, V3& Hv) {
     Hv.zero();
-    for_each_edge(N, neighbours, edge_lengths, pos, [&](const EdgeStressData& ed) {
+    for_each_edge(N, *this, edge_lengths, pos, [&](const EdgeStressData& ed) {
       ed.scatter_hv(dir, Hv);
     });
     project_rigid_body(Hv, pos);
@@ -679,6 +810,6 @@ vector<coord3d> FulleroidDelaunay::embed_3d() const
   x = steihaug_cg(std::move(x), eval, hv_prod);
 
   // Step 3: Orient so CCW face normals point outward
-  orient_outward(x, neighbours);
+  orient_outward(x, *this);
   return x;
 }

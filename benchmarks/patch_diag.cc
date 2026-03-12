@@ -32,50 +32,54 @@ static Graph makeNanotubeDual(int n_rings) {
     assert(n_rings >= 1);
     int N = 12 + 5 * n_rings;
 
+    // Vertex ID helpers (all indices mod 5)
     auto mod5 = [](int i) -> int { return ((i % 5) + 5) % 5; };
-    auto cn  = [&](int i) -> int { return 1 + mod5(i); };
-    auto rng = [&](int j, int i) -> int { return 6 + 5*j + mod5(i); };
-    auto cs  = [&](int i) -> int { return 6 + 5*n_rings + mod5(i); };
+    auto cn  = [&](int i) -> int { return 1 + mod5(i); };             // cap_N[i]
+    auto rng = [&](int j, int i) -> int { return 6 + 5*j + mod5(i); }; // ring_j[i]
+    auto cs  = [&](int i) -> int { return 6 + 5*n_rings + mod5(i); };  // cap_S[i]
     int pole_N = 0;
     int pole_S = 11 + 5*n_rings;
+    int last = n_rings - 1;
 
-    set<pair<int,int>> edges;
-    auto add = [&](int u, int v) {
-        int a = min(u,v), b = max(u,v);
-        edges.insert(make_pair(a, b));
-    };
+    // Build oriented adjacency lists directly (CCW as seen from outside).
+    Graph adj(N, GRAPH_DMAX);
 
-    for (int i = 0; i < 5; i++) add(pole_N, cn(i));
-    for (int i = 0; i < 5; i++) add(cn(i), cn((i+1)%5));
-    for (int i = 0; i < 5; i++) {
-        add(cn(i), rng(0, i));
-        add(cn(i), rng(0, (i+1)%5));
-    }
-    for (int j = 0; j < n_rings; j++)
+    // pole_N: CCW from outside = cn(0), cn(1), ..., cn(4)
+    for (int i = 0; i < 5; i++) adj.push_back(pole_N, cn(i));
+
+    // cn(i) (deg 5): CCW neighbors
+    for (int i = 0; i < 5; i++)
+        adj.assign_row(cn(i), {pole_N, cn(i+1), rng(0, i+1), rng(0, i), cn(i-1)});
+
+    // rng(0, i): connects up to cn(i-1), cn(i) and down to next layer
+    if (n_rings == 1) {
         for (int i = 0; i < 5; i++)
-            add(rng(j, i), rng(j, (i+1)%5));
-    for (int j = 0; j + 1 < n_rings; j++)
-        for (int i = 0; i < 5; i++) {
-            add(rng(j, i), rng(j+1, i));
-            add(rng(j, i), rng(j+1, (i+1)%5));
-        }
-    for (int i = 0; i < 5; i++) {
-        add(rng(n_rings-1, i), cs(i));
-        add(rng(n_rings-1, i), cs((i+1)%5));
-    }
-    for (int i = 0; i < 5; i++) add(cs(i), cs((i+1)%5));
-    for (int i = 0; i < 5; i++) add(pole_S, cs(i));
-
-    assert((int)edges.size() == 3 * N - 6);
-
-    neighbours_t adj(N);
-    for (const auto& [u, v] : edges) {
-        adj[u].push_back(v);
-        adj[v].push_back(u);
+            adj.assign_row(rng(0, i), {cn(i-1), cn(i), rng(0, i+1), cs(i+1), cs(i), rng(0, i-1)});
+    } else {
+        for (int i = 0; i < 5; i++)
+            adj.assign_row(rng(0, i), {cn(i-1), cn(i), rng(0, i+1), rng(1, i+1), rng(1, i), rng(0, i-1)});
     }
 
-    Triangulation T(adj, false);
-    return static_cast<const Graph&>(T);
+    // Interior rings: rng(j, i) for 1 <= j <= last-1
+    for (int j = 1; j < last; j++)
+        for (int i = 0; i < 5; i++)
+            adj.assign_row(rng(j, i), {rng(j-1, i-1), rng(j-1, i), rng(j, i+1), rng(j+1, i+1), rng(j+1, i), rng(j, i-1)});
+
+    // rng(last, i): connects down to cs
+    if (n_rings >= 2)
+        for (int i = 0; i < 5; i++)
+            adj.assign_row(rng(last, i), {rng(last-1, i-1), rng(last-1, i), rng(last, i+1), cs(i+1), cs(i), rng(last, i-1)});
+
+    // cs(i) (deg 5): connected up to rng(last,i-1) and rng(last,i)
+    for (int i = 0; i < 5; i++)
+        adj.assign_row(cs(i), {pole_S, cs(i-1), rng(last, i-1), rng(last, i), cs(i+1)});
+
+    // pole_S (deg 5): CCW from outside (below) = cs(4), cs(3), ..., cs(0)
+    for (int i = 4; i >= 0; i--) adj.push_back(pole_S, cs(i));
+
+    Graph G(adj);
+    assert(G.is_consistently_oriented());
+    return G;
 }
 
 // =====================================================================
@@ -95,7 +99,7 @@ static QStats quality(const Deltahedron& D) {
     double sum = 0, sum2 = 0; int ne = 0;
     double lmin = 1e30, lmax = 0;
     for (int u = 0; u < D.N; u++)
-        for (int v : D.neighbours[u])
+        for (int v : D.nbrs(u))
             if (v > u) {
                 double l = (D.points[u] - D.points[v]).norm();
                 sum += l; sum2 += l*l; ne++;
@@ -107,7 +111,7 @@ static QStats quality(const Deltahedron& D) {
 
     // Triangle angles
     q.ang_min = 180; q.ang_max = 0;
-    for (const auto& tri : D.triangles)
+    for (const auto& tri : D.triangles())
         for (int c = 0; c < 3; c++) {
             coord3d va = D.points[tri[(c+1)%3]] - D.points[tri[c]];
             coord3d vb = D.points[tri[(c+2)%3]] - D.points[tri[c]];
@@ -119,15 +123,15 @@ static QStats quality(const Deltahedron& D) {
     // Convexity
     q.h_min = 1e30; q.n_concave = 0;
     for (int v = 0; v < D.N; v++) {
-        int d = (int)D.neighbours[v].size();
+        int d = (int)D.degree(v);
         if (d > 6) continue;
         coord3d cen(0,0,0);
-        for (int i = 0; i < d; i++) cen += D.points[D.neighbours[v][i]];
+        for (int i = 0; i < d; i++) cen += D.points[D.nbrs(v)[i]];
         cen /= (double)d;
         coord3d nf(0,0,0);
         for (int i = 0; i < d; i++) {
-            coord3d e1 = D.points[D.neighbours[v][i]] - D.points[v];
-            coord3d e2 = D.points[D.neighbours[v][(i+1)%d]] - D.points[v];
+            coord3d e1 = D.points[D.nbrs(v)[i]] - D.points[v];
+            coord3d e2 = D.points[D.nbrs(v)[(i+1)%d]] - D.points[v];
             nf += e1.cross(e2);
         }
         double nl = nf.norm();
@@ -140,7 +144,7 @@ static QStats quality(const Deltahedron& D) {
 }
 
 static void write_mol2(const Deltahedron& D, const string& path) {
-    Polyhedron P(static_cast<const PlanarGraph&>(D), D.points);
+    Polyhedron P(static_cast<const PlanarGraph&>(D), vector<coord3d>(D.points.begin(), D.points.end()));
     Polyhedron::to_file(P, path);
 }
 

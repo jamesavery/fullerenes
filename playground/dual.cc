@@ -13,7 +13,6 @@ int main(int ac, char **av)
 
   FullereneGraph g(N,rspi);
 
-  g.layout2d = g.tutte_layout();
   Graph dual(g.dual_graph(6));
  
   cout << "graph = " << g    << endl;

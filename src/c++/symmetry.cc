@@ -116,16 +116,17 @@ Permutation Permutation::operator*(const Permutation& q) const {
 //		  SYMMETRY-DETECTION IMPLEMENTATION
 //////////////////////////////////////////////////////////////////////
 vector<Permutation> Symmetry::tri_permutation(const vector<Permutation>& Gf) const {
-  assert(triangles.size() == (N-2)*2); // Triangulation is cubic dual
-  vector<Permutation> Gtri(Gf.size(),Permutation(triangles.size()));
+  auto tris = triangles();
+  assert(tris.size() == (N-2)*2); // Triangulation is cubic dual
+  vector<Permutation> Gtri(Gf.size(),Permutation(tris.size()));
   IDCounter<tri_t> tri_id;
-    
-  for(int i=0;i<triangles.size();i++) tri_id.insert(triangles[i].sorted());
-    
+
+  for(int i=0;i<tris.size();i++) tri_id.insert(tris[i].sorted());
+
   for(int j=0;j<Gf.size();j++){
-    const Permutation& pi = Gf[j];    
-    for(int i=0;i<triangles.size();i++){
-      const tri_t &t  = triangles[i];
+    const Permutation& pi = Gf[j];
+    for(int i=0;i<tris.size();i++){
+      const tri_t &t  = tris[i];
       const tri_t &tp = {pi[t[0]], pi[t[1]], pi[t[2]]}; 
       
       int tp_id = tri_id(tp.sorted());
@@ -140,7 +141,7 @@ vector<Permutation> Symmetry::tri_permutation(const vector<Permutation>& Gf) con
 	cout << "tp = " << tp << endl;
 	cout << "tp.sorted() = " << tp.sorted() << endl;
 
-	cout << "triangles = " << triangles << endl;
+	cout << "triangles = " << tris << endl;
 	
 	assert(tp_id >= 0);
       }
@@ -197,7 +198,7 @@ vector<Permutation> Symmetry::permutation_representation() const
 
   for(node_t u=0;u<N;u++){
     if(degree(u) == S0[0])
-      for(const node_t &v: neighbours[u]){
+      for(const node_t &v: nbrs(u)){
 	if(degree(v) == S0[1]){
 	  vector<int> spiral,permutation;
 	  jumplist_t  jumps;
@@ -294,11 +295,11 @@ vector<int> Symmetry::group_fixpoints(const vector<Permutation>& G) const {
 
 bool Symmetry::reverses_orientation(const Permutation& pi) const 
 {
-  Triangulation piG(neighbours,true);
+  Triangulation piG(static_cast<const neighbours_t&>(*this));
 
   for(node_t u=0;u<N;u++){
-    const vector<node_t>& nu(neighbours[u]);
-    for(int i=0;i<nu.size();i++) piG.neighbours[pi[u]][i] = pi[nu[i]];
+    auto nu = nbrs(u);
+    for(int i=0;i<nu.size();i++) piG[pi[u]][i] = pi[nu[i]];
   }
   if(piG.next(0,1) == 2) return false;
   if(piG.prev(0,1) != 2){
@@ -308,8 +309,8 @@ bool Symmetry::reverses_orientation(const Permutation& pi) const
     fprintf(stderr,"pi(G).next(0,1) == {%d,%d} (CW,CCW)\n",
 	    piG.prev(0,1),
 	    piG.next(0,1));
-    cout << "pi(G).neighbours[0] = " << piG.neighbours[0] << ";\n"
-	 << "pi(G).neighbours[1] = " << piG.neighbours[1] << ";\n";
+    cout << "pi(G).neighbours[0] = "; for(auto x: piG[0]) cout << x << ' '; cout << ";\n";
+    cout << "pi(G).neighbours[1] = "; for(auto x: piG[1]) cout << x << ' '; cout << ";\n";
     abort();
   }
   return true;
