@@ -125,12 +125,13 @@ CuDeque(const local_accessor<T,1> memory, const int capacity): array(memory), fr
 template <typename K>
 K multiple_source_shortest_paths(const sycl::group<1>& cta, const Span<std::array<K,3>> cubic_neighbours,const local_accessor<int,1>& distances, const local_accessor<K,1>& smem){
     INT_TYPEDEFS(K);
+    constexpr int unreachable_distance = std::numeric_limits<int>::max();
     auto N = cta.get_local_linear_range();
     auto tid = cta.get_local_linear_id();
     DeviceCubicGraph FG(cubic_neighbours);
     std::array<K,6> outer_face; memset(outer_face.data(), 0, 6*sizeof(node_t));
     uint8_t Nface = FG.get_face_oriented(0,FG[0][0], outer_face);
-    distances[tid] = std::numeric_limits<K>::max();
+    distances[tid] = unreachable_distance;
     sycl::group_barrier(cta);
     if(tid < Nface) distances[outer_face[tid]] = 0;
     sycl::group_barrier(cta);
@@ -141,7 +142,7 @@ K multiple_source_shortest_paths(const sycl::group<1>& cta, const Span<std::arra
             auto v = work_queue.pop_front();
             for (size_t i = 0; i < 3; i++){
                 auto w = FG[v][i];
-                if(distances[w] == std::numeric_limits<K>::max()){
+                if(distances[w] == unreachable_distance){
                     distances[w] = distances[v] + 1;
                     work_queue.push_back(w);
                 }

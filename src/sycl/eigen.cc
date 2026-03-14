@@ -6,6 +6,38 @@
 #include "queue-impl.cc"
 using namespace sycl;
 
+template <int M, typename T, typename K>
+inline T lanczos_mat_vec(const sycl::group<1>& cta, const sycl::local_accessor<T,1>& smem,
+                         const size_t tid, const T x, const T* row_values, const K* row_cols) {
+    T result = T(0);
+    smem[tid] = x;
+    sycl::group_barrier(cta);
+    #pragma unroll
+    for (int j = 0; j < M; j++) {
+        result += row_values[j] * smem[row_cols[j]];
+    }
+    sycl::group_barrier(cta);
+    return result;
+}
+
+template <typename T>
+inline T lanczos_mgs(const sycl::group<1>& cta, const int index, const int N, T* V, const T* Z) {
+    sycl::group_barrier(cta);
+    T result = V[index * N];
+    #pragma unroll
+    for (int j = 0; j < 6; j++) {
+        auto proj = reduce_over_group(cta, result * Z[j], sycl::plus<T>{}) * Z[j];
+        result -= proj;
+    }
+    #pragma unroll
+    for (int j = 0; j < index; j++) {
+        auto proj = reduce_over_group(cta, result * V[j * N], sycl::plus<T>{}) * V[j * N];
+        result -= proj;
+    }
+    result /= sycl::sqrt(reduce_over_group(cta, result * result, sycl::plus<T>{}));
+    return result;
+}
+
 template <typename T>
 inline T deterministic_unit_random(uint32_t seed, uint32_t lane) {
     uint32_t x = seed ^ (lane + 0x9e3779b9u + (seed << 6) + (seed >> 2));
@@ -318,19 +350,6 @@ SyclEvent eigensolve(SyclQueue& Q, FullereneBatchView<T,K> B,
             real_t* V = V_acc.data() + bid * nLanczos * N + tid;
             coord3d* X_ptr = X_acc.data()  + Natoms*bid; 
 
-            auto mat_vect = [&](const real_t x){
-                real_t result = real_t(0);
-                smem[tid] = x;
-                sycl::group_barrier(cta);
-                #pragma unroll
-                for (int j = 0; j < M; j++){
-                    int col = C[j];
-                    result += A[j] * smem[col];
-                }
-                sycl::group_barrier(cta);
-                return result;
-            };
-
             real_t Z[6]; //Eigenvectors spanning the kernel of the hessian (Rotations, Translations)
             Z[0] = real_t(tid%3 == 0)/sycl::sqrt(T(Natoms)); Z[1] = real_t(tid%3 == 1)/sycl::sqrt(T(Natoms)); Z[2] = real_t(tid%3 == 2)/sycl::sqrt(T(Natoms)); // Translation eigenvectors
             if(tid%3 == 0){
@@ -351,27 +370,6 @@ SyclEvent eigensolve(SyclQueue& Q, FullereneBatchView<T,K> B,
             Z[3] /= sycl::sqrt(reduce_over_group(cta, Z[3]*Z[3], sycl::plus<real_t>{}));
             Z[4] /= sycl::sqrt(reduce_over_group(cta, Z[4]*Z[4], sycl::plus<real_t>{}));
             Z[5] /= sycl::sqrt(reduce_over_group(cta, Z[5]*Z[5], sycl::plus<real_t>{}));
-
-
-            //Modified Gram-Schmidt, Also orthogonalizes against the deflation space
-            auto MGS = [&](int index){
-                sycl::group_barrier(cta);
-                real_t result = V[index*N];
-                #pragma unroll
-                for (int j = 0; j < 6; j++){
-                    auto proj = reduce_over_group(cta, result * Z[j], sycl::plus<real_t>{}) * Z[j];
-                    result -= proj; //Remove the component along Z[j] from result
-                }
-
-                #pragma unroll
-                for (int j = 0; j < index; j++){
-                    auto proj = reduce_over_group(cta, result * V[j*N], sycl::plus<real_t>{}) * V[j*N];
-                    result -= proj; //Remove the component along V[j*N] from result
-                }
-                result /= sycl::sqrt(reduce_over_group(cta, result * result, sycl::plus<real_t>{}));
-                return result;
-            };
-
             sycl::group_barrier(cta);
 
             for(int j = 0; j < M; j++){
@@ -383,12 +381,12 @@ SyclEvent eigensolve(SyclQueue& Q, FullereneBatchView<T,K> B,
             // Generate deterministic pseudo-random starting vector from lane id.
             V[0*N] = deterministic_unit_random<T>(42u, static_cast<uint32_t>(tid));
             V[0*N] /= sycl::sqrt(reduce_over_group(cta, V[0*N] * V[0*N], sycl::plus<real_t>{}));
-            V[0*N] = MGS(0);
+            V[0*N] = lanczos_mgs(cta, 0, N, V, Z);
             for (int i = 0; i < nLanczos; i++){
                 if (i > 1){
-                    V[i*N] = MGS(i);
+                    V[i*N] = lanczos_mgs(cta, i, N, V, Z);
                 }
-                real_t v = mat_vect(V[i*N]);
+                real_t v = lanczos_mat_vec<M>(cta, smem, tid, V[i*N], A, C);
                 real_t alpha = reduce_over_group(cta, v * V[i*N],sycl::plus<real_t>{});
                 if (tid == i) alphas[i] = alpha;
                 if (i == 0){

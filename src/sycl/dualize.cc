@@ -28,7 +28,7 @@ struct DeviceDualGraph{
         }
 
         assert(false);
-	return -1;		// Make compiler happy
+    	return std::numeric_limits<K>::max();		// Make compiler happy
     }
     K arc_ix(const node2& e){ return arc_ix(e[0], e[1]); }
 
@@ -202,7 +202,7 @@ SyclEvent dualize_batch_impl(SyclQueue& Q, FullereneBatchView<T,K> batch){
                 cached_degrees[f] = deg[isomer*Nf + f];
             }
 
-            DeviceDualGraph<MaxDegree, node_t> FD(Span<std::array<K,MaxDegree>>(cached_neighbours.get_pointer(),Nf), Span<K>(cached_degrees.get_pointer(),Nf));
+            DeviceDualGraph<MaxDegree, node_t> FD(Span<std::array<K,MaxDegree>>(get_raw_ptr(cached_neighbours), Nf), Span<K>(get_raw_ptr(cached_degrees), Nf));
 
             node_t canon_arcs[MaxDegree]; for(size_t i=0;i<MaxDegree;i++) canon_arcs[i] = EMPTY_NODE; // JA: memset was bug: it writes byte-values, but node_t is 16/32bit.
 

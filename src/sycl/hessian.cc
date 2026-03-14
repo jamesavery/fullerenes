@@ -1829,8 +1829,8 @@ SyclEvent compute_hessians(SyclQueue& Q, FullereneBatchView<T,K> B, Span<T> hess
             Constants<T,K> constants (cubic_neighbours_acc, K(tid));
             NodeNeighbours nodeG(cubic_neighbours_acc, K(tid));
             X[tid] = X_acc[bid*N + tid];
-            ForceField FF = ForceField<FFT,T,K>(nodeG, constants, cta, sdata.get_pointer());
-            auto hessian = FF.hessian(Span<coord3d>(X.get_pointer(), N));
+            ForceField FF = ForceField<FFT,T,K>(nodeG, constants, cta, get_raw_ptr(sdata));
+            auto hessian = FF.hessian(Span<coord3d>(get_raw_ptr(X), N));
             int n_cols = 10*3;
             int n_rows = N*3;
             int hess_stride = n_cols*n_rows;

@@ -1894,11 +1894,11 @@ SyclEvent forcefield_optimize_impl(SyclQueue &Q, FullereneBatchView<T, K> B, siz
                 printf("FF_BATCH: bid=%d N=%d X_nan_before_CG=%d X[0]=(%f,%f,%f)\n", (int)bid, (int)N, any_nan, X[0][0], X[0][1], X[0][2]);
             }
             sycl::group_barrier(cta);
-            ForceField FF = ForceField<FFT,T,K>(nodeG, constants, cta, sdata.get_pointer());
+            ForceField FF = ForceField<FFT,T,K>(nodeG, constants, cta, get_raw_ptr(sdata));
             auto convergence_check = [&]() {
                 coord3d rel_bond_err, rel_angle_err, rel_dihedral_err;
                 for(int j = 0; j < 3; j++){
-                    auto arc = typename ForceField<FFT,T,K>::ArcData(tid, j, Span<coord3d>(X.get_pointer(), N), nodeG);
+                    auto arc = typename ForceField<FFT,T,K>::ArcData(tid, j, Span<coord3d>(get_raw_ptr(X), N), nodeG);
                     rel_bond_err[j] = std::abs(arc.bond() - constants.r0[j]) / constants.r0[j];
                     rel_angle_err[j] = std::abs(arc.angle() - constants.angle0[j]) / constants.angle0[j];
                     rel_dihedral_err[j] = std::abs(arc.dihedral() - constants.inner_dih0[j]) / constants.inner_dih0[j];
@@ -1913,7 +1913,7 @@ SyclEvent forcefield_optimize_impl(SyclQueue &Q, FullereneBatchView<T, K> B, siz
                     B.m_.flags_[bid].set(converged ? StatusEnum::CONVERGED_3D : (failed ? StatusEnum::FAILED_3D : StatusEnum::NOT_CONVERGED));
                 }
             };
-            FF.CG(Span<coord3d>(X.get_pointer(), N), Span<coord3d>(X1.get_pointer(),N), Span<coord3d>(X2.get_pointer(),N), std::max(iterations - 1,size_t(0)));
+            FF.CG(Span<coord3d>(get_raw_ptr(X), N), Span<coord3d>(get_raw_ptr(X1),N), Span<coord3d>(get_raw_ptr(X2),N), std::max(iterations - 1,size_t(0)));
             // DEBUG: check X after first CG
             if (tid == 0 && bid == 0) {
                 bool any_nan = false;
@@ -1923,9 +1923,9 @@ SyclEvent forcefield_optimize_impl(SyclQueue &Q, FullereneBatchView<T, K> B, siz
                 printf("FF_BATCH: bid=%d X_nan_after_CG1=%d X[0]=(%f,%f,%f) iters=%d\n", (int)bid, any_nan, X[0][0], X[0][1], X[0][2], (int)(iterations-1));
             }
             sycl::group_barrier(cta);
-            auto E1 = FF.energy(Span<coord3d>(X.get_pointer(), N));
-            FF.CG(Span<coord3d>(X.get_pointer(), N), Span<coord3d>(X1.get_pointer(),N), Span<coord3d>(X2.get_pointer(),N), std::min(size_t(1),iterations));
-            auto E2 = FF.energy(Span<coord3d>(X.get_pointer(), N));
+            auto E1 = FF.energy(Span<coord3d>(get_raw_ptr(X), N));
+            FF.CG(Span<coord3d>(get_raw_ptr(X), N), Span<coord3d>(get_raw_ptr(X1),N), Span<coord3d>(get_raw_ptr(X2),N), std::min(size_t(1),iterations));
+            auto E2 = FF.energy(Span<coord3d>(get_raw_ptr(X), N));
             if ( (std::abs(E1 - E2)/N < std::numeric_limits<T>::epsilon()*1e2)   || (B.m_.iterations_[bid] >= max_iterations)) /* ~1e-5 for float, ~2e-14 for double */ check_convergence = true;
             //
             if (check_convergence) convergence_check();
