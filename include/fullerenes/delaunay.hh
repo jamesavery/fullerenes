@@ -67,8 +67,9 @@ public:
   // --- Delaunay operations ---
 
   bool is_delaunay_edge(node_t u, node_t v) const;
-  bool flip_edge(node_t u, node_t v);
-  int  flip_to_delaunay();
+  bool flip_edge(node_t u, node_t v, bool verbose = false);
+  int  flip_to_delaunay();           // Full: Phase 1 + Phase 2 (blocker resolution)
+  int  flip_to_delaunay_phase1();    // Phase 1 only: standard Lawson, no blocker resolution
   bool is_delaunay() const;
 
   // --- Vertex removal ---

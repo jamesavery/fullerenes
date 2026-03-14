@@ -108,86 +108,125 @@ bool FulleroidDelaunay::is_delaunay_edge(node_t u, node_t v) const
   return diamond(u, v).is_delaunay();
 }
 
-bool FulleroidDelaunay::flip_edge(node_t u, node_t v)
+bool FulleroidDelaunay::flip_edge(node_t u, node_t v, bool verbose)
 {
   node_t B = next(v, u), D = next(u, v);
 
   // Topological guards
-  if (B == D) return false;
-  if (edge_exists(edge_t(B, D))) return false;
+  if (B == D) { if (verbose) fprintf(stderr, "  flip(%d,%d): B==D==%d\n", u, v, B); return false; }
+  if (edge_exists(edge_t(B, D))) { if (verbose) fprintf(stderr, "  flip(%d,%d): multi-edge (%d,%d)\n", u, v, B, D); return false; }
 
   // Geometric guards
   auto d = diamond(u, v);
-  if (!d.is_convex()) return false;
+  if (!d.is_convex()) { if (verbose) fprintf(stderr, "  flip(%d,%d): not convex\n", u, v); return false; }
   double f = d.flipped_length();
-  if (!std::isfinite(f) || f <= 0) return false;
-
-  // Check area conservation before flip
-  double area_before = 0;
-  {
-    // Triangle (u, v, B): sides e, a, b
-    double s = (d.e + d.a + d.b) / 2;
-    area_before += sqrt(max(0.0, s*(s-d.e)*(s-d.a)*(s-d.b)));
-    // Triangle (u, v, D): sides e, c, d_side
-    s = (d.e + d.c + d.d) / 2;
-    area_before += sqrt(max(0.0, s*(s-d.e)*(s-d.c)*(s-d.d)));
-  }
+  if (!std::isfinite(f) || f <= 0) { if (verbose) fprintf(stderr, "  flip(%d,%d): bad length f=%g\n", u, v, f); return false; }
 
   // Execute flip: remove diagonal u-v, insert diagonal B-D.
-  // insert_edge(arc(B,D), u, v) places D before u in neighbours[B]
-  // and B before v in neighbours[D], preserving CCW orientation.
   Graph::remove_edge(edge_t(u, v));
   set_length(u, v, 0);
   Graph::insert_edge(arc_t(B, D), u, v);
   set_length(B, D, f);
-
-  // Check area conservation after flip
-  double area_after = 0;
-  {
-    // Triangle (B, D, u): sides f, a, c
-    double s = (f + d.a + d.c) / 2;
-    area_after += sqrt(max(0.0, s*(s-f)*(s-d.a)*(s-d.c)));
-    // Triangle (B, D, v): sides f, b, d_side
-    s = (f + d.b + d.d) / 2;
-    area_after += sqrt(max(0.0, s*(s-f)*(s-d.b)*(s-d.d)));
-  }
-  if (abs(area_before - area_after) > 1e-10)
-    fprintf(stderr, "FLIP_AREA: u=%d v=%d B=%d D=%d area_before=%.10g area_after=%.10g diff=%.6g\n",
-            u, v, B, D, area_before, area_after, area_after - area_before);
 
   return true;
 }
 
 int FulleroidDelaunay::flip_to_delaunay()
 {
-  // Lawson's algorithm: flip non-Delaunay edges using a stack.
-  map<edge_t, bool> in_stack;
-  stack<edge_t> S;
-
-  for (node_t u = 0; u < N; u++)
-    for (node_t v : (*this)[u])
-      if (u < v) {
-        edge_t e(u, v);
-        if (!in_stack[e]) { S.push(e); in_stack[e] = true; }
-      }
+  // Two-phase Lawson algorithm for intrinsic Delaunay triangulations.
+  //
+  // Phase 1: Standard Lawson — flip all unblocked non-Delaunay edges.
+  // Phase 2: When only blocked edges remain (multi-edge prevents flip),
+  //   resolve ONE blocked edge via support flip (flip a rim edge to change
+  //   the diamond geometry), then return to Phase 1.
 
   int flips = 0;
-  while (!S.empty()) {
-    edge_t e = S.top(); S.pop();
-    in_stack[e] = false;
 
-    node_t u = e.first, v = e.second;
-    if (!edge_exists(e)) continue;
+  for (int round = 0; round < 50; round++) {
+    // Phase 1: Exhaust all unblocked non-Delaunay flips.
+    {
+      map<edge_t, bool> in_stack;
+      stack<edge_t> S;
+      for (node_t u = 0; u < N; u++)
+        for (node_t v : (*this)[u])
+          if (u < v) {
+            edge_t e(u, v);
+            S.push(e); in_stack[e] = true;
+          }
 
-    if (!is_delaunay_edge(u, v)) {
-      node_t B = next(v, u), D = next(u, v);
-      if (flip_edge(u, v)) {
-        flips++;
+      int budget = 200 * N;
+      while (!S.empty() && budget > 0) {
+        edge_t e = S.top(); S.pop();
+        in_stack[e] = false;
+        node_t u = e.first, v = e.second;
+        if (!edge_exists(e) || is_delaunay_edge(u, v)) continue;
+
+        node_t B = next(v, u), D = next(u, v);
+        if (!flip_edge(u, v)) continue;
+
+        flips++; budget--;
         for (edge_t ec : {edge_t(u,B), edge_t(B,v), edge_t(v,D), edge_t(D,u)})
           if (!in_stack[ec]) { S.push(ec); in_stack[ec] = true; }
       }
     }
+
+    if (is_delaunay()) return flips;
+
+    // Phase 2: Find one blocked non-Delaunay edge and try support flips.
+    bool resolved = false;
+    for (node_t u = 0; u < N && !resolved; u++)
+      for (node_t v : (*this)[u]) {
+        if (u >= v || is_delaunay_edge(u, v)) continue;
+        node_t B = next(v, u), D = next(u, v);
+        bool blocked = (B != D) && edge_exists(edge_t(std::min(B,D), std::max(B,D)));
+
+        if (!blocked) continue;  // Phase 1 handles unblocked edges
+
+        // Edge (u,v) is non-Delaunay, blocked by multi-edge (B,D).
+        // Try flipping each rim edge to change the diamond geometry.
+        edge_t e(u, v);
+        for (auto [ra, rb] : {pair{(int)v,(int)D}, {(int)D,u}, {u,(int)B}, {(int)B,(int)v}}) {
+          edge_t rim(std::min(ra,rb), std::max(ra,rb));
+          if (!edge_exists(rim)) continue;
+          node_t rB = next(rb, ra), rD = next(ra, rb);
+          if (!flip_edge(ra, rb)) continue;
+          flips++;
+
+          // Check: did the support flip resolve the target AND not create
+          // a new non-Delaunay edge?  If the created edge is non-Delaunay,
+          // Phase 1 will flip it right back, causing an infinite cycle.
+          edge_t created(std::min(rB,rD), std::max(rB,rD));
+          bool target_ok = edge_exists(e) && is_delaunay_edge(u, v);
+          bool created_ok = !edge_exists(created) || is_delaunay_edge(rB, rD);
+
+          if (target_ok && created_ok) {
+            resolved = true;
+            break;
+          }
+
+          // Support flip didn't help or created new problem — undo.
+          edge_t new_rim(std::min(rB,rD), std::max(rB,rD));
+          if (edge_exists(new_rim) && flip_edge(rB, rD)) {
+            flips--;
+          } else {
+            resolved = true;  // can't undo, state changed — re-run Phase 1
+            break;
+          }
+        }
+        if (resolved) break;
+
+        // Atomic blocker resolution: flip blocker, then original.
+        if (flip_edge(B, D)) {
+          flips++;
+          resolved = true;
+          if (flip_edge(u, v)) flips++;
+        }
+        break;
+      }
+
+    if (!resolved) break;
   }
+
   return flips;
 }
 
@@ -219,8 +258,8 @@ void FulleroidDelaunay::remove_flat_vertex(node_t v)
   int deg = degree(v);
 
   // Phase 2: Star retriangulation for degree >= 4 via intrinsic ear clipping.
-  // Uses angle accumulation + law of cosines for diagonal lengths, avoiding
-  // 2D polygon unfolding (which self-intersects when fan angle > 2π).
+  // Unfolds the fan of triangles around v into a planar polygon using
+  // cumulative angles and spoke lengths, then clips convex ears.
   if (deg >= 4) {
     int k = deg;
     auto row = (*this)[v];
@@ -250,6 +289,15 @@ void FulleroidDelaunay::remove_flat_vertex(node_t v)
       return (len2 > 0) ? sqrt(len2) : 0;
     };
 
+    // Signed area of triangle (P_pp, P_pi, P_pn) in the 2D fan unfolding,
+    // where P_j = (spokes[j]*cos(cum[j]), spokes[j]*sin(cum[j])).
+    // Positive means the polygon vertex at pi is convex (valid ear).
+    auto ear_signed_area = [&](int pp, int pi, int pn) -> double {
+      double rp = spokes[pp], ri = spokes[pi], rn = spokes[pn];
+      double tp = cum[pp], ti = cum[pi], tn = cum[pn];
+      return rp*ri*sin(ti - tp) + ri*rn*sin(tn - ti) + rn*rp*sin(tp - tn);
+    };
+
     // Ear clipping with intrinsic geometry.
     struct EarDiag { int prev_idx, ear_idx, next_idx; double len; };
     vector<EarDiag> diagonals;
@@ -275,22 +323,19 @@ void FulleroidDelaunay::remove_flat_vertex(node_t v)
             { dup = true; break; }
         if (dup) continue;
 
-        // Diagonal length via sub-fan angle + law of cosines.
-        double len = diag_len(pp, pn);
-        if (len <= 1e-15) continue;
+        // Convexity check: polygon vertex must be convex (positive signed area).
+        if (ear_signed_area(pp, pi, pn) <= 1e-10) continue;
 
-        // Ear validity: sub-fan angle from pp to pn (through pi) must be < π.
-        // If the sub-fan angle >= π, the ear covers more than half the fan and
-        // would produce overlapping triangles.
+        // Sub-fan angle check: the ear's fan arc from pp to pn (through pi)
+        // must be <= pi.  This ensures we always clip a "small" ear.
         double sub_angle = (pn > pp) ? cum[pn] - cum[pp]
                                       : (cum[k] - cum[pp]) + cum[pn];
         if (sub_angle > M_PI + 1e-10) continue;
 
-        // Also check triangle inequality: angle at pi must be < π.
-        double a = poly_edge[jm], b = poly_edge[j];
-        if (a <= 0 || b <= 0) continue;
-        double cos_pi = std::clamp((a*a + b*b - len*len) / (2*a*b), -1.0, 1.0);
-        if (cos_pi <= -1.0 + 1e-10) continue;
+        // Diagonal length via sub-fan angle + law of cosines.
+        double len = diag_len(pp, pn);
+        if (len <= 1e-15) continue;
+
         diagonals.push_back({pp, pi, pn, len});
         poly.erase(poly.begin() + j);
         poly_edge.erase(poly_edge.begin() + j);
@@ -298,59 +343,20 @@ void FulleroidDelaunay::remove_flat_vertex(node_t v)
         found = true;
         break;
       }
-      if (!found) return;  // stuck — should not happen for flat vertices
-    }
-
-    // Validate area conservation: sum of fan triangles = sum of ear + final.
-    {
-      double fan_area = 0;
-      for (int i = 0; i < k; i++) {
-        double s = (spokes[i] + spokes[(i+1)%k] + rims[i]) / 2;
-        fan_area += sqrt(max(0.0, s*(s-spokes[i])*(s-spokes[(i+1)%k])*(s-rims[i])));
-      }
-      double ear_area = 0;
-      // Each ear has sides: poly_edge[jm], poly_edge[j], len (but we don't
-      // have those anymore). Instead, recompute from the stored diag info.
-      // Ear triangles: for each diagonal {pp, pi, pn, len}, the triangle has
-      // vertices nb[pp], nb[pi], nb[pn] with sides:
-      //   nb[pp]-nb[pi] edge, nb[pi]-nb[pn] edge, and len=nb[pp]-nb[pn] diagonal.
-      // But we need the actual edge lengths between these vertices.
-      // We can compute: each ear triangle covers fan triangles from pp to pn
-      // going through pi. The sub-fan area = sum of those fan triangles.
-      for (auto& d : diagonals) {
-        // Fan triangles from d.prev_idx to d.next_idx going through d.ear_idx
-        int from = d.prev_idx, to = d.next_idx;
-        double sub_area = 0;
-        for (int i = from; i != to; i = (i+1)%k) {
-          double s = (spokes[i] + spokes[(i+1)%k] + rims[i]) / 2;
-          sub_area += sqrt(max(0.0, s*(s-spokes[i])*(s-spokes[(i+1)%k])*(s-rims[i])));
+      if (!found) {
+        // Blocker-flip: try flipping edges that block ear diagonals.
+        bool flipped_blocker = false;
+        int n2 = poly.size();
+        for (int j = 0; j < n2 && !flipped_blocker; j++) {
+          int jm = (j - 1 + n2) % n2, jp = (j + 1) % n2;
+          int pp = poly[jm], pn = poly[jp];
+          if (nb[pp] != nb[pn] && edge_exists(edge_t(nb[pp], nb[pn]))) {
+            if (flip_edge(nb[pp], nb[pn]))
+              flipped_blocker = true;
+          }
         }
-        // Now compute the ear triangle area from its side lengths
-        // sides: edge(nb[pp],nb[pi]) and edge(nb[pi],nb[pn]) and diagonal len
-        // These are not easy to get from the current state, so let's compute
-        // the triangle area differently: use diag_len for the third side
-        // Actually, the sides are diag_len(pp,pi), diag_len(pi,pn), and d.len
-        double a = diag_len(d.prev_idx, d.ear_idx);
-        double b = diag_len(d.ear_idx, d.next_idx);
-        double c = d.len;  // = diag_len(d.prev_idx, d.next_idx)
-        double s = (a + b + c) / 2;
-        double tri_area = sqrt(max(0.0, s*(s-a)*(s-b)*(s-c)));
-        if (abs(tri_area - sub_area) > 1e-8)
-          fprintf(stderr, "EAR_AREA v=%d diag pp=%d pi=%d pn=%d: sub_fan=%.10g ear_tri=%.10g diff=%.6g\n",
-                  v, d.prev_idx, d.ear_idx, d.next_idx, sub_area, tri_area, tri_area - sub_area);
-        ear_area += tri_area;
+        if (!flipped_blocker) return;  // truly stuck
       }
-      // Last triangle (the remaining 3 polygon vertices)
-      {
-        int p0 = poly[0], p1 = poly[1], p2 = poly[2];
-        double a = diag_len(p0, p1);
-        double b = diag_len(p1, p2);
-        double c = diag_len(p2, p0);
-        double s = (a + b + c) / 2;
-        ear_area += sqrt(max(0.0, s*(s-a)*(s-b)*(s-c)));
-      }
-      fprintf(stderr, "AREA_CHECK v=%d deg=%d: fan=%.10g ears=%.10g diff=%.6g\n",
-              v, k, fan_area, ear_area, ear_area - fan_area);
     }
 
     // Remove all spoke edges.
@@ -363,50 +369,13 @@ void FulleroidDelaunay::remove_flat_vertex(node_t v)
       node_t p_prev = nb[d.prev_idx];
       node_t p_ear  = nb[d.ear_idx];
       node_t p_next = nb[d.next_idx];
+      // Insert diagonal p_prev--p_next so that the ear face
+      // (p_prev, p_ear, p_next) is created with correct CCW orientation.
       node_t suc_uv = next(p_prev, p_ear);
       node_t suc_vu = p_ear;
-      // Debug: verify that the face (p_prev, p_ear, p_next) will be created
-      // i.e., after insert: next(p_prev, p_ear) should be p_next... wait, no.
-      // insert_edge(arc(p_prev, p_next), suc_uv, suc_vu):
-      //   p_next inserted before suc_uv in p_prev's list
-      //   p_prev inserted before suc_vu=p_ear in p_next's list
-      // After insertion: next(p_prev, p_next) should give the right successor.
-      // Before insertion: verify p_ear is in p_next's neighbor list
-      if (find(p_next, p_ear) < 0) {
-        fprintf(stderr, "FATAL: p_ear=%d not in p_next=%d's neighbors at diag %zu for v=%d\n",
-                p_ear, p_next, di, v);
-        // Print p_next's neighbors
-        auto pn_row = (*this)[p_next];
-        fprintf(stderr, "  p_next neighbors:");
-        for (node_t x : pn_row) fprintf(stderr, " %d", x);
-        fprintf(stderr, "\n");
-        // Also print expected structure
-        fprintf(stderr, "  diag: prev=%d(nb[%d]) ear=%d(nb[%d]) next=%d(nb[%d]) len=%.6g\n",
-                p_prev, d.prev_idx, p_ear, d.ear_idx, p_next, d.next_idx, d.len);
-        return;
-      }
+      assert(find(p_next, p_ear) >= 0);
       Graph::insert_edge(arc_t(p_prev, p_next), suc_uv, suc_vu);
       set_length(p_prev, p_next, d.len);
-
-      // Verify the new face orientation: next(p_prev, p_ear) should be p_next
-      // (the ear triangle is p_prev -> p_ear -> p_next -> p_prev)
-      // Wait, the face should be (p_prev, p_ear, p_next) if the ear is CCW.
-      // After inserting p_prev-p_next:
-      //   next(p_prev, p_ear) should still be the old successor (not p_next)
-      //   next(p_prev, p_next) should be suc_uv
-      // The face (p_prev, p_ear, p_next) requires next(p_prev, p_ear) = p_next.
-      // But we inserted p_next BEFORE suc_uv in p_prev's list. If p_ear was
-      // just before suc_uv, then p_next is now between p_ear and suc_uv,
-      // so next(p_prev, p_ear) = p_next. ✓
-      node_t check = next(p_prev, p_ear);
-      if (check != p_next) {
-        fprintf(stderr, "ORIENT_ERR: next(%d,%d)=%d but expected %d at diag %zu for v=%d\n",
-                p_prev, p_ear, check, p_next, di, v);
-        auto pp_row = (*this)[p_prev];
-        fprintf(stderr, "  p_prev neighbors:");
-        for (node_t x : pp_row) fprintf(stderr, " %d", x);
-        fprintf(stderr, "\n");
-      }
     }
 
     assert(v == N - 1 && degree(v) == 0);
@@ -425,6 +394,37 @@ void FulleroidDelaunay::remove_flat_vertex(node_t v)
 
   assert(v == N - 1);
   pop_back();
+}
+
+// Phase 1 only: standard Lawson flips, no blocker resolution.
+// Safe to call between vertex removals — terminates on polyhedral surfaces.
+int FulleroidDelaunay::flip_to_delaunay_phase1()
+{
+  int flips = 0;
+  map<edge_t, bool> in_stack;
+  stack<edge_t> S;
+  for (node_t u = 0; u < N; u++)
+    for (node_t v : (*this)[u])
+      if (u < v) {
+        edge_t e(u, v);
+        S.push(e); in_stack[e] = true;
+      }
+
+  int budget = 200 * N;
+  while (!S.empty() && budget > 0) {
+    edge_t e = S.top(); S.pop();
+    in_stack[e] = false;
+    node_t u = e.first, v = e.second;
+    if (!edge_exists(e) || is_delaunay_edge(u, v)) continue;
+
+    node_t B = next(v, u), D = next(u, v);
+    if (!flip_edge(u, v)) continue;
+
+    flips++; budget--;
+    for (edge_t ec : {edge_t(u,B), edge_t(B,v), edge_t(v,D), edge_t(D,u)})
+      if (!in_stack[ec]) { S.push(ec); in_stack[ec] = true; }
+  }
+  return flips;
 }
 
 void FulleroidDelaunay::remove_flat_vertices()
@@ -447,8 +447,15 @@ void FulleroidDelaunay::remove_flat_vertices()
       if (!removed) break;
     }
 
-    flip_to_delaunay();
+    // Between removals: only do Phase 1 (standard Lawson) flips.
+    // Phase 2 (blocker resolution) on graphs still containing flat vertices
+    // can cycle because high-degree flat vertices create multi-edge blocker
+    // patterns where support flips and Phase 1 undo each other.
+    flip_to_delaunay_phase1();
   }
+
+  // Full Delaunay flipping (with blocker resolution) on the final graph.
+  flip_to_delaunay();
 }
 
 // ============================================================================

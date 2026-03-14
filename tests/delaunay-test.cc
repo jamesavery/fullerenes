@@ -486,6 +486,24 @@ TEST(IntrinsicDelaunay, C60_Ih_IcosahedralSymmetry) {
   std::cout << "C60 Ih: all 30 edges have length " << first_len << std::endl;
 }
 
+// Test C100 #84570 with the actual remove_flat_vertices pipeline.
+TEST(IntrinsicDelaunay, C100_84570) {
+  BuckyGen::buckygen_queue Q = BuckyGen::start(100, false, false);
+  Triangulation T;
+  int idx = 0;
+  while (BuckyGen::next_fullerene(Q, T)) {
+    if (idx == 84570) break;
+    idx++;
+  }
+  BuckyGen::stop(Q);
+  ASSERT_EQ(idx, 84570) << "Could not reach isomer #84570";
+
+  FulleroidDelaunay D(T);
+  D.remove_flat_vertices();
+  ASSERT_EQ(D.N, 12);
+  verify_reduced(D, 12, 100);
+}
+
 // ============================================================================
 // 3D Embedding tests
 // ============================================================================
