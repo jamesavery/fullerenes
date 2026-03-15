@@ -3,6 +3,7 @@
 
 #include "triangulation.hh"
 #include "geometry.hh"
+#include <memory>
 
 // Diamond: the local geometry around an edge in a metrized triangulation.
 //
@@ -183,6 +184,13 @@ struct DelaunayTriangulation {
   vector<int> free_edges;  // recycled edge slots (half-edge id / 2)
   vector<int> free_faces;  // recycled face slots
 
+  // --- Optional exact face-origin tracking ---
+  // When non-null, flip_edge() and remove_flat_vertex() use exact Eisenstein
+  // arithmetic (turn predicate on the Z[omega] grid) to repartition f_origin.
+  // When null, conservative merge is used (both faces get the union).
+  struct OriginTracker;
+  std::shared_ptr<const OriginTracker> origin_tracker;
+
   // --- Clean accessors ---
   int  twin(int h)  const { return h ^ 1; }
   int  edge(int h)  const { return h >> 1; }
@@ -226,7 +234,11 @@ struct DelaunayTriangulation {
   void dealloc_face(int f);  // mark face as dead, add to free list
 
   // --- Full algorithm ---
-  static DelaunayTriangulation compute(const Triangulation& T);
+  // exact_origins: when true, f_origin is computed exactly using Eisenstein
+  // arithmetic during every flip and vertex removal.  When false, f_origin
+  // uses a conservative merge (each face gets the union of its neighbors).
+  static DelaunayTriangulation compute(const Triangulation& T,
+                                       bool exact_origins = false);
 
   // --- 3D Embedding ---
   vector<coord3d> embed_3d() const;

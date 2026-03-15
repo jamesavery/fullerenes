@@ -1,11 +1,16 @@
 #include "fullerenes/delaunay.hh"
+#include "fullerenes/eisenstein.hh"
 
 #include <stack>
+#include <queue>
 #include <cmath>
 #include <cassert>
 #include <algorithm>
 #include <numeric>
 #include <map>
+#include <array>
+#include <unordered_set>
+#include <unordered_map>
 
 // ============================================================================
 // Intrinsic geometry primitives
@@ -1071,6 +1076,175 @@ vector<coord3d> FulleroidDelaunay::embed_3d() const
 }
 
 // ============================================================================
+// OriginTracker — exact Eisenstein face-origin tracking
+// ============================================================================
+//
+// Maintains a copy of the original equilateral triangulation so that during
+// flips and vertex removals, the repartitioning of original faces among iDT
+// faces can be done exactly using the Eisenstein integer turn predicate.
+//
+// The key operation is unfold_patch(): BFS-unfold a connected set of original
+// equilateral faces into the Z[omega] grid.  Since all original edges have
+// unit length, every vertex lands at an Eisenstein integer, and the turn()
+// predicate gives exact orientation tests with zero floating-point error.
+
+struct DelaunayTriangulation::OriginTracker {
+  int N;                                    // vertex count in original triangulation
+  vector<array<int,3>> face_verts;          // face_verts[fid] = {u, v, w} CCW
+  unordered_map<int64_t, int> arc_to_face;  // directed arc (u,v) → face ID
+
+  // Build from the sorted triangulation used by from_triangulation().
+  // num_faces must match the number of faces assigned during construction.
+  OriginTracker(const Triangulation& T, int num_faces);
+
+  // BFS-unfold a connected patch of original equilateral faces into Z[omega].
+  // Returns a map from original vertex ID to Eisenstein grid position.
+  unordered_map<int, Eisenstein> unfold_patch(const vector<int>& face_ids) const;
+
+  // Classify original faces across the directed line vtx_A → vtx_B.
+  // Returns (left_of_line, right_of_line).  Faces whose centroid is exactly
+  // on the line are assigned to both sides.
+  pair<vector<int>, vector<int>>
+  classify_across_line(const vector<int>& face_ids,
+                       int vtx_A, int vtx_B) const;
+
+  // Classify original faces into a set of triangles (for ear-clipping).
+  // tri_verts[j] = {a, b, c} gives the CCW vertex IDs of triangle j.
+  // Returns assignment[j] = list of original face IDs inside triangle j.
+  vector<vector<int>>
+  classify_into_triangles(const vector<int>& face_ids,
+                          const vector<array<int,3>>& tri_verts) const;
+};
+
+DelaunayTriangulation::OriginTracker::OriginTracker(
+    const Triangulation& T, int num_faces) : N(T.N)
+{
+  face_verts.resize(num_faces);
+  int fid = 0;
+  for (node_t u = 0; u < T.N; u++) {
+    auto row = T[u];
+    int deg = row.size();
+    for (int j = 0; j < deg; j++) {
+      node_t v = row[j], w = row[(j+1) % deg];
+      if (u < v && u < w) {
+        face_verts[fid] = {u, v, w};
+        arc_to_face[int64_t(u) * N + v] = fid;
+        arc_to_face[int64_t(v) * N + w] = fid;
+        arc_to_face[int64_t(w) * N + u] = fid;
+        fid++;
+      }
+    }
+  }
+  assert(fid == num_faces);
+}
+
+unordered_map<int, Eisenstein>
+DelaunayTriangulation::OriginTracker::unfold_patch(
+    const vector<int>& face_ids) const
+{
+  if (face_ids.empty()) return {};
+
+  unordered_set<int> patch(face_ids.begin(), face_ids.end());
+  unordered_map<int, Eisenstein> pos;
+  unordered_set<int> placed;
+  queue<int> Q;
+
+  // Place first face at the standard triangle.
+  int f0 = face_ids[0];
+  auto& fv = face_verts[f0];
+  pos[fv[0]] = Eisenstein(0, 0);
+  pos[fv[1]] = Eisenstein(1, 0);
+  pos[fv[2]] = Eisenstein(0, 1);
+  placed.insert(f0);
+  Q.push(f0);
+
+  while (!Q.empty()) {
+    int f = Q.front(); Q.pop();
+    auto& v = face_verts[f];
+
+    for (int i = 0; i < 3; i++) {
+      int eu = v[i], ev = v[(i+1) % 3];
+
+      // Adjacent face across edge eu→ev has the twin arc ev→eu.
+      auto it = arc_to_face.find(int64_t(ev) * N + eu);
+      if (it == arc_to_face.end()) continue;
+      int adj = it->second;
+      if (!patch.count(adj) || placed.count(adj)) continue;
+
+      // Third vertex of adjacent face (ev, eu, third) in CCW order.
+      auto& av = face_verts[adj];
+      int third = av[0];
+      if (third == eu || third == ev) third = av[1];
+      if (third == eu || third == ev) third = av[2];
+
+      // Place: third = ev + (eu - ev).nextCCW()  [standard equilateral unfolding]
+      if (!pos.count(third))
+        pos[third] = pos[ev] + (pos[eu] - pos[ev]).nextCCW();
+
+      placed.insert(adj);
+      Q.push(adj);
+    }
+  }
+  return pos;
+}
+
+pair<vector<int>, vector<int>>
+DelaunayTriangulation::OriginTracker::classify_across_line(
+    const vector<int>& face_ids, int vtx_A, int vtx_B) const
+{
+  auto pos = unfold_patch(face_ids);
+
+  // Scale line endpoints by 3 so we can test the centroid (p+q+r)
+  // without dividing by 3.  sign(turn(3A, 3B, p+q+r)) = sign(turn(A, B, centroid)).
+  Eisenstein A3 = pos.at(vtx_A) * 3;
+  Eisenstein B3 = pos.at(vtx_B) * 3;
+
+  vector<int> left, right;
+  for (int fid : face_ids) {
+    auto& fv = face_verts[fid];
+    Eisenstein sum = pos.at(fv[0]) + pos.at(fv[1]) + pos.at(fv[2]);
+    int t = Eisenstein::turn(A3, B3, sum);
+    if (t > 0) left.push_back(fid);
+    else if (t < 0) right.push_back(fid);
+    else { left.push_back(fid); right.push_back(fid); }  // on the line: both
+  }
+  return {left, right};
+}
+
+vector<vector<int>>
+DelaunayTriangulation::OriginTracker::classify_into_triangles(
+    const vector<int>& face_ids,
+    const vector<array<int,3>>& tri_verts) const
+{
+  auto pos = unfold_patch(face_ids);
+  int nt = tri_verts.size();
+  vector<vector<int>> assignment(nt);
+
+  // Precompute scaled triangle corners.
+  vector<array<Eisenstein,3>> corners(nt);
+  for (int j = 0; j < nt; j++)
+    for (int k = 0; k < 3; k++)
+      corners[j][k] = pos.at(tri_verts[j][k]) * 3;
+
+  for (int fid : face_ids) {
+    auto& fv = face_verts[fid];
+    Eisenstein sum = pos.at(fv[0]) + pos.at(fv[1]) + pos.at(fv[2]);
+
+    for (int j = 0; j < nt; j++) {
+      auto& c = corners[j];
+      // Point inside CCW triangle iff all three turn tests are >= 0.
+      if (Eisenstein::turn(c[0], c[1], sum) >= 0 &&
+          Eisenstein::turn(c[1], c[2], sum) >= 0 &&
+          Eisenstein::turn(c[2], c[0], sum) >= 0) {
+        assignment[j].push_back(fid);
+        break;  // each face goes to exactly one triangle
+      }
+    }
+  }
+  return assignment;
+}
+
+// ============================================================================
 // DelaunayTriangulation — DCEL-based iDT (delta-complex)
 // ============================================================================
 
@@ -1323,18 +1497,29 @@ bool DelaunayTriangulation::flip_edge(int h)
   recompute_face_angles(fh);
   recompute_face_angles(ft);
 
-  // Merge face origins (flip repartitions the covered original faces).
-  // We can't determine the partition without geometry, so merge into both.
-  // The final mapping is computed after all flips are done.
-  vector<int> merged;
-  merged.reserve(f_origin[fh].size() + f_origin[ft].size());
-  merged.insert(merged.end(), f_origin[fh].begin(), f_origin[fh].end());
-  merged.insert(merged.end(), f_origin[ft].begin(), f_origin[ft].end());
-  // Remove duplicates.
-  sort(merged.begin(), merged.end());
-  merged.erase(unique(merged.begin(), merged.end()), merged.end());
-  f_origin[fh] = merged;
-  f_origin[ft] = merged;
+  // Repartition face origins across the new diagonal B→D.
+  {
+    vector<int> all;
+    all.reserve(f_origin[fh].size() + f_origin[ft].size());
+    all.insert(all.end(), f_origin[fh].begin(), f_origin[fh].end());
+    all.insert(all.end(), f_origin[ft].begin(), f_origin[ft].end());
+    sort(all.begin(), all.end());
+    all.erase(unique(all.begin(), all.end()), all.end());
+
+    if (origin_tracker) {
+      // Exact: classify each original face by which side of B→D its centroid
+      // falls on, using Eisenstein turn() in the Z[omega] grid.
+      // After flip, face(h) = (B, D, v) is left of B→D;
+      //             face(t) = (D, B, u) is right of B→D.
+      auto [left, right] = origin_tracker->classify_across_line(all, B, D);
+      f_origin[fh] = std::move(left);
+      f_origin[ft] = std::move(right);
+    } else {
+      // Conservative: assign the full union to both faces.
+      f_origin[fh] = all;
+      f_origin[ft] = all;
+    }
+  }
 
   return true;
 }
@@ -1838,4 +2023,277 @@ bool DelaunayTriangulation::check_consistency() const
     if (alive(h) && he_length[h] != he_length[h ^ 1]) return false;
 
   return true;
+}
+
+// ============================================================================
+// DelaunayTriangulation::embed_3d()
+//
+// Embeds the reduced DCEL triangulation in 3D by minimizing:
+//   E = E_edge + lambda * E_cone
+//
+// E_edge = sum_{shortest edge per vertex pair} (|xi-xj| - Lij)^2
+//   Matches extrinsic distances to intrinsic geodesic lengths.
+//   For multi-edges, only the shortest is used (longest are redundant).
+//
+// E_cone = sum_v (angle_sum(v) - cone_angle(v))^2
+//   Matches the angle sum around each vertex to the intrinsic cone angle.
+//   Provides 11 independent constraints (12 minus Gauss-Bonnet redundancy)
+//   that compensate for dropped multi-edge constraints.
+// ============================================================================
+
+// Per-face-angle geometry for cone angle energy.
+// Computes the 3D angle at a triangle corner and its gradients.
+struct FaceAngleData {
+  int a, b, d;        // arm1 end, apex, arm2 end (angle at b)
+  double theta;       // angle at b
+  coord3d p, q;       // dtheta/d(x[a]), dtheta/d(x[d])
+  double ra, rc, S;   // |a-b|, |d-b|, sin(theta)
+  coord3d ua, uc;     // unit arm vectors
+  bool valid;
+
+  static FaceAngleData compute(const vector<coord3d>& x, int a, int b, int d) {
+    FaceAngleData fa;
+    fa.a = a; fa.b = b; fa.d = d;
+
+    coord3d va = x[a] - x[b], vc = x[d] - x[b];
+    fa.ra = va.norm(); fa.rc = vc.norm();
+    fa.valid = (fa.ra > 1e-15 && fa.rc > 1e-15);
+    if (!fa.valid) return fa;
+
+    fa.ua = va / fa.ra;
+    fa.uc = vc / fa.rc;
+    double C = max(-1.0, min(1.0, fa.ua.dot(fa.uc)));
+    fa.theta = acos(C);
+    fa.S = sin(fa.theta);
+    if (fa.S < 1e-10) { fa.valid = false; return fa; }
+
+    coord3d::dangle(va, vc, fa.p, fa.q);
+    return fa;
+  }
+
+  void scatter_gradient(double w, vector<coord3d>& g) const {
+    g[a] = g[a] + p * w;
+    g[d] = g[d] + q * w;
+    g[b] = g[b] - (p + q) * w;
+  }
+
+  // Hessian-vector product with weight k.
+  // H = k * [alpha * (p⊗p, q⊗q, p⊗q) + correction terms]
+  void scatter_hv(double k, const vector<coord3d>& v, vector<coord3d>& Hv) const {
+    double C = ua.dot(uc);
+    double dev = theta - M_PI / 3.0;  // deviation used for correction terms
+    double alpha = 1.0 - dev * C / S;
+    matrix3d sym_ac = ua.outer(uc) + uc.outer(ua);
+    matrix3d I = matrix3d::unit_matrix();
+
+    matrix3d Haa = p.outer(p) * (k * alpha)
+      + (sym_ac + I * C - ua.outer(ua) * (3*C)) * (k * dev / (ra*ra * S));
+    matrix3d Hcc = q.outer(q) * (k * alpha)
+      + (sym_ac + I * C - uc.outer(uc) * (3*C)) * (k * dev / (rc*rc * S));
+    matrix3d Hac = p.outer(q) * (k * alpha)
+      + (ua.outer(ua) + uc.outer(uc) - ua.outer(uc) * C - I) * (k * dev / (ra*rc * S));
+
+    matrix3d Hab = Haa + Hac;
+    matrix3d Hcb = Hcc + Hac.transpose();
+
+    Hv[a] = Hv[a] + Haa * v[a] + Hac * v[d] + (-Hab) * v[b];
+    Hv[d] = Hv[d] + Hac.transpose() * v[a] + Hcc * v[d] + (-Hcb) * v[b];
+    Hv[b] = Hv[b] + (-Hab.transpose()) * v[a] + (-Hcb.transpose()) * v[d] + (Hab + Hcb) * v[b];
+  }
+};
+
+vector<coord3d> DelaunayTriangulation::embed_3d() const
+{
+  // --- Step 1: Extract shortest edge per vertex pair ---
+  // Multi-edges between the same pair have different lengths (different geodesics).
+  // For distance matching, use the shortest one (closest to extrinsic distance).
+  struct EdgeInfo { int u, v; double L; };
+  vector<EdgeInfo> edges;
+  map<pair<int,int>, double> shortest;
+
+  for (int h = 0; h < nh; h += 2) {
+    if (!alive(h)) continue;
+    int u = he_origin[h], v = dest(h);
+    if (u > v) swap(u, v);
+    double L = he_length[h];
+    auto key = make_pair(u, v);
+    auto it = shortest.find(key);
+    if (it == shortest.end() || L < it->second)
+      shortest[key] = L;
+  }
+  for (auto& [key, L] : shortest)
+    edges.push_back({key.first, key.second, L});
+
+  // --- Step 2: APSP via Floyd-Warshall on shortest edges ---
+  matrix<double> D(nv, nv, 1e18);
+  for (int i = 0; i < nv; i++) D(i, i) = 0;
+  for (auto& e : edges) {
+    D(e.u, e.v) = e.L;
+    D(e.v, e.u) = e.L;
+  }
+  for (int k = 0; k < nv; k++)
+    for (int i = 0; i < nv; i++)
+      for (int j = 0; j < nv; j++)
+        D(i, j) = min(D(i, j), D(i, k) + D(k, j));
+
+  // --- Step 3: MDS initial placement ---
+  V3 x = mds_placement(D);
+
+  // Separate collapsed vertices.  When the DCEL has a symmetry that swaps
+  // two vertices with identical APSP profiles, MDS places them at exactly
+  // the same point.  Perturb such pairs along a direction perpendicular to
+  // the centroid-to-vertex line, by half their target distance.
+  for (auto& e : edges) {
+    coord3d diff = x[e.u] - x[e.v];
+    double d = diff.norm();
+    if (d < 0.1 * e.L) {
+      // Find a direction to perturb: use cross product with a non-parallel axis
+      coord3d c;
+      for (auto& xi : x) c += xi;
+      c /= nv;
+      coord3d radial = x[e.u] - c;
+      if (radial.norm() < 1e-10) radial = coord3d(1, 0, 0);
+      coord3d axis(0, 0, 1);
+      if (fabs(radial.dot(axis)) / radial.norm() > 0.9) axis = coord3d(0, 1, 0);
+      coord3d perp = radial.cross(axis);
+      perp /= max(perp.norm(), 1e-15);
+      x[e.u] = x[e.u] + perp * (0.5 * e.L);
+      x[e.v] = x[e.v] - perp * (0.5 * e.L);
+    }
+  }
+
+  // --- Step 4: Collect per-vertex fan structure for cone angle energy ---
+  // For each vertex, store the CW-ordered list of half-edges leaving it.
+  // Each consecutive pair (h, cw(h)) shares a face, giving a face angle.
+  struct VertexFan {
+    vector<int> out_halfedges;  // CW-ordered outgoing half-edges
+  };
+  vector<VertexFan> fans(nv);
+  for (int v = 0; v < nv; v++) {
+    if (v_out[v] < 0) continue;
+    int h0 = v_out[v], h = h0;
+    do {
+      fans[v].out_halfedges.push_back(h);
+      h = cw(h);
+    } while (h != h0);
+  }
+
+  // Cone angle weight: scale so E_cone is comparable to E_edge.
+  // E_edge ~ n_edges * L^2, E_cone ~ n_vertices * angle^2.
+  // With typical L ~ O(1) and angle deficits ~ O(1), lambda ~ 1 is reasonable.
+  double lambda = 1.0;
+
+  // --- Step 5: Stress + cone angle optimization ---
+  auto eval = [&](const V3& pos, V3& g) -> double {
+    double E = 0;
+    g.zero();
+
+    // E_edge: sum (|xi-xj| - Lij)^2
+    for (auto& e : edges) {
+      auto ed = EdgeStressData::compute(pos, e.u, e.v, e.L);
+      if (!ed.valid()) continue;
+      E += ed.energy();
+      ed.scatter_gradient(g);
+    }
+
+    // E_cone: sum_v (angle_sum(v) - cone_angle(v))^2
+    for (int v = 0; v < nv; v++) {
+      auto& fan = fans[v];
+      int deg = fan.out_halfedges.size();
+      if (deg < 2) continue;
+
+      double angle_sum = 0;
+      vector<FaceAngleData> fa(deg);
+      for (int i = 0; i < deg; i++) {
+        int h = fan.out_halfedges[i];
+        int d_v = dest(h);
+        int h_next = fan.out_halfedges[(i + 1) % deg];
+        int d_next = dest(h_next);
+        // Angle at v between edges v->d_v and v->d_next
+        fa[i] = FaceAngleData::compute(pos, d_v, v, d_next);
+        if (fa[i].valid) angle_sum += fa[i].theta;
+      }
+
+      double dev = angle_sum - v_cone_angle[v];
+      E += lambda * dev * dev;
+
+      double w = 2.0 * lambda * dev;
+      for (int i = 0; i < deg; i++)
+        if (fa[i].valid) fa[i].scatter_gradient(w, g);
+    }
+
+    project_rigid_body(g, pos);
+    return E;
+  };
+
+  auto hv_prod = [&](const V3& pos, const V3& dir, V3& Hv) {
+    Hv.zero();
+
+    // E_edge Hv
+    for (auto& e : edges) {
+      auto ed = EdgeStressData::compute(pos, e.u, e.v, e.L);
+      if (!ed.valid()) continue;
+      ed.scatter_hv(dir, Hv);
+    }
+
+    // E_cone Hv: H = 2*lambda * [dA⊗dA + dev * d²A/dx²]
+    // where A = angle_sum, dev = A - cone_angle
+    for (int v = 0; v < nv; v++) {
+      auto& fan = fans[v];
+      int deg = fan.out_halfedges.size();
+      if (deg < 2) continue;
+
+      double angle_sum = 0;
+      vector<FaceAngleData> fa(deg);
+      for (int i = 0; i < deg; i++) {
+        int h = fan.out_halfedges[i];
+        int d_v = dest(h);
+        int h_next = fan.out_halfedges[(i + 1) % deg];
+        int d_next = dest(h_next);
+        fa[i] = FaceAngleData::compute(pos, d_v, v, d_next);
+        if (fa[i].valid) angle_sum += fa[i].theta;
+      }
+      double dev = angle_sum - v_cone_angle[v];
+
+      // Rank-1 term: 2*lambda * (dA . dir) * dA
+      double dA_dot_v = 0;
+      for (int i = 0; i < deg; i++)
+        if (fa[i].valid) {
+          dA_dot_v += fa[i].p.dot(dir[fa[i].a] - dir[v])
+                    + fa[i].q.dot(dir[fa[i].d] - dir[v]);
+        }
+      for (int i = 0; i < deg; i++)
+        if (fa[i].valid) fa[i].scatter_gradient(2.0 * lambda * dA_dot_v, Hv);
+
+      // Correction term: 2*lambda * dev * d²A/dx² . dir
+      if (fabs(dev) > 1e-15) {
+        double w2 = 2.0 * lambda * dev;
+        for (int i = 0; i < deg; i++)
+          if (fa[i].valid) fa[i].scatter_hv(w2, dir, Hv);
+      }
+    }
+
+    project_rigid_body(Hv, pos);
+  };
+
+  x = steihaug_cg(std::move(x), eval, hv_prod);
+
+  // --- Step 6: Orient outward using DCEL face iteration ---
+  coord3d c;
+  for (auto& xi : x) c += xi;
+  c /= nv;
+
+  double vol = 0;
+  for (int f = 0; f < nf; f++) {
+    if (f_he[f] < 0) continue;
+    int h0 = f_he[f];
+    int h1 = he_next[h0];
+    int h2 = he_next[h1];
+    int u = he_origin[h0], v = he_origin[h1], w = he_origin[h2];
+    vol += (x[u] - c).dot((x[v] - c).cross(x[w] - c));
+  }
+  if (vol < 0)
+    for (auto& xi : x) xi = c * 2.0 - xi;
+
+  return x;
 }

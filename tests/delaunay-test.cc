@@ -1799,10 +1799,21 @@ TEST(DCEL, Compute_C60_Ih) {
 }
 
 // Helper: verify a DCEL result has the expected structure.
-static void verify_dcel_reduced(const DelaunayTriangulation& D, int expected_verts) {
+// N_original_faces: number of equilateral triangles in the input (for area check).
+// If 0, area check is skipped.
+static void verify_dcel_reduced(const DelaunayTriangulation& D, int expected_verts,
+                                int N_original_faces = 0) {
   EXPECT_EQ(D.nv, expected_verts);
   EXPECT_TRUE(D.check_consistency());
-  EXPECT_TRUE(D.is_delaunay());
+
+  // --- Delaunay criterion: every edge must be Delaunay ---
+  {
+    int non_del = 0;
+    for (int h = 0; h < D.nh; h += 2)
+      if (D.alive(h) && !D.is_delaunay_edge(h))
+        non_del++;
+    EXPECT_EQ(non_del, 0) << non_del << " non-Delaunay edges remain";
+  }
 
   // Count live edges and faces.
   int live_edges = 0;
@@ -1823,17 +1834,59 @@ static void verify_dcel_reduced(const DelaunayTriangulation& D, int expected_ver
     EXPECT_EQ(live_faces, 20);
   }
 
-  // All cone angles should be 5*pi/3 for fullerene duals.
-  for (int v = 0; v < D.nv; v++) {
-    if (D.v_out[v] < 0) continue;  // dead vertex
-    EXPECT_NEAR(D.v_cone_angle[v], 5.0 * M_PI / 3.0, 1e-10)
-      << "Vertex " << v << " cone angle = " << D.v_cone_angle[v];
-  }
-
-  // All edge lengths positive.
+  // --- Edge lengths: positive and twin-consistent ---
   for (int h = 0; h < D.nh; h += 2) {
     if (!D.alive(h)) continue;
     EXPECT_GT(D.he_length[h], 0.0) << "Edge " << h/2 << " has non-positive length";
+    EXPECT_EQ(D.he_length[h], D.he_length[h ^ 1])
+      << "Edge " << h/2 << " twin length mismatch";
+  }
+
+  // --- Triangle inequality and angle sum = pi for each face ---
+  for (int f = 0; f < D.nf; f++) {
+    if (D.f_he[f] < 0) continue;
+    int h0 = D.f_he[f], h1 = D.he_next[h0], h2 = D.he_next[h1];
+    double a = D.he_length[h0], b = D.he_length[h1], c = D.he_length[h2];
+    EXPECT_GT(a + b, c) << "Triangle inequality in face " << f;
+    EXPECT_GT(b + c, a) << "Triangle inequality in face " << f;
+    EXPECT_GT(c + a, b) << "Triangle inequality in face " << f;
+
+    double cos_u = std::clamp((a*a + c*c - b*b) / (2.0*a*c), -1.0, 1.0);
+    double cos_v = std::clamp((a*a + b*b - c*c) / (2.0*a*b), -1.0, 1.0);
+    double cos_w = std::clamp((b*b + c*c - a*a) / (2.0*b*c), -1.0, 1.0);
+    double angle_sum = acos(cos_u) + acos(cos_v) + acos(cos_w);
+    EXPECT_NEAR(angle_sum, M_PI, 1e-10) << "Angle sum != pi in face " << f;
+  }
+
+  // --- Cone angles: each vertex retains its original cone angle ---
+  for (int v = 0; v < D.nv; v++) {
+    if (D.v_out[v] < 0) continue;  // dead vertex
+    double expected_angle = D.v_cone_angle[v];  // set at construction
+    double total_angle = 0;
+    int h0 = D.v_out[v], h = h0;
+    do {
+      total_angle += D.he_angle[h];
+      h = D.cw(h);
+    } while (h != h0);
+    EXPECT_NEAR(total_angle, expected_angle, 1e-6)
+      << "Vertex " << v << " (orig degree " << D.v_orig_degree[v]
+      << "): cone angle " << total_angle << " != expected " << expected_angle;
+  }
+
+  // --- Area conservation ---
+  if (N_original_faces > 0) {
+    double expected_area = N_original_faces * sqrt(3.0) / 4.0;
+    double actual_area = 0;
+    for (int f = 0; f < D.nf; f++) {
+      if (D.f_he[f] < 0) continue;
+      int h0 = D.f_he[f], h1 = D.he_next[h0], h2 = D.he_next[h1];
+      double a = D.he_length[h0], b = D.he_length[h1], c = D.he_length[h2];
+      double s = (a + b + c) / 2.0;
+      double area2 = s * (s - a) * (s - b) * (s - c);
+      actual_area += sqrt(std::max(0.0, area2));
+    }
+    EXPECT_NEAR(actual_area, expected_area, 1e-6)
+      << "Total area " << actual_area << " != expected " << expected_area;
   }
 }
 
@@ -1849,7 +1902,7 @@ TEST(DCEL, C60_AllIsomers) {
     auto D = DelaunayTriangulation::compute(T);
     auto t1 = std::chrono::high_resolution_clock::now();
     times_us.push_back(std::chrono::duration<double, std::micro>(t1 - t0).count());
-    verify_dcel_reduced(D, 12);
+    verify_dcel_reduced(D, 12, 60);
     if (D.nv != 12 || !D.is_delaunay()) n_fail++;
     idx++;
   }
@@ -1871,7 +1924,7 @@ TEST(DCEL, DISABLED_C80_AllIsomers) {
     auto D = DelaunayTriangulation::compute(T);
     auto t1 = std::chrono::high_resolution_clock::now();
     times_us.push_back(std::chrono::duration<double, std::micro>(t1 - t0).count());
-    verify_dcel_reduced(D, 12);
+    verify_dcel_reduced(D, 12, 80);
     if (D.nv != 12 || !D.is_delaunay()) n_fail++;
     idx++;
   }
@@ -1892,11 +1945,415 @@ TEST(DCEL, DISABLED_C100_AllIsomers) {
     auto D = DelaunayTriangulation::compute(T);
     auto t1 = std::chrono::high_resolution_clock::now();
     times_us.push_back(std::chrono::duration<double, std::micro>(t1 - t0).count());
-    verify_dcel_reduced(D, 12);
+    verify_dcel_reduced(D, 12, 100);
     if (D.nv != 12 || !D.is_delaunay()) n_fail++;
     idx++;
   }
   BuckyGen::stop(Q);
   EXPECT_EQ(n_fail, 0);
   print_timing_stats("DCEL C100 iDT", times_us);
+}
+
+TEST(DCEL, DISABLED_Plantri15_AllTriangulations) {
+  std::string path = FULLERENE_ROOT "/data/triangulations_15.pl";
+  // Check file exists.
+  {
+    FILE* f = fopen(path.c_str(), "rb");
+    if (!f) {
+      std::cerr << "Skipping: " << path << " not found" << std::endl;
+      return;
+    }
+    fclose(f);
+  }
+
+  int n_tested = 0, n_failed = 0;
+  int max_degree_seen = 0;
+  std::vector<double> times_us;
+
+  stream_planarcode(path, [&](const PlanarGraph& g, int idx) {
+    // Record original degrees
+    vector<int> orig_degrees(g.N);
+    for (int u = 0; u < g.N; u++)
+      orig_degrees[u] = g[u].size();
+
+    for (int d : orig_degrees)
+      max_degree_seen = std::max(max_degree_seen, d);
+
+    // Count cone points (non-degree-6)
+    int n_cones = 0;
+    for (int d : orig_degrees)
+      if (d != 6) n_cones++;
+
+    // Skip flat tori
+    if (n_cones == 0) return;
+
+    int N_original_faces = 2 * g.N - 4;
+    Triangulation T(g);
+
+    if (!T.is_consistently_oriented()) {
+      n_failed++;
+      if (n_failed <= 10)
+        std::cerr << "Graph #" << idx << ": input not consistently oriented" << std::endl;
+      n_tested++;
+      return;
+    }
+
+    auto t0 = std::chrono::high_resolution_clock::now();
+    auto D = DelaunayTriangulation::compute(T);
+    auto t1 = std::chrono::high_resolution_clock::now();
+    times_us.push_back(std::chrono::duration<double, std::micro>(t1 - t0).count());
+
+    // Vertex count must match
+    if (D.nv != n_cones) {
+      n_failed++;
+      if (n_failed <= 10)
+        std::cerr << "Graph #" << idx << ": removal incomplete (D.nv="
+                  << D.nv << ", expected " << n_cones << ")" << std::endl;
+      n_tested++;
+      return;
+    }
+
+    // Consistency
+    if (!D.check_consistency()) {
+      n_failed++;
+      if (n_failed <= 10)
+        std::cerr << "Graph #" << idx << ": consistency check failed" << std::endl;
+      n_tested++;
+      return;
+    }
+
+    // Delaunay: STRICT — 0 non-Delaunay edges
+    int non_del = D.count_non_delaunay();
+    if (non_del > 0) {
+      if (n_failed < 10 || non_del > 4)
+        ADD_FAILURE() << "Graph #" << idx << ": " << non_del << " non-Delaunay edges";
+      n_failed++;
+    }
+
+    // Cone angles
+    // Cone degrees are ordered by sort_flat_last: non-6 first, in original order.
+    vector<int> cone_degrees;
+    for (int d : orig_degrees)
+      if (d != 6) cone_degrees.push_back(d);
+
+    if ((int)cone_degrees.size() == D.nv) {
+      for (int v = 0; v < D.nv; v++) {
+        if (D.v_out[v] < 0) continue;
+        double expected_angle = D.v_cone_angle[v];
+        double total_angle = 0;
+        int h0 = D.v_out[v], h = h0;
+        do {
+          total_angle += D.he_angle[h];
+          h = D.cw(h);
+        } while (h != h0);
+        if (std::abs(total_angle - expected_angle) > 1e-6) {
+          if (n_failed < 10)
+            ADD_FAILURE() << "Graph #" << idx << " vertex " << v
+                          << " (orig deg " << D.v_orig_degree[v]
+                          << "): cone angle " << total_angle
+                          << " != expected " << expected_angle;
+          n_failed++;
+          break;
+        }
+      }
+    }
+
+    // Area conservation
+    double expected_area = N_original_faces * sqrt(3.0) / 4.0;
+    double actual_area = 0;
+    for (int f = 0; f < D.nf; f++) {
+      if (D.f_he[f] < 0) continue;
+      int h0 = D.f_he[f], h1 = D.he_next[h0], h2 = D.he_next[h1];
+      double a = D.he_length[h0], b = D.he_length[h1], c = D.he_length[h2];
+      double s = (a + b + c) / 2.0;
+      double area2 = s * (s - a) * (s - b) * (s - c);
+      actual_area += sqrt(std::max(0.0, area2));
+    }
+    if (std::abs(actual_area - expected_area) > 1e-6) {
+      if (n_failed < 10)
+        ADD_FAILURE() << "Graph #" << idx << ": area " << actual_area
+                      << " != expected " << expected_area;
+      n_failed++;
+    }
+
+    n_tested++;
+
+    if (n_tested % 100000 == 0)
+      fprintf(stderr, "  [%d] tested=%d failed=%d\n", idx, n_tested, n_failed);
+  });
+
+  print_timing_stats("DCEL Plantri15 iDT", times_us);
+  std::cout << "DCEL Plantri15: tested " << n_tested << " triangulations, "
+            << n_failed << " failures, max degree seen = "
+            << max_degree_seen << std::endl;
+  EXPECT_EQ(n_failed, 0);
+}
+
+// ============================================================================
+// DCEL embed_3d tests
+// ============================================================================
+
+// Verify DCEL 3D embedding quality: edge distance errors and convexity.
+static void verify_dcel_embedding(const DelaunayTriangulation& D,
+                                  const vector<coord3d>& coords,
+                                  double dist_tol, const std::string& label) {
+  ASSERT_EQ((int)coords.size(), D.nv) << label << ": wrong coord count";
+
+  // Edge distance errors (shortest edge per pair, matching what embed_3d targets).
+  map<pair<int,int>, double> shortest;
+  for (int h = 0; h < D.nh; h += 2) {
+    if (!D.alive(h)) continue;
+    int u = D.he_origin[h], v = D.dest(h);
+    if (u > v) swap(u, v);
+    double L = D.he_length[h];
+    auto key = make_pair(u, v);
+    auto it = shortest.find(key);
+    if (it == shortest.end() || L < it->second)
+      shortest[key] = L;
+  }
+
+  double max_rel_err = 0;
+  double sum_sq_err = 0;
+  int n_edges = 0;
+  for (auto& [key, target] : shortest) {
+    double actual = (coords[key.first] - coords[key.second]).norm();
+    double rel_err = fabs(actual - target) / target;
+    max_rel_err = std::max(max_rel_err, rel_err);
+    sum_sq_err += (actual - target) * (actual - target);
+    n_edges++;
+  }
+  double rms_err = sqrt(sum_sq_err / n_edges);
+
+  EXPECT_LT(max_rel_err, dist_tol)
+    << label << ": max relative edge error = " << max_rel_err;
+
+  // Cone angle errors
+  double max_cone_err = 0;
+  for (int v = 0; v < D.nv; v++) {
+    if (D.v_out[v] < 0) continue;
+    double angle_sum = 0;
+    int h0 = D.v_out[v], h = h0;
+    do {
+      int d1 = D.dest(h);
+      int h2 = D.cw(h);
+      int d2 = D.dest(h2);
+      coord3d va = coords[d1] - coords[v], vb = coords[d2] - coords[v];
+      double ra = va.norm(), rb = vb.norm();
+      if (ra > 1e-15 && rb > 1e-15) {
+        double C = max(-1.0, min(1.0, va.dot(vb) / (ra * rb)));
+        angle_sum += acos(C);
+      }
+      h = h2;
+    } while (h != h0);
+    max_cone_err = std::max(max_cone_err, fabs(angle_sum - D.v_cone_angle[v]));
+  }
+
+  std::cout << label << ": n_edges=" << n_edges
+            << " max_rel_err=" << max_rel_err
+            << " rms_err=" << rms_err
+            << " max_cone_err=" << max_cone_err << std::endl;
+}
+
+TEST(DCELEmbed, C20_Icosahedron) {
+  Triangulation T = make_dual(20, 0, false);
+  auto D = DelaunayTriangulation::compute(T);
+  ASSERT_EQ(D.nv, 12);
+
+  auto coords = D.embed_3d();
+  verify_dcel_embedding(D, coords, 1e-6, "C20");
+
+  // For C20, all iDT edges should have length 1 (regular icosahedron).
+  for (int h = 0; h < D.nh; h += 2) {
+    if (!D.alive(h)) continue;
+    int u = D.he_origin[h], v = D.dest(h);
+    double dist = (coords[u] - coords[v]).norm();
+    EXPECT_NEAR(dist, 1.0, 1e-6) << "C20 edge h=" << h
+      << " (" << u << "," << v << ") = " << dist;
+  }
+}
+
+TEST(DCELEmbed, C60_Ih) {
+  Triangulation T = make_dual(60, 0, true);
+  auto D = DelaunayTriangulation::compute(T);
+  ASSERT_EQ(D.nv, 12);
+
+  auto coords = D.embed_3d();
+  verify_dcel_embedding(D, coords, 1e-4, "C60_Ih");
+}
+
+TEST(DCELEmbed, SmallFullerenes) {
+  int sizes[] = {20, 24, 26, 28, 30, 32, 34, 36, 38, 40};
+  int total = 0, n_poor = 0;
+
+  for (int N : sizes) {
+    BuckyGen::buckygen_queue Q = BuckyGen::start(N, false, false);
+    Triangulation T;
+    int idx = 0;
+    while (BuckyGen::next_fullerene(Q, T)) {
+      auto D = DelaunayTriangulation::compute(T);
+      if (D.nv != 12) { idx++; continue; }
+
+      auto coords = D.embed_3d();
+
+      // Check edge distance matching (shortest per pair)
+      map<pair<int,int>, double> shortest;
+      for (int h = 0; h < D.nh; h += 2) {
+        if (!D.alive(h)) continue;
+        int u = D.he_origin[h], v = D.dest(h);
+        if (u > v) swap(u, v);
+        double L = D.he_length[h];
+        auto key = make_pair(u, v);
+        auto it = shortest.find(key);
+        if (it == shortest.end() || L < it->second)
+          shortest[key] = L;
+      }
+
+      double max_rel_err = 0;
+      for (auto& [key, target] : shortest) {
+        double actual = (coords[key.first] - coords[key.second]).norm();
+        double rel_err = fabs(actual - target) / target;
+        max_rel_err = std::max(max_rel_err, rel_err);
+      }
+
+      if (max_rel_err > 0.01) {
+        n_poor++;
+        std::cerr << "C" << N << " #" << idx
+                  << ": max_rel_err=" << max_rel_err << std::endl;
+      }
+
+      EXPECT_LT(max_rel_err, 0.05)
+        << "C" << N << " #" << idx << " DCEL embedding too inaccurate";
+
+      idx++;
+      total++;
+    }
+    BuckyGen::stop(Q);
+  }
+  std::cout << "DCEL Embed: Tested " << total << " embeddings, "
+            << n_poor << " with >1% error" << std::endl;
+}
+
+TEST(DCELEmbed, C60_1264_MultiEdge) {
+  BuckyGen::buckygen_queue Q = BuckyGen::start(60, false, false);
+  Triangulation T;
+  int idx = 0;
+  while (BuckyGen::next_fullerene(Q, T)) {
+    if (idx == 1264) break;
+    idx++;
+  }
+  BuckyGen::stop(Q);
+
+  auto D = DelaunayTriangulation::compute(T);
+  ASSERT_EQ(D.nv, 12);
+
+  // Report multi-edges
+  std::map<std::pair<int,int>, std::vector<double>> edge_lengths;
+  for (int h = 0; h < D.nh; h += 2) {
+    if (!D.alive(h)) continue;
+    int u = D.he_origin[h], v = D.dest(h);
+    if (u > v) std::swap(u, v);
+    edge_lengths[{u,v}].push_back(D.he_length[h]);
+  }
+
+  std::cout << "Distinct vertex pairs: " << edge_lengths.size() << std::endl;
+  for (auto& [key, lens] : edge_lengths) {
+    if (lens.size() > 1) {
+      std::cout << "  Multi-edge (" << key.first << "," << key.second << "): ";
+      for (double l : lens) std::cout << l << " ";
+      std::cout << std::endl;
+    }
+  }
+
+  for (int v = 0; v < D.nv; v++)
+    std::cout << "  v" << v << ": deg=" << D.vertex_degree(v)
+              << " cone=" << D.v_cone_angle[v]
+              << " orig_deg=" << D.v_orig_degree[v] << std::endl;
+
+  auto coords = D.embed_3d();
+
+  // Report edge errors
+  double max_rel_err = 0;
+  for (auto& [key, lens] : edge_lengths) {
+    double dist = (coords[key.first] - coords[key.second]).norm();
+    double shortest = *std::min_element(lens.begin(), lens.end());
+    double rel_err = std::abs(dist - shortest) / shortest;
+    max_rel_err = std::max(max_rel_err, rel_err);
+    if (rel_err > 0.01)
+      std::cout << "  (" << key.first << "," << key.second
+                << "): target=" << shortest << " actual=" << dist
+                << " rel_err=" << rel_err << std::endl;
+  }
+
+  // Report cone angle errors
+  for (int v = 0; v < D.nv; v++) {
+    if (D.v_out[v] < 0) continue;
+    double angle_sum = 0;
+    int h0 = D.v_out[v], h = h0;
+    do {
+      int d1 = D.dest(h);
+      int h2 = D.cw(h);
+      int d2 = D.dest(h2);
+      coord3d va = coords[d1] - coords[v], vb = coords[d2] - coords[v];
+      double ra = va.norm(), rb = vb.norm();
+      if (ra > 1e-15 && rb > 1e-15) {
+        double C = std::max(-1.0, std::min(1.0, va.dot(vb) / (ra * rb)));
+        angle_sum += acos(C);
+      }
+      h = h2;
+    } while (h != h0);
+    if (std::abs(angle_sum - D.v_cone_angle[v]) > 0.01)
+      std::cout << "  v" << v << ": target_cone=" << D.v_cone_angle[v]
+                << " actual=" << angle_sum
+                << " err=" << std::abs(angle_sum - D.v_cone_angle[v]) << std::endl;
+  }
+
+  std::cout << "max_rel_err=" << max_rel_err << std::endl;
+  EXPECT_LT(max_rel_err, 0.05) << "C60 #1264 DCEL embedding too inaccurate";
+}
+
+TEST(DCELEmbed, C60_AllIsomers) {
+  BuckyGen::buckygen_queue Q = BuckyGen::start(60, false, false);
+  Triangulation T;
+  int idx = 0, n_poor = 0;
+  double worst_err = 0;
+  int worst_idx = -1;
+
+  while (BuckyGen::next_fullerene(Q, T)) {
+    auto D = DelaunayTriangulation::compute(T);
+    if (D.nv != 12) { idx++; continue; }
+
+    auto coords = D.embed_3d();
+
+    map<pair<int,int>, double> shortest;
+    for (int h = 0; h < D.nh; h += 2) {
+      if (!D.alive(h)) continue;
+      int u = D.he_origin[h], v = D.dest(h);
+      if (u > v) swap(u, v);
+      double L = D.he_length[h];
+      auto key = make_pair(u, v);
+      auto it = shortest.find(key);
+      if (it == shortest.end() || L < it->second)
+        shortest[key] = L;
+    }
+
+    double max_rel_err = 0;
+    for (auto& [key, target] : shortest) {
+      double actual = (coords[key.first] - coords[key.second]).norm();
+      double rel_err = fabs(actual - target) / target;
+      max_rel_err = std::max(max_rel_err, rel_err);
+    }
+
+    if (max_rel_err > worst_err) { worst_err = max_rel_err; worst_idx = idx; }
+    if (max_rel_err > 0.01) n_poor++;
+
+    EXPECT_LT(max_rel_err, 0.05)
+      << "C60 #" << idx << " DCEL embedding too inaccurate";
+
+    idx++;
+  }
+  BuckyGen::stop(Q);
+
+  std::cout << "DCEL C60 Embed: " << idx << " isomers, "
+            << n_poor << " with >1% error, worst=" << worst_err
+            << " at #" << worst_idx << std::endl;
 }
