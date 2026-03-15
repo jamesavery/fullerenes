@@ -70,16 +70,14 @@ static void verify_reduced(const FulleroidDelaunay& D, int expected_verts, int N
     }
 
   // --- Delaunay criterion ---
-  // Lawson's flip algorithm may leave a small number of non-Delaunay edges
-  // in rare topological configurations (multi-edge blocked flips).
-  // Count them rather than hard-failing.
+  // Every edge must be Delaunay.  A non-Delaunay edge is an algorithm bug.
   {
     int non_del = 0;
     for (node_t u = 0; u < D.N; u++)
       for (node_t v : D[u])
         if (u < v && !D.is_delaunay_edge(u, v))
           non_del++;
-    EXPECT_LE(non_del, 2) << non_del << " non-Delaunay edges (max 2 allowed for blocked flips)";
+    EXPECT_EQ(non_del, 0) << non_del << " non-Delaunay edges remain";
   }
 
   // --- Metric checks ---
@@ -262,6 +260,31 @@ TEST(IntrinsicDelaunay, C60_AllIsomers) {
   print_timing_stats("C60 iDT", times_us);
 }
 
+// Run the iDT with full invariant auditing on C60 #1264 (known problematic isomer).
+TEST(IntrinsicDelaunay, C60_1264_Audit) {
+  BuckyGen::buckygen_queue Q = BuckyGen::start(60, false, false);
+  Triangulation T;
+  int idx = 0;
+  while (BuckyGen::next_fullerene(Q, T)) {
+    if (idx == 1264) break;
+    idx++;
+  }
+  BuckyGen::stop(Q);
+  ASSERT_EQ(idx, 1264);
+
+  FulleroidDelaunay D(T);
+  IDTAudit audit(D);
+  audit.stop_on_failure = false;  // collect all failures, don't abort
+  D.audit = &audit;
+
+  D.remove_flat_vertices();
+  ASSERT_EQ(D.N, 12);
+
+  std::cout << "Audit: " << audit.n_checks << " checks, "
+            << audit.n_failures << " failures\n";
+  EXPECT_EQ(audit.n_failures, 0);
+}
+
 TEST(IntrinsicDelaunay, DISABLED_C80_AllIsomers) {
   BuckyGen::buckygen_queue Q = BuckyGen::start(80, false, false);
   Triangulation T;
@@ -377,7 +400,7 @@ static void verify_reduced_general(const FulleroidDelaunay& D,
       for (node_t v : D[u])
         if (u < v && !D.is_delaunay_edge(u, v))
           non_del++;
-    EXPECT_LE(non_del, 2) << non_del << " non-Delaunay edges";
+    EXPECT_EQ(non_del, 0) << non_del << " non-Delaunay edges remain";
   }
 
   // --- Triangle inequality ---
@@ -1705,4 +1728,175 @@ TEST(IntrinsicDelaunay, Plantri15_AllTriangulations) {
             << n_failed << " failures, max degree seen = "
             << max_degree_seen << std::endl;
   EXPECT_EQ(n_failed, 0);
+}
+
+// ============================================================================
+// DCEL-based DelaunayTriangulation tests
+// ============================================================================
+
+// Verify DCEL construction from a known triangulation.
+TEST(DCEL, Construction_C20) {
+  Triangulation T = make_dual(20, 0);
+  auto D = DelaunayTriangulation::from_triangulation(T);
+
+  EXPECT_EQ(D.nv, T.N);
+  // C20 dual: 12 vertices, 30 edges, 20 faces
+  EXPECT_EQ(D.nh, 2 * 30);
+  EXPECT_EQ(D.nf, 20);
+
+  EXPECT_TRUE(D.check_consistency()) << "DCEL consistency check failed";
+
+  // All edges should have length 1.
+  for (int h = 0; h < D.nh; h++)
+    if (D.alive(h))
+      EXPECT_DOUBLE_EQ(D.he_length[h], 1.0);
+
+  // All angles should be pi/3 (equilateral).
+  for (int h = 0; h < D.nh; h++)
+    if (D.alive(h))
+      EXPECT_NEAR(D.he_angle[h], M_PI / 3.0, 1e-14);
+}
+
+// Test DCEL construction for C60.
+TEST(DCEL, Construction_C60) {
+  Triangulation T = make_dual(60, 0);
+  auto D = DelaunayTriangulation::from_triangulation(T);
+  EXPECT_EQ(D.nv, T.N);  // N/2+2 = 32
+  EXPECT_TRUE(D.check_consistency());
+}
+
+// Test the full DCEL-based iDT algorithm on C20 (trivial: no flat vertices).
+TEST(DCEL, Compute_C20) {
+  Triangulation T = make_dual(20, 0);
+  auto D = DelaunayTriangulation::compute(T);
+
+  // C20 has only degree-5 vertices, no flat vertices to remove.
+  // Result should be 12 vertices, fully Delaunay.
+  EXPECT_EQ(D.nv, 12);
+  EXPECT_TRUE(D.check_consistency());
+  EXPECT_TRUE(D.is_delaunay());
+}
+
+// Test the full DCEL-based iDT algorithm on C60 Ih.
+TEST(DCEL, Compute_C60_Ih) {
+  Triangulation T = make_dual(60, 0, true);  // IPR isomer 0 = Ih
+  auto D = DelaunayTriangulation::compute(T);
+
+  EXPECT_EQ(D.nv, 12);
+  EXPECT_TRUE(D.check_consistency());
+  EXPECT_TRUE(D.is_delaunay());
+
+  // Count live edges and faces.
+  int live_edges = 0;
+  for (int h = 0; h < D.nh; h += 2)
+    if (D.alive(h)) live_edges++;
+  EXPECT_EQ(live_edges, 30);
+
+  int live_faces = 0;
+  for (int f = 0; f < D.nf; f++)
+    if (D.f_he[f] >= 0) live_faces++;
+  EXPECT_EQ(live_faces, 20);
+}
+
+// Helper: verify a DCEL result has the expected structure.
+static void verify_dcel_reduced(const DelaunayTriangulation& D, int expected_verts) {
+  EXPECT_EQ(D.nv, expected_verts);
+  EXPECT_TRUE(D.check_consistency());
+  EXPECT_TRUE(D.is_delaunay());
+
+  // Count live edges and faces.
+  int live_edges = 0;
+  for (int h = 0; h < D.nh; h += 2)
+    if (D.alive(h)) live_edges++;
+
+  int live_faces = 0;
+  for (int f = 0; f < D.nf; f++)
+    if (D.f_he[f] >= 0) live_faces++;
+
+  // Euler: V - E + F = 2 for genus 0
+  EXPECT_EQ(expected_verts - live_edges + live_faces, 2)
+    << "Euler formula failed: V=" << expected_verts
+    << " E=" << live_edges << " F=" << live_faces;
+
+  if (expected_verts == 12) {
+    EXPECT_EQ(live_edges, 30);
+    EXPECT_EQ(live_faces, 20);
+  }
+
+  // All cone angles should be 5*pi/3 for fullerene duals.
+  for (int v = 0; v < D.nv; v++) {
+    if (D.v_out[v] < 0) continue;  // dead vertex
+    EXPECT_NEAR(D.v_cone_angle[v], 5.0 * M_PI / 3.0, 1e-10)
+      << "Vertex " << v << " cone angle = " << D.v_cone_angle[v];
+  }
+
+  // All edge lengths positive.
+  for (int h = 0; h < D.nh; h += 2) {
+    if (!D.alive(h)) continue;
+    EXPECT_GT(D.he_length[h], 0.0) << "Edge " << h/2 << " has non-positive length";
+  }
+}
+
+TEST(DCEL, C60_AllIsomers) {
+  BuckyGen::buckygen_queue Q = BuckyGen::start(60, false, false);
+  Triangulation T;
+  std::vector<double> times_us;
+  int idx = 0;
+  int n_fail = 0;
+  while (BuckyGen::next_fullerene(Q, T)) {
+    SCOPED_TRACE("C60 #" + std::to_string(idx));
+    auto t0 = std::chrono::high_resolution_clock::now();
+    auto D = DelaunayTriangulation::compute(T);
+    auto t1 = std::chrono::high_resolution_clock::now();
+    times_us.push_back(std::chrono::duration<double, std::micro>(t1 - t0).count());
+    verify_dcel_reduced(D, 12);
+    if (D.nv != 12 || !D.is_delaunay()) n_fail++;
+    idx++;
+  }
+  BuckyGen::stop(Q);
+  EXPECT_EQ(idx, 1812);
+  EXPECT_EQ(n_fail, 0);
+  print_timing_stats("DCEL C60 iDT", times_us);
+}
+
+TEST(DCEL, DISABLED_C80_AllIsomers) {
+  BuckyGen::buckygen_queue Q = BuckyGen::start(80, false, false);
+  Triangulation T;
+  std::vector<double> times_us;
+  int idx = 0;
+  int n_fail = 0;
+  while (BuckyGen::next_fullerene(Q, T)) {
+    SCOPED_TRACE("C80 #" + std::to_string(idx));
+    auto t0 = std::chrono::high_resolution_clock::now();
+    auto D = DelaunayTriangulation::compute(T);
+    auto t1 = std::chrono::high_resolution_clock::now();
+    times_us.push_back(std::chrono::duration<double, std::micro>(t1 - t0).count());
+    verify_dcel_reduced(D, 12);
+    if (D.nv != 12 || !D.is_delaunay()) n_fail++;
+    idx++;
+  }
+  BuckyGen::stop(Q);
+  EXPECT_EQ(n_fail, 0);
+  print_timing_stats("DCEL C80 iDT", times_us);
+}
+
+TEST(DCEL, DISABLED_C100_AllIsomers) {
+  BuckyGen::buckygen_queue Q = BuckyGen::start(100, false, false);
+  Triangulation T;
+  std::vector<double> times_us;
+  int idx = 0;
+  int n_fail = 0;
+  while (BuckyGen::next_fullerene(Q, T)) {
+    SCOPED_TRACE("C100 #" + std::to_string(idx));
+    auto t0 = std::chrono::high_resolution_clock::now();
+    auto D = DelaunayTriangulation::compute(T);
+    auto t1 = std::chrono::high_resolution_clock::now();
+    times_us.push_back(std::chrono::duration<double, std::micro>(t1 - t0).count());
+    verify_dcel_reduced(D, 12);
+    if (D.nv != 12 || !D.is_delaunay()) n_fail++;
+    idx++;
+  }
+  BuckyGen::stop(Q);
+  EXPECT_EQ(n_fail, 0);
+  print_timing_stats("DCEL C100 iDT", times_us);
 }
