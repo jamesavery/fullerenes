@@ -794,12 +794,14 @@ bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, vector<ve
             continue;
           }
           found = true;
-          if(general_spiral{jumps_tmp,spiral_tmp} < general_spiral{jumps,spiral}){
+          general_spiral gs_tmp{jumps_tmp,spiral_tmp}, gs_best{jumps,spiral};
+          if(gs_tmp < gs_best){
             jumps  = jumps_tmp;
             spiral = spiral_tmp;
             permutations.clear();
           }
-          permutations.push_back(permutation_tmp);
+          if(!(gs_best < gs_tmp))
+            permutations.push_back(permutation_tmp);
         }
       }
     }
