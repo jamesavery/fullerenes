@@ -27,123 +27,6 @@ struct Diamond {
   double flipped_length() const;  // length of BD (the other diagonal)
 };
 
-struct IDTAudit;  // forward declaration
-
-// Intrinsic Delaunay triangulation of an equilateral triangulation.
-//
-// Given any equilateral triangulation (all edges unit length) on a closed
-// orientable surface, computes the intrinsic Delaunay triangulation whose
-// vertices are only the cone points (degree != 6 vertices).
-//
-// Algorithm: incrementally remove flat (degree-6) vertices by reducing their
-// degree to 3 via local edge flips, then trivially removing them.  Each edge
-// flip computes the new edge length from the diamond geometry.
-// Lawson flipping after each removal restores the Delaunay property.
-//
-// References:
-//   Fisher, Springborn, Schroder, Bobenko. "An Algorithm for the Construction
-//   of Intrinsic Delaunay Triangulations." SIGGRAPH 2006.
-//   Bobenko, Springborn. "A discrete Laplace-Beltrami operator for simplicial
-//   surfaces." 2005.
-
-class FulleroidDelaunay: public Triangulation {
-public:
-  matrix<double> edge_lengths; // edge_lengths(u,v) = length if edge exists, 0 otherwise
-  IDTAudit* audit = nullptr;   // null = no checking; non-null = full invariant checking
-
-  // Construct from any equilateral triangulation.
-  // Sorts vertices so cone points (degree != 6) come first, degree-6 last.
-  // Initializes all edge lengths to 1.
-  FulleroidDelaunay(const Triangulation& T);
-
-  // --- Edge length access ---
-  double get_length(node_t u, node_t v) const { return edge_lengths(u,v); }
-  void   set_length(node_t u, node_t v, double len) {
-    edge_lengths(u,v) = len;
-    edge_lengths(v,u) = len;
-  }
-
-  // --- Intrinsic geometry ---
-
-  // Extract the diamond geometry around edge (u,v).
-  Diamond diamond(node_t u, node_t v) const;
-
-  // --- Delaunay operations ---
-
-  bool is_delaunay_edge(node_t u, node_t v) const;
-  bool flip_edge(node_t u, node_t v, bool verbose = false);
-  int  lawson_sweep();               // Standard Lawson: flip all flippable non-Delaunay edges
-  int  count_non_delaunay() const;   // Count remaining non-Delaunay edges
-  int  delaunay_resolve();           // Search-based escape from Lawson local minima
-  int  flip_to_delaunay();           // Full: lawson_sweep + delaunay_resolve
-  bool is_delaunay() const;
-
-  // --- Vertex removal ---
-
-  void remove_flat_vertex(node_t v);
-  void remove_flat_vertices();
-
-  // --- Validation ---
-  bool edge_lengths_are_symmetric() const;
-
-  // --- 3D Embedding ---
-
-  // All-pairs shortest-path distances on the reduced graph (Floyd-Warshall).
-  matrix<double> all_pairs_distances() const;
-
-  // Embed the reduced triangulation in 3D to match edge lengths.
-  // Uses classical MDS for initial guess, then stress refinement.
-  // Returns 3D coordinates for each vertex.
-  vector<coord3d> embed_3d() const;
-};
-
-// Invariant checker for iDT operations.  Attach to a FulleroidDelaunay via
-// its `audit` pointer to enable comprehensive postcondition checking after
-// every mutation (flip, vertex removal, Lawson sweep).  Null pointer = no
-// checking = zero cost.
-//
-// Usage:
-//   FulleroidDelaunay D(T);
-//   IDTAudit audit(D);
-//   D.audit = &audit;
-//   D.remove_flat_vertices();
-//   assert(audit.n_failures == 0);
-struct IDTAudit {
-  // --- Captured at construction ---
-  vector<int> original_degrees;   // original degree of every vertex
-  int    original_faces;          // face count of initial triangulation
-  double expected_area;           // original_faces * sqrt(3)/4
-
-  // --- Results ---
-  int n_checks   = 0;
-  int n_failures = 0;
-
-  // --- Options ---
-  bool stop_on_failure = true;    // abort on first failure (good for debugging)
-
-  explicit IDTAudit(const FulleroidDelaunay& D);
-
-  // --- Operation hooks (called from FulleroidDelaunay methods) ---
-  void after_flip(const FulleroidDelaunay& D, node_t u, node_t v);
-  void after_removal(const FulleroidDelaunay& D, node_t removed);
-  void after_sweep(const FulleroidDelaunay& D, int n_flips);
-
-private:
-  void check_all(const FulleroidDelaunay& D, const char* context);
-
-  bool verify_euler(const FulleroidDelaunay& D, const char* ctx);
-  bool verify_orientation(const FulleroidDelaunay& D, const char* ctx);
-  bool verify_edge_consistency(const FulleroidDelaunay& D, const char* ctx);
-  bool verify_triangle_inequality(const FulleroidDelaunay& D, const char* ctx);
-  bool verify_positive_area(const FulleroidDelaunay& D, const char* ctx);
-  bool verify_cone_angles(const FulleroidDelaunay& D, const char* ctx);
-  bool verify_total_area(const FulleroidDelaunay& D, const char* ctx);
-  bool verify_loeschian(const FulleroidDelaunay& D, const char* ctx);
-  bool verify_no_multi_edges(const FulleroidDelaunay& D, const char* ctx);
-
-  void fail(const char* invariant, const char* ctx, const string& detail);
-};
-
 // ============================================================================
 // DCEL-based intrinsic Delaunay triangulation (delta-complex).
 //
@@ -241,10 +124,26 @@ struct DelaunayTriangulation {
                                        bool exact_origins = false);
 
   // --- 3D Embedding ---
-  vector<coord3d> embed_3d() const;
+  // Embed the reduced triangulation in 3D to match intrinsic edge lengths.
+  // Optional symmetry: permutations on 0..nv-1 (the iDT vertex indices).
+  // When provided, the optimizer constrains the embedding to the symmetric
+  // subspace via Procrustes symmetrization, eliminating MDS degeneracies
+  // and reducing effective DOFs.
+  vector<coord3d> embed_3d(const vector<vector<int>>& sym = {}) const;
 
   // --- Validation ---
   bool check_consistency() const;
 };
+
+// Restrict full-triangulation automorphisms to iDT cone-point indices.
+// G: automorphisms of the full triangulation (from Symmetry::G).
+// T: the original triangulation (before sort_flat_last / iDT computation).
+// Returns permutations on 0..11 (the iDT vertex ordering: cone points sorted
+// by original index). Empty input → empty output.
+vector<vector<int>> restrict_to_cone_points(
+    const vector<vector<int>>& G, const Triangulation& T);
+
+// Compute vertex orbits from a group of permutations (union-find).
+vector<vector<int>> compute_orbits(int n, const vector<vector<int>>& G);
 
 #endif

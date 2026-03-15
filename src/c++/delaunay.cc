@@ -74,681 +74,7 @@ double Diamond::flipped_length() const
   return (f2 > 0) ? sqrt(f2) : 0;
 }
 
-// ============================================================================
-// Constructor
-// ============================================================================
-
-FulleroidDelaunay::FulleroidDelaunay(const Triangulation& T)
-  : Triangulation(T.sort_flat_last()), edge_lengths(N, N, 0)
-{
-  // Edge flips during vertex removal can temporarily push vertex degrees
-  // well above 6 (the max for fullerene duals). Restride to give headroom.
-  if (dmax < 20) {
-    auto restrided = restride(20);
-    owned_values = std::move(restrided.owned_values);
-    owned_deg = std::move(restrided.owned_deg);
-    dmax = 20;
-    repoint();
-  }
-  for (node_t u = 0; u < N; u++)
-    for (node_t v : (*this)[u])
-      edge_lengths(u, v) = 1.0;
-}
-
-// ============================================================================
-// Diamond extraction and Delaunay operations
-// ============================================================================
-
-Diamond FulleroidDelaunay::diamond(node_t u, node_t v) const
-{
-  node_t B = next(v, u), D = next(u, v);
-  Diamond d = {get_length(u,v), get_length(u,B), get_length(v,B),
-               get_length(u,D), get_length(v,D)};
-  assert(d.e > 0 && d.a > 0 && d.b > 0 && d.c > 0 && d.d > 0);
-  return d;
-}
-
-bool FulleroidDelaunay::is_delaunay_edge(node_t u, node_t v) const
-{
-  return diamond(u, v).is_delaunay();
-}
-
-bool FulleroidDelaunay::flip_edge(node_t u, node_t v, bool verbose)
-{
-  node_t B = next(v, u), D = next(u, v);
-
-  // Topological guards
-  if (B == D) { if (verbose) fprintf(stderr, "  flip(%d,%d): B==D==%d\n", u, v, B); return false; }
-  if (edge_exists(edge_t(B, D))) { if (verbose) fprintf(stderr, "  flip(%d,%d): multi-edge (%d,%d)\n", u, v, B, D); return false; }
-
-  // Geometric guards
-  auto d = diamond(u, v);
-  if (!d.is_convex()) { if (verbose) fprintf(stderr, "  flip(%d,%d): not convex\n", u, v); return false; }
-  double f = d.flipped_length();
-  if (!std::isfinite(f) || f <= 0) { if (verbose) fprintf(stderr, "  flip(%d,%d): bad length f=%g\n", u, v, f); return false; }
-
-  // Execute flip: remove diagonal u-v, insert diagonal B-D.
-  Graph::remove_edge(edge_t(u, v));
-  set_length(u, v, 0);
-  Graph::insert_edge(arc_t(B, D), u, v);
-  set_length(B, D, f);
-
-  if (audit) audit->after_flip(*this, u, v);
-  return true;
-}
-
-int FulleroidDelaunay::flip_to_delaunay()
-{
-  int flips = lawson_sweep();
-  if (!is_delaunay())
-    flips += delaunay_resolve();
-  return flips;
-}
-
-bool FulleroidDelaunay::is_delaunay() const
-{
-  for (node_t u = 0; u < N; u++)
-    for (node_t v : (*this)[u])
-      if (u < v && !is_delaunay_edge(u, v))
-        return false;
-  return true;
-}
-
-int FulleroidDelaunay::count_non_delaunay() const
-{
-  int count = 0;
-  for (node_t u = 0; u < N; u++)
-    for (node_t v : (*this)[u])
-      if (u < v && !is_delaunay_edge(u, v))
-        count++;
-  return count;
-}
-
-int FulleroidDelaunay::delaunay_resolve()
-{
-  // Search for a sequence of flips that reduces the non-Delaunay edge count.
-  //
-  // On some surfaces, the iDT is non-simplicial (has multi-edges between
-  // the same pair of cone points).  In that case, no simplicial triangulation
-  // is fully Delaunay, and this function cannot reach 0 non-Delaunay edges.
-  // It still improves the result when possible (e.g., reducing 3 → 1).
-
-  int total_flips = 0;
-
-  for (int round = 0; round < 20; round++) {
-    int count0 = count_non_delaunay();
-    if (count0 == 0) break;
-
-    FulleroidDelaunay saved = *this;
-    bool improved = false;
-
-    // Collect all edges from saved state.
-    vector<edge_t> edges;
-    for (node_t u = 0; u < N; u++)
-      for (node_t v : saved[u])
-        if (u < v) edges.push_back(edge_t(u, v));
-
-    // Depth 1: try every single edge flip.
-    for (size_t i = 0; i < edges.size() && !improved; i++) {
-      *this = saved;
-      if (!flip_edge(edges[i].first, edges[i].second)) continue;
-      int f = 1 + lawson_sweep();
-      if (count_non_delaunay() < count0) {
-        total_flips += f;
-        improved = true;
-      }
-    }
-
-    // Depth 2: try all pairs of flips.
-    for (size_t i = 0; i < edges.size() && !improved; i++) {
-      for (size_t j = i + 1; j < edges.size() && !improved; j++) {
-        *this = saved;
-        if (!flip_edge(edges[i].first, edges[i].second)) continue;
-        if (!edge_exists(edges[j]) ||
-            !flip_edge(edges[j].first, edges[j].second)) continue;
-        int f = 2 + lawson_sweep();
-        if (count_non_delaunay() < count0) {
-          total_flips += f;
-          improved = true;
-        }
-      }
-    }
-
-    if (!improved) {
-      *this = saved;  // restore
-      break;
-    }
-  }
-
-  return total_flips;
-}
-
-// ============================================================================
-// Vertex removal
-// ============================================================================
-
-void FulleroidDelaunay::remove_flat_vertex(node_t v)
-{
-  // Phase 1: Reduce v's degree via incident edge flips.
-  // Stop at degree 4 — the ear clipping in Phase 2 handles degree >= 4.
-  while (degree(v) > 4) {
-    bool progress = false;
-    vector<node_t> vnbrs((*this)[v].begin(), (*this)[v].end());
-    for (node_t u : vnbrs)
-      if (flip_edge(v, u)) { progress = true; break; }
-    if (!progress) break;
-  }
-
-  int deg = degree(v);
-
-  // Phase 2: Star retriangulation for degree >= 4 via intrinsic ear clipping.
-  // Unfolds the fan of triangles around v into a planar polygon using
-  // cumulative angles and spoke lengths, then clips convex ears.
-  if (deg >= 4) {
-    int k = deg;
-    auto row = (*this)[v];
-    vector<node_t> nb(row.begin(), row.end());
-
-    // Gather spoke and rim lengths.
-    vector<double> spokes(k), rims(k);
-    for (int i = 0; i < k; i++) {
-      spokes[i] = get_length(v, nb[i]);
-      rims[i]   = get_length(nb[i], nb[(i + 1) % k]);
-    }
-
-    // Cumulative angle at v: cum[i] = sum of fan-triangle angles from 0 to i-1.
-    vector<double> cum(k + 1, 0);
-    for (int i = 0; i < k; i++) {
-      double si = spokes[i], sn = spokes[(i+1)%k], r = rims[i];
-      double cos_a = std::clamp((si*si + sn*sn - r*r) / (2*si*sn), -1.0, 1.0);
-      cum[i+1] = cum[i] + acos(cos_a);
-    }
-
-    // Diagonal length from nb[from] to nb[to] through the CCW sub-fan.
-    auto diag_len = [&](int from, int to) -> double {
-      double angle = (to > from) ? cum[to] - cum[from]
-                                  : (cum[k] - cum[from]) + cum[to];
-      double sf = spokes[from], st = spokes[to];
-      double len2 = sf*sf + st*st - 2*sf*st*cos(angle);
-      return (len2 > 0) ? sqrt(len2) : 0;
-    };
-
-    // Signed area of triangle (P_pp, P_pi, P_pn) in the 2D fan unfolding,
-    // where P_j = (spokes[j]*cos(cum[j]), spokes[j]*sin(cum[j])).
-    // Positive means the polygon vertex at pi is convex (valid ear).
-    auto ear_signed_area = [&](int pp, int pi, int pn) -> double {
-      double rp = spokes[pp], ri = spokes[pi], rn = spokes[pn];
-      double tp = cum[pp], ti = cum[pi], tn = cum[pn];
-      return rp*ri*sin(ti - tp) + ri*rn*sin(tn - ti) + rn*rp*sin(tp - tn);
-    };
-
-    // Ear clipping with intrinsic geometry.
-    struct EarDiag { int prev_idx, ear_idx, next_idx; double len; };
-    vector<EarDiag> diagonals;
-
-    // Polygon as ring indices + edge lengths.
-    vector<int> poly(k);
-    vector<double> poly_edge(k);
-    for (int i = 0; i < k; i++) { poly[i] = i; poly_edge[i] = rims[i]; }
-
-    while ((int)poly.size() > 3) {
-      int n = poly.size();
-      bool found = false;
-      for (int j = 0; j < n; j++) {
-        int jm = (j - 1 + n) % n, jp = (j + 1) % n;
-        int pp = poly[jm], pi = poly[j], pn = poly[jp];
-
-        // Topological checks.
-        if (nb[pp] == nb[pn]) continue;
-        if (edge_exists(edge_t(nb[pp], nb[pn]))) continue;
-        bool dup = false;
-        for (auto& d : diagonals)
-          if (edge_t(nb[d.prev_idx], nb[d.next_idx]) == edge_t(nb[pp], nb[pn]))
-            { dup = true; break; }
-        if (dup) continue;
-
-        // Convexity check: polygon vertex must be convex (positive signed area).
-        if (ear_signed_area(pp, pi, pn) <= 1e-10) continue;
-
-        // Sub-fan angle check: the ear's fan arc from pp to pn (through pi)
-        // must be <= pi.  This ensures we always clip a "small" ear.
-        double sub_angle = (pn > pp) ? cum[pn] - cum[pp]
-                                      : (cum[k] - cum[pp]) + cum[pn];
-        if (sub_angle > M_PI + 1e-10) continue;
-
-        // Diagonal length via sub-fan angle + law of cosines.
-        double len = diag_len(pp, pn);
-        if (len <= 1e-15) continue;
-
-        diagonals.push_back({pp, pi, pn, len});
-        poly.erase(poly.begin() + j);
-        poly_edge.erase(poly_edge.begin() + j);
-        poly_edge[(j > 0) ? j - 1 : (int)poly.size() - 1] = len;
-        found = true;
-        break;
-      }
-      if (!found) {
-        // Blocker-flip: try flipping edges that block ear diagonals.
-        bool flipped_blocker = false;
-        int n2 = poly.size();
-        for (int j = 0; j < n2 && !flipped_blocker; j++) {
-          int jm = (j - 1 + n2) % n2, jp = (j + 1) % n2;
-          int pp = poly[jm], pn = poly[jp];
-          if (nb[pp] != nb[pn] && edge_exists(edge_t(nb[pp], nb[pn]))) {
-            if (flip_edge(nb[pp], nb[pn]))
-              flipped_blocker = true;
-          }
-        }
-        if (!flipped_blocker) return;  // truly stuck
-      }
-    }
-
-    // Remove all spoke edges.
-    for (int i = 0; i < k; i++) set_length(v, nb[i], 0);
-    for (int i = k - 1; i >= 0; i--) Graph::remove_edge(edge_t(v, nb[i]));
-
-    // Insert ear diagonals.
-    for (size_t di = 0; di < diagonals.size(); di++) {
-      auto& d = diagonals[di];
-      node_t p_prev = nb[d.prev_idx];
-      node_t p_ear  = nb[d.ear_idx];
-      node_t p_next = nb[d.next_idx];
-      // Insert diagonal p_prev--p_next so that the ear face
-      // (p_prev, p_ear, p_next) is created with correct CCW orientation.
-      node_t suc_uv = next(p_prev, p_ear);
-      node_t suc_vu = p_ear;
-      assert(find(p_next, p_ear) >= 0);
-      Graph::insert_edge(arc_t(p_prev, p_next), suc_uv, suc_vu);
-      set_length(p_prev, p_next, d.len);
-    }
-
-    assert(v == N - 1 && degree(v) == 0);
-    pop_back();
-    if (audit) audit->after_removal(*this, v);
-    return;
-  }
-
-  // Phase 3: Degree 3 — the three surrounding triangles collapse into one.
-  assert(deg == 3);
-  auto vrow = (*this)[v];
-  node_t a = vrow[0], b = vrow[1], c = vrow[2];
-  set_length(v, a, 0); set_length(v, b, 0); set_length(v, c, 0);
-  Graph::remove_edge(edge_t(v, a));
-  Graph::remove_edge(edge_t(v, b));
-  Graph::remove_edge(edge_t(v, c));
-
-  assert(v == N - 1);
-  pop_back();
-  if (audit) audit->after_removal(*this, v);
-}
-
-// Standard Lawson sweep: flip all flippable non-Delaunay edges.
-// Terminates because the Delaunay energy E_D strictly decreases with each flip
-// (Bobenko-Springborn 2005) and there are finitely many triangulations.
-int FulleroidDelaunay::lawson_sweep()
-{
-  int flips = 0;
-  map<edge_t, bool> in_stack;
-  stack<edge_t> S;
-  for (node_t u = 0; u < N; u++)
-    for (node_t v : (*this)[u])
-      if (u < v) {
-        edge_t e(u, v);
-        S.push(e); in_stack[e] = true;
-      }
-
-  int budget = 200 * N;
-  while (!S.empty() && budget > 0) {
-    edge_t e = S.top(); S.pop();
-    in_stack[e] = false;
-    node_t u = e.first, v = e.second;
-    if (!edge_exists(e) || is_delaunay_edge(u, v)) continue;
-
-    node_t B = next(v, u), D = next(u, v);
-    if (!flip_edge(u, v)) continue;
-
-    flips++; budget--;
-    for (edge_t ec : {edge_t(u,B), edge_t(B,v), edge_t(v,D), edge_t(D,u)})
-      if (!in_stack[ec]) { S.push(ec); in_stack[ec] = true; }
-  }
-  if (audit) audit->after_sweep(*this, flips);
-  return flips;
-}
-
-void FulleroidDelaunay::remove_flat_vertices()
-{
-  vector<int> original_degrees(N);
-  for (node_t v = 0; v < N; v++)
-    original_degrees[v] = degree(v);
-
-  while (N > 0 && original_degrees[N - 1] == 6) {
-    int old_N = N;
-    remove_flat_vertex(N - 1);
-
-    if (N == old_N) {
-      // Vertex removal stuck — restructure via Delaunay flips and retry.
-      bool removed = false;
-      for (int retry = 0; retry < 5; retry++) {
-        flip_to_delaunay();
-        remove_flat_vertex(N - 1);
-        if (N < old_N) { removed = true; break; }
-      }
-      if (!removed) break;  // truly stuck
-    }
-
-    lawson_sweep();  // maintain near-Delaunay between removals
-  }
-
-  // Final: lawson_sweep + delaunay_resolve on the cone-points-only graph.
-  flip_to_delaunay();
-}
-
-// ============================================================================
-// Validation
-// ============================================================================
-
-bool FulleroidDelaunay::edge_lengths_are_symmetric() const
-{
-  for (int i = 0; i < N; i++)
-    for (int j = i; j < N; j++)
-      if (edge_lengths(i,j) != edge_lengths(j,i))
-        return false;
-  return true;
-}
-
-// ============================================================================
-// IDTAudit — postcondition checking for iDT operations
-// ============================================================================
-
-IDTAudit::IDTAudit(const FulleroidDelaunay& D)
-  : original_degrees(D.N), original_faces(0), expected_area(0)
-{
-  for (node_t v = 0; v < D.N; v++)
-    original_degrees[v] = D.degree(v);
-
-  // Count faces: each triangle (u,v,w) with u<v<w is counted once.
-  for (node_t u = 0; u < D.N; u++)
-    for (size_t j = 0; j < D[u].size(); j++) {
-      node_t v = D[u][j], w = D[u][(j+1) % D[u].size()];
-      if (u < v && u < w) original_faces++;
-    }
-
-  expected_area = original_faces * sqrt(3.0) / 4.0;
-}
-
-void IDTAudit::after_flip(const FulleroidDelaunay& D, node_t u, node_t v) {
-  char buf[64];
-  snprintf(buf, sizeof(buf), "flip(%d,%d)", u, v);
-  check_all(D, buf);
-}
-
-void IDTAudit::after_removal(const FulleroidDelaunay& D, node_t removed) {
-  char buf[64];
-  snprintf(buf, sizeof(buf), "remove(%d)", removed);
-  check_all(D, buf);
-}
-
-void IDTAudit::after_sweep(const FulleroidDelaunay& D, int n_flips) {
-  char buf[64];
-  snprintf(buf, sizeof(buf), "sweep(%d flips)", n_flips);
-  check_all(D, buf);
-}
-
-void IDTAudit::check_all(const FulleroidDelaunay& D, const char* ctx)
-{
-  verify_euler(D, ctx);
-  verify_orientation(D, ctx);
-  verify_edge_consistency(D, ctx);
-  verify_triangle_inequality(D, ctx);
-  verify_positive_area(D, ctx);
-  verify_cone_angles(D, ctx);
-  verify_total_area(D, ctx);
-  verify_loeschian(D, ctx);
-  verify_no_multi_edges(D, ctx);
-}
-
-void IDTAudit::fail(const char* invariant, const char* ctx, const string& detail) {
-  n_failures++;
-  fprintf(stderr, "IDT INVARIANT FAILURE: %s\n  Context: %s\n  Detail: %s\n",
-          invariant, ctx, detail.c_str());
-  if (stop_on_failure) abort();
-}
-
-// --- Individual invariant checks ---
-
-bool IDTAudit::verify_euler(const FulleroidDelaunay& D, const char* ctx) {
-  n_checks++;
-  int V = D.N;
-  int E = 0;
-  for (node_t u = 0; u < D.N; u++) E += D.degree(u);
-  E /= 2;
-  int F = 0;
-  for (node_t u = 0; u < D.N; u++)
-    for (size_t j = 0; j < D[u].size(); j++) {
-      node_t v = D[u][j], w = D[u][(j+1) % D[u].size()];
-      if (u < v && u < w) F++;
-    }
-  if (V - E + F != 2) {
-    char buf[128];
-    snprintf(buf, sizeof(buf), "V=%d E=%d F=%d, V-E+F=%d (expected 2)", V, E, F, V-E+F);
-    fail("euler", ctx, buf);
-    return false;
-  }
-  return true;
-}
-
-bool IDTAudit::verify_orientation(const FulleroidDelaunay& D, const char* ctx) {
-  n_checks++;
-  if (!D.is_consistently_oriented()) {
-    fail("orientation", ctx, "is_consistently_oriented() returned false");
-    return false;
-  }
-  return true;
-}
-
-bool IDTAudit::verify_edge_consistency(const FulleroidDelaunay& D, const char* ctx) {
-  n_checks++;
-  // Symmetry
-  for (node_t u = 0; u < D.N; u++)
-    for (node_t v = u+1; v < D.N; v++)
-      if (D.edge_lengths(u,v) != D.edge_lengths(v,u)) {
-        char buf[128];
-        snprintf(buf, sizeof(buf), "edge_lengths(%d,%d)=%g != edge_lengths(%d,%d)=%g",
-                 u, v, D.edge_lengths(u,v), v, u, D.edge_lengths(v,u));
-        fail("edge_symmetry", ctx, buf);
-        return false;
-      }
-  // Adjacency match
-  for (node_t u = 0; u < D.N; u++)
-    for (node_t v : D[u])
-      if (D.get_length(u,v) <= 0) {
-        char buf[128];
-        snprintf(buf, sizeof(buf), "edge(%d,%d) exists but length=%g", u, v, D.get_length(u,v));
-        fail("edge_positive", ctx, buf);
-        return false;
-      }
-  for (node_t u = 0; u < D.N; u++)
-    for (node_t v = 0; v < D.N; v++)
-      if (u != v && D.edge_lengths(u,v) > 0 &&
-          std::find(D[u].begin(), D[u].end(), v) == D[u].end()) {
-        char buf[128];
-        snprintf(buf, sizeof(buf), "edge_lengths(%d,%d)=%g but not in neighbour list",
-                 u, v, D.edge_lengths(u,v));
-        fail("edge_phantom", ctx, buf);
-        return false;
-      }
-  return true;
-}
-
-bool IDTAudit::verify_triangle_inequality(const FulleroidDelaunay& D, const char* ctx) {
-  n_checks++;
-  for (node_t u = 0; u < D.N; u++)
-    for (size_t j = 0; j < D[u].size(); j++) {
-      node_t v = D[u][j], w = D[u][(j+1) % D[u].size()];
-      if (u < v && u < w) {
-        double a = D.get_length(u,v), b = D.get_length(v,w), c = D.get_length(w,u);
-        if (a + b <= c || b + c <= a || c + a <= b) {
-          char buf[128];
-          snprintf(buf, sizeof(buf), "triangle(%d,%d,%d) sides %g,%g,%g", u, v, w, a, b, c);
-          fail("triangle_inequality", ctx, buf);
-          return false;
-        }
-      }
-    }
-  return true;
-}
-
-bool IDTAudit::verify_positive_area(const FulleroidDelaunay& D, const char* ctx) {
-  n_checks++;
-  for (node_t u = 0; u < D.N; u++)
-    for (size_t j = 0; j < D[u].size(); j++) {
-      node_t v = D[u][j], w = D[u][(j+1) % D[u].size()];
-      if (u < v && u < w) {
-        double a = D.get_length(u,v), b = D.get_length(v,w), c = D.get_length(w,u);
-        double s = (a+b+c)/2;
-        double H = s*(s-a)*(s-b)*(s-c);
-        if (H <= 0) {
-          char buf[128];
-          snprintf(buf, sizeof(buf), "triangle(%d,%d,%d) heron=%g (sides %g,%g,%g)",
-                   u, v, w, H, a, b, c);
-          fail("positive_area", ctx, buf);
-          return false;
-        }
-      }
-    }
-  return true;
-}
-
-bool IDTAudit::verify_cone_angles(const FulleroidDelaunay& D, const char* ctx) {
-  n_checks++;
-  for (node_t u = 0; u < D.N; u++) {
-    double total = 0;
-    auto nbrs = D[u];
-    int k = nbrs.size();
-    for (int j = 0; j < k; j++) {
-      node_t v = nbrs[j], w = nbrs[(j+1)%k];
-      double a = D.get_length(v,w), b = D.get_length(u,v), c = D.get_length(u,w);
-      double cos_u = (b*b + c*c - a*a) / (2.0*b*c);
-      cos_u = std::max(-1.0, std::min(1.0, cos_u));
-      total += acos(cos_u);
-    }
-    double expected = original_degrees[u] * M_PI / 3.0;
-    double err = fabs(total - expected);
-    if (err > 1e-8) {
-      char buf[128];
-      snprintf(buf, sizeof(buf), "vertex %d: cone_angle=%g expected=%g (orig_deg=%d) err=%g",
-               u, total, expected, original_degrees[u], err);
-      fail("cone_angle", ctx, buf);
-      return false;
-    }
-  }
-  return true;
-}
-
-bool IDTAudit::verify_total_area(const FulleroidDelaunay& D, const char* ctx) {
-  n_checks++;
-  double area = 0;
-  for (node_t u = 0; u < D.N; u++)
-    for (size_t j = 0; j < D[u].size(); j++) {
-      node_t v = D[u][j], w = D[u][(j+1) % D[u].size()];
-      if (u < v && u < w) {
-        double a = D.get_length(u,v), b = D.get_length(v,w), c = D.get_length(w,u);
-        double s = (a+b+c)/2;
-        double H = s*(s-a)*(s-b)*(s-c);
-        area += (H > 0) ? sqrt(H) : 0;
-      }
-    }
-  double err = fabs(area - expected_area);
-  if (err > 1e-8) {
-    char buf[128];
-    snprintf(buf, sizeof(buf), "total_area=%g expected=%g err=%g", area, expected_area, err);
-    fail("total_area", ctx, buf);
-    return false;
-  }
-  return true;
-}
-
-// Check if n is a Loeschian number (a^2 + ab + b^2 for non-negative integers a,b).
-static bool is_loeschian(int n) {
-  if (n < 0) return false;
-  if (n == 0) return true;
-  for (int a = 0; 3*a*a <= 4*n; a++) {
-    int disc = 4*n - 3*a*a;
-    int s = (int)round(sqrt((double)disc));
-    if (s*s != disc) continue;
-    if ((s - a) % 2 != 0) continue;
-    int b = (s - a) / 2;
-    if (b >= 0) return true;
-  }
-  return false;
-}
-
-bool IDTAudit::verify_loeschian(const FulleroidDelaunay& D, const char* ctx) {
-  n_checks++;
-  for (node_t u = 0; u < D.N; u++)
-    for (node_t v : D[u])
-      if (u < v) {
-        double L = D.get_length(u,v);
-        double L2 = L*L;
-        int L2i = (int)round(L2);
-        if (fabs(L2 - L2i) > 1e-6) {
-          char buf[128];
-          snprintf(buf, sizeof(buf), "edge(%d,%d) L=%g L^2=%g not integer (nearest=%d, err=%g)",
-                   u, v, L, L2, L2i, L2-L2i);
-          fail("loeschian_integer", ctx, buf);
-          return false;
-        }
-        if (!is_loeschian(L2i)) {
-          char buf[128];
-          snprintf(buf, sizeof(buf), "edge(%d,%d) L^2=%d is not a Loeschian number", u, v, L2i);
-          fail("loeschian_form", ctx, buf);
-          return false;
-        }
-      }
-  return true;
-}
-
-bool IDTAudit::verify_no_multi_edges(const FulleroidDelaunay& D, const char* ctx) {
-  n_checks++;
-  for (node_t u = 0; u < D.N; u++) {
-    auto row = D[u];
-    for (size_t i = 0; i < row.size(); i++)
-      for (size_t j = i+1; j < row.size(); j++)
-        if (row[i] == row[j]) {
-          char buf[128];
-          snprintf(buf, sizeof(buf), "vertex %d has duplicate neighbour %d (positions %zu,%zu)",
-                   u, row[i], i, j);
-          fail("no_multi_edges", ctx, buf);
-          return false;
-        }
-  }
-  return true;
-}
-
-// ============================================================================
-// 3D Embedding
-// ============================================================================
-
-matrix<double> FulleroidDelaunay::all_pairs_distances() const
-{
-  const double INF = 1e30;
-  matrix<double> D(N, N, INF);
-
-  for (node_t u = 0; u < N; u++) {
-    D(u, u) = 0;
-    for (node_t v : (*this)[u])
-      D(u, v) = get_length(u, v);
-  }
-
-  // Floyd-Warshall
-  for (node_t k = 0; k < N; k++)
-    for (node_t i = 0; i < N; i++)
-      for (node_t j = 0; j < N; j++)
-        if (D(i, k) + D(k, j) < D(i, j))
-          D(i, j) = D(i, k) + D(k, j);
-
-  return D;
-}
+// Old FulleroidDelaunay + IDTAudit implementation moved to delaunay_old.cc.
 
 // ============================================================================
 // 3D Embedding primitives
@@ -1043,38 +369,6 @@ static V3 mds_placement(const matrix<double>& D) {
   return x;
 }
 
-vector<coord3d> FulleroidDelaunay::embed_3d() const
-{
-  // Step 1: Classical MDS initial placement (APSP + eigendecomposition)
-  V3 x = mds_placement(all_pairs_distances());
-
-  // Step 2: Stress minimization — E = sum_{edges} (|xi-xj| - Lij)^2
-  auto eval = [&](const V3& pos, V3& g) -> double {
-    double E = 0;
-    g.zero();
-    for_each_edge(N, *this, edge_lengths, pos, [&](const EdgeStressData& ed) {
-      E += ed.energy();
-      ed.scatter_gradient(g);
-    });
-    project_rigid_body(g, pos);
-    return E;
-  };
-
-  auto hv_prod = [&](const V3& pos, const V3& dir, V3& Hv) {
-    Hv.zero();
-    for_each_edge(N, *this, edge_lengths, pos, [&](const EdgeStressData& ed) {
-      ed.scatter_hv(dir, Hv);
-    });
-    project_rigid_body(Hv, pos);
-  };
-
-  x = steihaug_cg(std::move(x), eval, hv_prod);
-
-  // Step 3: Orient so CCW face normals point outward
-  orient_outward(x, *this);
-  return x;
-}
-
 // ============================================================================
 // OriginTracker — exact Eisenstein face-origin tracking
 // ============================================================================
@@ -1097,9 +391,16 @@ struct DelaunayTriangulation::OriginTracker {
   // num_faces must match the number of faces assigned during construction.
   OriginTracker(const Triangulation& T, int num_faces);
 
-  // BFS-unfold a connected patch of original equilateral faces into Z[omega].
+  // BFS-unfold original equilateral faces into Z[omega].
+  // Two-phase BFS: first through target faces only (to avoid wrapping on
+  // closed surfaces), then through all faces if required vertices are still
+  // unreached.  If anchor_vertex >= 0, starts from a target face containing
+  // that vertex (ensures the unfolding is centered on the fan).
   // Returns a map from original vertex ID to Eisenstein grid position.
-  unordered_map<int, Eisenstein> unfold_patch(const vector<int>& face_ids) const;
+  unordered_map<int, Eisenstein> unfold_patch(
+      const vector<int>& face_ids,
+      const vector<int>& required_vertices = {},
+      int anchor_vertex = -1) const;
 
   // Classify original faces across the directed line vtx_A → vtx_B.
   // Returns (left_of_line, right_of_line).  Faces whose centroid is exactly
@@ -1110,10 +411,12 @@ struct DelaunayTriangulation::OriginTracker {
 
   // Classify original faces into a set of triangles (for ear-clipping).
   // tri_verts[j] = {a, b, c} gives the CCW vertex IDs of triangle j.
+  // anchor_vertex: the removed flat vertex (ensures unfolding is fan-centered).
   // Returns assignment[j] = list of original face IDs inside triangle j.
   vector<vector<int>>
   classify_into_triangles(const vector<int>& face_ids,
-                          const vector<array<int,3>>& tri_verts) const;
+                          const vector<array<int,3>>& tri_verts,
+                          int anchor_vertex = -1) const;
 };
 
 DelaunayTriangulation::OriginTracker::OriginTracker(
@@ -1140,51 +443,163 @@ DelaunayTriangulation::OriginTracker::OriginTracker(
 
 unordered_map<int, Eisenstein>
 DelaunayTriangulation::OriginTracker::unfold_patch(
-    const vector<int>& face_ids) const
+    const vector<int>& face_ids,
+    const vector<int>& required_vertices,
+    int anchor_vertex) const
 {
   if (face_ids.empty()) return {};
 
-  unordered_set<int> patch(face_ids.begin(), face_ids.end());
+  // Two-phase BFS unfolding.
+  //
+  // On a closed surface, naive BFS can reach a vertex via a path that wraps
+  // around the surface, giving it coordinates inconsistent with the local
+  // geometry of the target patch.  To avoid this:
+  //
+  // Phase 1: expand only through TARGET faces.  This keeps the unfolding
+  //   within the patch (e.g., a fan polygon around a removed vertex).
+  //   All target face vertices get consistent local coordinates.
+  //
+  // Phase 2: if required vertices are still unreached, expand through
+  //   ALL adjacent faces to find them.  Positions set in phase 1 are
+  //   never overwritten.
+
+  unordered_set<int> target_faces(face_ids.begin(), face_ids.end());
+  unordered_set<int> target_verts(required_vertices.begin(),
+                                  required_vertices.end());
   unordered_map<int, Eisenstein> pos;
   unordered_set<int> placed;
   queue<int> Q;
 
-  // Place first face at the standard triangle.
-  int f0 = face_ids[0];
-  auto& fv = face_verts[f0];
-  pos[fv[0]] = Eisenstein(0, 0);
-  pos[fv[1]] = Eisenstein(1, 0);
-  pos[fv[2]] = Eisenstein(0, 1);
-  placed.insert(f0);
-  Q.push(f0);
+  int faces_remaining = target_faces.size();
+  int verts_remaining = target_verts.size();
 
-  while (!Q.empty()) {
-    int f = Q.front(); Q.pop();
+  auto done = [&]() { return faces_remaining <= 0 && verts_remaining <= 0; };
+
+  auto place_vertex = [&](int vtx, Eisenstein p) {
+    if (!pos.count(vtx)) {
+      pos[vtx] = p;
+      if (target_verts.count(vtx)) verts_remaining--;
+    }
+  };
+
+  // Helper: expand from face f, placing the third vertex of each adjacent
+  // face.  If target_only, skip non-target adjacent faces.
+  auto expand = [&](int f, bool target_only) {
     auto& v = face_verts[f];
-
     for (int i = 0; i < 3; i++) {
       int eu = v[i], ev = v[(i+1) % 3];
-
-      // Adjacent face across edge eu→ev has the twin arc ev→eu.
       auto it = arc_to_face.find(int64_t(ev) * N + eu);
       if (it == arc_to_face.end()) continue;
       int adj = it->second;
-      if (!patch.count(adj) || placed.count(adj)) continue;
+      if (placed.count(adj)) continue;
+      if (target_only && !target_faces.count(adj)) continue;
 
-      // Third vertex of adjacent face (ev, eu, third) in CCW order.
       auto& av = face_verts[adj];
       int third = av[0];
       if (third == eu || third == ev) third = av[1];
       if (third == eu || third == ev) third = av[2];
 
-      // Place: third = ev + (eu - ev).nextCCW()  [standard equilateral unfolding]
-      if (!pos.count(third))
-        pos[third] = pos[ev] + (pos[eu] - pos[ev]).nextCCW();
-
+      place_vertex(third, pos[ev] + (pos[eu] - pos[ev]).nextCCW());
       placed.insert(adj);
+      if (target_faces.count(adj)) faces_remaining--;
       Q.push(adj);
     }
+  };
+
+  // Choose starting face: prefer one containing anchor_vertex (ensures the
+  // unfolding starts at the fan center for vertex removal).
+  int f0 = face_ids[0];
+  if (anchor_vertex >= 0) {
+    for (int fid : face_ids) {
+      auto& fv2 = face_verts[fid];
+      if (fv2[0] == anchor_vertex || fv2[1] == anchor_vertex || fv2[2] == anchor_vertex) {
+        f0 = fid;
+        break;
+      }
+    }
   }
+  auto& fv = face_verts[f0];
+  place_vertex(fv[0], Eisenstein(0, 0));
+  place_vertex(fv[1], Eisenstein(1, 0));
+  place_vertex(fv[2], Eisenstein(0, 1));
+  placed.insert(f0);
+  faces_remaining--;
+  Q.push(f0);
+
+  // Phase 1: BFS through target faces only.
+  while (!Q.empty() && !done()) {
+    int f = Q.front(); Q.pop();
+    expand(f, /*target_only=*/true);
+  }
+
+  // If target faces are disconnected, seed each unvisited component.
+  if (faces_remaining > 0) {
+    for (int fid : face_ids) {
+      if (placed.count(fid)) continue;
+      // Try to find an adjacent placed face to seed from.
+      auto& fv2 = face_verts[fid];
+      bool seeded = false;
+      for (int i = 0; i < 3 && !seeded; i++) {
+        int eu = fv2[i], ev = fv2[(i+1) % 3];
+        // Check if the adjacent face across this edge is already placed.
+        auto it = arc_to_face.find(int64_t(ev) * N + eu);
+        if (it != arc_to_face.end() && placed.count(it->second)) {
+          // Place this face's third vertex.
+          int third = fv2[0];
+          if (third == eu || third == ev) third = fv2[1];
+          if (third == eu || third == ev) third = fv2[2];
+          place_vertex(third, pos[ev] + (pos[eu] - pos[ev]).nextCCW());
+          placed.insert(fid);
+          faces_remaining--;
+          Q.push(fid);
+          seeded = true;
+        }
+      }
+      if (!seeded) {
+        // Bridge: expand through non-target faces to reach this component.
+        // Re-enqueue all placed faces and expand without target restriction
+        // until we reach this unvisited target face.
+        queue<int> bridge_Q;
+        for (int p : placed) bridge_Q.push(p);
+        while (!bridge_Q.empty() && !placed.count(fid)) {
+          int f = bridge_Q.front(); bridge_Q.pop();
+          auto& v = face_verts[f];
+          for (int i = 0; i < 3; i++) {
+            int eu = v[i], ev = v[(i+1) % 3];
+            auto it = arc_to_face.find(int64_t(ev) * N + eu);
+            if (it == arc_to_face.end()) continue;
+            int adj = it->second;
+            if (placed.count(adj)) continue;
+            auto& av = face_verts[adj];
+            int third = av[0];
+            if (third == eu || third == ev) third = av[1];
+            if (third == eu || third == ev) third = av[2];
+            place_vertex(third, pos[ev] + (pos[eu] - pos[ev]).nextCCW());
+            placed.insert(adj);
+            if (target_faces.count(adj)) faces_remaining--;
+            bridge_Q.push(adj);
+          }
+        }
+      }
+      // Continue phase 1 BFS from any newly added faces.
+      while (!Q.empty() && !done()) {
+        int f = Q.front(); Q.pop();
+        expand(f, /*target_only=*/true);
+      }
+    }
+  }
+
+  // Phase 2: expand through all faces if required vertices still unreached.
+  if (verts_remaining > 0) {
+    // Re-seed from all placed faces.
+    queue<int>().swap(Q);  // clear
+    for (int f : placed) Q.push(f);
+    while (!Q.empty() && !done()) {
+      int f = Q.front(); Q.pop();
+      expand(f, /*target_only=*/false);
+    }
+  }
+
   return pos;
 }
 
@@ -1192,7 +607,8 @@ pair<vector<int>, vector<int>>
 DelaunayTriangulation::OriginTracker::classify_across_line(
     const vector<int>& face_ids, int vtx_A, int vtx_B) const
 {
-  auto pos = unfold_patch(face_ids);
+  if (face_ids.empty()) return {{}, {}};
+  auto pos = unfold_patch(face_ids, {vtx_A, vtx_B});
 
   // Scale line endpoints by 3 so we can test the centroid (p+q+r)
   // without dividing by 3.  sign(turn(3A, 3B, p+q+r)) = sign(turn(A, B, centroid)).
@@ -1204,9 +620,8 @@ DelaunayTriangulation::OriginTracker::classify_across_line(
     auto& fv = face_verts[fid];
     Eisenstein sum = pos.at(fv[0]) + pos.at(fv[1]) + pos.at(fv[2]);
     int t = Eisenstein::turn(A3, B3, sum);
-    if (t > 0) left.push_back(fid);
-    else if (t < 0) right.push_back(fid);
-    else { left.push_back(fid); right.push_back(fid); }  // on the line: both
+    if (t >= 0) left.push_back(fid);     // on the line → left (by convention)
+    else right.push_back(fid);
   }
   return {left, right};
 }
@@ -1214,13 +629,20 @@ DelaunayTriangulation::OriginTracker::classify_across_line(
 vector<vector<int>>
 DelaunayTriangulation::OriginTracker::classify_into_triangles(
     const vector<int>& face_ids,
-    const vector<array<int,3>>& tri_verts) const
+    const vector<array<int,3>>& tri_verts,
+    int anchor_vertex) const
 {
-  auto pos = unfold_patch(face_ids);
+  // Collect all triangle corner vertices as required.
+  vector<int> req;
+  for (auto& tv : tri_verts)
+    for (int v : tv)
+      req.push_back(v);
+
+  auto pos = unfold_patch(face_ids, req, anchor_vertex);
   int nt = tri_verts.size();
   vector<vector<int>> assignment(nt);
 
-  // Precompute scaled triangle corners.
+  // Precompute scaled triangle corners (3x to avoid centroid division).
   vector<array<Eisenstein,3>> corners(nt);
   for (int j = 0; j < nt; j++)
     for (int k = 0; k < 3; k++)
@@ -1232,12 +654,11 @@ DelaunayTriangulation::OriginTracker::classify_into_triangles(
 
     for (int j = 0; j < nt; j++) {
       auto& c = corners[j];
-      // Point inside CCW triangle iff all three turn tests are >= 0.
       if (Eisenstein::turn(c[0], c[1], sum) >= 0 &&
           Eisenstein::turn(c[1], c[2], sum) >= 0 &&
           Eisenstein::turn(c[2], c[0], sum) >= 0) {
         assignment[j].push_back(fid);
-        break;  // each face goes to exactly one triangle
+        break;
       }
     }
   }
@@ -1763,13 +1184,24 @@ void DelaunayTriangulation::remove_flat_vertex(int v)
 
     // --- Splice the ear-clipped polygon into the DCEL ---
 
-    // Collect face origins from the fan.
+    // Collect face origins from the fan (both combined and per-sector).
+    // Faces on the boundary between iDT faces (from classify_across_line's
+    // "both sides" case) may appear in multiple sectors.  Deduplicate so
+    // each face appears in exactly one sector (the first one that claims it).
     vector<int> all_origins;
+    vector<vector<int>> sector_origins(k);
     { int h0 = v_out[v], h = h0;
+      int sec = 0;
+      unordered_set<int> seen;
       do {
         int f = he_face[h];
-        all_origins.insert(all_origins.end(), f_origin[f].begin(), f_origin[f].end());
+        for (int fid : f_origin[f]) {
+          all_origins.push_back(fid);
+          if (seen.insert(fid).second)
+            sector_origins[sec].push_back(fid);
+        }
         h = ccw(h);
+        sec++;
       } while (h != h0); }
     sort(all_origins.begin(), all_origins.end());
     all_origins.erase(unique(all_origins.begin(), all_origins.end()), all_origins.end());
@@ -1839,9 +1271,176 @@ void DelaunayTriangulation::remove_flat_vertex(int v)
       edge_len_map[{d.prev_idx, d.next_idx}] = edge_len_map[{d.next_idx, d.prev_idx}] = d.len;
     }
 
+    // Compute per-triangle origin assignment.
+    vector<vector<int>> origin_assignment;
+    if (origin_tracker) {
+      // Per-sector local unfolding + barycentric mapping to fan coordinates.
+      //
+      // Global Eisenstein unfolding fails for vertex removal because the fan
+      // can contain cone points, and BFS wraps around them giving inconsistent
+      // coordinates.  Instead, unfold each sector (iDT fan face) separately
+      // and map each original face's centroid to fan 2D coordinates via
+      // barycentric interpolation within the iDT triangle.
+      //
+      // Fan 2D positions of boundary vertices:
+      vector<double> fan_x(k), fan_y(k);
+      for (int i = 0; i < k; i++) {
+        fan_x[i] = spokes[i] * cos(cum[i]);
+        fan_y[i] = spokes[i] * sin(cum[i]);
+      }
+
+      // Ear triangle vertices in fan 2D.
+      int nt = tris.size();
+      vector<array<double,2>> ear_v0(nt), ear_v1(nt), ear_v2(nt);
+      for (int ti = 0; ti < nt; ti++) {
+        ear_v0[ti] = {fan_x[tris[ti].v0], fan_y[tris[ti].v0]};
+        ear_v1[ti] = {fan_x[tris[ti].v1], fan_y[tris[ti].v1]};
+        ear_v2[ti] = {fan_x[tris[ti].v2], fan_y[tris[ti].v2]};
+      }
+
+      // 2D cross product sign for point-in-triangle test.
+      auto cross2d_sign = [](double ax, double ay, double bx, double by,
+                             double px, double py) -> int {
+        double c = (bx - ax) * (py - ay) - (by - ay) * (px - ax);
+        return (c > 1e-12) ? 1 : (c < -1e-12) ? -1 : 0;
+      };
+
+      // Classify a 2D point into an ear triangle.
+      auto classify_point = [&](double px, double py) -> int {
+        for (int ti = 0; ti < nt; ti++) {
+          int t0 = cross2d_sign(ear_v0[ti][0], ear_v0[ti][1],
+                                ear_v1[ti][0], ear_v1[ti][1], px, py);
+          int t1 = cross2d_sign(ear_v1[ti][0], ear_v1[ti][1],
+                                ear_v2[ti][0], ear_v2[ti][1], px, py);
+          int t2 = cross2d_sign(ear_v2[ti][0], ear_v2[ti][1],
+                                ear_v0[ti][0], ear_v0[ti][1], px, py);
+          if (t0 >= 0 && t1 >= 0 && t2 >= 0) return ti;
+          if (t0 <= 0 && t1 <= 0 && t2 <= 0) return ti;  // CW winding
+        }
+        return -1;  // not found (shouldn't happen)
+      };
+
+      origin_assignment.resize(nt);
+
+      // Process each sector separately.
+      for (int sec = 0; sec < k; sec++) {
+        auto& sec_origins = sector_origins[sec];
+
+        if (!sec_origins.empty()) {
+          // Local Eisenstein unfolding of this sector's original faces.
+          auto pos = origin_tracker->unfold_patch(sec_origins, {v, nb[sec], nb[(sec+1)%k]}, v);
+
+          // Get Eisenstein positions of sector triangle vertices.
+          auto it_v = pos.find(v);
+          auto it_a = pos.find(nb[sec]);
+          auto it_b = pos.find(nb[(sec+1)%k]);
+
+          if (it_v != pos.end() && it_a != pos.end() && it_b != pos.end()) {
+            // Compute the affine transform from Eisenstein to fan 2D.
+            // Eisenstein triangle: V, A, B (as doubles).
+            double eVx = it_v->second.first, eVy = it_v->second.second;
+            double eAx = it_a->second.first, eAy = it_a->second.second;
+            double eBx = it_b->second.first, eBy = it_b->second.second;
+
+            // Fan 2D triangle: (0,0), (fan_x[sec], fan_y[sec]), (fan_x[(sec+1)%k], fan_y[(sec+1)%k]).
+            double fAx = fan_x[sec], fAy = fan_y[sec];
+            double fBx = fan_x[(sec+1)%k], fBy = fan_y[(sec+1)%k];
+
+            // Determinant for barycentric coords in Eisenstein triangle.
+            double det = (eAx - eVx) * (eBy - eVy) - (eBx - eVx) * (eAy - eVy);
+
+            for (int fid : sec_origins) {
+              auto& fverts = origin_tracker->face_verts[fid];
+              // Centroid in Eisenstein coordinates.
+              double cx = 0, cy = 0;
+              bool all_found = true;
+              for (int vi = 0; vi < 3; vi++) {
+                auto it = pos.find(fverts[vi]);
+                if (it == pos.end()) { all_found = false; break; }
+                cx += it->second.first;
+                cy += it->second.second;
+              }
+              if (!all_found) {
+                // Fallback: assign to ear triangle containing the sector's rim edge.
+                for (int ti = 0; ti < nt; ti++) {
+                  auto& t = tris[ti];
+                  if ((t.v0 == sec || t.v1 == sec || t.v2 == sec) &&
+                      (t.v0 == (sec+1)%k || t.v1 == (sec+1)%k || t.v2 == (sec+1)%k)) {
+                    origin_assignment[ti].push_back(fid);
+                    break;
+                  }
+                }
+                continue;
+              }
+              cx /= 3.0; cy /= 3.0;
+
+              // Barycentric coords in Eisenstein triangle.
+              if (std::abs(det) < 1e-15) {
+                // Degenerate sector — assign to first ear triangle touching this sector.
+                for (int ti = 0; ti < nt; ti++) {
+                  auto& t = tris[ti];
+                  if ((t.v0 == sec || t.v1 == sec || t.v2 == sec) &&
+                      (t.v0 == (sec+1)%k || t.v1 == (sec+1)%k || t.v2 == (sec+1)%k)) {
+                    origin_assignment[ti].push_back(fid);
+                    break;
+                  }
+                }
+                continue;
+              }
+              double bary_a = ((cx - eVx) * (eBy - eVy) - (cy - eVy) * (eBx - eVx)) / det;
+              double bary_b = ((cy - eVy) * (eAx - eVx) - (cx - eVx) * (eAy - eVy)) / det;
+
+              // Map to fan 2D.
+              double fan_px = bary_a * fAx + bary_b * fBx;
+              double fan_py = bary_a * fAy + bary_b * fBy;
+
+              int ti = classify_point(fan_px, fan_py);
+              if (ti >= 0) {
+                origin_assignment[ti].push_back(fid);
+              } else {
+                // Fallback: assign to nearest ear triangle.
+                for (int j = 0; j < nt; j++) {
+                  auto& t = tris[j];
+                  if ((t.v0 == sec || t.v1 == sec || t.v2 == sec) &&
+                      (t.v0 == (sec+1)%k || t.v1 == (sec+1)%k || t.v2 == (sec+1)%k)) {
+                    origin_assignment[j].push_back(fid);
+                    break;
+                  }
+                }
+              }
+            }
+          } else {
+            // Couldn't unfold sector — fallback to rim assignment.
+            for (int fid : sec_origins) {
+              for (int ti = 0; ti < nt; ti++) {
+                auto& t = tris[ti];
+                if ((t.v0 == sec || t.v1 == sec || t.v2 == sec) &&
+                    (t.v0 == (sec+1)%k || t.v1 == (sec+1)%k || t.v2 == (sec+1)%k)) {
+                  origin_assignment[ti].push_back(fid);
+                  break;
+                }
+              }
+            }
+          }
+        }
+
+      }
+    } else {
+      // Approximate: distribute origins evenly across triangles.
+      origin_assignment.resize(tris.size());
+      int per = all_origins.size() / tris.size();
+      int idx = 0;
+      for (size_t i = 0; i < tris.size(); i++) {
+        int n = (i + 1 < tris.size()) ? per
+                                       : (int)all_origins.size() - idx;
+        n = std::max(n, 0);
+        origin_assignment[i].assign(all_origins.begin() + idx,
+                                    all_origins.begin() + idx + n);
+        idx += n;
+      }
+    }
+
     // Wire up each triangle.
-    int origin_idx = 0;
-    int origins_per_face = all_origins.size() / tris.size();
     for (size_t ti = 0; ti < tris.size(); ti++) {
       auto& tri = tris[ti];
       int fid = alloc_face();
@@ -1858,12 +1457,7 @@ void DelaunayTriangulation::remove_flat_vertex(int v)
       he_face[h_20] = fid;
       f_he[fid] = h_01;
 
-      int n_assign = (ti + 1 < tris.size()) ? origins_per_face
-                                              : (int)all_origins.size() - origin_idx;
-      n_assign = std::max(n_assign, 0);
-      f_origin[fid].assign(all_origins.begin() + origin_idx,
-                            all_origins.begin() + origin_idx + n_assign);
-      origin_idx += n_assign;
+      f_origin[fid] = std::move(origin_assignment[ti]);
     }
 
     // Recompute angles for new faces.
@@ -1975,11 +1569,16 @@ void DelaunayTriangulation::remove_flat_vertices()
 
 // --- Full algorithm ---
 
-DelaunayTriangulation DelaunayTriangulation::compute(const Triangulation& T)
+DelaunayTriangulation DelaunayTriangulation::compute(
+    const Triangulation& T, bool exact_origins)
 {
   // Sort flat vertices last, then build DCEL and run the algorithm.
   Triangulation sorted = T.sort_flat_last();
   DelaunayTriangulation D = from_triangulation(sorted);
+
+  if (exact_origins)
+    D.origin_tracker = std::make_shared<OriginTracker>(sorted, D.nf);
+
   D.remove_flat_vertices();
   return D;
 }
@@ -2023,6 +1622,186 @@ bool DelaunayTriangulation::check_consistency() const
     if (alive(h) && he_length[h] != he_length[h ^ 1]) return false;
 
   return true;
+}
+
+// ============================================================================
+// Symmetry utilities for embed_3d
+// ============================================================================
+
+vector<vector<int>> restrict_to_cone_points(
+    const vector<vector<int>>& G, const Triangulation& T)
+{
+  if (G.empty()) return {};
+
+  // Cone points: vertices with degree != 6, in original index order.
+  // sort_flat_last() places these first in the same relative order,
+  // so iDT vertex i corresponds to the i-th cone point by original index.
+  int N = T.N;
+  vector<int> cone;
+  vector<int> orig_to_idt(N, -1);
+  for (int v = 0; v < N; v++)
+    if (T.degree(v) != 6) {
+      orig_to_idt[v] = cone.size();
+      cone.push_back(v);
+    }
+  int nc = cone.size();
+
+  vector<vector<int>> result;
+  for (auto& pi : G) {
+    vector<int> r(nc);
+    bool valid = true;
+    for (int i = 0; i < nc; i++) {
+      int img = orig_to_idt[pi[cone[i]]];
+      if (img < 0) { valid = false; break; }
+      r[i] = img;
+    }
+    if (valid) result.push_back(r);
+  }
+
+  // Remove duplicate permutations
+  sort(result.begin(), result.end());
+  result.erase(unique(result.begin(), result.end()), result.end());
+  return result;
+}
+
+// Compute vertex orbits from a group of permutations (union-find).
+vector<vector<int>> compute_orbits(int n, const vector<vector<int>>& G) {
+  vector<int> parent(n);
+  iota(parent.begin(), parent.end(), 0);
+  std::function<int(int)> find = [&](int x) {
+    return parent[x] == x ? x : parent[x] = find(parent[x]);
+  };
+  for (auto& pi : G)
+    for (int v = 0; v < n; v++) {
+      int a = find(v), b = find(pi[v]);
+      if (a != b) parent[a] = b;
+    }
+
+  map<int, vector<int>> m;
+  for (int v = 0; v < n; v++) m[find(v)].push_back(v);
+  vector<vector<int>> orbits;
+  for (auto& [_, orbit] : m) orbits.push_back(orbit);
+  return orbits;
+}
+
+// 3x3 Jacobi eigendecomposition of symmetric matrix A.
+// On return: A is diagonal (eigenvalues), V columns are eigenvectors.
+static void jacobi_eigen_3x3(matrix3d& A, matrix3d& V) {
+  V = matrix3d::unit_matrix();
+  for (int iter = 0; iter < 100; iter++) {
+    double mx = 0; int p = 0, q = 1;
+    for (int i = 0; i < 3; i++)
+      for (int j = i+1; j < 3; j++)
+        if (fabs(A(i,j)) > mx) { mx = fabs(A(i,j)); p = i; q = j; }
+    if (mx < 1e-15) break;
+
+    double app = A(p,p), aqq = A(q,q), apq = A(p,q);
+    double theta = (fabs(app-aqq) < 1e-30) ? M_PI/4 : 0.5*atan2(2*apq, app-aqq);
+    double cs = cos(theta), sn = sin(theta);
+
+    for (int j = 0; j < 3; j++) {
+      double bp = A(p,j), bq = A(q,j);
+      A(p,j) = cs*bp + sn*bq; A(q,j) = -sn*bp + cs*bq;
+    }
+    for (int i = 0; i < 3; i++) {
+      double bp = A(i,p), bq = A(i,q);
+      A(i,p) = cs*bp + sn*bq; A(i,q) = -sn*bp + cs*bq;
+    }
+    for (int i = 0; i < 3; i++) {
+      double vp = V(i,p), vq = V(i,q);
+      V(i,p) = cs*vp + sn*vq; V(i,q) = -sn*vp + cs*vq;
+    }
+  }
+}
+
+// Matrix-vector product for matrix3d * coord3d.
+static coord3d matvec(const matrix3d& M, const coord3d& v) {
+  return coord3d(M(0,0)*v[0]+M(0,1)*v[1]+M(0,2)*v[2],
+                 M(1,0)*v[0]+M(1,1)*v[1]+M(1,2)*v[2],
+                 M(2,0)*v[0]+M(2,1)*v[1]+M(2,2)*v[2]);
+}
+
+// Procrustes rotation: find the orthogonal R minimizing sum |R*src[i] - dst[i]|^2.
+// Allows improper rotations (reflections) for orientation-reversing automorphisms.
+static matrix3d procrustes_rotation(const vector<coord3d>& src,
+                                    const vector<coord3d>& dst) {
+  // Cross-covariance M = sum dst[i] src[i]^T
+  matrix3d M;
+  for (size_t i = 0; i < src.size(); i++)
+    M += dst[i].outer(src[i]);
+
+  // SVD via eigendecomposition of M^T M
+  matrix3d MtM = M.transpose() * M;
+  matrix3d V;
+  jacobi_eigen_3x3(MtM, V);
+
+  // U = M V Sigma^{-1}, processing columns in decreasing singular value order
+  double svals[3] = { sqrt(max(0.0, MtM(0,0))),
+                      sqrt(max(0.0, MtM(1,1))),
+                      sqrt(max(0.0, MtM(2,2))) };
+
+  matrix3d U;
+  int computed = 0;
+  for (int col = 0; col < 3; col++) {
+    if (svals[col] > 1e-12) {
+      coord3d v_col(V(0,col), V(1,col), V(2,col));
+      coord3d u_col = matvec(M, v_col) * (1.0/svals[col]);
+      U(0,col) = u_col[0]; U(1,col) = u_col[1]; U(2,col) = u_col[2];
+      computed++;
+    }
+  }
+
+  // Complete U for zero singular values via cross product
+  if (computed == 2) {
+    int z = -1;
+    for (int i = 0; i < 3; i++) if (svals[i] <= 1e-12) { z = i; break; }
+    int a = (z+1)%3, b = (z+2)%3;
+    coord3d ua(U(0,a),U(1,a),U(2,a)), ub(U(0,b),U(1,b),U(2,b));
+    coord3d uc = ua.cross(ub);
+    double n = uc.norm();
+    if (n > 1e-15) uc /= n;
+    U(0,z) = uc[0]; U(1,z) = uc[1]; U(2,z) = uc[2];
+  }
+
+  return U * V.transpose();
+}
+
+// Symmetrize coordinates via the Reynolds operator:
+//   x_sym[v] = (1/|G|) sum_{pi in G} R_pi^T x[pi(v)]
+// where R_pi is the Procrustes rotation for group element pi.
+static void symmetrize_embedding(V3& x, const vector<vector<int>>& G) {
+  if (G.empty()) return;
+  int n = x.size();
+
+  // Center
+  coord3d c;
+  for (auto& xi : x) c += xi;
+  c /= n;
+  for (auto& xi : x) xi -= c;
+
+  // Compute Procrustes rotation for each group element
+  vector<matrix3d> rotations(G.size());
+  for (size_t g = 0; g < G.size(); g++) {
+    auto& pi = G[g];
+    vector<coord3d> src(n), dst(n);
+    for (int v = 0; v < n; v++) {
+      src[v] = x[v];
+      dst[v] = x[pi[v]];
+    }
+    rotations[g] = procrustes_rotation(src, dst);
+  }
+
+  // Reynolds average: x_sym[v] = (1/|G|) sum_pi R_pi^T x[pi(v)]
+  V3 x_sym(n);
+  for (size_t g = 0; g < G.size(); g++) {
+    auto& pi = G[g];
+    matrix3d Rt = rotations[g].transpose();
+    for (int v = 0; v < n; v++)
+      x_sym[v] += matvec(Rt, x[pi[v]]);
+  }
+  double inv_g = 1.0 / G.size();
+  for (int v = 0; v < n; v++)
+    x[v] = x_sym[v] * inv_g + c;
 }
 
 // ============================================================================
@@ -2102,7 +1881,7 @@ struct FaceAngleData {
   }
 };
 
-vector<coord3d> DelaunayTriangulation::embed_3d() const
+vector<coord3d> DelaunayTriangulation::embed_3d(const vector<vector<int>>& sym) const
 {
   // --- Step 1: Extract shortest edge per vertex pair ---
   // Multi-edges between the same pair have different lengths (different geodesics).
@@ -2139,27 +1918,42 @@ vector<coord3d> DelaunayTriangulation::embed_3d() const
   // --- Step 3: MDS initial placement ---
   V3 x = mds_placement(D);
 
-  // Separate collapsed vertices.  When the DCEL has a symmetry that swaps
-  // two vertices with identical APSP profiles, MDS places them at exactly
-  // the same point.  Perturb such pairs along a direction perpendicular to
-  // the centroid-to-vertex line, by half their target distance.
-  for (auto& e : edges) {
-    coord3d diff = x[e.u] - x[e.v];
-    double d = diff.norm();
-    if (d < 0.1 * e.L) {
-      // Find a direction to perturb: use cross product with a non-parallel axis
-      coord3d c;
-      for (auto& xi : x) c += xi;
-      c /= nv;
-      coord3d radial = x[e.u] - c;
-      if (radial.norm() < 1e-10) radial = coord3d(1, 0, 0);
-      coord3d axis(0, 0, 1);
-      if (fabs(radial.dot(axis)) / radial.norm() > 0.9) axis = coord3d(0, 1, 0);
-      coord3d perp = radial.cross(axis);
-      perp /= max(perp.norm(), 1e-15);
-      x[e.u] = x[e.u] + perp * (0.5 * e.L);
-      x[e.v] = x[e.v] - perp * (0.5 * e.L);
-    }
+  // Resolve MDS degeneracies from symmetry.  When vertices in the same
+  // orbit have identical APSP profiles to all other vertices, the full
+  // MDS places them at the same point.  Fix this by running a secondary
+  // MDS on the intra-orbit distances: orbit members have different
+  // distances to EACH OTHER, so this local MDS is non-degenerate.
+  auto orbits = compute_orbits(nv, sym);  // trivial singletons if sym={}
+  for (auto& orbit : orbits) {
+    if (orbit.size() < 2) continue;
+
+    // Orbit centroid and spread
+    coord3d center;
+    for (int v : orbit) center += x[v];
+    center /= orbit.size();
+
+    double max_spread = 0;
+    for (int v : orbit)
+      max_spread = max(max_spread, (x[v] - center).norm());
+
+    // Minimum intra-orbit APSP distance
+    double min_intra = 1e18;
+    for (size_t i = 0; i < orbit.size(); i++)
+      for (size_t j = i+1; j < orbit.size(); j++)
+        min_intra = min(min_intra, D(orbit[i], orbit[j]));
+
+    if (max_spread > 0.1 * min_intra) continue;  // already separated
+
+    // Collapsed: local MDS on intra-orbit distances
+    int m = orbit.size();
+    matrix<double> D_local(m, m);
+    for (int i = 0; i < m; i++)
+      for (int j = 0; j < m; j++)
+        D_local(i, j) = D(orbit[i], orbit[j]);
+
+    V3 local = mds_placement(D_local);
+    for (int i = 0; i < m; i++)
+      x[orbit[i]] = center + local[i];
   }
 
   // --- Step 4: Collect per-vertex fan structure for cone angle energy ---
@@ -2276,7 +2070,30 @@ vector<coord3d> DelaunayTriangulation::embed_3d() const
     project_rigid_body(Hv, pos);
   };
 
-  x = steihaug_cg(std::move(x), eval, hv_prod);
+  if (sym.empty()) {
+    x = steihaug_cg(std::move(x), eval, hv_prod);
+  } else {
+    // Symmetry-constrained optimization in two phases:
+    //
+    // Phase 1: Optimize without symmetry constraint.  The heuristic
+    //   perturbation (above) breaks MDS degeneracy for collapsed orbits.
+    //   The optimizer converges to a non-degenerate embedding that's
+    //   approximately but not exactly symmetric.
+    //
+    // Phase 2: Symmetrize via Procrustes + Reynolds, then polish.
+    //   Now that the vertices are at well-separated positions, the
+    //   Procrustes rotation for each group element is well-determined.
+    //   Symmetrization projects onto the symmetric subspace, and a
+    //   short optimization pass restores edge-length accuracy.
+    x = steihaug_cg(std::move(x), eval, hv_prod);
+    for (int pass = 0; pass < 5; pass++) {
+      V3 x_before(x);
+      symmetrize_embedding(x, sym);
+      double shift = (x - x_before).norm() / max(x.norm(), 1e-15);
+      if (shift < 1e-12) break;
+      x = steihaug_cg(std::move(x), eval, hv_prod, 100, 1e-13);
+    }
+  }
 
   // --- Step 6: Orient outward using DCEL face iteration ---
   coord3d c;

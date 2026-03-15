@@ -1,0 +1,665 @@
+// Old adjacency-list iDT implementation.
+// Superseded by the DCEL-based DelaunayTriangulation in delaunay.cc.
+// Kept for reference and for the old test suite.
+
+#include "fullerenes/delaunay_old.hh"
+#include "fullerenes/delaunay.hh"  // for Diamond
+
+#include <stack>
+#include <cmath>
+#include <cassert>
+#include <algorithm>
+#include <map>
+
+// ============================================================================
+// Constructor
+// ============================================================================
+
+FulleroidDelaunay::FulleroidDelaunay(const Triangulation& T)
+  : Triangulation(T.sort_flat_last()), edge_lengths(N, N, 0)
+{
+  // Edge flips during vertex removal can temporarily push vertex degrees
+  // well above 6 (the max for fullerene duals). Restride to give headroom.
+  if (dmax < 20) {
+    auto restrided = restride(20);
+    owned_values = std::move(restrided.owned_values);
+    owned_deg = std::move(restrided.owned_deg);
+    dmax = 20;
+    repoint();
+  }
+  for (node_t u = 0; u < N; u++)
+    for (node_t v : (*this)[u])
+      edge_lengths(u, v) = 1.0;
+}
+
+// ============================================================================
+// Diamond extraction and Delaunay operations
+// ============================================================================
+
+Diamond FulleroidDelaunay::diamond(node_t u, node_t v) const
+{
+  node_t B = next(v, u), D = next(u, v);
+  Diamond d = {get_length(u,v), get_length(u,B), get_length(v,B),
+               get_length(u,D), get_length(v,D)};
+  assert(d.e > 0 && d.a > 0 && d.b > 0 && d.c > 0 && d.d > 0);
+  return d;
+}
+
+bool FulleroidDelaunay::is_delaunay_edge(node_t u, node_t v) const
+{
+  return diamond(u, v).is_delaunay();
+}
+
+bool FulleroidDelaunay::flip_edge(node_t u, node_t v, bool verbose)
+{
+  node_t B = next(v, u), D = next(u, v);
+
+  // Topological guards
+  if (B == D) { if (verbose) fprintf(stderr, "  flip(%d,%d): B==D==%d\n", u, v, B); return false; }
+  if (edge_exists(edge_t(B, D))) { if (verbose) fprintf(stderr, "  flip(%d,%d): multi-edge (%d,%d)\n", u, v, B, D); return false; }
+
+  // Geometric guards
+  auto d = diamond(u, v);
+  if (!d.is_convex()) { if (verbose) fprintf(stderr, "  flip(%d,%d): not convex\n", u, v); return false; }
+  double f = d.flipped_length();
+  if (!std::isfinite(f) || f <= 0) { if (verbose) fprintf(stderr, "  flip(%d,%d): bad length f=%g\n", u, v, f); return false; }
+
+  // Execute flip: remove diagonal u-v, insert diagonal B-D.
+  Graph::remove_edge(edge_t(u, v));
+  set_length(u, v, 0);
+  Graph::insert_edge(arc_t(B, D), u, v);
+  set_length(B, D, f);
+
+  if (audit) audit->after_flip(*this, u, v);
+  return true;
+}
+
+int FulleroidDelaunay::flip_to_delaunay()
+{
+  int flips = lawson_sweep();
+  if (!is_delaunay())
+    flips += delaunay_resolve();
+  return flips;
+}
+
+bool FulleroidDelaunay::is_delaunay() const
+{
+  for (node_t u = 0; u < N; u++)
+    for (node_t v : (*this)[u])
+      if (u < v && !is_delaunay_edge(u, v))
+        return false;
+  return true;
+}
+
+int FulleroidDelaunay::count_non_delaunay() const
+{
+  int count = 0;
+  for (node_t u = 0; u < N; u++)
+    for (node_t v : (*this)[u])
+      if (u < v && !is_delaunay_edge(u, v))
+        count++;
+  return count;
+}
+
+int FulleroidDelaunay::delaunay_resolve()
+{
+  int total_flips = 0;
+
+  for (int round = 0; round < 20; round++) {
+    int count0 = count_non_delaunay();
+    if (count0 == 0) break;
+
+    FulleroidDelaunay saved = *this;
+    bool improved = false;
+
+    // Collect all edges from saved state.
+    vector<edge_t> edges;
+    for (node_t u = 0; u < N; u++)
+      for (node_t v : saved[u])
+        if (u < v) edges.push_back(edge_t(u, v));
+
+    // Depth 1: try every single edge flip.
+    for (size_t i = 0; i < edges.size() && !improved; i++) {
+      *this = saved;
+      if (!flip_edge(edges[i].first, edges[i].second)) continue;
+      int f = 1 + lawson_sweep();
+      if (count_non_delaunay() < count0) {
+        total_flips += f;
+        improved = true;
+      }
+    }
+
+    // Depth 2: try all pairs of flips.
+    for (size_t i = 0; i < edges.size() && !improved; i++) {
+      for (size_t j = i + 1; j < edges.size() && !improved; j++) {
+        *this = saved;
+        if (!flip_edge(edges[i].first, edges[i].second)) continue;
+        if (!edge_exists(edges[j]) ||
+            !flip_edge(edges[j].first, edges[j].second)) continue;
+        int f = 2 + lawson_sweep();
+        if (count_non_delaunay() < count0) {
+          total_flips += f;
+          improved = true;
+        }
+      }
+    }
+
+    if (!improved) {
+      *this = saved;  // restore
+      break;
+    }
+  }
+
+  return total_flips;
+}
+
+// ============================================================================
+// Vertex removal
+// ============================================================================
+
+void FulleroidDelaunay::remove_flat_vertex(node_t v)
+{
+  // Phase 1: Reduce v's degree via incident edge flips.
+  // Stop at degree 4 — the ear clipping in Phase 2 handles degree >= 4.
+  while (degree(v) > 4) {
+    bool progress = false;
+    vector<node_t> vnbrs((*this)[v].begin(), (*this)[v].end());
+    for (node_t u : vnbrs)
+      if (flip_edge(v, u)) { progress = true; break; }
+    if (!progress) break;
+  }
+
+  int deg = degree(v);
+
+  // Phase 2: Star retriangulation for degree >= 4 via intrinsic ear clipping.
+  if (deg >= 4) {
+    int k = deg;
+    auto row = (*this)[v];
+    vector<node_t> nb(row.begin(), row.end());
+
+    // Gather spoke and rim lengths.
+    vector<double> spokes(k), rims(k);
+    for (int i = 0; i < k; i++) {
+      spokes[i] = get_length(v, nb[i]);
+      rims[i]   = get_length(nb[i], nb[(i + 1) % k]);
+    }
+
+    // Cumulative angle at v: cum[i] = sum of fan-triangle angles from 0 to i-1.
+    vector<double> cum(k + 1, 0);
+    for (int i = 0; i < k; i++) {
+      double si = spokes[i], sn = spokes[(i+1)%k], r = rims[i];
+      double cos_a = std::clamp((si*si + sn*sn - r*r) / (2*si*sn), -1.0, 1.0);
+      cum[i+1] = cum[i] + acos(cos_a);
+    }
+
+    // Diagonal length from nb[from] to nb[to] through the CCW sub-fan.
+    auto diag_len = [&](int from, int to) -> double {
+      double angle = (to > from) ? cum[to] - cum[from]
+                                  : (cum[k] - cum[from]) + cum[to];
+      double sf = spokes[from], st = spokes[to];
+      double len2 = sf*sf + st*st - 2*sf*st*cos(angle);
+      return (len2 > 0) ? sqrt(len2) : 0;
+    };
+
+    // Signed area of triangle (P_pp, P_pi, P_pn) in the 2D fan unfolding.
+    auto ear_signed_area = [&](int pp, int pi, int pn) -> double {
+      double rp = spokes[pp], ri = spokes[pi], rn = spokes[pn];
+      double tp = cum[pp], ti = cum[pi], tn = cum[pn];
+      return rp*ri*sin(ti - tp) + ri*rn*sin(tn - ti) + rn*rp*sin(tp - tn);
+    };
+
+    // Ear clipping with intrinsic geometry.
+    struct EarDiag { int prev_idx, ear_idx, next_idx; double len; };
+    vector<EarDiag> diagonals;
+
+    // Polygon as ring indices + edge lengths.
+    vector<int> poly(k);
+    vector<double> poly_edge(k);
+    for (int i = 0; i < k; i++) { poly[i] = i; poly_edge[i] = rims[i]; }
+
+    while ((int)poly.size() > 3) {
+      int n = poly.size();
+      bool found = false;
+      for (int j = 0; j < n; j++) {
+        int jm = (j - 1 + n) % n, jp = (j + 1) % n;
+        int pp = poly[jm], pi = poly[j], pn = poly[jp];
+
+        // Topological checks.
+        if (nb[pp] == nb[pn]) continue;
+        if (edge_exists(edge_t(nb[pp], nb[pn]))) continue;
+        bool dup = false;
+        for (auto& d : diagonals)
+          if (edge_t(nb[d.prev_idx], nb[d.next_idx]) == edge_t(nb[pp], nb[pn]))
+            { dup = true; break; }
+        if (dup) continue;
+
+        // Convexity check: polygon vertex must be convex (positive signed area).
+        if (ear_signed_area(pp, pi, pn) <= 1e-10) continue;
+
+        // Sub-fan angle check.
+        double sub_angle = (pn > pp) ? cum[pn] - cum[pp]
+                                      : (cum[k] - cum[pp]) + cum[pn];
+        if (sub_angle > M_PI + 1e-10) continue;
+
+        // Diagonal length via sub-fan angle + law of cosines.
+        double len = diag_len(pp, pn);
+        if (len <= 1e-15) continue;
+
+        diagonals.push_back({pp, pi, pn, len});
+        poly.erase(poly.begin() + j);
+        poly_edge.erase(poly_edge.begin() + j);
+        poly_edge[(j > 0) ? j - 1 : (int)poly.size() - 1] = len;
+        found = true;
+        break;
+      }
+      if (!found) {
+        // Blocker-flip: try flipping edges that block ear diagonals.
+        bool flipped_blocker = false;
+        int n2 = poly.size();
+        for (int j = 0; j < n2 && !flipped_blocker; j++) {
+          int jm = (j - 1 + n2) % n2, jp = (j + 1) % n2;
+          int pp = poly[jm], pn = poly[jp];
+          if (nb[pp] != nb[pn] && edge_exists(edge_t(nb[pp], nb[pn]))) {
+            if (flip_edge(nb[pp], nb[pn]))
+              flipped_blocker = true;
+          }
+        }
+        if (!flipped_blocker) return;  // truly stuck
+      }
+    }
+
+    // Remove all spoke edges.
+    for (int i = 0; i < k; i++) set_length(v, nb[i], 0);
+    for (int i = k - 1; i >= 0; i--) Graph::remove_edge(edge_t(v, nb[i]));
+
+    // Insert ear diagonals.
+    for (size_t di = 0; di < diagonals.size(); di++) {
+      auto& d = diagonals[di];
+      node_t p_prev = nb[d.prev_idx];
+      node_t p_ear  = nb[d.ear_idx];
+      node_t p_next = nb[d.next_idx];
+      node_t suc_uv = next(p_prev, p_ear);
+      node_t suc_vu = p_ear;
+      assert(find(p_next, p_ear) >= 0);
+      Graph::insert_edge(arc_t(p_prev, p_next), suc_uv, suc_vu);
+      set_length(p_prev, p_next, d.len);
+    }
+
+    assert(v == N - 1 && degree(v) == 0);
+    pop_back();
+    if (audit) audit->after_removal(*this, v);
+    return;
+  }
+
+  // Phase 3: Degree 3 — the three surrounding triangles collapse into one.
+  assert(deg == 3);
+  auto vrow = (*this)[v];
+  node_t a = vrow[0], b = vrow[1], c = vrow[2];
+  set_length(v, a, 0); set_length(v, b, 0); set_length(v, c, 0);
+  Graph::remove_edge(edge_t(v, a));
+  Graph::remove_edge(edge_t(v, b));
+  Graph::remove_edge(edge_t(v, c));
+
+  assert(v == N - 1);
+  pop_back();
+  if (audit) audit->after_removal(*this, v);
+}
+
+int FulleroidDelaunay::lawson_sweep()
+{
+  int flips = 0;
+  map<edge_t, bool> in_stack;
+  stack<edge_t> S;
+  for (node_t u = 0; u < N; u++)
+    for (node_t v : (*this)[u])
+      if (u < v) {
+        edge_t e(u, v);
+        S.push(e); in_stack[e] = true;
+      }
+
+  int budget = 200 * N;
+  while (!S.empty() && budget > 0) {
+    edge_t e = S.top(); S.pop();
+    in_stack[e] = false;
+    node_t u = e.first, v = e.second;
+    if (!edge_exists(e) || is_delaunay_edge(u, v)) continue;
+
+    node_t B = next(v, u), D = next(u, v);
+    if (!flip_edge(u, v)) continue;
+
+    flips++; budget--;
+    for (edge_t ec : {edge_t(u,B), edge_t(B,v), edge_t(v,D), edge_t(D,u)})
+      if (!in_stack[ec]) { S.push(ec); in_stack[ec] = true; }
+  }
+  if (audit) audit->after_sweep(*this, flips);
+  return flips;
+}
+
+void FulleroidDelaunay::remove_flat_vertices()
+{
+  vector<int> original_degrees(N);
+  for (node_t v = 0; v < N; v++)
+    original_degrees[v] = degree(v);
+
+  while (N > 0 && original_degrees[N - 1] == 6) {
+    int old_N = N;
+    remove_flat_vertex(N - 1);
+
+    if (N == old_N) {
+      // Vertex removal stuck — restructure via Delaunay flips and retry.
+      bool removed = false;
+      for (int retry = 0; retry < 5; retry++) {
+        flip_to_delaunay();
+        remove_flat_vertex(N - 1);
+        if (N < old_N) { removed = true; break; }
+      }
+      if (!removed) break;  // truly stuck
+    }
+
+    lawson_sweep();  // maintain near-Delaunay between removals
+  }
+
+  // Final: lawson_sweep + delaunay_resolve on the cone-points-only graph.
+  flip_to_delaunay();
+}
+
+// ============================================================================
+// Validation
+// ============================================================================
+
+bool FulleroidDelaunay::edge_lengths_are_symmetric() const
+{
+  for (int i = 0; i < N; i++)
+    for (int j = i; j < N; j++)
+      if (edge_lengths(i,j) != edge_lengths(j,i))
+        return false;
+  return true;
+}
+
+// ============================================================================
+// IDTAudit — postcondition checking for iDT operations
+// ============================================================================
+
+IDTAudit::IDTAudit(const FulleroidDelaunay& D)
+  : original_degrees(D.N), original_faces(0), expected_area(0)
+{
+  for (node_t v = 0; v < D.N; v++)
+    original_degrees[v] = D.degree(v);
+
+  for (node_t u = 0; u < D.N; u++)
+    for (size_t j = 0; j < D[u].size(); j++) {
+      node_t v = D[u][j], w = D[u][(j+1) % D[u].size()];
+      if (u < v && u < w) original_faces++;
+    }
+
+  expected_area = original_faces * sqrt(3.0) / 4.0;
+}
+
+void IDTAudit::after_flip(const FulleroidDelaunay& D, node_t u, node_t v) {
+  char buf[64];
+  snprintf(buf, sizeof(buf), "flip(%d,%d)", u, v);
+  check_all(D, buf);
+}
+
+void IDTAudit::after_removal(const FulleroidDelaunay& D, node_t removed) {
+  char buf[64];
+  snprintf(buf, sizeof(buf), "remove(%d)", removed);
+  check_all(D, buf);
+}
+
+void IDTAudit::after_sweep(const FulleroidDelaunay& D, int n_flips) {
+  char buf[64];
+  snprintf(buf, sizeof(buf), "sweep(%d flips)", n_flips);
+  check_all(D, buf);
+}
+
+void IDTAudit::check_all(const FulleroidDelaunay& D, const char* ctx)
+{
+  verify_euler(D, ctx);
+  verify_orientation(D, ctx);
+  verify_edge_consistency(D, ctx);
+  verify_triangle_inequality(D, ctx);
+  verify_positive_area(D, ctx);
+  verify_cone_angles(D, ctx);
+  verify_total_area(D, ctx);
+  verify_loeschian(D, ctx);
+  verify_no_multi_edges(D, ctx);
+}
+
+void IDTAudit::fail(const char* invariant, const char* ctx, const string& detail) {
+  n_failures++;
+  fprintf(stderr, "IDT INVARIANT FAILURE: %s\n  Context: %s\n  Detail: %s\n",
+          invariant, ctx, detail.c_str());
+  if (stop_on_failure) abort();
+}
+
+bool IDTAudit::verify_euler(const FulleroidDelaunay& D, const char* ctx) {
+  n_checks++;
+  int V = D.N;
+  int E = 0;
+  for (node_t u = 0; u < D.N; u++) E += D.degree(u);
+  E /= 2;
+  int F = 0;
+  for (node_t u = 0; u < D.N; u++)
+    for (size_t j = 0; j < D[u].size(); j++) {
+      node_t v = D[u][j], w = D[u][(j+1) % D[u].size()];
+      if (u < v && u < w) F++;
+    }
+  if (V - E + F != 2) {
+    char buf[128];
+    snprintf(buf, sizeof(buf), "V=%d E=%d F=%d, V-E+F=%d (expected 2)", V, E, F, V-E+F);
+    fail("euler", ctx, buf);
+    return false;
+  }
+  return true;
+}
+
+bool IDTAudit::verify_orientation(const FulleroidDelaunay& D, const char* ctx) {
+  n_checks++;
+  if (!D.is_consistently_oriented()) {
+    fail("orientation", ctx, "is_consistently_oriented() returned false");
+    return false;
+  }
+  return true;
+}
+
+bool IDTAudit::verify_edge_consistency(const FulleroidDelaunay& D, const char* ctx) {
+  n_checks++;
+  for (node_t u = 0; u < D.N; u++)
+    for (node_t v = u+1; v < D.N; v++)
+      if (D.edge_lengths(u,v) != D.edge_lengths(v,u)) {
+        char buf[128];
+        snprintf(buf, sizeof(buf), "edge_lengths(%d,%d)=%g != edge_lengths(%d,%d)=%g",
+                 u, v, D.edge_lengths(u,v), v, u, D.edge_lengths(v,u));
+        fail("edge_symmetry", ctx, buf);
+        return false;
+      }
+  for (node_t u = 0; u < D.N; u++)
+    for (node_t v : D[u])
+      if (D.get_length(u,v) <= 0) {
+        char buf[128];
+        snprintf(buf, sizeof(buf), "edge(%d,%d) exists but length=%g", u, v, D.get_length(u,v));
+        fail("edge_positive", ctx, buf);
+        return false;
+      }
+  for (node_t u = 0; u < D.N; u++)
+    for (node_t v = 0; v < D.N; v++)
+      if (u != v && D.edge_lengths(u,v) > 0 &&
+          std::find(D[u].begin(), D[u].end(), v) == D[u].end()) {
+        char buf[128];
+        snprintf(buf, sizeof(buf), "edge_lengths(%d,%d)=%g but not in neighbour list",
+                 u, v, D.edge_lengths(u,v));
+        fail("edge_phantom", ctx, buf);
+        return false;
+      }
+  return true;
+}
+
+bool IDTAudit::verify_triangle_inequality(const FulleroidDelaunay& D, const char* ctx) {
+  n_checks++;
+  for (node_t u = 0; u < D.N; u++)
+    for (size_t j = 0; j < D[u].size(); j++) {
+      node_t v = D[u][j], w = D[u][(j+1) % D[u].size()];
+      if (u < v && u < w) {
+        double a = D.get_length(u,v), b = D.get_length(v,w), c = D.get_length(w,u);
+        if (a + b <= c || b + c <= a || c + a <= b) {
+          char buf[128];
+          snprintf(buf, sizeof(buf), "triangle(%d,%d,%d) sides %g,%g,%g", u, v, w, a, b, c);
+          fail("triangle_inequality", ctx, buf);
+          return false;
+        }
+      }
+    }
+  return true;
+}
+
+bool IDTAudit::verify_positive_area(const FulleroidDelaunay& D, const char* ctx) {
+  n_checks++;
+  for (node_t u = 0; u < D.N; u++)
+    for (size_t j = 0; j < D[u].size(); j++) {
+      node_t v = D[u][j], w = D[u][(j+1) % D[u].size()];
+      if (u < v && u < w) {
+        double a = D.get_length(u,v), b = D.get_length(v,w), c = D.get_length(w,u);
+        double s = (a+b+c)/2;
+        double H = s*(s-a)*(s-b)*(s-c);
+        if (H <= 0) {
+          char buf[128];
+          snprintf(buf, sizeof(buf), "triangle(%d,%d,%d) heron=%g (sides %g,%g,%g)",
+                   u, v, w, H, a, b, c);
+          fail("positive_area", ctx, buf);
+          return false;
+        }
+      }
+    }
+  return true;
+}
+
+bool IDTAudit::verify_cone_angles(const FulleroidDelaunay& D, const char* ctx) {
+  n_checks++;
+  for (node_t u = 0; u < D.N; u++) {
+    double total = 0;
+    auto nbrs = D[u];
+    int k = nbrs.size();
+    for (int j = 0; j < k; j++) {
+      node_t v = nbrs[j], w = nbrs[(j+1)%k];
+      double a = D.get_length(v,w), b = D.get_length(u,v), c = D.get_length(u,w);
+      double cos_u = (b*b + c*c - a*a) / (2.0*b*c);
+      cos_u = std::max(-1.0, std::min(1.0, cos_u));
+      total += acos(cos_u);
+    }
+    double expected = original_degrees[u] * M_PI / 3.0;
+    double err = fabs(total - expected);
+    if (err > 1e-8) {
+      char buf[128];
+      snprintf(buf, sizeof(buf), "vertex %d: cone_angle=%g expected=%g (orig_deg=%d) err=%g",
+               u, total, expected, original_degrees[u], err);
+      fail("cone_angle", ctx, buf);
+      return false;
+    }
+  }
+  return true;
+}
+
+bool IDTAudit::verify_total_area(const FulleroidDelaunay& D, const char* ctx) {
+  n_checks++;
+  double area = 0;
+  for (node_t u = 0; u < D.N; u++)
+    for (size_t j = 0; j < D[u].size(); j++) {
+      node_t v = D[u][j], w = D[u][(j+1) % D[u].size()];
+      if (u < v && u < w) {
+        double a = D.get_length(u,v), b = D.get_length(v,w), c = D.get_length(w,u);
+        double s = (a+b+c)/2;
+        double H = s*(s-a)*(s-b)*(s-c);
+        area += (H > 0) ? sqrt(H) : 0;
+      }
+    }
+  double err = fabs(area - expected_area);
+  if (err > 1e-8) {
+    char buf[128];
+    snprintf(buf, sizeof(buf), "total_area=%g expected=%g err=%g", area, expected_area, err);
+    fail("total_area", ctx, buf);
+    return false;
+  }
+  return true;
+}
+
+static bool is_loeschian(int n) {
+  if (n < 0) return false;
+  if (n == 0) return true;
+  for (int a = 0; 3*a*a <= 4*n; a++) {
+    int disc = 4*n - 3*a*a;
+    int s = (int)round(sqrt((double)disc));
+    if (s*s != disc) continue;
+    if ((s - a) % 2 != 0) continue;
+    int b = (s - a) / 2;
+    if (b >= 0) return true;
+  }
+  return false;
+}
+
+bool IDTAudit::verify_loeschian(const FulleroidDelaunay& D, const char* ctx) {
+  n_checks++;
+  for (node_t u = 0; u < D.N; u++)
+    for (node_t v : D[u])
+      if (u < v) {
+        double L = D.get_length(u,v);
+        double L2 = L*L;
+        int L2i = (int)round(L2);
+        if (fabs(L2 - L2i) > 1e-6) {
+          char buf[128];
+          snprintf(buf, sizeof(buf), "edge(%d,%d) L=%g L^2=%g not integer (nearest=%d, err=%g)",
+                   u, v, L, L2, L2i, L2-L2i);
+          fail("loeschian_integer", ctx, buf);
+          return false;
+        }
+        if (!is_loeschian(L2i)) {
+          char buf[128];
+          snprintf(buf, sizeof(buf), "edge(%d,%d) L^2=%d is not a Loeschian number", u, v, L2i);
+          fail("loeschian_form", ctx, buf);
+          return false;
+        }
+      }
+  return true;
+}
+
+bool IDTAudit::verify_no_multi_edges(const FulleroidDelaunay& D, const char* ctx) {
+  n_checks++;
+  for (node_t u = 0; u < D.N; u++) {
+    auto row = D[u];
+    for (size_t i = 0; i < row.size(); i++)
+      for (size_t j = i+1; j < row.size(); j++)
+        if (row[i] == row[j]) {
+          char buf[128];
+          snprintf(buf, sizeof(buf), "vertex %d has duplicate neighbour %d (positions %zu,%zu)",
+                   u, row[i], i, j);
+          fail("no_multi_edges", ctx, buf);
+          return false;
+        }
+  }
+  return true;
+}
+
+// ============================================================================
+// 3D Embedding (old, uses all_pairs_distances + MDS)
+// ============================================================================
+
+matrix<double> FulleroidDelaunay::all_pairs_distances() const
+{
+  const double INF = 1e30;
+  matrix<double> D(N, N, INF);
+
+  for (node_t u = 0; u < N; u++) {
+    D(u, u) = 0;
+    for (node_t v : (*this)[u])
+      D(u, v) = get_length(u, v);
+  }
+
+  // Floyd-Warshall
+  for (node_t k = 0; k < N; k++)
+    for (node_t i = 0; i < N; i++)
+      for (node_t j = 0; j < N; j++)
+        if (D(i, k) + D(k, j) < D(i, j))
+          D(i, j) = D(i, k) + D(k, j);
+
+  return D;
+}

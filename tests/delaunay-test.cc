@@ -1,8 +1,10 @@
 #include <gtest/gtest.h>
 #include "fullerenes/delaunay.hh"
+#include "fullerenes/delaunay_old.hh"
 #include "fullerenes/isomerdb.hh"
 #include "fullerenes/planargraph.hh"
 #include "fullerenes/buckygen-wrapper.hh"
+#include "fullerenes/symmetry.hh"
 #include <chrono>
 #include <numeric>
 #include <queue>
@@ -18,6 +20,24 @@ static Triangulation make_dual(int N, int idx, bool IPR = false) {
   return T;
 }
 
+// Print timing stats from a vector of durations in microseconds.
+static void print_timing_stats(const std::string& label, std::vector<double>& times_us) {
+  if (times_us.empty()) return;
+  std::sort(times_us.begin(), times_us.end());
+  double median = times_us[times_us.size() / 2];
+  double max_t = times_us.back();
+  double mean = std::accumulate(times_us.begin(), times_us.end(), 0.0) / times_us.size();
+  double sq_sum = 0;
+  for (double t : times_us) sq_sum += (t - mean) * (t - mean);
+  double stddev = sqrt(sq_sum / times_us.size());
+  std::cout << label << ": n=" << times_us.size()
+            << " median=" << median << "us"
+            << " max=" << max_t << "us"
+            << " mean=" << mean << "us"
+            << " stddev=" << stddev << "us" << std::endl;
+}
+
+#if 0  // Old FulleroidDelaunay iDT tests — superseded by DCEL tests.
 // Verify all properties of the reduced triangulation.
 // N_original is the number of faces in the original fullerene dual (= N for C_N).
 static void verify_reduced(const FulleroidDelaunay& D, int expected_verts, int N_original) {
@@ -526,7 +546,8 @@ TEST(IntrinsicDelaunay, C100_84570) {
   ASSERT_EQ(D.N, 12);
   verify_reduced(D, 12, 100);
 }
-
+#endif  // Old FulleroidDelaunay iDT tests
+#if 0  // Old FulleroidDelaunay embedding tests — embed_3d() moved out.
 // ============================================================================
 // 3D Embedding tests
 // ============================================================================
@@ -1560,6 +1581,7 @@ static void compare_mds_vs_bfs(int N) {
 TEST(DelaunayCompare, C60_MDS_vs_BFS) { compare_mds_vs_bfs(60); }
 TEST(DelaunayCompare, C70_MDS_vs_BFS) { compare_mds_vs_bfs(70); }
 TEST(DelaunayCompare, C80_MDS_vs_BFS) { compare_mds_vs_bfs(80); }
+#endif  // Old FulleroidDelaunay embedding tests
 
 // ============================================================================
 // Plantri: general 3-connected planar triangulations
@@ -1586,6 +1608,7 @@ static int stream_planarcode(const std::string& path,
   return count;
 }
 
+#if 0  // Old FulleroidDelaunay Plantri test.
 TEST(IntrinsicDelaunay, Plantri15_AllTriangulations) {
   // Validate iDT on ALL 2,406,841 3-connected planar triangulations on 15 vertices.
   // These include vertices of degree 3-12, testing negative-curvature cone points.
@@ -1729,6 +1752,7 @@ TEST(IntrinsicDelaunay, Plantri15_AllTriangulations) {
             << max_degree_seen << std::endl;
   EXPECT_EQ(n_failed, 0);
 }
+#endif  // Old FulleroidDelaunay Plantri test
 
 // ============================================================================
 // DCEL-based DelaunayTriangulation tests
@@ -1912,6 +1936,88 @@ TEST(DCEL, C60_AllIsomers) {
   print_timing_stats("DCEL C60 iDT", times_us);
 }
 
+// Verify exact Eisenstein face-origin tracking: every original face must
+// appear in exactly one iDT face's f_origin (modulo boundary faces that
+// appear in exactly two), and the total count must equal N_original_faces.
+static void verify_exact_origins(const DelaunayTriangulation& D,
+                                 int N_original_faces) {
+  // Collect all origin assignments.
+  std::map<int, int> origin_count;  // original face ID → number of iDT faces claiming it
+  int total = 0;
+  for (int f = 0; f < D.nf; f++) {
+    if (D.f_he[f] < 0) continue;  // dead face
+    for (int orig : D.f_origin[f])
+      origin_count[orig]++;
+    total += D.f_origin[f].size();
+  }
+
+  // Every original face must appear at least once.
+  int missing = 0, singly = 0, doubly = 0, multi = 0;
+  for (int i = 0; i < N_original_faces; i++) {
+    auto it = origin_count.find(i);
+    if (it == origin_count.end()) missing++;
+    else if (it->second == 1) singly++;
+    else if (it->second == 2) doubly++;
+    else multi++;
+  }
+
+  EXPECT_EQ(missing, 0) << missing << " original faces not assigned to any iDT face";
+  EXPECT_EQ(multi, 0) << multi << " original faces assigned to 3+ iDT faces";
+  // Boundary faces (split by a geodesic) appear in exactly 2 iDT faces.
+  // Interior faces appear in exactly 1.  Both are acceptable.
+  // But no face should appear in 0 or 3+.
+
+  // No spurious face IDs outside [0, N_original_faces).
+  for (auto& [fid, cnt] : origin_count)
+    EXPECT_LT(fid, N_original_faces) << "Spurious origin face ID " << fid;
+}
+
+// Exact origin tracking on C20 (no flat vertices to remove).
+TEST(DCEL, ExactOrigins_C20) {
+  Triangulation T = make_dual(20, 0, false);
+  auto D = DelaunayTriangulation::compute(T, /*exact_origins=*/true);
+  EXPECT_EQ(D.nv, 12);
+  EXPECT_TRUE(D.is_delaunay());
+  verify_exact_origins(D, 20);
+}
+
+// Exact origin tracking on C60 Ih.
+TEST(DCEL, ExactOrigins_C60_Ih) {
+  Triangulation T = make_dual(60, 0, true);
+  auto D = DelaunayTriangulation::compute(T, /*exact_origins=*/true);
+  EXPECT_EQ(D.nv, 12);
+  EXPECT_TRUE(D.is_delaunay());
+  verify_exact_origins(D, 60);
+}
+
+TEST(DCEL, ExactOrigins_C60_AllIsomers) {
+  BuckyGen::buckygen_queue Q = BuckyGen::start(60, false, false);
+  Triangulation T;
+  std::vector<double> times_us;
+  int idx = 0;
+  int n_fail = 0;
+  while (BuckyGen::next_fullerene(Q, T)) {
+    SCOPED_TRACE("C60 #" + std::to_string(idx));
+    try {
+      auto t0 = std::chrono::high_resolution_clock::now();
+      auto D = DelaunayTriangulation::compute(T, /*exact_origins=*/true);
+      auto t1 = std::chrono::high_resolution_clock::now();
+      times_us.push_back(std::chrono::duration<double, std::micro>(t1 - t0).count());
+      verify_dcel_reduced(D, 12, 60);
+      verify_exact_origins(D, 60);
+      if (D.nv != 12 || !D.is_delaunay()) n_fail++;
+    } catch (const std::exception& e) {
+      ADD_FAILURE() << "C60 #" << idx << ": exception: " << e.what();
+      n_fail++;
+    }
+    idx++;
+  }
+  BuckyGen::stop(Q);
+  EXPECT_EQ(idx, 1812);
+  EXPECT_EQ(n_fail, 0);
+  print_timing_stats("DCEL C60 exact origins", times_us);
+}
+
 TEST(DCEL, DISABLED_C80_AllIsomers) {
   BuckyGen::buckygen_queue Q = BuckyGen::start(80, false, false);
   Triangulation T;
@@ -1933,6 +2039,33 @@ TEST(DCEL, DISABLED_C80_AllIsomers) {
   print_timing_stats("DCEL C80 iDT", times_us);
 }
 
+TEST(DCEL, DISABLED_ExactOrigins_C80_AllIsomers) {
+  BuckyGen::buckygen_queue Q = BuckyGen::start(80, false, false);
+  Triangulation T;
+  std::vector<double> times_us;
+  int idx = 0;
+  int n_fail = 0;
+  while (BuckyGen::next_fullerene(Q, T)) {
+    SCOPED_TRACE("C80 #" + std::to_string(idx));
+    try {
+      auto t0 = std::chrono::high_resolution_clock::now();
+      auto D = DelaunayTriangulation::compute(T, /*exact_origins=*/true);
+      auto t1 = std::chrono::high_resolution_clock::now();
+      times_us.push_back(std::chrono::duration<double, std::micro>(t1 - t0).count());
+      verify_dcel_reduced(D, 12, 80);
+      verify_exact_origins(D, 80);
+      if (D.nv != 12 || !D.is_delaunay()) n_fail++;
+    } catch (const std::exception& e) {
+      ADD_FAILURE() << "C80 #" << idx << ": exception: " << e.what();
+      n_fail++;
+    }
+    idx++;
+  }
+  BuckyGen::stop(Q);
+  EXPECT_EQ(n_fail, 0);
+  print_timing_stats("DCEL C80 exact origins", times_us);
+}
+
 TEST(DCEL, DISABLED_C100_AllIsomers) {
   BuckyGen::buckygen_queue Q = BuckyGen::start(100, false, false);
   Triangulation T;
@@ -1952,6 +2085,33 @@ TEST(DCEL, DISABLED_C100_AllIsomers) {
   BuckyGen::stop(Q);
   EXPECT_EQ(n_fail, 0);
   print_timing_stats("DCEL C100 iDT", times_us);
+}
+
+TEST(DCEL, DISABLED_ExactOrigins_C100_AllIsomers) {
+  BuckyGen::buckygen_queue Q = BuckyGen::start(100, false, false);
+  Triangulation T;
+  std::vector<double> times_us;
+  int idx = 0;
+  int n_fail = 0;
+  while (BuckyGen::next_fullerene(Q, T)) {
+    SCOPED_TRACE("C100 #" + std::to_string(idx));
+    try {
+      auto t0 = std::chrono::high_resolution_clock::now();
+      auto D = DelaunayTriangulation::compute(T, /*exact_origins=*/true);
+      auto t1 = std::chrono::high_resolution_clock::now();
+      times_us.push_back(std::chrono::duration<double, std::micro>(t1 - t0).count());
+      verify_dcel_reduced(D, 12, 100);
+      verify_exact_origins(D, 100);
+      if (D.nv != 12 || !D.is_delaunay()) n_fail++;
+    } catch (const std::exception& e) {
+      ADD_FAILURE() << "C100 #" << idx << ": exception: " << e.what();
+      n_fail++;
+    }
+    idx++;
+  }
+  BuckyGen::stop(Q);
+  EXPECT_EQ(n_fail, 0);
+  print_timing_stats("DCEL C100 exact origins", times_us);
 }
 
 TEST(DCEL, DISABLED_Plantri15_AllTriangulations) {
@@ -2356,4 +2516,132 @@ TEST(DCELEmbed, C60_AllIsomers) {
   std::cout << "DCEL C60 Embed: " << idx << " isomers, "
             << n_poor << " with >1% error, worst=" << worst_err
             << " at #" << worst_idx << std::endl;
+}
+
+// ============================================================================
+// Symmetry-constrained DCEL embedding tests
+// ============================================================================
+
+// Helper: make dual triangulation from buckygen
+static Triangulation make_buckygen_dual(int N, int target_idx) {
+  BuckyGen::buckygen_queue Q = BuckyGen::start(N, false, false);
+  Triangulation T;
+  int idx = 0;
+  while (BuckyGen::next_fullerene(Q, T)) {
+    if (idx == target_idx) break;
+    idx++;
+  }
+  BuckyGen::stop(Q);
+  return T;
+}
+
+TEST(DCELSymEmbed, C20_Ih) {
+  // C20 has Ih symmetry (group order 120). All 12 iDT vertices in one orbit.
+  Triangulation T = make_dual(20, 0, false);
+  Symmetry S(T);
+  auto sym = restrict_to_cone_points(
+      vector<vector<int>>(S.G.begin(), S.G.end()), T);
+  EXPECT_GT(sym.size(), 1u) << "Expected non-trivial symmetry group";
+
+  auto D = DelaunayTriangulation::compute(T);
+  ASSERT_EQ(D.nv, 12);
+
+  auto coords_nosym = D.embed_3d();
+  auto coords_sym   = D.embed_3d(sym);
+
+  // Both should give machine-precision results for C20 (regular icosahedron)
+  verify_dcel_embedding(D, coords_nosym, 1e-6, "C20 no-sym");
+  verify_dcel_embedding(D, coords_sym,   1e-6, "C20 with-sym");
+
+  std::cout << "  Symmetry group order: " << sym.size()
+            << ", point group: " << S.point_group() << std::endl;
+}
+
+TEST(DCELSymEmbed, C60_1264_MultiEdge) {
+  // The multi-edge case that originally caused MDS collapse.
+  // Without symmetry: relies on heuristic perturbation.
+  // With symmetry: principled symmetrization.
+  Triangulation T = make_buckygen_dual(60, 1264);
+  Symmetry S(T);
+  auto sym = restrict_to_cone_points(
+      vector<vector<int>>(S.G.begin(), S.G.end()), T);
+
+  auto D = DelaunayTriangulation::compute(T);
+  ASSERT_EQ(D.nv, 12);
+
+  auto orbits = compute_orbits(12, sym);
+  std::cout << "  C60 #1264: point group " << S.point_group()
+            << ", |G|=" << sym.size()
+            << ", " << orbits.size() << " orbits:";
+  for (auto& o : orbits) {
+    std::cout << " {";
+    for (size_t i = 0; i < o.size(); i++)
+      std::cout << (i?",":"") << o[i];
+    std::cout << "}";
+  }
+  std::cout << std::endl;
+
+  auto coords = D.embed_3d(sym);
+  verify_dcel_embedding(D, coords, 1e-4, "C60 #1264 sym");
+}
+
+TEST(DCELSymEmbed, C60_AllIsomers) {
+  int total = 0, n_poor_nosym = 0, n_poor_sym = 0;
+  double worst_nosym = 0, worst_sym = 0;
+  int worst_idx_nosym = -1, worst_idx_sym = -1;
+
+  BuckyGen::buckygen_queue Q = BuckyGen::start(60, false, false);
+  Triangulation T;
+  int idx = 0;
+  while (BuckyGen::next_fullerene(Q, T)) {
+    Symmetry S(T);
+    auto sym = restrict_to_cone_points(
+        vector<vector<int>>(S.G.begin(), S.G.end()), T);
+
+    auto D = DelaunayTriangulation::compute(T);
+    if (D.nv != 12) { idx++; continue; }
+
+    auto coords_nosym = D.embed_3d();
+    auto coords_sym   = D.embed_3d(sym);
+
+    // Measure max relative edge error (shortest per pair)
+    auto measure_err = [&](const vector<coord3d>& coords) {
+      double max_err = 0;
+      map<pair<int,int>, double> sh;
+      for (int h = 0; h < D.nh; h += 2) {
+        if (!D.alive(h)) continue;
+        int u = D.he_origin[h], v = D.dest(h);
+        if (u > v) std::swap(u, v);
+        double L = D.he_length[h];
+        auto key = make_pair(u, v);
+        auto it = sh.find(key);
+        if (it == sh.end() || L < it->second) sh[key] = L;
+      }
+      for (auto& [key, target] : sh) {
+        double actual = (coords[key.first] - coords[key.second]).norm();
+        max_err = std::max(max_err, std::abs(actual - target) / target);
+      }
+      return max_err;
+    };
+
+    double err_nosym = measure_err(coords_nosym);
+    double err_sym   = measure_err(coords_sym);
+
+    if (err_nosym > 0.01) n_poor_nosym++;
+    if (err_sym   > 0.01) n_poor_sym++;
+    if (err_nosym > worst_nosym) { worst_nosym = err_nosym; worst_idx_nosym = idx; }
+    if (err_sym   > worst_sym)   { worst_sym   = err_sym;   worst_idx_sym   = idx; }
+
+    EXPECT_LT(err_sym, 0.05) << "C60 #" << idx << " sym embedding too inaccurate";
+
+    idx++;
+    total++;
+  }
+  BuckyGen::stop(Q);
+
+  std::cout << "C60 all-isomers (" << total << "):" << std::endl;
+  std::cout << "  no-sym: " << n_poor_nosym << " with >1% error, worst="
+            << worst_nosym << " at #" << worst_idx_nosym << std::endl;
+  std::cout << "  sym:    " << n_poor_sym << " with >1% error, worst="
+            << worst_sym   << " at #" << worst_idx_sym << std::endl;
 }
