@@ -7,6 +7,7 @@
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/symmetry.hh"
 #include "fullerenes/isomerdb.hh"
+#include "fullerenes/planargraph.hh"
 #include "fullerenes/buckygen-wrapper.hh"
 #include "fullerenes/auxiliary.hh"  // pad_string
 
@@ -147,6 +148,123 @@ TEST(SymmetryValidation, PointGroups) {
 
   fprintf(stderr, "\nTotal: %d isomers, %d per-isomer, %d tally, %d skipped\n",
           total, n_per_isomer, n_tally, n_skipped);
+}
+
+// ============================================================================
+// Representation3D validation
+// ============================================================================
+
+// Determinant of 3x3 matrix.
+static double det3(const matrix3d& M) {
+  return M(0,0)*(M(1,1)*M(2,2) - M(1,2)*M(2,1))
+       - M(0,1)*(M(1,0)*M(2,2) - M(1,2)*M(2,0))
+       + M(0,2)*(M(1,0)*M(2,1) - M(1,1)*M(2,0));
+}
+
+// Verify Representation3D for a given symmetry object.
+static void verify_rep3d(const Symmetry& S, const string& label) {
+  Representation3D rep = S.representation_3d();
+  int n = S.G.size();
+
+  ASSERT_EQ((int)rep.R.size(), n) << label << ": wrong number of matrices";
+
+  matrix3d I3 = matrix3d::unit_matrix();
+
+  // 1. All matrices are orthogonal: R^T * R == I
+  for (int i = 0; i < n; i++) {
+    matrix3d RtR = rep.R[i].transpose() * rep.R[i];
+    EXPECT_LT((RtR - I3).norm(), 1e-10)
+      << label << ": R[" << i << "] not orthogonal";
+  }
+
+  // 2. det matches orientation character
+  for (int i = 0; i < n; i++) {
+    double d = det3(rep.R[i]);
+    bool reverses = S.reverses_orientation(S.G[i]);
+    if (reverses)
+      EXPECT_NEAR(d, -1.0, 1e-10) << label << ": R[" << i << "] should be improper";
+    else
+      EXPECT_NEAR(d, +1.0, 1e-10) << label << ": R[" << i << "] should be proper";
+  }
+
+  // 3. Multiplication table consistency: R[i]*R[j] == R[k] when G[i]*G[j] == G[k]
+  IDCounter<Permutation> pid;
+  for (int i = 0; i < n; i++) pid.insert(S.G[i]);
+  for (int i = 0; i < n; i++)
+    for (int j = 0; j < n; j++) {
+      int k = pid(S.G[i] * S.G[j]);
+      ASSERT_GE(k, 0) << label << ": perm table broken at " << i << "," << j;
+      matrix3d prod = rep.R[i] * rep.R[j];
+      EXPECT_LT((prod - rep.R[k]).norm(), 1e-8)
+        << label << ": R[" << i << "]*R[" << j << "] != R[" << k << "]";
+    }
+
+  // 4. R[0] == identity (G[0] is always the identity permutation)
+  EXPECT_LT((rep.R[0] - I3).norm(), 1e-10) << label << ": R[0] != identity";
+}
+
+// Test representation_3d on all C20..C60 fullerenes with nontrivial symmetry.
+TEST(Representation3D, AllNontrivialUpToC60) {
+  int Nmax = 60;
+  int tested = 0, skipped_C1 = 0;
+  map<string, int> group_counts;
+
+  for (int N = 20; N <= Nmax; N += 2) {
+    if (N == 22) continue;
+
+    BuckyGen::buckygen_queue Q = BuckyGen::start(N, false, false);
+    Graph g;
+    int idx = 0;
+    while (BuckyGen::next_fullerene(Q, g)) {
+      idx++;
+      Triangulation T(g);
+      Symmetry S(T);
+      string pg = S.point_group().to_string();
+
+      if (pg == "C1") { skipped_C1++; continue; }
+
+      string label = "C" + to_string(N) + " #" + to_string(idx) + " " + pg;
+      verify_rep3d(S, label);
+      group_counts[pg]++;
+      tested++;
+    }
+  }
+
+  fprintf(stderr, "\nRepresentation3D: tested %d nontrivial isomers (skipped %d C1)\n",
+          tested, skipped_C1);
+  fprintf(stderr, "Groups found: ");
+  for (auto& [pg, cnt] : group_counts)
+    fprintf(stderr, "%s(%d) ", pg.c_str(), cnt);
+  fprintf(stderr, "\n");
+}
+
+// Build a fullerene dual triangulation from N and isomer index (via IsomerDB).
+static Triangulation make_sym_dual(int N, int idx, bool IPR = false) {
+  IsomerDB db = IsomerDB::readPDB(N, IPR);
+  FullereneGraph G = IsomerDB::makeIsomer(N, db.entries[idx]);
+  PlanarGraph PG(G);
+  return Triangulation(PG.dual_graph());
+}
+
+// Focused test on specific high-symmetry fullerenes.
+TEST(Representation3D, HighSymmetry) {
+  // C20 (Ih)
+  {
+    Triangulation T = make_sym_dual(20, 0);
+    Symmetry S(T);
+    EXPECT_EQ(S.point_group().to_string(), "Ih");
+    verify_rep3d(S, "C20 Ih");
+    fprintf(stderr, "C20 Ih: |G|=%zu, representation_3d OK\n", S.G.size());
+  }
+
+  // C60 Ih (IPR #1)
+  {
+    Triangulation T = make_sym_dual(60, 0, true);
+    Symmetry S(T);
+    EXPECT_EQ(S.point_group().to_string(), "Ih");
+    verify_rep3d(S, "C60 Ih");
+    fprintf(stderr, "C60 Ih: |G|=%zu, representation_3d OK\n", S.G.size());
+  }
 }
 
 int main(int argc, char** argv) {

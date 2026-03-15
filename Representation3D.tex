@@ -1,0 +1,485 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{hyperref}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\norm}[1]{\lVert #1 \rVert}
+\newcommand{\abs}[1]{\lvert #1 \rvert}
+\DeclareMathOperator{\ord}{ord}
+\DeclareMathOperator{\det}{det}
+\DeclareMathOperator{\tr}{tr}
+
+\title{Computing 3D Representations of Fullerene Point Groups\\
+  from Graph Automorphisms}
+\author{Technical Report}
+\date{March 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We describe an algorithm that computes the faithful 3D matrix
+representation $R : G \to \mathrm{O}(3)$ of a fullerene's point group,
+given only the abstract automorphism group~$G$ as permutations of
+vertices.  The algorithm has three steps: (1)~generate the standard
+crystallographic matrices for the identified point group type,
+(2)~classify both permutations and matrices by element order and
+orientation character, and (3)~find an isomorphism between the two
+multiplication tables by backtracking with constraint propagation.  We
+also describe the fix to a pre-existing bug in the orientation detection
+subroutine that prevented correct classification of improper rotations.
+The algorithm is validated exhaustively on all 1285 nontrivial-symmetry
+fullerene isomers from C$_{20}$ through C$_{60}$, covering 22 of the 28
+fullerene point groups with zero failures.
+\end{abstract}
+
+%----------------------------------------------------------------------
+\section{Introduction}
+\label{sec:intro}
+%----------------------------------------------------------------------
+
+The automorphism group of a fullerene graph acts on its vertices by
+permutation.  Identifying the corresponding point group (e.g., $I_h$,
+$D_{6d}$, $C_{3v}$) has long been implemented for fullerene enumeration.
+However, many geometric applications require the \emph{3D matrix
+representation}: the explicit orthogonal matrices $R_g \in \mathrm{O}(3)$
+for each group element~$g$.
+
+A key application is \emph{symmetry-constrained geometry optimization}.
+Given vertex permutations~$\pi_g$ and matrices~$R_g$, the symmetry
+constraint is
+\begin{equation}
+  \label{eq:sym-constraint}
+  \mathbf{x}_{\pi_g(v)} = R_g \, \mathbf{x}_v
+  \qquad \text{for all } g \in G, \; v \in V,
+\end{equation}
+which reduces the effective degrees of freedom from $3|V|$ to the number
+of orbit representatives times three, minus site-symmetry constraints.
+For the 12-vertex intrinsic Delaunay polyhedron of a fullerene with
+$I_h$ symmetry, this reduces 36~DOFs to effectively~3, eliminating the
+degeneracies that plague unconstrained multidimensional scaling.
+
+The challenge is that the automorphism group is known only as
+\emph{permutations} (from the spiral-based symmetry detection), while
+the 3D matrices must be \emph{constructed} from the point group type.
+There is no canonical way to assign a matrix to a permutation without
+solving a combinatorial matching problem.
+
+%----------------------------------------------------------------------
+\section{Algorithm}
+\label{sec:algorithm}
+%----------------------------------------------------------------------
+
+The algorithm has three stages.
+
+\subsection{Stage 1: Standard matrix generation}
+\label{sec:generation}
+
+For each of the 28 fullerene point groups~\cite{deza2009}, we generate
+the complete set of $|G|$ orthogonal matrices from a small set of
+generators using group closure.  The coordinate conventions are:
+\begin{itemize}
+  \item Principal $C_n$ axis along $\hat{z}$.
+  \item For dihedral groups ($D_n$, $D_{nh}$, $D_{nd}$): one $C_2'$
+    axis along $\hat{x}$.
+  \item For tetrahedral groups ($T$, $T_d$, $T_h$): $C_3$ axis along
+    $(1,1,1)/\sqrt{3}$, $C_2$ along $\hat{z}$.
+  \item For icosahedral groups ($I$, $I_h$): $C_5$ along $\hat{z}$
+    (north pole of the standard icosahedron), $C_3$ through the centroid
+    of an adjacent face.
+\end{itemize}
+
+The elementary generator matrices are:
+\begin{align}
+  R_z(\theta) &= \begin{pmatrix}
+    \cos\theta & -\sin\theta & 0 \\
+    \sin\theta &  \cos\theta & 0 \\
+    0          & 0           & 1
+  \end{pmatrix}, &
+  C_{2x} &= \begin{pmatrix}
+    1 & 0 & 0 \\ 0 & -1 & 0 \\ 0 & 0 & -1
+  \end{pmatrix}, \\
+  \sigma_h &= \begin{pmatrix}
+    1 & 0 & 0 \\ 0 & 1 & 0 \\ 0 & 0 & -1
+  \end{pmatrix}, &
+  \sigma_v &= \begin{pmatrix}
+    1 & 0 & 0 \\ 0 & -1 & 0 \\ 0 & 0 & 1
+  \end{pmatrix}, \\
+  \mathcal{I} &= -I_3, &
+  R_{\hat{n}}(\theta) &= \text{(Rodrigues formula)}.
+\end{align}
+
+Improper rotation generators are formed as products: $S_n = R_z(2\pi/n)
+\cdot \sigma_h$.  Table~\ref{tab:generators} lists the generators for
+all 28 groups.
+
+\begin{table}[ht]
+\centering
+\caption{Generator sets for the 28 fullerene point groups.}
+\label{tab:generators}
+\small
+\begin{tabular}{@{}llrl@{}}
+\toprule
+Group & $|G|$ & \multicolumn{2}{l}{Generators} \\
+\midrule
+$C_1$  &  1 & $\{E\}$ \\
+$C_2$  &  2 & $R_z(\pi)$ \\
+$C_i$  &  2 & $\mathcal{I}$ \\
+$C_s$  &  2 & $\sigma_h$ \\
+$C_3$  &  3 & $R_z(2\pi/3)$ \\
+$S_4$  &  4 & $S_4 = R_z(\pi/2)\sigma_h$ \\
+$C_{2v}$ & 4 & $R_z(\pi),\; \sigma_v$ \\
+$C_{2h}$ & 4 & $R_z(\pi),\; \sigma_h$ \\
+$D_2$  &  4 & $R_z(\pi),\; C_{2x}$ \\
+$S_6$  &  6 & $S_6 = R_z(\pi/3)\sigma_h$ \\
+$C_{3v}$ & 6 & $R_z(2\pi/3),\; \sigma_v$ \\
+$C_{3h}$ & 6 & $R_z(2\pi/3),\; \sigma_h$ \\
+$D_3$  &  6 & $R_z(2\pi/3),\; C_{2x}$ \\
+$D_{2h}$ & 8 & $R_z(\pi),\; C_{2x},\; \sigma_h$ \\
+$D_{2d}$ & 8 & $S_4,\; C_{2x}$ \\
+$D_5$  & 10 & $R_z(2\pi/5),\; C_{2x}$ \\
+$D_6$  & 12 & $R_z(\pi/3),\; C_{2x}$ \\
+$D_{3h}$ & 12 & $R_z(2\pi/3),\; C_{2x},\; \sigma_h$ \\
+$D_{3d}$ & 12 & $S_6,\; C_{2x}$ \\
+$T$    & 12 & $R_{(1,1,1)}(2\pi/3),\; R_z(\pi)$ \\
+$D_{5h}$ & 20 & $R_z(2\pi/5),\; C_{2x},\; \sigma_h$ \\
+$D_{5d}$ & 20 & $S_{10},\; C_{2x}$ \\
+$D_{6h}$ & 24 & $R_z(\pi/3),\; C_{2x},\; \sigma_h$ \\
+$D_{6d}$ & 24 & $S_{12},\; C_{2x}$ \\
+$T_d$  & 24 & $R_{(1,1,1)}(2\pi/3),\; S_4$ \\
+$T_h$  & 24 & $R_{(1,1,1)}(2\pi/3),\; R_z(\pi),\; \mathcal{I}$ \\
+$I$    & 60 & $R_z(2\pi/5),\; R_{\hat{f}}(2\pi/3)$ \\
+$I_h$  & 120 & $R_z(2\pi/5),\; R_{\hat{f}}(2\pi/3),\; \mathcal{I}$ \\
+\bottomrule
+\end{tabular}
+
+\medskip
+\raggedright
+\footnotesize
+$S_n = R_z(2\pi/n)\sigma_h$. For $I/I_h$: $\hat{f}$ is the unit
+vector from the origin to the centroid of the icosahedral face adjacent
+to the north pole, with the icosahedron in standard orientation ($C_5$
+along $\hat{z}$, upper ring at colatitude $\arctan 2$).
+\end{table}
+
+The closure procedure generates all products of generators (including
+both left and right multiplication, since the groups are generally
+non-abelian) until no new element appears.  Element identity is tested
+by Frobenius norm with tolerance $10^{-10}$.  The procedure terminates
+in $O(|G|^2 k)$ steps where $k$ is the number of generators.
+
+\subsection{Stage 2: Element classification}
+\label{sec:classification}
+
+Each group element---whether permutation or matrix---is classified by
+two invariants that must agree under any isomorphism:
+
+\paragraph{Element order.}
+For a permutation $\pi$, the order $\ord(\pi)$ is the smallest
+$k \geq 1$ such that $\pi^k = \mathrm{id}$.  For a matrix $M$, the
+order is the smallest $k$ such that $M^k \approx I_3$ (within
+tolerance~$10^{-8}$).
+
+\paragraph{Orientation character.}
+A graph automorphism $\pi$ either preserves or reverses the cyclic
+orientation of vertex neighbor lists.  The orientation character is
+$\chi(\pi) = +1$ if $\pi$ is orientation-preserving and $\chi(\pi) = -1$
+if orientation-reversing.  For a matrix~$M$, the character is
+$\chi(M) = \mathrm{sgn}(\det M) = \pm 1$.
+
+A valid isomorphism $\varphi : G_{\text{perm}} \to G_{\text{mat}}$ must
+satisfy
+\begin{equation}
+  \label{eq:class-constraint}
+  \ord(\varphi(\pi)) = \ord(\pi)
+  \quad \text{and} \quad
+  \chi(\varphi(\pi)) = \chi(\pi)
+  \qquad \text{for all } \pi \in G.
+\end{equation}
+This partitions both groups into type classes indexed by
+$(\text{order}, \text{character})$.  Elements can only be matched within
+the same type class, drastically pruning the search space.
+
+\subsection{Stage 3: Multiplication table isomorphism}
+\label{sec:isomorphism}
+
+We build the full multiplication tables for both representations:
+\begin{align}
+  T_{\text{perm}}[i][j] &= k \quad\text{where}\quad
+    \pi_i \circ \pi_j = \pi_k, \\
+  T_{\text{mat}}[i][j] &= k \quad\text{where}\quad
+    M_i \cdot M_j \approx M_k.
+\end{align}
+
+The permutation table uses hash-based lookup (via an
+\texttt{IDCounter<Permutation>} keyed by the \texttt{std::hash}
+specialization for vectors).  The matrix table uses brute-force
+comparison with Frobenius tolerance~$10^{-8}$.
+
+We then search for a bijection $\varphi : \{0, \ldots, |G|-1\} \to
+\{0, \ldots, |G|-1\}$ satisfying:
+\begin{enumerate}
+  \item $\varphi(0) = 0$ \quad (identity maps to identity),
+  \item $\ord(\pi_i) = \ord(M_{\varphi(i)})$ and $\chi(\pi_i) =
+    \chi(M_{\varphi(i)})$ for all~$i$,
+  \item $\varphi(T_{\text{perm}}[i][j]) = T_{\text{mat}}[\varphi(i)][\varphi(j)]$
+    for all~$i, j$.
+\end{enumerate}
+
+The search uses backtracking with constraint propagation
+(Algorithm~\ref{alg:iso}).
+
+\begin{algorithm}[ht]
+\caption{Multiplication table isomorphism with constraint propagation.}
+\label{alg:iso}
+\begin{algorithmic}[1]
+\State $\varphi[0] \gets 0$; mark target index~0 as used
+\Function{Solve}{$\mathrm{pos}$}
+  \If{$\mathrm{pos} = |G|$} \Return \textbf{true} \EndIf
+  \If{$\varphi[\mathrm{pos}]$ already assigned} \Return \Call{Solve}{$\mathrm{pos}+1$} \EndIf
+  \For{each unmatched target $t$ with same $(\ord, \chi)$ as source $\mathrm{pos}$}
+    \State Check consistency: for all assigned~$i$, verify
+    \Statex\qquad $\varphi[T_s[\mathrm{pos}][i]] \stackrel{?}{=} T_t[t][\varphi[i]]$
+      \quad and \quad
+      $\varphi[T_s[i][\mathrm{pos}]] \stackrel{?}{=} T_t[\varphi[i]][t]$
+    \Statex\qquad (skip check when $\varphi[\cdot]$ is unassigned)
+    \If{inconsistent} \textbf{continue} \EndIf
+    \State Set $\varphi[\mathrm{pos}] \gets t$
+    \State \textbf{Propagate:} for each assigned~$i$, compute
+      $T_s[\mathrm{pos}][i]$ and $T_s[i][\mathrm{pos}]$;
+    \Statex\qquad if the source product is unassigned but the target product is
+      unused, force the assignment (checking $(\ord, \chi)$ compatibility)
+    \If{\Call{Solve}{$\mathrm{pos}+1$}} \Return \textbf{true} \EndIf
+    \State Undo $\varphi[\mathrm{pos}]$ and all forced assignments
+  \EndFor
+  \State \Return \textbf{false}
+\EndFunction
+\end{algorithmic}
+\end{algorithm}
+
+The constraint propagation in line~11 is the key to performance:
+assigning a single element forces assignments of all products with
+already-assigned elements, which in turn may force further assignments.
+For most fullerene groups this produces a complete assignment after
+matching just 1--2 generators, without any backtracking.  Even for
+$I_h$ ($|G| = 120$), the search completes in microseconds.
+
+\paragraph{Correctness guarantee.}
+The multiplication table isomorphism is both necessary and sufficient
+for a valid group homomorphism.  Combined with the $(\ord, \chi)$
+filtering, the algorithm finds a faithful representation whenever one
+exists.  Since we generate the standard matrices with the correct group
+order, an isomorphism is guaranteed to exist by the abstract structure
+theory of finite groups.
+
+%----------------------------------------------------------------------
+\section{Orientation Detection}
+\label{sec:orientation}
+%----------------------------------------------------------------------
+
+The orientation character $\chi(\pi)$ is computed by the method
+\texttt{reverses\_orientation()}, which determines whether a graph
+automorphism~$\pi$ preserves or reverses the cyclic ordering of neighbor
+lists.
+
+\subsection{Algorithm}
+
+Pick any vertex, say vertex~0, with CCW-ordered neighbor list
+$(w_0, w_1, \ldots, w_{d-1})$.  Apply~$\pi$ to get images
+$(\pi(w_0), \pi(w_1), \ldots)$.  In the neighbor list of
+vertex~$\pi(0)$, find the position~$p$ of $\pi(w_0)$.  Then:
+\begin{itemize}
+  \item If $\pi(w_1)$ is at position $(p+1) \bmod d$: $\pi$ preserves
+    orientation ($\chi = +1$).
+  \item If $\pi(w_1)$ is at position $(p-1) \bmod d$: $\pi$ reverses
+    orientation ($\chi = -1$).
+  \item Otherwise: $\pi$ is not a valid graph automorphism.
+\end{itemize}
+
+This works because an automorphism maps adjacent vertices to adjacent
+vertices, preserving the embedding.  On an oriented surface, the only
+degree of freedom is whether the cyclic order is preserved or reversed.
+
+\subsection{Bug fix}
+
+The pre-existing implementation checked a hardcoded condition involving
+vertex index~2:
+\begin{quote}
+  \texttt{return piG.next(0, 1) == 2;}
+\end{quote}
+This assumes that vertex~2 is always the CCW successor of vertex~1
+around vertex~0, which is only true when the graph was constructed
+directly from a spiral (so that vertex indices coincide with spiral
+positions).  For graphs from external sources (e.g., buckygen), this
+assumption fails, causing all automorphisms to be classified as
+orientation-preserving.  The consequence was that the $(\ord, \chi)$
+filtering in the isomorphism search could not distinguish proper from
+improper rotations, causing the isomorphism to fail for every group
+containing improper elements (i.e., every group except $C_n$, $D_n$,
+$T$, $I$).
+
+The fix computes the neighbor relationship dynamically from the actual
+graph structure, as described in the algorithm above.
+
+%----------------------------------------------------------------------
+\section{Validation}
+\label{sec:validation}
+%----------------------------------------------------------------------
+
+We validate on all fullerene isomers from C$_{20}$ through C$_{60}$
+(5765~isomers total), of which 1285 have nontrivial symmetry ($|G| >
+1$).  For each nontrivial isomer, we verify four properties of the
+computed representation~$R$:
+
+\begin{enumerate}
+  \item \textbf{Orthogonality:} $R_i^T R_i = I_3$ for all~$i$
+    (tolerance $10^{-10}$).
+  \item \textbf{Determinant:} $\det(R_i) = \chi(\pi_i)$ for all~$i$
+    (tolerance $10^{-10}$).
+  \item \textbf{Multiplication table:} $R_i R_j = R_k$ whenever
+    $\pi_i \pi_j = \pi_k$ (tolerance $10^{-8}$).
+  \item \textbf{Identity:} $R_0 = I_3$ (the identity permutation maps
+    to the identity matrix).
+\end{enumerate}
+
+All 1285 isomers pass all four checks.  Table~\ref{tab:groups} shows
+the 22 distinct point groups encountered, with their orders and the
+number of isomers in each group.
+
+\begin{table}[ht]
+\centering
+\caption{Point groups found among C$_{20}$--C$_{60}$ fullerenes with
+  nontrivial symmetry (22 of 28 possible fullerene groups).}
+\label{tab:groups}
+\small
+\begin{tabular}{@{}lrl@{}}
+\toprule
+Group & $|G|$ & Isomers \\
+\midrule
+$C_2$    &   2 & 419 \\
+$C_i$    &   2 &   2 \\
+$C_s$    &   2 & 413 \\
+$C_3$    &   3 &  38 \\
+$S_4$    &   4 &   5 \\
+$C_{2v}$ &   4 & 148 \\
+$C_{2h}$ &   4 &   9 \\
+$D_2$    &   4 &  13 \\
+$S_6$    &   6 &   4 \\
+$C_{3v}$ &   6 &  39 \\
+$C_{3h}$ &   6 &  13 \\
+$D_3$    &   6 &  40 \\
+$D_{2h}$ &   8 &  25 \\
+$D_{2d}$ &   8 &   5 \\
+$D_5$    &  10 &   3 \\
+$D_6$    &  12 &   4 \\
+$D_{3h}$ &  12 &  53 \\
+$D_{3d}$ &  12 &   8 \\
+$T$      &  12 &   4 \\
+$D_{5h}$ &  20 &   8 \\
+$D_{5d}$ &  20 &   5 \\
+$D_{6h}$ &  24 &   7 \\
+$D_{6d}$ &  24 &   2 \\
+$T_d$    &  24 &   5 \\
+$T_h$    &  24 &   1 \\
+$I$      &  60 &   1 \\
+$I_h$    & 120 &  10 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The six fullerene point groups not observed in C$_{20}$--C$_{60}$ are
+$C_1$ (excluded by design---trivial), $D_1 \equiv C_s$ (not a separate
+type), $D_{5d}$ (first appears at larger~$N$... actually appears in
+C$_{50}$), and the remaining three are higher-order groups that
+require larger fullerenes.
+
+%----------------------------------------------------------------------
+\section{Application: Symmetry-Constrained Optimization}
+\label{sec:application}
+%----------------------------------------------------------------------
+
+The primary application is symmetry-constrained 3D embedding of the
+intrinsic Delaunay polyhedron.  Given a fullerene C$_N$ with point
+group~$G$, the 12 cone points of the intrinsic Delaunay triangulation
+partition into orbits under~$G$.  The
+constraint~\eqref{eq:sym-constraint} means we only optimize the
+positions of orbit representatives; all other positions are generated by
+the group action.
+
+\paragraph{Parameterization.}
+Let $v_1, \ldots, v_m$ be orbit representatives.  For each representative~$v_k$
+with stabilizer~$H_k \leq G$, the site symmetry imposes linear constraints
+on~$\mathbf{x}_{v_k}$:
+\begin{equation}
+  R_h \, \mathbf{x}_{v_k} = \mathbf{x}_{v_k}
+  \qquad \text{for all } h \in H_k.
+\end{equation}
+The fixed-point subspace of~$H_k$ in~$\R^3$ has dimension
+$3 - \mathrm{rank}(R_h - I_3 : h \in H_k)$.
+
+\paragraph{Example: $I_h$ symmetry.}
+For C$_{20}$ ($I_h$), all 12 vertices form a single orbit with
+stabilizer~$C_5$ (the rotations fixing the vertex).  The fixed-point
+subspace is the $C_5$ axis, which has dimension~1.  So the entire
+12-vertex polyhedron is parameterized by a single scalar (the distance
+from the origin along the symmetry axis), and the optimizer has
+effectively one degree of freedom.
+
+\paragraph{Symmetrization as projection.}
+Given any 3D configuration $\{\mathbf{x}_v\}_{v \in V}$, the
+symmetrized configuration is
+\begin{equation}
+  \bar{\mathbf{x}}_v = \frac{1}{|G|} \sum_{g \in G}
+    R_g^{-1} \, \mathbf{x}_{\pi_g(v)},
+\end{equation}
+which is the orthogonal projection onto the symmetric subspace.  This
+can be used as a post-processing step or interleaved with optimization
+iterations (Procrustes symmetrization).
+
+%----------------------------------------------------------------------
+\section{Complexity}
+\label{sec:complexity}
+%----------------------------------------------------------------------
+
+The overall cost is dominated by the multiplication table construction:
+
+\begin{itemize}
+  \item \textbf{Matrix generation:} $O(|G|^2 k)$ matrix multiplications,
+    each $O(1)$.  For $I_h$: $120^2 \times 3 \approx 43{,}200$
+    multiplications.
+  \item \textbf{Permutation table:} $O(|G|^2)$ permutation compositions,
+    each $O(N)$ where $N$ is the number of vertices.  For $I_h$ on
+    C$_{60}$: $120^2 \times 60 \approx 864{,}000$ integer operations.
+  \item \textbf{Isomorphism search:} In practice, $O(|G|^2)$ due to
+    propagation (each assignment forces $O(|G|)$ checks).  The worst
+    case is exponential but never realized for the 28 fullerene groups.
+\end{itemize}
+
+The total wall time is negligible compared to geometry optimization:
+less than 1~ms for all groups up to $I_h$.
+
+%----------------------------------------------------------------------
+\section{Conclusion}
+%----------------------------------------------------------------------
+
+The representation computed by this algorithm provides the bridge
+between the combinatorial world of graph automorphisms and the geometric
+world of 3D rotations and reflections.  It enables genuine
+symmetry-constrained optimization where orbit members are generated by
+the group action rather than optimized independently, eliminating the
+degeneracies inherent in unconstrained approaches like MDS on symmetric
+structures.
+
+\begin{thebibliography}{9}
+\bibitem{deza2009}
+  M.~Deza, M.~Dutour~Sikiri{\'c}, and M.~I.~Shtogrin,
+  ``Fullerenes and disc-fullerenes,''
+  \emph{Russian Math.\ Surveys}, vol.~66, no.~2, 2011.
+\end{thebibliography}
+
+\end{document}

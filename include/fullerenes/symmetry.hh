@@ -1,10 +1,11 @@
 #pragma once
 
 #include <vector>
-#include <iostream> 
+#include <iostream>
 
 #include "fullerenes/spiral.hh"
 #include "fullerenes/triangulation.hh"
+#include "fullerenes/geometry.hh"
 
 class PointGroup {
 public:
@@ -50,6 +51,22 @@ struct Permutation : public vector<int> {
 
 };
 
+namespace std {
+  template<> struct hash<Permutation> {
+    size_t operator()(const Permutation &v) const {
+      return std::hash<vector<int>>()(v);
+    }
+  };
+}
+
+
+// 3D representation of a point group: one orthogonal matrix per group element.
+// R[i] is the 3D matrix for the i-th group element (same indexing as Symmetry::G).
+// Invariant: R[i]*R[j] == R[k] whenever G[i]*G[j] == G[k].
+// det(R[i]) == +1 for orientation-preserving, -1 for orientation-reversing.
+struct Representation3D {
+  vector<matrix3d> R;
+};
 
 class Symmetry : public Triangulation {
 public:
@@ -63,7 +80,7 @@ public:
   vector<Permutation> tri_permutation(const vector<Permutation>& Gf)  const;
   vector<Permutation> edge_permutation(const vector<Permutation>& Gf) const;
   vector<Permutation> arc_permutation(const vector<Permutation>& Gf) const;
-  
+
   // Returns the involutions *except* from the identity
   vector<int>           involutions() const;
   vector<int>           fixpoints(const Permutation& pi) const;
@@ -73,9 +90,16 @@ public:
   bool                  reverses_orientation(const Permutation& pi) const;
 
   vector< pair<int,int> > NMR_pattern() const;
-  
+
   PointGroup point_group() const;
   vector<vector<node_t>> equivalence_classes(const vector<Permutation>& G) const;
+
+  // Compute the 3D rotation/reflection matrices for each element of G.
+  // Uses the point group type (from point_group()) to generate standard
+  // matrices, then matches them to permutations via multiplication table
+  // isomorphism.  Coordinate convention: principal Cn axis along z,
+  // one C2' axis along x for dihedral groups.
+  Representation3D representation_3d() const;
   
   void initialize(){
     for(node_t u=0;u<N;u++){
