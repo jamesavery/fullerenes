@@ -919,7 +919,7 @@ bool DelaunayTriangulation::flip_edge(int h)
   recompute_face_angles(ft);
 
   // Repartition face origins across the new diagonal B→D.
-  {
+  if (origin_tracker) {
     vector<int> all;
     all.reserve(f_origin[fh].size() + f_origin[ft].size());
     all.insert(all.end(), f_origin[fh].begin(), f_origin[fh].end());
@@ -927,19 +927,11 @@ bool DelaunayTriangulation::flip_edge(int h)
     sort(all.begin(), all.end());
     all.erase(unique(all.begin(), all.end()), all.end());
 
-    if (origin_tracker) {
-      // Exact: classify each original face by which side of B→D its centroid
-      // falls on, using Eisenstein turn() in the Z[omega] grid.
-      // After flip, face(h) = (B, D, v) is left of B→D;
-      //             face(t) = (D, B, u) is right of B→D.
-      auto [left, right] = origin_tracker->classify_across_line(all, B, D);
-      f_origin[fh] = std::move(left);
-      f_origin[ft] = std::move(right);
-    } else {
-      // Conservative: assign the full union to both faces.
-      f_origin[fh] = all;
-      f_origin[ft] = all;
-    }
+    // Classify each original face by which side of B→D its centroid
+    // falls on, using Eisenstein turn() in the Z[omega] grid.
+    auto [left, right] = origin_tracker->classify_across_line(all, B, D);
+    f_origin[fh] = std::move(left);
+    f_origin[ft] = std::move(right);
   }
 
   return true;
@@ -1185,12 +1177,14 @@ void DelaunayTriangulation::remove_flat_vertex(int v)
     // --- Splice the ear-clipped polygon into the DCEL ---
 
     // Collect face origins from the fan (both combined and per-sector).
-    // Faces on the boundary between iDT faces (from classify_across_line's
-    // "both sides" case) may appear in multiple sectors.  Deduplicate so
-    // each face appears in exactly one sector (the first one that claims it).
+    // Collect and partition face origins across sectors (only when tracking).
     vector<int> all_origins;
     vector<vector<int>> sector_origins(k);
-    { int h0 = v_out[v], h = h0;
+    if (origin_tracker) {
+      // Faces on the boundary between iDT faces (from classify_across_line's
+      // "both sides" case) may appear in multiple sectors.  Deduplicate so
+      // each face appears in exactly one sector (the first one that claims it).
+      int h0 = v_out[v], h = h0;
       int sec = 0;
       unordered_set<int> seen;
       do {
@@ -1202,9 +1196,10 @@ void DelaunayTriangulation::remove_flat_vertex(int v)
         }
         h = ccw(h);
         sec++;
-      } while (h != h0); }
-    sort(all_origins.begin(), all_origins.end());
-    all_origins.erase(unique(all_origins.begin(), all_origins.end()), all_origins.end());
+      } while (h != h0);
+      sort(all_origins.begin(), all_origins.end());
+      all_origins.erase(unique(all_origins.begin(), all_origins.end()), all_origins.end());
+    }
 
     // Inner rim half-edges: next(spoke_he[i]) goes nb[i] -> nb[(i+1)%k].
     // These are in the fan faces and will be reassigned to new ear faces.
@@ -1271,10 +1266,10 @@ void DelaunayTriangulation::remove_flat_vertex(int v)
       edge_len_map[{d.prev_idx, d.next_idx}] = edge_len_map[{d.next_idx, d.prev_idx}] = d.len;
     }
 
-    // Compute per-triangle origin assignment.
+    // Compute per-triangle origin assignment via per-sector local unfolding
+    // + barycentric mapping to fan coordinates.
     vector<vector<int>> origin_assignment;
     if (origin_tracker) {
-      // Per-sector local unfolding + barycentric mapping to fan coordinates.
       //
       // Global Eisenstein unfolding fails for vertex removal because the fan
       // can contain cone points, and BFS wraps around them giving inconsistent
@@ -1425,19 +1420,6 @@ void DelaunayTriangulation::remove_flat_vertex(int v)
         }
 
       }
-    } else {
-      // Approximate: distribute origins evenly across triangles.
-      origin_assignment.resize(tris.size());
-      int per = all_origins.size() / tris.size();
-      int idx = 0;
-      for (size_t i = 0; i < tris.size(); i++) {
-        int n = (i + 1 < tris.size()) ? per
-                                       : (int)all_origins.size() - idx;
-        n = std::max(n, 0);
-        origin_assignment[i].assign(all_origins.begin() + idx,
-                                    all_origins.begin() + idx + n);
-        idx += n;
-      }
     }
 
     // Wire up each triangle.
@@ -1457,7 +1439,8 @@ void DelaunayTriangulation::remove_flat_vertex(int v)
       he_face[h_20] = fid;
       f_he[fid] = h_01;
 
-      f_origin[fid] = std::move(origin_assignment[ti]);
+      if (origin_tracker)
+        f_origin[fid] = std::move(origin_assignment[ti]);
     }
 
     // Recompute angles for new faces.
@@ -1482,14 +1465,16 @@ void DelaunayTriangulation::remove_flat_vertex(int v)
   assert(deg == 3);
   int h0 = v_out[v], h1 = ccw(h0), h2 = ccw(h1);
 
-  // Collect face origins.
+  // Collect face origins (only when tracking).
   vector<int> all_origins;
-  for (int h : {h0, h1, h2}) {
-    int f = he_face[h];
-    all_origins.insert(all_origins.end(), f_origin[f].begin(), f_origin[f].end());
+  if (origin_tracker) {
+    for (int h : {h0, h1, h2}) {
+      int f = he_face[h];
+      all_origins.insert(all_origins.end(), f_origin[f].begin(), f_origin[f].end());
+    }
+    sort(all_origins.begin(), all_origins.end());
+    all_origins.erase(unique(all_origins.begin(), all_origins.end()), all_origins.end());
   }
-  sort(all_origins.begin(), all_origins.end());
-  all_origins.erase(unique(all_origins.begin(), all_origins.end()), all_origins.end());
 
   // Inner rim: next(spoke_he[i]) goes nb[i] -> nb[i+1].
   int inner0 = he_next[h0], inner1 = he_next[h1], inner2 = he_next[h2];
@@ -1529,7 +1514,8 @@ void DelaunayTriangulation::remove_flat_vertex(int v)
   he_face[inner1] = fid;
   he_face[inner2] = fid;
   f_he[fid] = inner0;
-  f_origin[fid] = all_origins;
+  if (origin_tracker)
+    f_origin[fid] = all_origins;
 
   recompute_face_angles(fid);
 }
@@ -1570,15 +1556,13 @@ void DelaunayTriangulation::remove_flat_vertices()
 // --- Full algorithm ---
 
 DelaunayTriangulation DelaunayTriangulation::compute(
-    const Triangulation& T, bool exact_origins)
+    const Triangulation& T, bool track_origins)
 {
   // Sort flat vertices last, then build DCEL and run the algorithm.
   Triangulation sorted = T.sort_flat_last();
   DelaunayTriangulation D = from_triangulation(sorted);
-
-  if (exact_origins)
+  if (track_origins)
     D.origin_tracker = std::make_shared<OriginTracker>(sorted, D.nf);
-
   D.remove_flat_vertices();
   return D;
 }
@@ -1664,6 +1648,45 @@ vector<vector<int>> restrict_to_cone_points(
   return result;
 }
 
+SymmetryConstraint restrict_symmetry_to_cone_points(
+    const vector<vector<int>>& G, const vector<matrix3d>& R,
+    const Triangulation& T)
+{
+  if (G.empty() || G.size() != R.size()) return {};
+
+  int N = T.N;
+  vector<int> cone;
+  vector<int> orig_to_idt(N, -1);
+  for (int v = 0; v < N; v++)
+    if (T.degree(v) != 6) {
+      orig_to_idt[v] = cone.size();
+      cone.push_back(v);
+    }
+  int nc = cone.size();
+
+  // Build paired (perm, matrix), deduplicating by perm.
+  SymmetryConstraint result;
+  map<vector<int>, int> seen;  // perm -> index in result
+
+  for (size_t g = 0; g < G.size(); g++) {
+    vector<int> r(nc);
+    bool valid = true;
+    for (int i = 0; i < nc; i++) {
+      int img = orig_to_idt[G[g][cone[i]]];
+      if (img < 0) { valid = false; break; }
+      r[i] = img;
+    }
+    if (!valid) continue;
+
+    if (seen.find(r) == seen.end()) {
+      seen[r] = result.perms.size();
+      result.perms.push_back(r);
+      result.matrices.push_back(R[g]);
+    }
+  }
+  return result;
+}
+
 // Compute vertex orbits from a group of permutations (union-find).
 vector<vector<int>> compute_orbits(int n, const vector<vector<int>>& G) {
   vector<int> parent(n);
@@ -1714,28 +1737,208 @@ static void jacobi_eigen_3x3(matrix3d& A, matrix3d& V) {
   }
 }
 
-// Matrix-vector product for matrix3d * coord3d.
-static coord3d matvec(const matrix3d& M, const coord3d& v) {
-  return coord3d(M(0,0)*v[0]+M(0,1)*v[1]+M(0,2)*v[2],
-                 M(1,0)*v[0]+M(1,1)*v[1]+M(1,2)*v[2],
-                 M(2,0)*v[0]+M(2,1)*v[1]+M(2,2)*v[2]);
+// ============================================================================
+// Orbit structure for symmetry-constrained embedding
+// ============================================================================
+
+// Per-orbit data for reduced-parameter optimization.
+struct OrbitInfo {
+  int rep;                    // orbit representative (smallest index)
+  vector<int> members;        // all orbit members (including rep)
+  vector<int> gen_element;    // gen_element[k]: group index g such that perms[g][rep] == members[k]
+  int subspace_dim;           // dimension of stabilizer fixed-point subspace (1, 2, or 3)
+  matrix3d basis;             // columns 0..subspace_dim-1 are ON basis for the subspace
+};
+
+// Compute the fixed-point subspace of a set of O(3) matrices.
+// Returns (dimension, basis) where basis columns 0..dim-1 span the subspace.
+static pair<int, matrix3d> fixed_point_subspace(const vector<matrix3d>& stabilizer) {
+  // Form A = sum (R_h - I)^T (R_h - I).  Null space of A = fixed-point subspace.
+  matrix3d I3 = matrix3d::unit_matrix();
+  matrix3d A;
+  for (auto& R : stabilizer) {
+    matrix3d D = R - I3;
+    A += D.transpose() * D;
+  }
+
+  // Eigendecompose A (symmetric PSD)
+  matrix3d V;
+  jacobi_eigen_3x3(A, V);
+
+  // Eigenvalues are on the diagonal of A after decomposition.
+  // Null space = eigenvectors with eigenvalue ~ 0.
+  // Sort by eigenvalue ascending to put null-space vectors first in basis.
+  double evals[3] = {A(0,0), A(1,1), A(2,2)};
+  int order[3] = {0, 1, 2};
+  sort(order, order+3, [&](int a, int b) { return evals[a] < evals[b]; });
+
+  int dim = 0;
+  matrix3d basis;
+  for (int k = 0; k < 3; k++) {
+    int col = order[k];
+    if (evals[col] < 1e-10) {
+      for (int r = 0; r < 3; r++) basis(r, dim) = V(r, col);
+      dim++;
+    }
+  }
+
+  // Dimension 0 means the origin is the only fixed point -- shouldn't happen
+  // for a vertex of a convex polyhedron.  Fall back to full R^3.
+  if (dim == 0) {
+    dim = 3;
+    basis = matrix3d::unit_matrix();
+  }
+
+  return {dim, basis};
 }
 
-// Procrustes rotation: find the orthogonal R minimizing sum |R*src[i] - dst[i]|^2.
-// Allows improper rotations (reflections) for orientation-reversing automorphisms.
-static matrix3d procrustes_rotation(const vector<coord3d>& src,
-                                    const vector<coord3d>& dst) {
-  // Cross-covariance M = sum dst[i] src[i]^T
-  matrix3d M;
-  for (size_t i = 0; i < src.size(); i++)
-    M += dst[i].outer(src[i]);
+// Build orbit structure from a SymmetryConstraint.
+static vector<OrbitInfo> compute_orbit_structure(
+    int nv, const SymmetryConstraint& sym)
+{
+  auto orbits = compute_orbits(nv, sym.perms);
+  int n_g = sym.perms.size();
 
-  // SVD via eigendecomposition of M^T M
+  vector<OrbitInfo> result;
+  for (auto& orbit : orbits) {
+    OrbitInfo oi;
+    oi.rep = orbit[0];  // compute_orbits uses union-find; just use first
+    oi.members = orbit;
+
+    // For each member, find a group element mapping rep to it.
+    oi.gen_element.resize(orbit.size());
+    for (size_t k = 0; k < orbit.size(); k++) {
+      oi.gen_element[k] = -1;
+      for (int g = 0; g < n_g; g++) {
+        if (sym.perms[g][oi.rep] == orbit[k]) {
+          oi.gen_element[k] = g;
+          break;
+        }
+      }
+      assert(oi.gen_element[k] >= 0);
+    }
+
+    // Compute stabilizer (elements fixing the rep)
+    vector<matrix3d> stabilizer;
+    for (int g = 0; g < n_g; g++)
+      if (sym.perms[g][oi.rep] == oi.rep)
+        stabilizer.push_back(sym.matrices[g]);
+
+    auto [dim, basis] = fixed_point_subspace(stabilizer);
+    oi.subspace_dim = dim;
+    oi.basis = basis;
+
+    result.push_back(oi);
+  }
+  return result;
+}
+
+// Expand orbit-rep coordinates to full vertex set via group action.
+// reduced[k] is the coord3d for orbit k's representative.
+// Returns V3 of size nv.
+static V3 expand_to_full(const V3& reduced, const vector<OrbitInfo>& orbits,
+                          int nv, const SymmetryConstraint& sym) {
+  V3 full(nv);
+  for (size_t k = 0; k < orbits.size(); k++) {
+    auto& oi = orbits[k];
+    // Project reduced[k] into the orbit's fixed-point subspace
+    coord3d x_rep;
+    for (int d = 0; d < oi.subspace_dim; d++) {
+      coord3d b(oi.basis(0,d), oi.basis(1,d), oi.basis(2,d));
+      x_rep += b * reduced[k].dot(b);
+    }
+    for (size_t m = 0; m < oi.members.size(); m++) {
+      int g = oi.gen_element[m];
+      full[oi.members[m]] = sym.matrices[g] * x_rep;
+    }
+  }
+  return full;
+}
+
+// Restrict full gradient to orbit-rep space via Reynolds averaging + subspace projection.
+// For orbit rep v:  g_reduced[v] = P_sub * (1/|orbit|) sum_{m in orbit} R_g^T * g_full[m]
+// where g maps rep to m, and P_sub projects onto the fixed-point subspace.
+static V3 restrict_gradient(const V3& g_full, const vector<OrbitInfo>& orbits,
+                             const SymmetryConstraint& sym) {
+  V3 g_red(orbits.size());
+  for (size_t k = 0; k < orbits.size(); k++) {
+    auto& oi = orbits[k];
+    // Average back-rotated gradients from all orbit members
+    coord3d avg;
+    for (size_t m = 0; m < oi.members.size(); m++) {
+      int g = oi.gen_element[m];
+      avg += sym.matrices[g].transpose() * g_full[oi.members[m]];
+    }
+    avg /= oi.members.size();
+
+    // Project onto fixed-point subspace
+    coord3d proj;
+    for (int d = 0; d < oi.subspace_dim; d++) {
+      coord3d b(oi.basis(0,d), oi.basis(1,d), oi.basis(2,d));
+      proj += b * avg.dot(b);
+    }
+    g_red[k] = proj;
+  }
+  return g_red;
+}
+
+// Symmetry-aware initialization from MDS result.
+// Uses the Reynolds operator to project MDS positions into the standard
+// crystallographic frame defined by the symmetry matrices, then extracts
+// reduced parameters in each orbit rep's fixed-point subspace.
+static V3 symmetry_aware_init(const V3& mds_full, const matrix<double>& D,
+                               const vector<OrbitInfo>& orbits,
+                               const SymmetryConstraint& sym) {
+  V3 reduced(orbits.size());
+  for (size_t k = 0; k < orbits.size(); k++) {
+    auto& oi = orbits[k];
+
+    // Reynolds average: pull all orbit members' MDS positions back to the
+    // standard frame via R_g^T, then average.  This extracts the component
+    // of the MDS that is consistent with the standard-frame group action.
+    coord3d reynolds;
+    for (size_t m = 0; m < oi.members.size(); m++) {
+      int g = oi.gen_element[m];
+      reynolds += sym.matrices[g].transpose() * mds_full[oi.members[m]];
+    }
+    reynolds /= oi.members.size();
+
+    // Project onto fixed-point subspace
+    coord3d proj;
+    for (int d = 0; d < oi.subspace_dim; d++) {
+      coord3d b(oi.basis(0,d), oi.basis(1,d), oi.basis(2,d));
+      proj += b * reynolds.dot(b);
+    }
+
+    // If projection is too small (collapsed MDS or unlucky cancellation),
+    // perturb along subspace basis using APSP distances as scale.
+    double scale = 0;
+    for (size_t i = 0; i < oi.members.size(); i++)
+      for (size_t j = i+1; j < oi.members.size(); j++)
+        scale = max(scale, D(oi.members[i], oi.members[j]));
+    if (oi.members.size() == 1) {
+      for (int v = 0; v < (int)mds_full.size(); v++)
+        if (v != oi.rep) scale = max(scale, D(oi.rep, v));
+    }
+
+    if (proj.norm() < 0.01 * scale) {
+      for (int d = 0; d < oi.subspace_dim; d++) {
+        coord3d b(oi.basis(0,d), oi.basis(1,d), oi.basis(2,d));
+        proj += b * (0.3 * scale * (d == 0 ? 1.0 : 0.3));
+      }
+    }
+    reduced[k] = proj;
+  }
+  return reduced;
+}
+
+// Polar decomposition: extract the orthogonal factor Q from M = Q*S.
+// Uses SVD (M = U Sigma V^T) to return Q = U V^T.
+static matrix3d polar_orthogonal(const matrix3d& M) {
   matrix3d MtM = M.transpose() * M;
   matrix3d V;
   jacobi_eigen_3x3(MtM, V);
 
-  // U = M V Sigma^{-1}, processing columns in decreasing singular value order
   double svals[3] = { sqrt(max(0.0, MtM(0,0))),
                       sqrt(max(0.0, MtM(1,1))),
                       sqrt(max(0.0, MtM(2,2))) };
@@ -1745,63 +1948,111 @@ static matrix3d procrustes_rotation(const vector<coord3d>& src,
   for (int col = 0; col < 3; col++) {
     if (svals[col] > 1e-12) {
       coord3d v_col(V(0,col), V(1,col), V(2,col));
-      coord3d u_col = matvec(M, v_col) * (1.0/svals[col]);
+      coord3d u_col = M * v_col * (1.0 / svals[col]);
       U(0,col) = u_col[0]; U(1,col) = u_col[1]; U(2,col) = u_col[2];
       computed++;
     }
   }
 
-  // Complete U for zero singular values via cross product
   if (computed == 2) {
     int z = -1;
     for (int i = 0; i < 3; i++) if (svals[i] <= 1e-12) { z = i; break; }
-    int a = (z+1)%3, b = (z+2)%3;
-    coord3d ua(U(0,a),U(1,a),U(2,a)), ub(U(0,b),U(1,b),U(2,b));
-    coord3d uc = ua.cross(ub);
-    double n = uc.norm();
-    if (n > 1e-15) uc /= n;
-    U(0,z) = uc[0]; U(1,z) = uc[1]; U(2,z) = uc[2];
+    if (z >= 0) {
+      int a = (z+1)%3, b = (z+2)%3;
+      coord3d ua(U(0,a),U(1,a),U(2,a)), ub(U(0,b),U(1,b),U(2,b));
+      coord3d uc = ua.cross(ub);
+      double n = uc.norm();
+      if (n > 1e-15) uc /= n;
+      U(0,z) = uc[0]; U(1,z) = uc[1]; U(2,z) = uc[2];
+    }
+  } else if (computed < 2) {
+    return matrix3d::unit_matrix();
   }
 
   return U * V.transpose();
 }
 
-// Symmetrize coordinates via the Reynolds operator:
-//   x_sym[v] = (1/|G|) sum_{pi in G} R_pi^T x[pi(v)]
-// where R_pi is the Procrustes rotation for group element pi.
-static void symmetrize_embedding(V3& x, const vector<vector<int>>& G) {
-  if (G.empty()) return;
-  int n = x.size();
+// Align symmetry matrices to the embedding frame via generalized intertwiner.
+//
+// The standard-frame matrices R_g from representation_3d() are related to the
+// embedding-frame action by conjugation: M_g = Q R_g Q^T.  We find Q by:
+//   1. Compute per-element Procrustes P_g ≈ M_g from positions.
+//   2. Form generalized intertwiner T_A = sum_g P_g * A * R_g^T.
+//      For irreducible representations, T_A = (|G|/3) tr(Q^T A) Q.
+//      The standard choice A=I gives coefficient tr(Q), which vanishes
+//      when Q is a 120° rotation.  We try A = e_i e_j^T (coefficient Q_{ji})
+//      and pick the probe with largest ||T_A||, guaranteeing a robust signal.
+//   3. Extract Q via polar decomposition of T_A.
+//   4. Return conjugated matrices Q R_g Q^T (exact group structure).
+static SymmetryConstraint align_symmetry_to_embedding(
+    const V3& x, const SymmetryConstraint& sym)
+{
+  int nv = x.size();
+  int ng = sym.perms.size();
 
-  // Center
-  coord3d c;
-  for (auto& xi : x) c += xi;
-  c /= n;
-  for (auto& xi : x) xi -= c;
+  // Step 1: Compute all Procrustes rotations P_g
+  vector<matrix3d> P(ng);
+  for (int g = 0; g < ng; g++) {
+    matrix3d M_g;
+    for (int v = 0; v < nv; v++)
+      M_g += x[sym.perms[g][v]].outer(x[v]);
+    P[g] = polar_orthogonal(M_g);
+  }
 
-  // Compute Procrustes rotation for each group element
-  vector<matrix3d> rotations(G.size());
-  for (size_t g = 0; g < G.size(); g++) {
-    auto& pi = G[g];
-    vector<coord3d> src(n), dst(n);
-    for (int v = 0; v < n; v++) {
-      src[v] = x[v];
-      dst[v] = x[pi[v]];
+  // Step 2: Try generalized intertwiners T_A for different seed matrices A.
+  // A=I: T = sum P_g R_g^T, coefficient = (|G|/3) tr(Q)
+  // A=e_i*e_j^T: T = sum (P_g e_i)(R_g e_j)^T, coefficient = (|G|/3) Q_{ji}
+  // Pick the one with largest Frobenius norm.
+  matrix3d best_T;
+  double best_norm_sq = -1;
+
+  auto try_probe = [&](const matrix3d& T_candidate) {
+    double nsq = 0;
+    for (int a = 0; a < 3; a++)
+      for (int b = 0; b < 3; b++)
+        nsq += T_candidate(a,b) * T_candidate(a,b);
+    if (nsq > best_norm_sq) {
+      best_norm_sq = nsq;
+      best_T = T_candidate;
     }
-    rotations[g] = procrustes_rotation(src, dst);
+  };
+
+  // Probe 0: A = I (standard intertwiner)
+  {
+    matrix3d T;
+    for (int g = 0; g < ng; g++)
+      T += P[g] * sym.matrices[g].transpose();
+    try_probe(T);
   }
 
-  // Reynolds average: x_sym[v] = (1/|G|) sum_pi R_pi^T x[pi(v)]
-  V3 x_sym(n);
-  for (size_t g = 0; g < G.size(); g++) {
-    auto& pi = G[g];
-    matrix3d Rt = rotations[g].transpose();
-    for (int v = 0; v < n; v++)
-      x_sym[v] += matvec(Rt, x[pi[v]]);
+  // Probes 1-9: A = e_i e_j^T
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      matrix3d T;
+      for (int g = 0; g < ng; g++) {
+        // P_g e_i = column i of P_g
+        // R_g e_j = column j of R_g
+        // outer product (P_g e_i)(R_g e_j)^T
+        coord3d pe(P[g](0,i), P[g](1,i), P[g](2,i));
+        coord3d re(sym.matrices[g](0,j), sym.matrices[g](1,j), sym.matrices[g](2,j));
+        T += pe.outer(re);
+      }
+      try_probe(T);
+    }
   }
-  double inv_g = 1.0 / G.size();
-  for (int v = 0; v < n; v++)
-    x[v] = x_sym[v] * inv_g + c;
+
+  // Step 3: Extract frame rotation Q
+  matrix3d Q = polar_orthogonal(best_T);
+
+  // Step 4: Conjugate standard-frame matrices: R'_g = Q R_g Q^T
+  SymmetryConstraint aligned;
+  aligned.perms = sym.perms;
+  aligned.matrices.resize(ng);
+  matrix3d Qt = Q.transpose();
+  for (int g = 0; g < ng; g++)
+    aligned.matrices[g] = Q * sym.matrices[g] * Qt;
+
+  return aligned;
 }
 
 // ============================================================================
@@ -1881,11 +2132,9 @@ struct FaceAngleData {
   }
 };
 
-vector<coord3d> DelaunayTriangulation::embed_3d(const vector<vector<int>>& sym) const
+vector<coord3d> DelaunayTriangulation::embed_3d(const SymmetryConstraint& sym) const
 {
   // --- Step 1: Extract shortest edge per vertex pair ---
-  // Multi-edges between the same pair have different lengths (different geodesics).
-  // For distance matching, use the shortest one (closest to extrinsic distance).
   struct EdgeInfo { int u, v; double L; };
   vector<EdgeInfo> edges;
   map<pair<int,int>, double> shortest;
@@ -1916,51 +2165,19 @@ vector<coord3d> DelaunayTriangulation::embed_3d(const vector<vector<int>>& sym) 
         D(i, j) = min(D(i, j), D(i, k) + D(k, j));
 
   // --- Step 3: MDS initial placement ---
-  V3 x = mds_placement(D);
+  V3 x_mds = mds_placement(D);
 
-  // Resolve MDS degeneracies from symmetry.  When vertices in the same
-  // orbit have identical APSP profiles to all other vertices, the full
-  // MDS places them at the same point.  Fix this by running a secondary
-  // MDS on the intra-orbit distances: orbit members have different
-  // distances to EACH OTHER, so this local MDS is non-degenerate.
-  auto orbits = compute_orbits(nv, sym);  // trivial singletons if sym={}
-  for (auto& orbit : orbits) {
-    if (orbit.size() < 2) continue;
-
-    // Orbit centroid and spread
+  // Center at origin (needed for Procrustes alignment in symmetry path)
+  {
     coord3d center;
-    for (int v : orbit) center += x[v];
-    center /= orbit.size();
-
-    double max_spread = 0;
-    for (int v : orbit)
-      max_spread = max(max_spread, (x[v] - center).norm());
-
-    // Minimum intra-orbit APSP distance
-    double min_intra = 1e18;
-    for (size_t i = 0; i < orbit.size(); i++)
-      for (size_t j = i+1; j < orbit.size(); j++)
-        min_intra = min(min_intra, D(orbit[i], orbit[j]));
-
-    if (max_spread > 0.1 * min_intra) continue;  // already separated
-
-    // Collapsed: local MDS on intra-orbit distances
-    int m = orbit.size();
-    matrix<double> D_local(m, m);
-    for (int i = 0; i < m; i++)
-      for (int j = 0; j < m; j++)
-        D_local(i, j) = D(orbit[i], orbit[j]);
-
-    V3 local = mds_placement(D_local);
-    for (int i = 0; i < m; i++)
-      x[orbit[i]] = center + local[i];
+    for (int v = 0; v < nv; v++) center += x_mds[v];
+    center /= nv;
+    for (int v = 0; v < nv; v++) x_mds[v] = x_mds[v] - center;
   }
 
   // --- Step 4: Collect per-vertex fan structure for cone angle energy ---
-  // For each vertex, store the CW-ordered list of half-edges leaving it.
-  // Each consecutive pair (h, cw(h)) shares a face, giving a face angle.
   struct VertexFan {
-    vector<int> out_halfedges;  // CW-ordered outgoing half-edges
+    vector<int> out_halfedges;
   };
   vector<VertexFan> fans(nv);
   for (int v = 0; v < nv; v++) {
@@ -1972,17 +2189,14 @@ vector<coord3d> DelaunayTriangulation::embed_3d(const vector<vector<int>>& sym) 
     } while (h != h0);
   }
 
-  // Cone angle weight: scale so E_cone is comparable to E_edge.
-  // E_edge ~ n_edges * L^2, E_cone ~ n_vertices * angle^2.
-  // With typical L ~ O(1) and angle deficits ~ O(1), lambda ~ 1 is reasonable.
   double lambda = 1.0;
 
-  // --- Step 5: Stress + cone angle optimization ---
-  auto eval = [&](const V3& pos, V3& g) -> double {
+  // --- Step 5: Full-space energy and Hessian-vector product ---
+  // These operate on V3(nv) -- the full vertex set.
+  auto eval_full = [&](const V3& pos, V3& g) -> double {
     double E = 0;
     g.zero();
 
-    // E_edge: sum (|xi-xj| - Lij)^2
     for (auto& e : edges) {
       auto ed = EdgeStressData::compute(pos, e.u, e.v, e.L);
       if (!ed.valid()) continue;
@@ -1990,7 +2204,6 @@ vector<coord3d> DelaunayTriangulation::embed_3d(const vector<vector<int>>& sym) 
       ed.scatter_gradient(g);
     }
 
-    // E_cone: sum_v (angle_sum(v) - cone_angle(v))^2
     for (int v = 0; v < nv; v++) {
       auto& fan = fans[v];
       int deg = fan.out_halfedges.size();
@@ -2003,7 +2216,6 @@ vector<coord3d> DelaunayTriangulation::embed_3d(const vector<vector<int>>& sym) 
         int d_v = dest(h);
         int h_next = fan.out_halfedges[(i + 1) % deg];
         int d_next = dest(h_next);
-        // Angle at v between edges v->d_v and v->d_next
         fa[i] = FaceAngleData::compute(pos, d_v, v, d_next);
         if (fa[i].valid) angle_sum += fa[i].theta;
       }
@@ -2015,23 +2227,18 @@ vector<coord3d> DelaunayTriangulation::embed_3d(const vector<vector<int>>& sym) 
       for (int i = 0; i < deg; i++)
         if (fa[i].valid) fa[i].scatter_gradient(w, g);
     }
-
-    project_rigid_body(g, pos);
     return E;
   };
 
-  auto hv_prod = [&](const V3& pos, const V3& dir, V3& Hv) {
+  auto hv_full = [&](const V3& pos, const V3& dir, V3& Hv) {
     Hv.zero();
 
-    // E_edge Hv
     for (auto& e : edges) {
       auto ed = EdgeStressData::compute(pos, e.u, e.v, e.L);
       if (!ed.valid()) continue;
       ed.scatter_hv(dir, Hv);
     }
 
-    // E_cone Hv: H = 2*lambda * [dA⊗dA + dev * d²A/dx²]
-    // where A = angle_sum, dev = A - cone_angle
     for (int v = 0; v < nv; v++) {
       auto& fan = fans[v];
       int deg = fan.out_halfedges.size();
@@ -2049,7 +2256,6 @@ vector<coord3d> DelaunayTriangulation::embed_3d(const vector<vector<int>>& sym) 
       }
       double dev = angle_sum - v_cone_angle[v];
 
-      // Rank-1 term: 2*lambda * (dA . dir) * dA
       double dA_dot_v = 0;
       for (int i = 0; i < deg; i++)
         if (fa[i].valid) {
@@ -2059,43 +2265,96 @@ vector<coord3d> DelaunayTriangulation::embed_3d(const vector<vector<int>>& sym) 
       for (int i = 0; i < deg; i++)
         if (fa[i].valid) fa[i].scatter_gradient(2.0 * lambda * dA_dot_v, Hv);
 
-      // Correction term: 2*lambda * dev * d²A/dx² . dir
       if (fabs(dev) > 1e-15) {
         double w2 = 2.0 * lambda * dev;
         for (int i = 0; i < deg; i++)
           if (fa[i].valid) fa[i].scatter_hv(w2, dir, Hv);
       }
     }
-
-    project_rigid_body(Hv, pos);
   };
 
+  V3 x;
+
   if (sym.empty()) {
-    x = steihaug_cg(std::move(x), eval, hv_prod);
+    // --- No symmetry: optimize in full space with rigid-body projection ---
+    x = x_mds;
+
+    auto eval = [&](const V3& pos, V3& g) -> double {
+      double E = eval_full(pos, g);
+      project_rigid_body(g, pos);
+      return E;
+    };
+    auto hv = [&](const V3& pos, const V3& dir, V3& Hv) {
+      hv_full(pos, dir, Hv);
+      project_rigid_body(Hv, pos);
+    };
+    x = steihaug_cg(std::move(x), eval, hv);
+
   } else {
-    // Symmetry-constrained optimization in two phases:
+    // --- Fully symmetric reduced-parameter optimization ---
     //
-    // Phase 1: Optimize without symmetry constraint.  The heuristic
-    //   perturbation (above) breaks MDS degeneracy for collapsed orbits.
-    //   The optimizer converges to a non-degenerate embedding that's
-    //   approximately but not exactly symmetric.
-    //
-    // Phase 2: Symmetrize via Procrustes + Reynolds, then polish.
-    //   Now that the vertices are at well-separated positions, the
-    //   Procrustes rotation for each group element is well-determined.
-    //   Symmetrization projects onto the symmetric subspace, and a
-    //   short optimization pass restores edge-length accuracy.
-    x = steihaug_cg(std::move(x), eval, hv_prod);
-    for (int pass = 0; pass < 5; pass++) {
-      V3 x_before(x);
-      symmetrize_embedding(x, sym);
-      double shift = (x - x_before).norm() / max(x.norm(), 1e-15);
-      if (shift < 1e-12) break;
-      x = steihaug_cg(std::move(x), eval, hv_prod, 100, 1e-13);
+    // 1. Align standard-frame matrices to MDS embedding frame (generalized intertwiner)
+    // 2. Compute orbit structure + fixed-point subspaces
+    // 3. Initialize reduced params via Reynolds projection of MDS positions
+    // 4. Optimize entirely in reduced parameter space
+    // 5. Expand to full vertex set
+
+    SymmetryConstraint aligned = align_symmetry_to_embedding(x_mds, sym);
+    auto orbit_info = compute_orbit_structure(nv, aligned);
+
+    // Debug: print orbit structure
+    fprintf(stderr, "[embed_3d sym] nv=%d |G|=%d n_orbits=%zu\n",
+            nv, (int)sym.perms.size(), orbit_info.size());
+    for (size_t k = 0; k < orbit_info.size(); k++) {
+      auto& oi = orbit_info[k];
+      fprintf(stderr, "  orbit %zu: rep=%d size=%zu dim=%d\n",
+              k, oi.rep, oi.members.size(), oi.subspace_dim);
     }
+
+    V3 x_red = symmetry_aware_init(x_mds, D, orbit_info, aligned);
+
+    // Debug: print init state
+    {
+      V3 x_init = expand_to_full(x_red, orbit_info, nv, aligned);
+      V3 g_init(nv);
+      double E_init = eval_full(x_init, g_init);
+      fprintf(stderr, "[embed_3d sym] E_init=%.6e\n", E_init);
+      for (size_t k = 0; k < orbit_info.size(); k++)
+        fprintf(stderr, "  x_red[%zu] = (%.6f, %.6f, %.6f)\n",
+                k, x_red[k][0], x_red[k][1], x_red[k][2]);
+    }
+
+    auto eval_red = [&](const V3& pos_red, V3& g_red) -> double {
+      V3 pos_full = expand_to_full(pos_red, orbit_info, nv, aligned);
+      V3 g_full(nv);
+      double E = eval_full(pos_full, g_full);
+      g_red = restrict_gradient(g_full, orbit_info, aligned);
+      return E;
+    };
+    auto hv_red = [&](const V3& pos_red, const V3& dir_red, V3& Hv_red) {
+      V3 pos_full = expand_to_full(pos_red, orbit_info, nv, aligned);
+      V3 dir_full = expand_to_full(dir_red, orbit_info, nv, aligned);
+      V3 Hv_full(nv);
+      hv_full(pos_full, dir_full, Hv_full);
+      Hv_red = restrict_gradient(Hv_full, orbit_info, aligned);
+    };
+
+    x_red = steihaug_cg(std::move(x_red), eval_red, hv_red);
+
+    // Debug: print final state
+    {
+      V3 g_final(orbit_info.size());
+      double E_final = eval_red(x_red, g_final);
+      fprintf(stderr, "[embed_3d sym] E_final=%.6e\n", E_final);
+      for (size_t k = 0; k < orbit_info.size(); k++)
+        fprintf(stderr, "  x_red[%zu] = (%.6f, %.6f, %.6f)\n",
+                k, x_red[k][0], x_red[k][1], x_red[k][2]);
+    }
+
+    x = expand_to_full(x_red, orbit_info, nv, aligned);
   }
 
-  // --- Step 6: Orient outward using DCEL face iteration ---
+  // --- Orient outward using DCEL face iteration ---
   coord3d c;
   for (auto& xi : x) c += xi;
   c /= nv;

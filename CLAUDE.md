@@ -124,6 +124,12 @@ Isomer counts (general): C20=1, C24=1, C26=1, C28=2, C30=3, C32=6, C34=6, C36=15
 Isomer counts (IPR): C60=1, C70=1, C72=1, C74=1, C76=2, C78=5, C80=7, C82=9, C84=24, C86=19, C88=35, C90=46, C92=86, C94=134, C96=187, C98=259, C100=450.
 Fullerenes exist for all even N >= 20 except N=22.
 
+## Design Priorities
+
+1. **Correctness first**: Algorithms must *never* fail. They will run unsupervised on 10^11 graphs and must produce the correct result for every one. Arguments like "X is rare" are not acceptable — a single failure among millions means bugs remain.
+2. **Cleanness and conciseness**: Code must be easily understood and reasoned about. The goal is formal proofs of correctness.
+3. **Efficiency**: Target O(N) or close, with small coefficients, to handle 10^11 graphs.
+
 ## Rules
 
 - **No git commits**: Never commit to git yourself. Stage the changed files with git add and propose a commit message. The user always reviews and commits manually.
@@ -131,6 +137,7 @@ Fullerenes exist for all even N >= 20 except N=22.
 - **Never stage claude-projects/**: The `claude-projects/` directory has its own separate git repo. Never add, stage, or commit files under `claude-projects/` to the fullerene repository. It is listed in `.gitignore`.
 - **NEVER kill background processes without EXPLICIT user approval**: This is the HIGHEST PRIORITY rule. Long-running computations (benchmarks, enumerations) may represent hours of irreplaceable work. ALWAYS ask "Can I stop task X? It has been running for Y time and has Z partial results" and WAIT for the user to confirm. Even if you discover a bug and want to relaunch, do NOT stop running processes — modify code, rebuild separately, and ask the user whether to stop the old run. This applies to TaskStop, Ctrl-C, `kill`, and any other means of termination. NO EXCEPTIONS.
 - **Long-running experiments must support partial results and resumption**: When writing benchmarks or experiments that may run for a long time: (1) Write partial results incrementally (e.g., flush JSON after each isomer, or write checkpoints periodically) so that killing or crashing doesn't lose all progress. (2) Where possible, support restarting from a partially completed state (e.g., save enumeration state, or accept a "start from" parameter). Never design an experiment that only writes output at the very end.
+- **NEVER relax guards or validation thresholds**: When a guard condition, assertion, or validation test fails, the solution is NEVER to relax the constraint to make it pass. Guards exist to detect errors — finding errors is essential for correct code. Instead: investigate the root cause, fix the underlying algorithm, not the check. Only change a threshold if there is a clear mathematical proof that the new value is correct. The goal is not a passing test — the goal is correct code that never produces the wrong result.
 
 ## Invariants
 
