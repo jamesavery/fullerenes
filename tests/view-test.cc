@@ -30,7 +30,7 @@ TEST(GraphView, ViewFromExternalMemory) {
     Graph owned = FullereneGraph::C20();
 
     Graph view(owned.N, owned.dmax,
-               std::span<node_t>(owned.owned_values),
+               std::span<node_t>(owned.owned_neighbours),
                std::span<uint8_t>(owned.owned_deg));
 
     EXPECT_FALSE(view.owns_memory());  // view, not owned
@@ -70,7 +70,7 @@ TEST(GraphView, ViewMutatesExternalMemory) {
 TEST(GraphView, CopyOfViewIsOwned) {
     Graph owned = FullereneGraph::C20();
     Graph view(owned.N, owned.dmax,
-               std::span<node_t>(owned.owned_values),
+               std::span<node_t>(owned.owned_neighbours),
                std::span<uint8_t>(owned.owned_deg));
 
     // Copy a view -> produces an owned copy
@@ -86,7 +86,7 @@ TEST(GraphView, CopyOfViewIsOwned) {
 TEST(GraphView, MovePreservesView) {
     Graph owned = FullereneGraph::C20();
     Graph view(owned.N, owned.dmax,
-               std::span<node_t>(owned.owned_values),
+               std::span<node_t>(owned.owned_neighbours),
                std::span<uint8_t>(owned.owned_deg));
 
     Graph moved(std::move(view));
@@ -103,12 +103,12 @@ TEST(HierarchyView, CubicGraphFromViewGraph) {
     Graph owned = FullereneGraph::C20();
     // Already dmax=3, so CubicGraph won't restride — preserves view
     Graph view(owned.N, owned.dmax,
-               std::span<node_t>(owned.owned_values),
+               std::span<node_t>(owned.owned_neighbours),
                std::span<uint8_t>(owned.owned_deg));
 
     CubicGraph cg(view);
     // CubicGraph copies the view (via PlanarGraph -> Graph copy ctor)
-    // Since owned_values of view is empty, copy is also a view
+    // Since owned_neighbours of view is empty, copy is also a view
     EXPECT_FALSE(cg.owns_memory());
     EXPECT_EQ(cg.N, 20);
     EXPECT_EQ(cg.dmax, 3);
@@ -117,7 +117,7 @@ TEST(HierarchyView, CubicGraphFromViewGraph) {
 TEST(HierarchyView, FullereneGraphFromViewGraph) {
     Graph owned = FullereneGraph::C20();
     Graph view(owned.N, owned.dmax,
-               std::span<node_t>(owned.owned_values),
+               std::span<node_t>(owned.owned_neighbours),
                std::span<uint8_t>(owned.owned_deg));
 
     FullereneGraph fg(view);
@@ -191,7 +191,7 @@ TEST(BatchSlicing, GraphBatch) {
 
     // Fill batch by copying the same graph B times
     for (int b = 0; b < B; b++) {
-        std::copy(fg.values.begin(), fg.values.end(),
+        std::copy(fg.neighbours.begin(), fg.neighbours.end(),
                   all_values.begin() + b * N * dmax);
         std::copy(fg.deg.begin(), fg.deg.end(),
                   all_deg.begin() + b * N);
@@ -236,7 +236,7 @@ TEST(BatchSlicing, PolyhedronBatch) {
     std::vector<coord3d> all_points(B * N);
 
     for (int b = 0; b < B; b++) {
-        std::copy(P0.values.begin(), P0.values.end(),
+        std::copy(P0.neighbours.begin(), P0.neighbours.end(),
                   all_values.begin() + b * N * dmax);
         std::copy(P0.deg.begin(), P0.deg.end(),
                   all_deg.begin() + b * N);
@@ -274,7 +274,7 @@ TEST(BatchSlicing, MutationThroughViewWritesBack) {
     Polyhedron P0 = Polyhedron::C20();
 
     // Flat batch storage (single element for simplicity)
-    std::vector<node_t> values(P0.values.begin(), P0.values.end());
+    std::vector<node_t> values(P0.neighbours.begin(), P0.neighbours.end());
     std::vector<uint8_t> deg(P0.deg.begin(), P0.deg.end());
     std::vector<coord3d> pts(P0.points.begin(), P0.points.end());
 
@@ -303,7 +303,7 @@ TEST(TriangulationView, FromGraphView) {
 
     // Create a Graph view of the triangulation's adjacency
     Graph view(T_owned.N, T_owned.dmax,
-               std::span<node_t>(T_owned.owned_values),
+               std::span<node_t>(T_owned.owned_neighbours),
                std::span<uint8_t>(T_owned.owned_deg));
 
     Triangulation T_view(view);
@@ -339,7 +339,7 @@ TEST(GraphView, EmptyGraph) {
     Graph G;
     EXPECT_EQ(G.N, 0);
     EXPECT_FALSE(G.owns_memory());
-    EXPECT_TRUE(G.values.empty());
+    EXPECT_TRUE(G.neighbours.empty());
 }
 
 TEST(GraphView, EmptyView) {

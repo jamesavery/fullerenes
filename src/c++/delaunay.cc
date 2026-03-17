@@ -16,7 +16,7 @@ FulleroidDelaunay::FulleroidDelaunay(const Triangulation& T)
   // well above 6 (the max for fullerene duals). Restride to give headroom.
   if (dmax < 20) {
     auto restrided = restride(20);
-    owned_values = std::move(restrided.owned_values);
+    owned_neighbours = std::move(restrided.owned_neighbours);
     owned_deg = std::move(restrided.owned_deg);
     dmax = 20;
     repoint();
