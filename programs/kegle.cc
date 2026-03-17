@@ -297,10 +297,11 @@ int main(int ac, char **argv)
   ofstream failures((output_dir+"/failures.txt").c_str()); // output/failures.txt contains list of any fullerenes that failed optimization
 
   int i=0;  
-  FullereneDual dualG;
+  Graph dualG_buf;
   BuckyGen::buckygen_queue Q = BuckyGen::start(N,IPR,only_nontrivial);  
 
-  while(BuckyGen::next_fullerene(Q,dualG)){ // Generate all appropriate C_N isomer duals 
+  while(BuckyGen::next_fullerene(Q,dualG_buf)){ // Generate all appropriate C_N isomer duals
+    FullereneDual dualG(dualG_buf);
     i++;
 
     //    if(i%100000 == 0)

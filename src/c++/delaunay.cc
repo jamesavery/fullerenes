@@ -15,11 +15,7 @@ FulleroidDelaunay::FulleroidDelaunay(const Triangulation& T)
   // Edge flips during vertex removal can temporarily push vertex degrees
   // well above 6 (the max for fullerene duals). Restride to give headroom.
   if (dmax < 20) {
-    auto restrided = restride(20);
-    owned_neighbours = std::move(restrided.owned_neighbours);
-    owned_deg = std::move(restrided.owned_deg);
-    dmax = 20;
-    repoint();
+    restride_inplace(20);
   }
   for (node_t u = 0; u < N; u++)
     for (node_t v : (*this)[u])
@@ -205,10 +201,10 @@ bool FulleroidDelaunay::flip_edge(node_t u, node_t v)
   //     D goes before u in neighbours[B]  ✓
   //     B goes before v in neighbours[D]  ✓
 
-  Graph::remove_edge(edge_t(u, v));
+  this->remove_edge(edge_t(u, v));
   set_length(u, v, 0);
 
-  Graph::insert_edge(arc_t(B, D), u, v);
+  this->insert_edge(arc_t(B, D), u, v);
   set_length(B, D, f);
 
   return true;
@@ -421,7 +417,7 @@ void FulleroidDelaunay::remove_flat_vertex(node_t v)
       set_length(v, nb[i], 0);
     // Remove in reverse to keep indices stable (v is last vertex).
     for (int i = 3; i >= 0; i--)
-      Graph::remove_edge(edge_t(v, nb[i]));
+      this->remove_edge(edge_t(v, nb[i]));
 
     // After removing v's edges, neighbor lists become:
     //   nb[0]: ..., nb[1], nb[3], ...   (v was between nb[1] and nb[3])
@@ -433,10 +429,10 @@ void FulleroidDelaunay::remove_flat_vertex(node_t v)
     // For diagonal nb[1]-nb[3]: insert_edge(arc_t(nb[1],nb[3]), nb[0], nb[2])
 
     if (use02) {
-      Graph::insert_edge(arc_t(nb[0], nb[2]), nb[3], nb[1]);
+      this->insert_edge(arc_t(nb[0], nb[2]), nb[3], nb[1]);
       set_length(nb[0], nb[2], len02);
     } else {
-      Graph::insert_edge(arc_t(nb[1], nb[3]), nb[0], nb[2]);
+      this->insert_edge(arc_t(nb[1], nb[3]), nb[0], nb[2]);
       set_length(nb[1], nb[3], len13);
     }
 
@@ -455,9 +451,9 @@ void FulleroidDelaunay::remove_flat_vertex(node_t v)
   set_length(v, a, 0);
   set_length(v, b, 0);
   set_length(v, c, 0);
-  Graph::remove_edge(edge_t(v, a));
-  Graph::remove_edge(edge_t(v, b));
-  Graph::remove_edge(edge_t(v, c));
+  this->remove_edge(edge_t(v, a));
+  this->remove_edge(edge_t(v, b));
+  this->remove_edge(edge_t(v, c));
 
   assert(v == N - 1);
   pop_back();

@@ -5,11 +5,10 @@
 #include "fullerenes/matrix.hh"
 #include "fullerenes/spiral.hh"
 #include "fullerenes/planargraph.hh"
-#include "fullerenes/planargraph.hh"
 
-// TODO: Easy correspondence between cubic and dual 
+// TODO: Easy correspondence between cubic and dual
 //  1. Triangle numbers correspond to cubic nodes
-//  2. 
+//  2.
 class Triangulation : public PlanarGraph {
 public:
   typedef function<bool(Triangulation)> predicate_t;
@@ -22,16 +21,16 @@ public:
   //  5. Embed in 2D
   //  6. Embed in 3D
   Triangulation(int N) : PlanarGraph(N, 6) {}
-  Triangulation(const Graph& g = Graph()) : PlanarGraph(g) {}
+  Triangulation(const GraphView& g = GraphView()) : PlanarGraph(g) {}
   Triangulation(const neighbours_t& neighbours) : PlanarGraph(Graph(neighbours)) {}
 
   Triangulation(const vector<int>& spiral_string, const jumplist_t& jumps = jumplist_t(), const bool best_effort=false); // and the opposite of 'best-effort' is 'fast and robust'
   Triangulation(const spiral_nomenclature &fsn): Triangulation(fsn.spiral.spiral_code, fsn.spiral.jumps, true){} // best_effort = true
-  
+
   PlanarGraph dual_graph() const;
   vector<face_t> cubic_faces() const;
   unordered_map<arc_t,arc_t> arc_translation() const;
-  
+
   size_t max_degree() const {
     size_t max_deg = 0;
     for(node_t u=0; u<N; u++) max_deg = std::max(max_deg, (size_t)degree(u));
@@ -43,15 +42,15 @@ public:
     for(node_t u=0; u<N; u++) nd[degree(u)-1]++;
     return nd;
   }
-  
+
   // takes a triangulation, and returns a dual of the inverse leapfrog
   // this is cheap because we just remove a set of faces
   PlanarGraph inverse_leapfrog_dual() const;
-  
+
   pair<node_t,node_t> adjacent_tris(const arc_t &e) const;
 
   vector<tri_t> compute_faces_oriented() const; // Compute oriented triangles given oriented neighbours
-  
+
   //  Unfolding unfold() const;
   Triangulation GCtransform(unsigned k=1, unsigned l=0) const;
   Triangulation halma_transform(int m, vector<map<edge_t,node_t>>* face_grids = nullptr) const;
@@ -78,7 +77,7 @@ public:
   void symmetry_information(int N_generators, Graph& coxeter_diagram, vector<int>& coxeter_labels) const;
 
   vector<node_t> vertex_numbers(vector<vector<node_t>> &perms, const vector<node_t> &loc) const;
-  
+
   vector<tri_t> triangles() const { return compute_faces_oriented(); }
   int n_triangles() const { return 2*N - 4; }
 
@@ -94,18 +93,18 @@ public:
     double d;
     int axis;
   };
-  
+
   matrix<int>    pentagon_distance_mtx() const;
 
 
   matrix<int>              simple_square_surface_distances(vector<node_t> only_nodes = {},bool calculate_self_geodesics=false) const;
   matrix<double>           surface_distances(vector<node_t> only_nodes = {},bool calculate_self_geodesics=false) const;
-  
-  matrix<geodesic>         surface_geodesics(vector<node_t> only_nodes = {},bool calculate_self_geodesics=false) const;    
+
+  matrix<geodesic>         surface_geodesics(vector<node_t> only_nodes = {},bool calculate_self_geodesics=false) const;
   matrix<simple_geodesic>  simple_geodesics(vector<node_t> only_nodes = {},bool calculate_self_geodesics=false) const;
-  
+
   node_t         end_of_the_line(node_t u0, int i, int a, int b) const;
-  vector<vector<node_t>> quads_of_the_line(node_t u0, int i, int a, int b) const;  
+  vector<vector<node_t>> quads_of_the_line(node_t u0, int i, int a, int b) const;
 
   Triangulation sort_nodes() const;
 };
@@ -124,7 +123,7 @@ public:
     for(int i: rspi) spiral[i] = 5;
     *this = Triangulation(spiral,jumps);
   }
-  
+
   bool get_rspi(const node_t f1, const node_t f2, const node_t f3, vector<int>& r, jumplist_t& j, const bool general=true) const;
   bool get_rspi(vector<int>& r, jumplist_t& j, const bool general=true, const bool pentagon_start=true) const;
   general_spiral get_rspi(const bool rarest_start=true) const; // TODO: Replace above by this simplified API
@@ -132,26 +131,26 @@ public:
   static vector<general_spiral> isomer_search(const Triangulation::predicate_t& predicate, size_t N, size_t print_step=0,
 					      bool IPR=false, bool only_nontrivial_symmetry=false, size_t N_chunks=1, size_t chunk_index=0);
 
-  spiral_nomenclature name(bool rarest_start=true) const;  
+  spiral_nomenclature name(bool rarest_start=true) const;
 };
 
 
 class CubicPair {
   Triangulation T;
   PlanarGraph   G;
-  IDCounter<tri_t> triangle_id;  
+  IDCounter<tri_t> triangle_id;
   vector<vector<arc_t>> CtoD, DtoC;
-  
+
   int face_start(const face_t &f){
     node_t i_m = 0;
     for(int i=0, m=INT_MAX; i<int(f.size()); i++) if(f[i] < m){ i_m = i; m = f[i]; }
     return i_m;
   }
-    
+
   CubicPair(const Triangulation &T) : G(T.dual_graph()), CtoD(G.N,vector<arc_t>(3)), DtoC(T.N)
   {
     for(const auto &t: T.triangles()) triangle_id.insert(t.sorted());
-  
+
     for(node_t u=0;u<T.N;u++){
       auto nu = T.nbrs(u);
       DtoC[u].resize(nu.size());
@@ -164,12 +163,12 @@ class CubicPair {
 	node_t t = nu[(i+nu.size()-1)%nu.size()]; // v->u->t is triangle associated with v->u
 
 	tri_t t1 = {u,v,s}, t2 = {v,u,t};
-	
+
 	// arcs get a unique number: id(u,i) = row_offset[u]+i
 	node_t U   = triangle_id(t1.sorted()), V = triangle_id(t2.sorted());
 	node_t i_V = G.arc_ix(U,V), i_U = G.arc_ix(V,U);
 	node_t i_v = T.arc_ix(u,v), i_u = T.arc_ix(v,u);
-	
+
 	CtoD[U][i_V] = {u,i_v};
 	CtoD[V][i_U] = {v,i_u};
 	DtoC[u][i_v] = {U,i_V};

@@ -100,6 +100,16 @@ struct Graph : GraphView {
     }
   }
 
+  // --- Assignment from any GraphView (deep copy adjacency) ---
+  Graph& operator=(const GraphView& src) {
+    if (src.neighbours.data() == owned_neighbours.data()) return *this;
+    N = src.N; dmax = src.dmax;
+    owned_neighbours.assign(src.neighbours.begin(), src.neighbours.end());
+    owned_deg.assign(src.deg.begin(), src.deg.end());
+    repoint();
+    return *this;
+  }
+
   // --- Assignment from OwnedDenseGraph ---
 
   Graph& operator=(Spanify::OwnedDenseGraph<node_t>&& adj) {

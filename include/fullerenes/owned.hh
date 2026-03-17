@@ -245,4 +245,35 @@ struct Owned : View {
 
     // Bring base push_back(node, node) into scope
     using View::push_back;
+
+    // --- Remove isolated vertices (compacts graph) ---
+    void remove_isolated_vertices() {
+        std::vector<int> new_id(this->N);
+        int u_new = 0;
+        for (int u = 0; u < this->N; u++)
+            if (!(*this)[u].empty())
+                new_id[u] = u_new++;
+
+        Owned g(u_new, this->dmax);
+        for (int u = 0; u < this->N; u++)
+            for (node v : (*this)[u])
+                g.push_back(node(new_id[u]), node(new_id[v]));
+
+        *this = std::move(g);
+    }
+
+    // --- Remove specific vertices and compact ---
+    void remove_vertices(std::set<int>& sv) {
+        const int N_naught = this->N;
+        for (int u : sv) {
+            while (!(*this)[u].empty()) {
+                node v = (*this)[u][0];
+                this->remove_edge({node(u), v});
+            }
+        }
+        remove_isolated_vertices();
+        if (N_naught != int(sv.size()) + this->N)
+            std::cerr << "removed more vertices than intended" << std::endl;
+        assert(this->is_connected());
+    }
 };

@@ -34,7 +34,7 @@ PlanarGraph::PlanarGraph(const spiral_nomenclature &fsn){
 //  1. If G is a triangulation, it is G
 //  2. If G is cubic, it is its dual
 //  3. If G is non-cubic and non-triangulation, it is G's leapfrog dual
-PlanarGraph PlanarGraph::enveloping_triangulation(construction_scheme_t &scheme) const
+PlanarGraph PlanarGraphView::enveloping_triangulation(construction_scheme_t &scheme) const
 {
   if(is_triangulation()){
     scheme = spiral_nomenclature::TRIANGULATION;
@@ -48,7 +48,7 @@ PlanarGraph PlanarGraph::enveloping_triangulation(construction_scheme_t &scheme)
   }
 }
 
-PlanarGraph PlanarGraph::enveloping_triangulation(const construction_scheme_t &scheme) const
+PlanarGraph PlanarGraphView::enveloping_triangulation(const construction_scheme_t &scheme) const
 {
   switch(scheme){
   case spiral_nomenclature::TRIANGULATION:
@@ -61,21 +61,21 @@ PlanarGraph PlanarGraph::enveloping_triangulation(const construction_scheme_t &s
   }
 }
 
-bool PlanarGraph::is_cubic() const {
+bool PlanarGraphView::is_cubic() const {
   for(node_t u=0;u<N;u++)
     if(degree(u) != 3)
       return false;
   return true;
 }
 
-bool PlanarGraph::is_triangulation() const { // NB: A bit expensive
+bool PlanarGraphView::is_triangulation() const { // NB: A bit expensive
   vector<face_t> faces(compute_faces());
 
   for(int i=0;i<faces.size();i++) if(faces[i].size() != 3) return false;
   return true;
 }
 
-bool PlanarGraph::is_a_fullerene(bool verbose) const {
+bool PlanarGraphView::is_a_fullerene(bool verbose) const {
   if(!is_cubic()){
     if(verbose) fprintf(stdout,"Graph is not cubic.\n");
     return false;
@@ -131,7 +131,7 @@ bool PlanarGraph::is_a_fullerene(bool verbose) const {
 // larger than a triangle.  If there is more than one larger face than a
 // triangle, the function may return 'false', even though the correct answer is
 // 'true'.
-bool PlanarGraph::is_cut_vertex(const node_t v) const {
+bool PlanarGraphView::is_cut_vertex(const node_t v) const {
   // Requires oriented (sorted) neighbours of v (direction doesn't matter)
   auto nv = nbrs(v);
   const int n_neighbours = nv.size();
@@ -154,7 +154,7 @@ bool PlanarGraph::is_cut_vertex(const node_t v) const {
 
 
 
-PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax) const
+PlanarGraph PlanarGraphView::dual_graph(unsigned int Fmax) const
 {
   // Each directed edge uniquely identifies a face
   vector<arc_t>            face_reps = compute_face_representations(Fmax);
@@ -181,12 +181,12 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax) const
 }
 
 // the dual of the LF, ie a Triangulation is returned
-PlanarGraph PlanarGraph::leapfrog_dual() const
+PlanarGraph PlanarGraphView::leapfrog_dual() const
 {
   vector<face_t> faces = compute_faces_oriented();
   size_t Nf = faces.size();
 
-  PlanarGraph lf(Graph(N+Nf));
+  PlanarGraph lf(N+Nf);
 
   // Start with all the existing nodes
   for(node_t u=0;u<N;u++) lf.assign_row(u, (*this)[u]);
@@ -207,19 +207,19 @@ PlanarGraph PlanarGraph::leapfrog_dual() const
 }
 
 
-vector<face_t> PlanarGraph::compute_faces(unsigned int Fmax) const {
+vector<face_t> PlanarGraphView::compute_faces(unsigned int Fmax) const {
   return compute_faces_oriented(Fmax);
 }
 
 
 
-vector<tri_t> PlanarGraph::triangulation(int face_max) const
+vector<tri_t> PlanarGraphView::triangulation(int face_max) const
 {
   vector<face_t> faces(compute_faces(face_max));
   return triangulation(faces);
 }
 
-vector<tri_t> PlanarGraph::centroid_triangulation(const vector<face_t>& faces) const
+vector<tri_t> PlanarGraphView::centroid_triangulation(const vector<face_t>& faces) const
 {
   // Test whether faces already form a triangulation
   bool is_tri = true; for(int i=0;i<faces.size();i++) if(faces[i].size() != 3) is_tri = false;
@@ -254,7 +254,7 @@ vector<tri_t> PlanarGraph::centroid_triangulation(const vector<face_t>& faces) c
 }
 
 
-vector<tri_t> PlanarGraph::triangulation(const vector<face_t>& faces) const
+vector<tri_t> PlanarGraphView::triangulation(const vector<face_t>& faces) const
 {
   // Test whether faces already form a triangulation
   bool is_tri = true; for(int i=0;i<faces.size();i++) if(faces[i].size() != 3) is_tri = false;
@@ -282,7 +282,7 @@ vector<tri_t> PlanarGraph::triangulation(const vector<face_t>& faces) const
 }
 
 
-vector<tri_t>& PlanarGraph::orient_triangulation(vector<tri_t>& tris) const
+vector<tri_t>& PlanarGraphView::orient_triangulation(vector<tri_t>& tris) const
 {
   // Check that triangles are orientable: Every edge must appear in two faces
   map<edge_t,int> edgecount;
@@ -427,7 +427,7 @@ double lu_det(const vector<double> &A, int N)
 }
 
 
-size_t PlanarGraph::count_perfect_matchings() const
+size_t PlanarGraphView::count_perfect_matchings() const
 {
   map<arc_t,int> faceEdge;
   assert(is_consistently_oriented());
@@ -459,7 +459,7 @@ size_t PlanarGraph::count_perfect_matchings() const
   return round(sqrtl(fabs(lu_det(Af,N))));
 }
 #else
-size_t PlanarGraph::count_perfect_matchings() const
+size_t PlanarGraphView::count_perfect_matchings() const
 {
    cerr << "count_perfect_matchings() requires LAPACK.\n";
    //    cerr << "count_perfect_matchings() is temporarily out of service.\n";
@@ -468,7 +468,7 @@ size_t PlanarGraph::count_perfect_matchings() const
 #endif
 
 
-vector<coord3d> PlanarGraph::zero_order_geometry(double scalerad) const
+vector<coord3d> PlanarGraphView::zero_order_geometry(double scalerad) const
 {
   vector<coord2d> flat_layout = tutte_layout();
   vector<coord2d> angles(layout2d::spherical_projection(*this, flat_layout));
@@ -501,7 +501,7 @@ vector<coord3d> PlanarGraph::zero_order_geometry(double scalerad) const
  
 // In an oriented planar graph, the directed edge starting in the smallest node
 // is a unique representation of the face.
-arc_t PlanarGraph::get_face_representation(arc_t e, int Fmax) const
+arc_t PlanarGraphView::get_face_representation(arc_t e, int Fmax) const
 {
   assert(is_consistently_oriented());
 
@@ -524,7 +524,7 @@ arc_t PlanarGraph::get_face_representation(arc_t e, int Fmax) const
 
 // In an oriented planar graph, the directed edge starting in the smallest node
 // is a unique representation of the face.
-vector<arc_t> PlanarGraph::compute_face_representations(int Fmax) const
+vector<arc_t> PlanarGraphView::compute_face_representations(int Fmax) const
 {
   assert(is_consistently_oriented());
 
@@ -541,7 +541,7 @@ vector<arc_t> PlanarGraph::compute_face_representations(int Fmax) const
 }
 
 
-face_t PlanarGraph::get_face_oriented(const arc_t &e, int Fmax) const
+face_t PlanarGraphView::get_face_oriented(const arc_t &e, int Fmax) const
 {
   assert(is_consistently_oriented());
 
@@ -560,7 +560,7 @@ face_t PlanarGraph::get_face_oriented(const arc_t &e, int Fmax) const
   return f;
 }
 
-vector<face_t> PlanarGraph::compute_faces_oriented(int Fmax) const
+vector<face_t> PlanarGraphView::compute_faces_oriented(int Fmax) const
 {
   vector<arc_t> face_representations = compute_face_representations(Fmax);
 
@@ -577,7 +577,7 @@ vector<face_t> PlanarGraph::compute_faces_oriented(int Fmax) const
 // permutation of vertex numbers (ie, replace v by vertex_numbers[v], to get numbered vertices)
 // where permutations are as returned by PG.leapfrog_dual().get_spiral()
 // locants are vertices that should have small vertex numbers (as far as permitted by symmetry equivalent canonical spirals)
-vector<node_t> PlanarGraph::vertex_numbers(vector<vector<node_t>> &permutations, const vector<node_t> &locants) const{
+vector<node_t> PlanarGraphView::vertex_numbers(vector<vector<node_t>> &permutations, const vector<node_t> &locants) const{
   assert(!is_cubic());
   vector<node_t> vertex_numbers_inv(N,INT_MAX);
   for(int p=0; p<permutations.size(); p++){

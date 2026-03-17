@@ -20,6 +20,7 @@
 #include "fullerenes/geometry.hh"
 #include "fullerenes/auxiliary.hh"
 #include "fullerenes/matrix.hh"
+#include "fullerenes/spiral.hh"
 
 // --- Forward declarations for owned types ---
 // Type aliases (Graph = Owned<GraphView>, etc.) are deferred until
@@ -88,13 +89,64 @@ struct GraphView : Spanify::RSRAdjacencyView<node_t> {
 // ---------------------------------------------------------------------------
 // PlanarGraphView: planar graph with oriented embedding.
 // ---------------------------------------------------------------------------
+// Forward declarations for owned return types.
+class PlanarGraph;
+
 struct PlanarGraphView : GraphView {
     using GraphView::GraphView;
     static constexpr uint8_t default_dmax = 6;
 
-    // Algorithm methods will be migrated here from PlanarGraph when
-    // PlanarGraph switches from inheriting Graph to inheriting PlanarGraphView.
-    // For now, PlanarGraph : Graph keeps the method definitions.
+    typedef spiral_nomenclature::construction_scheme_t construction_scheme_t;
+
+    // --- Topology queries ---
+    bool is_a_fullerene(bool verbose=true) const;
+    bool is_cubic() const;
+    bool is_triangulation() const;
+    bool is_cut_vertex(node_t v) const;
+
+    // --- Face computation ---
+    vector<face_t> compute_faces_oriented(int Fmax=INT_MAX) const;
+    vector<face_t> compute_faces(unsigned int Fmax=INT_MAX) const;
+    face_t get_face_oriented(const arc_t& e, int Fmax=INT_MAX) const;
+    arc_t get_face_representation(arc_t e, int Fmax=INT_MAX) const;
+    vector<arc_t> compute_face_representations(int Fmax=INT_MAX) const;
+
+    int face_size(node_t u, node_t v) const {
+        int d = 1;
+        node_t u0 = u;
+        while (v != u0) {
+            node_t w = v;
+            v = next_on_face(u, v);
+            u = w;
+            d++;
+        }
+        return d;
+    }
+
+    // --- Dual and derived graphs (return owned types) ---
+    PlanarGraph dual_graph(unsigned int Fmax=INT_MAX) const;
+    PlanarGraph leapfrog_dual() const;
+    PlanarGraph enveloping_triangulation(construction_scheme_t& scheme) const;
+    PlanarGraph enveloping_triangulation(const construction_scheme_t& scheme) const;
+
+    // --- Combinatorics ---
+    size_t count_perfect_matchings() const;
+    vector<node_t> vertex_numbers(vector<vector<node_t>>& perms, const vector<node_t>& loc) const;
+
+    // --- Triangulation helpers ---
+    vector<tri_t> triangulation(int face_max=INT_MAX) const;
+    vector<tri_t> triangulation(const vector<face_t>& faces) const;
+    vector<tri_t> centroid_triangulation(const vector<face_t>& faces) const;
+    vector<tri_t>& orient_triangulation(vector<tri_t>& tris) const;
+
+    // --- Layout ---
+    vector<coord2d> tutte_layout(node_t s=0, node_t t=-1, node_t r=-1, unsigned int face_max=INT_MAX) const;
+    vector<coord2d> tutte_layout(const face_t& outer_face) const;
+    vector<coord2d> tutte_layout_iterative(const face_t& outer_face, const vector<coord2d>& outer_coords) const;
+    vector<coord2d> tutte_layout_direct(const face_t& outer_face, const vector<coord2d>& outer_coords) const;
+
+    // --- Geometry ---
+    vector<coord3d> zero_order_geometry(double scalerad=4) const;
 };
 
 // ---------------------------------------------------------------------------

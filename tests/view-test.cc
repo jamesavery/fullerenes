@@ -107,9 +107,8 @@ TEST(HierarchyView, CubicGraphFromViewGraph) {
                std::span<uint8_t>(owned.owned_deg));
 
     CubicGraph cg(view);
-    // CubicGraph copies the view (via PlanarGraph -> Graph copy ctor)
-    // Since owned_neighbours of view is empty, copy is also a view
-    EXPECT_FALSE(cg.owns_memory());
+    // CubicGraph deep-copies from the view (via Owned<PlanarGraphView>)
+    EXPECT_TRUE(cg.owns_memory());
     EXPECT_EQ(cg.N, 20);
     EXPECT_EQ(cg.dmax, 3);
 }
@@ -121,7 +120,7 @@ TEST(HierarchyView, FullereneGraphFromViewGraph) {
                std::span<uint8_t>(owned.owned_deg));
 
     FullereneGraph fg(view);
-    EXPECT_FALSE(fg.owns_memory());
+    EXPECT_TRUE(fg.owns_memory());
     EXPECT_EQ(fg.N, 20);
     EXPECT_TRUE(fg.is_consistently_oriented());
 }
@@ -211,9 +210,9 @@ TEST(BatchSlicing, GraphBatch) {
         EXPECT_TRUE(view.is_consistently_oriented());
         EXPECT_EQ(int(view.count_edges()), 30);  // 3*20/2
 
-        // Construct fullerene graph from the view
+        // Construct fullerene graph from the view (deep copies)
         FullereneGraph fg_view(view);
-        EXPECT_FALSE(fg_view.owns_memory());
+        EXPECT_TRUE(fg_view.owns_memory());
 
         // Spiral extraction works on view
         vector<int> spiral;
@@ -254,7 +253,9 @@ TEST(BatchSlicing, PolyhedronBatch) {
         Graph g_view(N, dmax, vals, degs);
         Polyhedron poly(PlanarGraph(g_view), pts, 6);
 
-        EXPECT_FALSE(poly.owns_memory());
+        // PlanarGraph deep-copies from view, so adjacency is owned.
+        // points is a span view (not owned).
+        EXPECT_TRUE(poly.owns_memory());
         EXPECT_FALSE(poly.points.owns_memory());
         EXPECT_EQ(poly.N, N);
 
@@ -307,7 +308,7 @@ TEST(TriangulationView, FromGraphView) {
                std::span<uint8_t>(T_owned.owned_deg));
 
     Triangulation T_view(view);
-    EXPECT_FALSE(T_view.owns_memory());
+    EXPECT_TRUE(T_view.owns_memory());  // deep-copies from view
     EXPECT_EQ(T_view.N, T_owned.N);
 
     // triangles() works on the view

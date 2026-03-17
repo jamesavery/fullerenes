@@ -38,7 +38,7 @@ int main(int argc, char** argv){
             T_polys(N_runs,chrono::nanoseconds(0));
         
         auto Nf = N /2 + 2;
-        static_cast<Graph&>(G) = Graph(Nf, std::vector<node_t>(6));
+        G = FullereneDual(Triangulation(int(Nf)));
 
         auto path = "isomerspace_samples/dual_layout_" + to_string(N) + "_seed_42";
         ifstream isomer_sample(path,std::ios::binary);

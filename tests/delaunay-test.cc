@@ -224,9 +224,10 @@ TEST(IntrinsicDelaunay, AllIsomers_C20_to_C50) {
   int total = 0;
   for (int N : sizes) {
     BuckyGen::buckygen_queue Q = BuckyGen::start(N, false, false);
-    Triangulation T;
+    Graph Gbuf;
     int idx = 0;
-    while (BuckyGen::next_fullerene(Q, T)) {
+    while (BuckyGen::next_fullerene(Q, Gbuf)) {
+      Triangulation T(Gbuf);
       SCOPED_TRACE("C" + std::to_string(N) + " #" + std::to_string(idx));
       FulleroidDelaunay D(T);
       D.remove_flat_vertices();
@@ -241,10 +242,11 @@ TEST(IntrinsicDelaunay, AllIsomers_C20_to_C50) {
 
 TEST(IntrinsicDelaunay, C60_AllIsomers) {
   BuckyGen::buckygen_queue Q = BuckyGen::start(60, false, false);
-  Triangulation T;
+  Graph Gbuf;
   std::vector<double> times_us;
   int idx = 0;
-  while (BuckyGen::next_fullerene(Q, T)) {
+  while (BuckyGen::next_fullerene(Q, Gbuf)) {
+    Triangulation T(Gbuf);
     SCOPED_TRACE("C60 #" + std::to_string(idx));
     FulleroidDelaunay D(T);
     auto t0 = std::chrono::high_resolution_clock::now();
@@ -260,10 +262,11 @@ TEST(IntrinsicDelaunay, C60_AllIsomers) {
 
 TEST(IntrinsicDelaunay, C80_AllIsomers) {
   BuckyGen::buckygen_queue Q = BuckyGen::start(80, false, false);
-  Triangulation T;
+  Graph Gbuf;
   std::vector<double> times_us;
   int idx = 0;
-  while (BuckyGen::next_fullerene(Q, T)) {
+  while (BuckyGen::next_fullerene(Q, Gbuf)) {
+    Triangulation T(Gbuf);
     SCOPED_TRACE("C80 #" + std::to_string(idx));
     FulleroidDelaunay D(T);
     auto t0 = std::chrono::high_resolution_clock::now();

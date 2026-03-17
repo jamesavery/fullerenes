@@ -1,74 +1,22 @@
 #pragma once
 
 #include "fullerenes/graph.hh"
+#include "fullerenes/owned.hh"
 #include "fullerenes/spiral.hh"
 
-// TODO: Separate planar cubic graph stuff away from general planar graph into CubicGraph class.
-//       Exploit duality between triangulation and cubic planar graph.
-class PlanarGraph : public Graph {
+// PlanarGraph: owned planar graph with oriented embedding.
+// Inherits algorithm methods from PlanarGraphView via Owned<PlanarGraphView>.
+class PlanarGraph : public Owned<PlanarGraphView> {
 public:
-  typedef spiral_nomenclature::construction_scheme_t construction_scheme_t;
+  using base_t = Owned<PlanarGraphView>;
 
-  explicit PlanarGraph(size_t N=0, int dmax=6) : Graph(N, dmax) {}
-  PlanarGraph(const Graph& g) : Graph(g) {}
+  PlanarGraph() = default;
+  explicit PlanarGraph(size_t N, int dmax=6) : base_t(int(N), uint8_t(dmax)) {}
+
+  // Deep copy from any GraphView (Graph, PlanarGraph, Triangulation, etc.)
+  PlanarGraph(const GraphView& g) : base_t(g) {}
+
   PlanarGraph(const spiral_nomenclature &fsn);
-
-
-  bool is_a_fullerene(bool verbose=true) const; // TODO: Do something better with output
-  bool is_cubic() const;
-  bool is_triangulation() const;
-
-  bool is_cut_vertex(const node_t v) const;
-
-  // Oriented face computation. Fmax is not necessary, just an extra back-stop.
-  vector<face_t> compute_faces_oriented(int Fmax=INT_MAX) const;
-  vector<face_t> compute_faces(unsigned int Fmax=INT_MAX) const; // Synonym for compute_faces_oriented
-  face_t get_face_oriented(const arc_t &e, int Fmax=INT_MAX) const;
-  arc_t get_face_representation(arc_t e, int Fmax=INT_MAX) const;
-  vector<arc_t> compute_face_representations(int Fmax=INT_MAX) const;
-
-
-  int face_size(node_t u, node_t v) const
-  {
-    int d = 1;
-    node_t u0 = u;
-    while(v != u0){
-      node_t w = v;
-      v = next_on_face(u,v);
-      u = w;
-      d++;
-    }
-    return d;
-  }
-
-
-  PlanarGraph dual_graph(unsigned int Fmax=INT_MAX) const;
-  // the dual of the LF, ie a Triangulation is returned
-  PlanarGraph leapfrog_dual() const;
-  // Every polyhedral graph G can be represented by a triangulation.
-  //  1. If G is a triangulation, it is G
-  //  2. If G is cubic, it is its dual
-  //  3. If G is non-cubic and non-triangulation, it is G's leapfrog dual
-  PlanarGraph enveloping_triangulation(construction_scheme_t &scheme) const;
-  PlanarGraph enveloping_triangulation(const construction_scheme_t &scheme) const;
-
-  size_t count_perfect_matchings() const;
-
-
-  vector<node_t> vertex_numbers(vector<vector<node_t>> &perms, const vector<node_t> &loc) const;
-
-  vector<tri_t>  triangulation(int face_max=INT_MAX) const;
-  vector<tri_t>  triangulation(const vector<face_t>& faces) const;
-  vector<tri_t>  centroid_triangulation(const vector<face_t>& faces) const ;
-  vector<tri_t>&  orient_triangulation(vector<tri_t>& tris) const;
-
-
-  vector<coord2d> tutte_layout(node_t s=0, node_t t=-1, node_t r=-1, unsigned int face_max=INT_MAX) const;
-  vector<coord2d> tutte_layout(const face_t& outer_face) const;
-  vector<coord2d> tutte_layout_iterative(const face_t& outer_face, const vector<coord2d>& outer_coords) const;
-  vector<coord2d> tutte_layout_direct(const face_t& outer_face, const vector<coord2d>& outer_coords) const;
-
-  vector<coord3d> zero_order_geometry(double scalerad=4) const;
 
   // PlanarGraph I/O.
   static vector<string> formats,input_formats, output_formats;
@@ -83,15 +31,12 @@ public:
   static PlanarGraph from_xyz(FILE *file);
   static PlanarGraph from_mol2(FILE *file);
 
-
   static bool to_file(const PlanarGraph &G, string path);
   static bool to_file(const PlanarGraph &G, FILE *file, string format);
   static bool to_spiral(const PlanarGraph &G, FILE *file);
   static bool to_ascii(const PlanarGraph &G, FILE *file);
   static bool to_mathematica(const PlanarGraph &G, FILE *file);
   static bool to_planarcode(const PlanarGraph &G, FILE *file);
-
-
 
   static PlanarGraph read_hog_planarcode(FILE *planarcode_file);
   static vector<PlanarGraph> read_hog_planarcodes(FILE *planarcode_file);

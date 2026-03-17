@@ -317,10 +317,10 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
   vector<pair<node_t,int>> boundary_buf(max_boundary);
   SpiralBoundary B(boundary_buf);
 
-  // NB: Capture via Graph& reference, not Triangulation* this —
+  // NB: Capture via GraphView& reference, not Triangulation* this —
   // calling insert_edge through the derived pointer produces
   // incorrect neighbour ordering in the planar embedding.
-  Graph& g = *this;
+  GraphView& g = *this;
   auto ins = [&g](const arc_t& e, node_t su, node_t sv){ g.insert_edge(e, su, sv); };
 
   // ── Initialize: place first two nodes ────────────────────────────────

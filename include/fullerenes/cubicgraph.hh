@@ -17,16 +17,16 @@ struct CubicGraph : public PlanarGraph {
         fprintf(stderr,"Graph not cubic: deg(%d) = %d\n",u,int((*this)[u].size()));
         abort();
       }
-    if(N > 0 && dmax != 3) static_cast<Graph&>(*this) = restride(3);
+    if(N > 0 && dmax != 3) restride_inplace(3);
   }
 
-  CubicGraph(const Graph& g) : PlanarGraph(g) {
+  CubicGraph(const GraphView& g) : PlanarGraph(g) {
     for(node_t u=0;u<N;u++)
       if((*this)[u].size() != 3){
         fprintf(stderr,"Graph not cubic: deg(%d) = %d\n",u,int((*this)[u].size()));
         abort();
       }
-    if(N > 0 && dmax != 3) static_cast<Graph&>(*this) = restride(3);
+    if(N > 0 && dmax != 3) restride_inplace(3);
   }
   CubicGraph(const int N, const vector<int>& spiral_string, const jumplist_t& jumps = jumplist_t());
   CubicGraph(const spiral_nomenclature &fsn);
@@ -36,4 +36,3 @@ struct CubicGraph : public PlanarGraph {
 
   vector<node_t> vertex_numbers(const Triangulation &T, const vector<vector<node_t>> &perm, const vector<node_t>& loc) const;
 };
-
