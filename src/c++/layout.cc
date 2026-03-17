@@ -258,13 +258,13 @@ vector<coord2d> PlanarGraph::tutte_layout_iterative(const face_t& outer_face, co
 // spherical_projection moved to layout2d.cc
 
 
-coord2d Graph::centre2d(const vector<coord2d>& layout) const {
+coord2d GraphView::centre2d(const vector<coord2d>& layout) const {
   coord2d centre(0,0);
   for(node_t u=0;u<layout.size();u++) centre += layout[u];
   return centre/double(layout.size());
 }
 
-coord3d Graph::centre3d(std::span<const coord3d> layout) const {
+coord3d GraphView::centre3d(std::span<const coord3d> layout) const {
   coord3d centre(0,0,0);
   for(node_t u=0;u<layout.size();u++) centre += layout[u];
   return centre/double(layout.size());

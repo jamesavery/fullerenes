@@ -13,7 +13,7 @@ public:
   PlanarGraph(const Graph& g) : Graph(g) {}
   PlanarGraph(const spiral_nomenclature &fsn);
 
-  
+
   bool is_a_fullerene(bool verbose=true) const; // TODO: Do something better with output
   bool is_cubic() const;
   bool is_triangulation() const;
@@ -28,7 +28,7 @@ public:
   vector<arc_t> compute_face_representations(int Fmax=INT_MAX) const;
 
 
-  int face_size(node_t u, node_t v) const 
+  int face_size(node_t u, node_t v) const
   {
     int d = 1;
     node_t u0 = u;
@@ -51,12 +51,12 @@ public:
   //  3. If G is non-cubic and non-triangulation, it is G's leapfrog dual
   PlanarGraph enveloping_triangulation(construction_scheme_t &scheme) const;
   PlanarGraph enveloping_triangulation(const construction_scheme_t &scheme) const;
-  
+
   size_t count_perfect_matchings() const;
 
 
   vector<node_t> vertex_numbers(vector<vector<node_t>> &perms, const vector<node_t> &loc) const;
-  
+
   vector<tri_t>  triangulation(int face_max=INT_MAX) const;
   vector<tri_t>  triangulation(const vector<face_t>& faces) const;
   vector<tri_t>  centroid_triangulation(const vector<face_t>& faces) const ;
@@ -74,10 +74,10 @@ public:
   static vector<string> formats,input_formats, output_formats;
   enum {ASCII,PLANARCODE,XYZ,MOL2,MATHEMATICA,LATEX,SPIRAL} formats_t;
   static int format_id(string id);
-  
+
   static PlanarGraph from_file(string path, int index=0);
   static PlanarGraph from_file(FILE *file, string format, int index=0);
-  static PlanarGraph from_spiral(FILE *file, size_t index=0);    
+  static PlanarGraph from_spiral(FILE *file, size_t index=0);
   static PlanarGraph from_ascii(FILE *file);
   static PlanarGraph from_planarcode(FILE *file, const size_t index=0);
   static PlanarGraph from_xyz(FILE *file);
@@ -86,12 +86,12 @@ public:
 
   static bool to_file(const PlanarGraph &G, string path);
   static bool to_file(const PlanarGraph &G, FILE *file, string format);
-  static bool to_spiral(const PlanarGraph &G, FILE *file);  
+  static bool to_spiral(const PlanarGraph &G, FILE *file);
   static bool to_ascii(const PlanarGraph &G, FILE *file);
-  static bool to_mathematica(const PlanarGraph &G, FILE *file);  
+  static bool to_mathematica(const PlanarGraph &G, FILE *file);
   static bool to_planarcode(const PlanarGraph &G, FILE *file);
 
-  
+
 
   static PlanarGraph read_hog_planarcode(FILE *planarcode_file);
   static vector<PlanarGraph> read_hog_planarcodes(FILE *planarcode_file);
@@ -99,5 +99,3 @@ public:
 
   friend ostream& operator<<(ostream& s, const PlanarGraph& g);
 };
-
-

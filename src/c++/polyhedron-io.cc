@@ -2,10 +2,10 @@
 #include "fullerenes/layout2d.hh"
 
 //////////////////////////// FORMAT MULTIPLEXING ////////////////////////////
-vector<string> Polyhedron::formats{{"ascii","planarcode","xyz","mol2","mathematica","latex","cc1","turbomole","gaussian","wavefront","spiral"}};
-vector<string> Polyhedron::format_alias{{"txt","ply","xyz","mol2","m","tex","cc1","turbomole","com","obj","rspi"}};
-vector<string> Polyhedron::input_formats{{"xyz","mol2"}}; // TODO: "ascii","planarcode","obj"
-vector<string> Polyhedron::output_formats{{"ascii","xyz","mol2","cc1","turbomole","gaussian","spiral"}};
+vector<string> Polyhedron::formats{"ascii","planarcode","xyz","mol2","mathematica","latex","cc1","turbomole","gaussian","wavefront","spiral"};
+vector<string> Polyhedron::format_alias{"txt","ply","xyz","mol2","m","tex","cc1","turbomole","com","obj","rspi"};
+vector<string> Polyhedron::input_formats{"xyz","mol2"}; // TODO: "ascii","planarcode","obj"
+vector<string> Polyhedron::output_formats{"ascii","xyz","mol2","cc1","turbomole","gaussian","spiral"};
 
 int Polyhedron::format_id(string name)
 {

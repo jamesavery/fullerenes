@@ -17,8 +17,9 @@ using namespace std;
 #include "geometry.hh"
 #include "auxiliary.hh"
 #include "matrix.hh"
+#include "graphview.hh"
 
-struct Graph : Spanify::RSRAdjacencyView<node_t> {
+struct Graph : GraphView {
   using base_t = Spanify::RSRAdjacencyView<node_t>;
 
   // Optional owned storage (empty when Graph is a view of external memory).
@@ -121,12 +122,12 @@ struct Graph : Spanify::RSRAdjacencyView<node_t> {
   // --- Rule of 5 ---
 
   Graph(const Graph& o)
-      : base_t(o), owned_neighbours(o.owned_neighbours), owned_deg(o.owned_deg) {
+      : GraphView(o), owned_neighbours(o.owned_neighbours), owned_deg(o.owned_deg) {
     if (!owned_neighbours.empty()) repoint();
   }
 
   Graph(Graph&& o) noexcept
-      : base_t(o), owned_neighbours(std::move(o.owned_neighbours)),
+      : GraphView(o), owned_neighbours(std::move(o.owned_neighbours)),
         owned_deg(std::move(o.owned_deg)) {
     if (!owned_neighbours.empty()) repoint();
     o.neighbours = {}; o.deg = {}; o.N = 0;
@@ -185,48 +186,9 @@ struct Graph : Spanify::RSRAdjacencyView<node_t> {
     return Spanify::restride(*this, new_dmax);
   }
 
-  // --- Graph algorithms ---
-
-  bool insert_edge(const arc_t& e, const node_t suc_uv=-1, const node_t suc_vu=-1);
-  bool remove_edge(const edge_t& e);
-  bool edge_exists(const edge_t& e) const;
+  // --- Methods requiring owned storage ---
   void remove_isolated_vertices();
   void remove_vertices(set<int> &sv);
-  void flip_all_orientations();
-
-  int  arc_ix(node_t u, node_t v) const;
-  node_t next(node_t u, node_t v) const;
-  node_t prev(node_t u, node_t v) const;
-  node_t next_on_face(node_t u, node_t v) const;
-  node_t prev_on_face(node_t u, node_t v) const;
-
-  bool is_consistently_oriented() const;
-  bool adjacency_is_symmetric() const;
-  bool has_separating_triangles() const;
-
-  bool is_connected(const set<node_t>& subgraph = set<node_t>()) const;
-  void      single_source_shortest_paths(node_t source, int *distances, size_t max_depth = INT_MAX) const;
-  matrix<int> all_pairs_shortest_paths(const vector<node_t>& V,
-				       const unsigned int max_depth = INT_MAX) const;
-  matrix<int> all_pairs_shortest_paths(const unsigned int max_depth = INT_MAX) const;
-  vector<vector<node_t> > connected_components() const;
-
-  vector<node_t> shortest_cycle(node_t s, const int max_depth) const;
-  vector<node_t> shortest_cycle(const vector<node_t> &prefix, const int max_depth) const;
-  vector<int> multiple_source_shortest_paths(const vector<node_t>& sources, const unsigned int max_depth=INT_MAX) const;
-
-  int hamiltonian_count() const;
-  int hamiltonian_count(node_t current_node, vector<bool>& used_edges, vector<bool>& used_nodes, vector<node_t>& path, const vector<int>& distances) const;
-
-  coord2d centre2d(const vector<coord2d>& layout) const;
-  coord3d centre3d(std::span<const coord3d> layout) const;
-
-  int max_degree() const;
-
-  vector<edge_t>  undirected_edges() const;
-  vector<arc_t> directed_edges()   const;
-
-  size_t count_edges() const;
 
   friend ostream& operator<<(ostream& s, const Graph& g);
 };

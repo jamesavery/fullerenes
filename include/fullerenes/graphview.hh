@@ -18,29 +18,13 @@
 
 #include "fullerenes/dense_graph.hh"
 #include "fullerenes/geometry.hh"
+#include "fullerenes/auxiliary.hh"
+#include "fullerenes/matrix.hh"
 
 // --- Forward declarations for owned types ---
-template<typename View> struct Owned;
-
-struct GraphView;
-struct PlanarGraphView;
-struct CubicGraphView;
-struct FullereneGraphView;
-struct TriangulationView;
-struct FullereneDualView;
-struct PolyhedronView;
-struct DeltahedronView;
-
-using Graph         = Owned<GraphView>;
-using PlanarGraph   = Owned<PlanarGraphView>;
-using Triangulation = Owned<TriangulationView>;
-using FullereneDual = Owned<FullereneDualView>;
-using Polyhedron    = Owned<PolyhedronView>;
-
-// Thin wrappers (defined after Owned in their own headers):
-struct CubicGraph;
-struct FullereneGraph;
-struct Deltahedron;
+// Type aliases (Graph = Owned<GraphView>, etc.) are deferred until
+// the old class hierarchy is fully replaced. During migration, the
+// old classes inherit from these views.
 
 // ---------------------------------------------------------------------------
 // GraphView: general undirected/directed graph with adjacency lists.
@@ -49,6 +33,56 @@ struct GraphView : Spanify::RSRAdjacencyView<node_t> {
     using RSRAdjacencyView::RSRAdjacencyView;
     static constexpr uint8_t default_dmax = 10;
     GraphView() = default;
+
+    // --- Edge operations (mutate through spans) ---
+    bool insert_edge(const arc_t& e, const node_t suc_uv=-1, const node_t suc_vu=-1);
+    bool remove_edge(const edge_t& e);
+    bool edge_exists(const edge_t& e) const;
+    void flip_all_orientations();
+
+    // --- Vertex-pair navigation (O(degree) per call) ---
+    // Bring arc-index overloads from base into scope (otherwise hidden
+    // by the vertex-pair overloads declared here).
+    using RSRAdjacencyView::next;
+    using RSRAdjacencyView::prev;
+    using RSRAdjacencyView::next_on_face;
+
+    int  arc_ix(node_t u, node_t v) const;
+    node_t next(node_t u, node_t v) const;
+    node_t prev(node_t u, node_t v) const;
+    node_t next_on_face(node_t u, node_t v) const;
+    node_t prev_on_face(node_t u, node_t v) const;
+
+    // --- Topology queries ---
+    bool is_consistently_oriented() const;
+    bool adjacency_is_symmetric() const;
+    bool has_separating_triangles() const;
+
+    // --- Connectivity and shortest paths ---
+    bool is_connected(const set<node_t>& subgraph = set<node_t>()) const;
+    void single_source_shortest_paths(node_t source, int *distances, size_t max_depth = INT_MAX) const;
+    matrix<int> all_pairs_shortest_paths(const vector<node_t>& V,
+                                         const unsigned int max_depth = INT_MAX) const;
+    matrix<int> all_pairs_shortest_paths(const unsigned int max_depth = INT_MAX) const;
+    vector<vector<node_t>> connected_components() const;
+
+    vector<node_t> shortest_cycle(node_t s, const int max_depth) const;
+    vector<node_t> shortest_cycle(const vector<node_t>& prefix, const int max_depth) const;
+    vector<int> multiple_source_shortest_paths(const vector<node_t>& sources, const unsigned int max_depth=INT_MAX) const;
+
+    // --- Hamiltonian paths ---
+    int hamiltonian_count() const;
+    int hamiltonian_count(node_t current_node, vector<bool>& used_edges, vector<bool>& used_nodes, vector<node_t>& path, const vector<int>& distances) const;
+
+    // --- Geometry helpers ---
+    coord2d centre2d(const vector<coord2d>& layout) const;
+    coord3d centre3d(std::span<const coord3d> layout) const;
+
+    // --- Degree and edge queries ---
+    int max_degree() const;
+    vector<edge_t>  undirected_edges() const;
+    vector<arc_t> directed_edges() const;
+    size_t count_edges() const;
 };
 
 // ---------------------------------------------------------------------------
@@ -57,6 +91,10 @@ struct GraphView : Spanify::RSRAdjacencyView<node_t> {
 struct PlanarGraphView : GraphView {
     using GraphView::GraphView;
     static constexpr uint8_t default_dmax = 6;
+
+    // Algorithm methods will be migrated here from PlanarGraph when
+    // PlanarGraph switches from inheriting Graph to inheriting PlanarGraphView.
+    // For now, PlanarGraph : Graph keeps the method definitions.
 };
 
 // ---------------------------------------------------------------------------
