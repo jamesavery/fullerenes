@@ -152,17 +152,51 @@ struct PlanarGraphView : GraphView {
 // ---------------------------------------------------------------------------
 // CubicGraphView: 3-regular planar graph.
 // ---------------------------------------------------------------------------
+// Forward declarations for return types.
+class Triangulation;
+
 struct CubicGraphView : PlanarGraphView {
     using PlanarGraphView::PlanarGraphView;
     static constexpr uint8_t default_dmax = 3;
+
+    // --- Spiral methods ---
+    bool get_spiral_from_cg(node_t f1, node_t f2, node_t f3,
+                            vector<int>& spiral, jumplist_t& jumps,
+                            bool general=true) const;
+    bool get_spiral_from_cg(vector<int>& spiral, jumplist_t& jumps,
+                            bool canonical=true, bool general=true,
+                            bool pentagon_start=true) const;
+
+    vector<node_t> vertex_numbers(const Triangulation& T,
+                                  const vector<vector<node_t>>& perm,
+                                  const vector<node_t>& loc) const;
 };
 
 // ---------------------------------------------------------------------------
 // FullereneGraphView: fullerene graph (3-regular, 12 pentagons, rest hex).
 // ---------------------------------------------------------------------------
+// Forward declaration for FullereneGraph return types.
+class FullereneGraph;
+
 struct FullereneGraphView : CubicGraphView {
     using CubicGraphView::CubicGraphView;
     static constexpr uint8_t default_dmax = 3;
+
+    // --- Fullerene-specific methods ---
+    FullereneGraph halma_fullerene(int n, bool do_layout=false) const;
+    FullereneGraph leapfrog_fullerene(bool do_layout=false) const;
+    FullereneGraph GCtransform(unsigned k=1, unsigned l=0) const;
+
+    bool get_rspi_from_fg(node_t f1, node_t f2, node_t f3,
+                          vector<int>& rspi, jumplist_t& jumps,
+                          bool general=true) const;
+    bool get_rspi_from_fg(vector<int>& rspi, jumplist_t& jumps,
+                          bool general=true, bool pentagon_start=true) const;
+
+    matrix<int> pentagon_distance_mtx() const;
+    vector<coord3d> zero_order_geometry(double scalerad=4) const;
+    vector<coord3d> optimized_geometry(std::span<const coord3d> initial_geometry,
+                                       int opt_method=3, double ftol=1e-12) const;
 };
 
 // ---------------------------------------------------------------------------
