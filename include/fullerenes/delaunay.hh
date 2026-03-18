@@ -111,7 +111,6 @@ struct DelaunayTriangulation {
   bool flip_edge(int h);
   int  lawson_sweep();
   int  count_non_delaunay() const;
-  int  delaunay_resolve();
   int  flip_to_delaunay();
   bool is_delaunay() const;
 

@@ -1,4 +1,5 @@
 #include "fullerenes/delaunay.hh"
+#include "fullerenes/symmetry.hh"
 #include "fullerenes/eisenstein.hh"
 
 #include <stack>
@@ -874,10 +875,7 @@ bool DelaunayTriangulation::flip_edge(int h)
   int u = he_origin[h], v = he_origin[t];
   int B = he_origin[h2], D = he_origin[h5];
 
-  // Topological guard: B == D means the diamond is degenerate.
-  if (B == D) return false;
-
-  // Geometric guards.
+  // Geometric guards (self-loop flips B == D are allowed in the delta-complex).
   Diamond dm = diamond(h);
   if (!dm.is_convex()) return false;
   double f_len = dm.flipped_length();
@@ -927,11 +925,18 @@ bool DelaunayTriangulation::flip_edge(int h)
     sort(all.begin(), all.end());
     all.erase(unique(all.begin(), all.end()), all.end());
 
-    // Classify each original face by which side of B→D its centroid
-    // falls on, using Eisenstein turn() in the Z[omega] grid.
-    auto [left, right] = origin_tracker->classify_across_line(all, B, D);
-    f_origin[fh] = std::move(left);
-    f_origin[ft] = std::move(right);
+    if (B != D) {
+      // Classify each original face by which side of B→D its centroid
+      // falls on, using Eisenstein turn() in the Z[omega] grid.
+      auto [left, right] = origin_tracker->classify_across_line(all, B, D);
+      f_origin[fh] = std::move(left);
+      f_origin[ft] = std::move(right);
+    } else {
+      // Self-loop flip: B == D. classify_across_line degenerates.
+      // Conservatively assign all origins to the left face.
+      f_origin[fh] = std::move(all);
+      f_origin[ft].clear();
+    }
   }
 
   return true;
@@ -992,56 +997,7 @@ int DelaunayTriangulation::lawson_sweep()
 
 int DelaunayTriangulation::flip_to_delaunay()
 {
-  int flips = lawson_sweep();
-  if (!is_delaunay())
-    flips += delaunay_resolve();
-  return flips;
-}
-
-int DelaunayTriangulation::delaunay_resolve()
-{
-  int total_flips = 0;
-
-  for (int round = 0; round < 20; round++) {
-    int count0 = count_non_delaunay();
-    if (count0 == 0) break;
-
-    DelaunayTriangulation saved = *this;
-    bool improved = false;
-
-    // Collect all live edges.
-    vector<int> edges;
-    for (int h = 0; h < nh; h += 2)
-      if (alive(h)) edges.push_back(h);
-
-    // Depth 1: try flipping each edge, then Lawson sweep.
-    for (size_t i = 0; i < edges.size() && !improved; i++) {
-      *this = saved;
-      if (!flip_edge(edges[i])) continue;
-      int f = 1 + lawson_sweep();
-      if (count_non_delaunay() < count0) {
-        total_flips += f;
-        improved = true;
-      }
-    }
-
-    // Depth 2: try all pairs.
-    for (size_t i = 0; i < edges.size() && !improved; i++) {
-      for (size_t j = i + 1; j < edges.size() && !improved; j++) {
-        *this = saved;
-        if (!flip_edge(edges[i])) continue;
-        if (!alive(edges[j]) || !flip_edge(edges[j])) continue;
-        int f = 2 + lawson_sweep();
-        if (count_non_delaunay() < count0) {
-          total_flips += f;
-          improved = true;
-        }
-      }
-    }
-
-    if (!improved) { *this = saved; break; }
-  }
-  return total_flips;
+  return lawson_sweep();
 }
 
 // --- Vertex removal ---
@@ -1529,7 +1485,39 @@ void DelaunayTriangulation::remove_flat_vertices()
 
   while (nv > 0 && v_orig_degree[nv - 1] == 6 && v_out[nv - 1] >= 0) {
     int old_nv = nv;
-    remove_flat_vertex(nv - 1);
+    int target = nv - 1;
+
+    // Flip away self-loops at the target vertex before removal.
+    // Self-loops arise from self-loop ear diagonals in previous removals;
+    // they can't be handled by remove_flat_vertex because the inner rim
+    // half-edge at the self-loop position has origin = target (becomes dead).
+    if (v_out[target] >= 0) {
+      int h0 = v_out[target], h = h0;
+      bool flipped_any = true;
+      while (flipped_any) {
+        flipped_any = false;
+        h0 = v_out[target];
+        if (h0 < 0) break;
+        h = h0;
+        do {
+          if (dest(h) == target) {
+            // Self-loop: try to flip it away.
+            if (flip_edge(h)) {
+              flipped_any = true;
+              break;  // Restart scan (circulation changed).
+            }
+            // Can't flip — try the twin.
+            if (flip_edge(h ^ 1)) {
+              flipped_any = true;
+              break;
+            }
+          }
+          h = cw(h);
+        } while (h != h0);
+      }
+    }
+
+    remove_flat_vertex(target);
 
     // Check if removal succeeded (vertex is now dead).
     if (v_out[nv - 1] >= 0) {
@@ -1564,6 +1552,105 @@ DelaunayTriangulation DelaunayTriangulation::compute(
   if (track_origins)
     D.origin_tracker = std::make_shared<OriginTracker>(sorted, D.nf);
   D.remove_flat_vertices();
+  return D;
+}
+
+// --- Symmetric iDT ---
+
+int DelaunayTriangulation::check_edge_symmetry(const vector<vector<int>>& cone_perms) const
+{
+  set<pair<int,int>> edges;
+  for (int h = 0; h < nh; h += 2) {
+    if (!alive(h)) continue;
+    int u = he_origin[h], v = dest(h);
+    edges.insert({min(u,v), max(u,v)});
+  }
+  int violations = 0;
+  for (auto& perm : cone_perms)
+    for (auto& e : edges) {
+      int pu = perm[e.first], pv = perm[e.second];
+      if (!edges.count({min(pu,pv), max(pu,pv)})) violations++;
+    }
+  return violations;
+}
+
+// Find half-edge from u to v, or -1.
+static int find_half_edge(const DelaunayTriangulation& D, int u, int v) {
+  if (D.v_out[u] < 0) return -1;
+  int h0 = D.v_out[u], h = h0;
+  do { if (D.dest(h) == v) return h; h = D.cw(h); } while (h != h0);
+  return -1;
+}
+
+DelaunayTriangulation DelaunayTriangulation::compute_symmetric(
+    const Triangulation& T, const Symmetry& S)
+{
+  // Step 1: Standard non-symmetric iDT (valid topology, possibly wrong lengths).
+  DelaunayTriangulation D = compute(T);
+  if (D.nv != 12) return D;
+
+  vector<vector<int>> G_full(S.G.begin(), S.G.end());
+  auto cone_perms = restrict_to_cone_points(G_full, T);
+  if (cone_perms.empty() || D.check_edge_symmetry(cone_perms) == 0)
+    return D;
+
+  // Step 2: Replace edge lengths with true geodesic distances (G-invariant).
+  vector<int> cone_pts;
+  for (int v = 0; v < T.N; v++)
+    if (T.degree(v) != 6) cone_pts.push_back(v);
+  auto dist2 = T.surface_distances(cone_pts);
+
+  for (int h = 0; h < D.nh; h += 2) {
+    if (!D.alive(h)) continue;
+    int u = D.he_origin[h], v = D.dest(h);
+    double L = sqrt(dist2(u, v));
+    D.he_length[h] = D.he_length[h ^ 1] = L;
+  }
+  D.recompute_all_angles();
+
+  // Step 3: Flip to Delaunay with corrected distances.
+  D.flip_to_delaunay();
+
+  // Step 4: Flip co-circular edges to restore G-invariance.
+  // With G-invariant distances, violating edges must be co-circular (cot-sum=0).
+  // Collect ALL violating diagonals and flip them simultaneously.
+  for (int pass = 0; pass < 20; pass++) {
+    set<pair<int,int>> edge_set;
+    for (int h = 0; h < D.nh; h += 2) {
+      if (!D.alive(h)) continue;
+      edge_set.insert({min(D.he_origin[h], D.dest(h)),
+                        max(D.he_origin[h], D.dest(h))});
+    }
+
+    set<int> to_flip;
+    for (auto& perm : cone_perms)
+      for (auto& e : edge_set) {
+        auto pe = make_pair(min(perm[e.first],perm[e.second]),
+                            max(perm[e.first],perm[e.second]));
+        if (edge_set.count(pe)) continue;
+        // Find current diagonal of the quad for the missing edge.
+        if (D.v_out[pe.first] < 0) continue;
+        vector<int> common;
+        int h0 = D.v_out[pe.first], h = h0;
+        do {
+          if (find_half_edge(D, D.dest(h), pe.second) >= 0)
+            common.push_back(D.dest(h));
+          h = D.cw(h);
+        } while (h != h0);
+        if (common.size() != 2) continue;
+        int dh = find_half_edge(D, common[0], common[1]);
+        if (dh >= 0 && D.diamond(dh).is_convex())
+          to_flip.insert(D.edge(dh) * 2);
+      }
+
+    if (to_flip.empty()) break;
+    int nf = 0;
+    for (int h : to_flip) if (D.alive(h)) { D.flip_edge(h); nf++; }
+    int v = D.check_edge_symmetry(cone_perms);
+    fprintf(stderr, "  pass %d: flipped %d, violations %d\n", pass, nf, v);
+    if (v == 0) break;
+  }
+
   return D;
 }
 
