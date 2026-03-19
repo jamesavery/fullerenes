@@ -368,6 +368,9 @@ struct PolyhedronView : PlanarGraphView {
 // DeltahedronView: triangulation with 3D vertex coordinates (equilateral
 // triangle embedding).
 // ---------------------------------------------------------------------------
+// Forward declaration for return types.
+class Deltahedron;
+
 struct DeltahedronView : TriangulationView {
     std::span<coord3d> points;
     static constexpr uint8_t default_dmax = 6;
@@ -384,6 +387,26 @@ struct DeltahedronView : TriangulationView {
                     std::span<coord3d> pts,
                     std::span<uint8_t> twin = {})
         : TriangulationView(N, dmax, neighbours, deg, twin), points(pts) {}
+
+    // --- Quality metrics ---
+    double max_angle_relerr() const;
+    int count_concave() const;
+
+    // --- Geometry operations ---
+    vector<face_t> compute_dual_faces() const;
+    void smooth(double q);
+    Deltahedron GCtransform(unsigned k, unsigned l) const;
+    Deltahedron halma_transform(int m) const;
+
+    // optimize() and optimize_patch() stay on Deltahedron (use optimizer state fields).
+    int reflect_concave(std::span<coord3d> pts, double threshold=0,
+                        const vector<bool>& fixed={}) const;
+    int reflect_all_concave(std::span<coord3d> pts, double threshold=0,
+                            const vector<bool>& fixed={}) const;
+    double gradient_check(std::span<const coord3d> geometry, double target_L=0, double eps=1e-6) const;
+    double hessian_check(std::span<const coord3d> geometry, const vector<bool>& free_mask,
+                         const vector<bool>& interior_mask={}, double target_L=0,
+                         double eps=1e-5, bool verbose=false) const;
 };
 
 // ---------------------------------------------------------------------------

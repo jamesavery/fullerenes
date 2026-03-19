@@ -24,7 +24,7 @@ struct Quality {
 Quality measure(Deltahedron& D, OptMethod method, const vector<coord3d>& init_pts, int budget_mult) {
   D.opt_method = method;
   D.opt_k_flat = 0;
-  D.points = vector<coord3d>(init_pts);
+  D.set_points(vector<coord3d>(init_pts));
   int Nv = D.N;
   // Convert iteration budget to work budget: each iter ~ N work (one gradient)
   long long max_work = (long long)budget_mult * Nv * Nv;

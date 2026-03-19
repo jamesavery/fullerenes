@@ -133,7 +133,7 @@ TEST_P(FullereneTest, CopyAssignmentOperatorFromPolyhedron) {
     FullereneDual dual(G);
     PlanarGraph PG = dual.dual_graph();
     Polyhedron P(PG);
-    P.points = P.zero_order_geometry();
+    P.set_points(P.zero_order_geometry());
     P.optimize();
     FullereneBatch batch1(N, 1);
     batch1.push_back(P);
