@@ -6,7 +6,7 @@
 #include "fullerenes/layout2d.hh"
 
 
-double Polyhedron::diameter() const {
+double PolyhedronView::diameter() const {
   double dmax = -INFINITY;
   for(int i=0;i<N;i++)
     for(int j=i+1;j<N;j++){
@@ -24,7 +24,7 @@ static vector<coord3d> centroid_points(std::span<const coord3d> points, const ve
   return pts;
 }
 
-double Polyhedron::surface_area() const {
+double PolyhedronView::surface_area() const {
   auto fs = faces();
   vector<tri_t>  tris(centroid_triangulation(fs));
   vector<coord3d> pts(centroid_points(points, fs));
@@ -38,7 +38,7 @@ double Polyhedron::surface_area() const {
 // Signed volume via the divergence theorem: V = (1/3) ∮ r·n̂ dA.
 // For a flat triangle, a·n̂ = b·n̂ = c·n̂ (constant on plane), so using
 // any vertex gives the exact integral over the triangle.
-double Polyhedron::volume_divergence() const {
+double PolyhedronView::volume_divergence() const {
   auto fs = faces();
   vector<tri_t>   tris(centroid_triangulation(fs));
   vector<coord3d> pts(centroid_points(points, fs));
@@ -53,7 +53,7 @@ double Polyhedron::volume_divergence() const {
 
 // Signed volume via signed tetrahedra from the origin:
 // V = (1/6) Σ a·(b×c) for each triangle (a,b,c).
-double Polyhedron::volume_tetra() const {
+double PolyhedronView::volume_tetra() const {
   auto fs = faces();
   vector<tri_t>   tris(centroid_triangulation(fs));
   vector<coord3d> pts(centroid_points(points, fs));
@@ -66,7 +66,7 @@ double Polyhedron::volume_tetra() const {
   return fabs(V / 6.0);
 }
 
-Polyhedron Polyhedron::incremental_convex_hull() const {
+Polyhedron PolyhedronView::incremental_convex_hull() const {
   list<tri_t> output;
   typedef list<tri_t>::iterator triit;
   srandom(42); // Seed random numbers with constant for reproducible behaviour
@@ -249,9 +249,11 @@ static void orient_polyhedron_neighbours(Polyhedron& P)
   }
 }
 
-Polyhedron::Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_, const int face_max_) :
-  PlanarGraph(G), face_max(face_max_), points(points_)
+Polyhedron::Polyhedron(const PlanarGraphView& G, const vector<coord3d>& points_, const int face_max_) :
+  base_t(G), face_max(face_max_)
 {
+  owned_points = points_;
+  repoint();
   if(!is_consistently_oriented()) orient_polyhedron_neighbours(*this);
 
   if(face_max == INT_MAX){
@@ -261,9 +263,12 @@ Polyhedron::Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_, con
   }
 }
 
-Polyhedron::Polyhedron(const PlanarGraph& G, std::span<coord3d> points_, const int face_max_) :
-  PlanarGraph(G), face_max(face_max_), points(points_)
+Polyhedron::Polyhedron(const PlanarGraphView& G, std::span<coord3d> points_, const int face_max_) :
+  base_t(G), face_max(face_max_)
 {
+  // Copy coordinates into owned storage
+  owned_points.assign(points_.begin(), points_.end());
+  repoint();
   if(!is_consistently_oriented()) orient_polyhedron_neighbours(*this);
 
   if(face_max == INT_MAX){
@@ -295,11 +300,11 @@ Polyhedron::Polyhedron(const vector<coord3d>& xs, double tolerance)
     }
   }
 
-  *this = Polyhedron(PlanarGraph(Graph(nb)), xs);
+  *this = Polyhedron(PlanarGraph(nb), xs);
 }
 
 
-matrix3d Polyhedron::inertia_matrix() const
+matrix3d PolyhedronView::inertia_matrix() const
 {
   matrix3d I;
 
@@ -316,7 +321,7 @@ matrix3d Polyhedron::inertia_matrix() const
   return I;
 }
 
-matrix3d Polyhedron::principal_axes() const
+matrix3d PolyhedronView::principal_axes() const
 {
   const matrix3d I(inertia_matrix());
   pair<coord3d,matrix3d> ES(I.eigensystem());
@@ -346,7 +351,7 @@ matrix3d Polyhedron::principal_axes() const
   return ES.second;
 }
 
-coord3d Polyhedron::width_height_depth() const {
+coord3d PolyhedronView::width_height_depth() const {
   double xmin=INFINITY,xmax=-INFINITY,ymin=INFINITY,ymax=-INFINITY,zmin=INFINITY,zmax=-INFINITY;
   for(node_t u=0;u<N;u++){
     const coord3d& x(points[u]);
@@ -362,7 +367,7 @@ coord3d Polyhedron::width_height_depth() const {
 
 
 
-Polyhedron Polyhedron::dual() const
+Polyhedron PolyhedronView::dual() const
 {
   PlanarGraph d(dual_graph());
   auto fs = faces();
@@ -379,15 +384,15 @@ Polyhedron Polyhedron::dual() const
 }
 
 
-Polyhedron Polyhedron::leapfrog_dual() const
+Polyhedron PolyhedronView::leapfrog_dual() const
 {
   assert(is_consistently_oriented());
   auto fs = faces();
   size_t Nf = fs.size();
 
-  Polyhedron Plf(Graph(N+Nf));
-  Plf.points.owned.resize(N+Nf);
-  Plf.points.repoint();
+  Polyhedron Plf;
+  static_cast<Owned<PolyhedronView>&>(Plf) = Owned<PolyhedronView>(int(N+Nf));
+  // points already allocated by Owned<PolyhedronView>(N+Nf)
 
   // Start with all the existing nodes
   for(node_t u=0;u<N;u++){
@@ -422,7 +427,8 @@ Polyhedron Polyhedron::leapfrog_dual() const
 Polyhedron Polyhedron::fullerene_polyhedron(FullereneGraph G)
 {
   Polyhedron P(G,G.zero_order_geometry(),6);
-  P.points = G.optimized_geometry(P.points);
+  P.owned_points = G.optimized_geometry(P.points);
+  P.repoint();
 
   P.move_to_origin();		// Center of mass at (0,0,0)
   P.align_with_axes();		// Align with principal axes
@@ -430,11 +436,12 @@ Polyhedron Polyhedron::fullerene_polyhedron(FullereneGraph G)
   return P;
 }
 
-bool Polyhedron::optimize(int opt_method, double ftol)
+bool PolyhedronView::optimize(int opt_method, double ftol)
 {
   if(is_a_fullerene()){
     FullereneGraph g(*this);
-    points = g.optimized_geometry(points,opt_method,ftol);
+    auto new_pts = g.optimized_geometry(points,opt_method,ftol);
+    std::copy(new_pts.begin(), new_pts.end(), points.begin());
     return true;
   } if(is_cubic()) {
     bool optimize_angles = true;
@@ -479,13 +486,13 @@ bool Polyhedron::optimize(int opt_method, double ftol)
 }
 
 bool Polyhedron::is_triangulation() const {
-  for(auto& f: faces()) if(f.size()!=3) return false;
+  for(auto& f: faces(face_max)) if(f.size()!=3) return false;
   return true;
 }
 
 // TODO: Add function for checking if forcefield convergence is achieved
 
-bool Polyhedron::is_invalid() const {
+bool PolyhedronView::is_invalid() const {
   bool has_nans = false;
   for(auto p: points){
     if(std::isnan(p[0])||std::isnan(p[1])||std::isnan(p[2])) has_nans = true;
@@ -493,7 +500,7 @@ bool Polyhedron::is_invalid() const {
   return has_nans;
 }
 
-pair<coord3d,coord3d> Polyhedron::bounding_box() const {
+pair<coord3d,coord3d> PolyhedronView::bounding_box() const {
   coord3d xmin{INFINITY,INFINITY,INFINITY},xmax{-INFINITY,-INFINITY,-INFINITY};
   for(const auto& p: points)
     for(int i=0;i<3;i++){

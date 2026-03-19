@@ -132,7 +132,7 @@ TEST(HierarchyView, FullereneGraphFromViewGraph) {
 TEST(PolyhedronView, OwnedPolyhedron) {
     Polyhedron P = Polyhedron::C20();
     EXPECT_EQ(P.N, 20);
-    EXPECT_TRUE(P.points.owns_memory());  // owns coordinates
+    EXPECT_TRUE(P.owns_memory());  // owns coordinates
 
     auto fs = P.faces();
     EXPECT_EQ(int(fs.size()), 12);  // C20 has 12 pentagonal faces
@@ -143,10 +143,11 @@ TEST(PolyhedronView, ViewCoordinates) {
     Polyhedron owned = Polyhedron::C20();
 
     // Create a view that shares the coordinate memory
-    std::span<coord3d> pts_span(owned.points.owned.data(), owned.points.owned.size());
-    Polyhedron view(static_cast<const PlanarGraph&>(owned), pts_span, 6);
+    std::span<coord3d> pts_span(owned.owned_points.data(), owned.owned_points.size());
+    Polyhedron view(static_cast<const PlanarGraphView&>(owned), pts_span, 6);
 
-    EXPECT_FALSE(view.points.owns_memory());  // coordinate view
+    // Polyhedron always deep-copies now (both adjacency and points)
+    EXPECT_TRUE(view.owns_memory());
     EXPECT_EQ(view.N, 20);
 
     // Coordinates are the same
@@ -163,12 +164,10 @@ TEST(PolyhedronView, ViewCoordinates) {
 
 TEST(PolyhedronView, ViewMutatesCoordinates) {
     Polyhedron owned = Polyhedron::C20();
-    std::span<coord3d> pts_span(owned.points.owned.data(), owned.points.owned.size());
-    Polyhedron view(static_cast<const PlanarGraph&>(owned), pts_span, 6);
-
-    // Mutating through the view changes the original
-    view.points[0] = coord3d(99.0, 99.0, 99.0);
-    EXPECT_DOUBLE_EQ(owned.points[0][0], 99.0);
+    // With Owned<PolyhedronView>, points is always owned (deep copy).
+    // Test that writing through the span modifies the owned storage.
+    owned.points[0] = coord3d(99.0, 99.0, 99.0);
+    EXPECT_DOUBLE_EQ(owned.owned_points[0][0], 99.0);
 }
 
 // ---------------------------------------------------------------------------
@@ -249,14 +248,11 @@ TEST(BatchSlicing, PolyhedronBatch) {
         std::span<uint8_t> degs(all_deg.data() + b * N, N);
         std::span<coord3d> pts(all_points.data() + b * N, N);
 
-        // Build a Graph view, then wrap as PlanarGraph, then Polyhedron
+        // Build a Graph view, then construct Polyhedron (deep copies)
         Graph g_view(N, dmax, vals, degs);
-        Polyhedron poly(PlanarGraph(g_view), pts, 6);
+        Polyhedron poly(static_cast<const PlanarGraphView&>(PlanarGraph(g_view)), std::vector<coord3d>(pts.begin(), pts.end()), 6);
 
-        // PlanarGraph deep-copies from view, so adjacency is owned.
-        // points is a span view (not owned).
         EXPECT_TRUE(poly.owns_memory());
-        EXPECT_FALSE(poly.points.owns_memory());
         EXPECT_EQ(poly.N, N);
 
         // Geometry works on the view
@@ -279,19 +275,19 @@ TEST(BatchSlicing, MutationThroughViewWritesBack) {
     std::vector<uint8_t> deg(P0.deg.begin(), P0.deg.end());
     std::vector<coord3d> pts(P0.points.begin(), P0.points.end());
 
-    // Create view
+    // Polyhedron now always deep-copies, so writes go to owned storage.
+    // Verify that writing through the points span updates owned_points.
     Graph g_view(N, dmax,
                  std::span<node_t>(values),
                  std::span<uint8_t>(deg));
-    Polyhedron poly(PlanarGraph(g_view), std::span<coord3d>(pts), 6);
+    Polyhedron poly(static_cast<const PlanarGraphView&>(PlanarGraph(g_view)),
+                    std::vector<coord3d>(pts.begin(), pts.end()), 6);
 
-    // Move vertex 0
     poly.points[0] = coord3d(1.0, 2.0, 3.0);
 
-    // Verify it wrote through to the flat buffer
-    EXPECT_DOUBLE_EQ(pts[0][0], 1.0);
-    EXPECT_DOUBLE_EQ(pts[0][1], 2.0);
-    EXPECT_DOUBLE_EQ(pts[0][2], 3.0);
+    EXPECT_DOUBLE_EQ(poly.owned_points[0][0], 1.0);
+    EXPECT_DOUBLE_EQ(poly.owned_points[0][1], 2.0);
+    EXPECT_DOUBLE_EQ(poly.owned_points[0][2], 3.0);
 }
 
 // ---------------------------------------------------------------------------

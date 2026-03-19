@@ -477,8 +477,9 @@ Polyhedron Polyhedron::from_mol2(FILE *file)
   }
 
   Polyhedron P;
-  static_cast<Owned<PlanarGraphView>&>(P) = static_cast<const GraphView&>(G);
-  P.points = std::move(points);
+  static_cast<Owned<PolyhedronView>&>(P) = static_cast<const GraphView&>(G);
+  P.owned_points = std::move(points);
+  P.repoint();
   {
     vector<coord2d> layout = P.tutte_layout();
     layout2d::orient_neighbours(P, layout);

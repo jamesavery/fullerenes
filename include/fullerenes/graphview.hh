@@ -302,6 +302,9 @@ struct FullereneDualView : TriangulationView {
 // ---------------------------------------------------------------------------
 // PolyhedronView: planar graph with 3D vertex coordinates.
 // ---------------------------------------------------------------------------
+// Forward declaration for return types.
+class Polyhedron;
+
 struct PolyhedronView : PlanarGraphView {
     std::span<coord3d> points;
     static constexpr uint8_t default_dmax = 10;
@@ -318,6 +321,47 @@ struct PolyhedronView : PlanarGraphView {
                    std::span<coord3d> pts,
                    std::span<uint8_t> twin = {})
         : PlanarGraphView(N, dmax, neighbours, deg, twin), points(pts) {}
+
+    // --- Geometry queries ---
+    double surface_area() const;
+    double volume() const { return volume_divergence(); }
+    double volume_tetra() const;
+    double volume_divergence() const;
+    double diameter() const;
+    pair<coord3d,coord3d> bounding_box() const;
+    coord3d width_height_depth() const;
+    matrix3d inertia_matrix() const;
+    matrix3d principal_axes() const;
+    bool is_invalid() const;
+
+    Polyhedron incremental_convex_hull() const;
+    Polyhedron dual() const;
+    Polyhedron leapfrog_dual() const;
+
+    bool optimize(int opt_method=3, double ftol=1e-10);
+    bool optimize_other(bool optimize_angles=true, map<edge_t,double> zero_values_dist={});
+
+    vector<face_t> faces(int face_max=INT_MAX) const { return compute_faces(face_max); }
+
+    void scale(const coord3d& x) { for(node_t u=0;u<N;u++) points[u] *= x; }
+    void move(const coord3d& x) { for(node_t u=0;u<N;u++) points[u] += x; }
+    void move_to_origin() { move(-centre3d(points)); }
+    void align_with_axes() { matrix3d If(principal_axes()); for(node_t u=0;u<N;u++) points[u] = If * points[u]; }
+
+    vector<coord2d> polar_angles() const {
+        vector<coord2d> angles(N);
+        for(node_t u=0;u<N;u++) angles[u] = points[u].polar_angle();
+        return angles;
+    }
+
+    static vector<coord3d> polar_mapping(const vector<coord2d>& angles) {
+        vector<coord3d> surface(angles.size());
+        for(size_t u=0;u<surface.size();u++){
+            const double &theta = angles[u].first, &phi = angles[u].second;
+            surface[u] = coord3d(cos(theta)*sin(phi), sin(theta)*sin(phi), cos(phi));
+        }
+        return surface;
+    }
 };
 
 // ---------------------------------------------------------------------------
