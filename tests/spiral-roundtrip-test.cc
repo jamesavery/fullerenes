@@ -91,6 +91,7 @@ TEST(SpiralRoundtrip, PermutationIsomorphism) {
     Triangulation G = C28dual.GCtransform(k, l);
     int N = G.N;
 
+
     // Compute canonical spiral with permutation
     vector<int> spiral_code;
     jumplist_t jumps;

@@ -3,14 +3,14 @@
 #include "fullerenes/unfold.hh"
 #include "fullerenes/buckygen-wrapper.hh"
 
-pair<node_t,node_t> Triangulation::adjacent_tris(const arc_t& e) const
+pair<node_t,node_t> TriangulationView::adjacent_tris(const arc_t& e) const
 {
   node_t u  = e.first, v = e.second;
   node_t w1 = next_on_face(u,v), w2 = next_on_face(v,u);
   return make_pair(w1,w2);
 }
 
-vector<tri_t> Triangulation::compute_faces_oriented() const
+vector<tri_t> TriangulationView::compute_faces_oriented() const
 {
   //Why is this information stored in a hashmap seems like std::vector is perfectly suitable here.
   unordered_map<arc_t,bool> arc_done(2*count_edges());
@@ -116,7 +116,7 @@ void Triangulation::compute_lookup_tables(const PlanarGraph&            cubic_gr
 //       arc   -> arc   everywhere
 //       cubic nodes: a,b,c,...
 //       dual  nodes: u,v,w,...
-unordered_map<arc_t,arc_t> Triangulation::arc_translation() const
+unordered_map<arc_t,arc_t> TriangulationView::arc_translation() const
 {
   // TODO: Common metadata, calculate once
   IDCounter<tri_t> tri_numbers;
@@ -142,7 +142,7 @@ unordered_map<arc_t,arc_t> Triangulation::arc_translation() const
 
 
 // TODO: Factor out tri_numbers to do only once?
-PlanarGraph Triangulation::dual_graph() const
+PlanarGraph TriangulationView::dual_graph() const
 {
   IDCounter<tri_t> tri_numbers;
 
@@ -178,7 +178,7 @@ PlanarGraph Triangulation::dual_graph() const
 };
 
 
-vector<face_t> Triangulation::cubic_faces() const
+vector<face_t> TriangulationView::cubic_faces() const
 {
   vector<face_t> dfaces(N);
 
@@ -309,7 +309,7 @@ private:
 // Windup: construct an oriented triangulation from a face-degree sequence.
 // Mirrors Haskell reference: windupGeneralSpiral spiral jumps = init2 >> foldl' stepK >> closeLast
 Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t& j, const bool best_effort):
-  PlanarGraph(spiral_string.size())
+  base_t(int(spiral_string.size()))
 {
   jumplist_t jumps = j;
 
@@ -371,7 +371,7 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
 }
 
 
-Triangulation Triangulation::GCtransform(unsigned k, unsigned l) const
+Triangulation TriangulationView::GCtransform(unsigned k, unsigned l) const
 {
   if(l==0) return halma_transform(k-1);
 
@@ -382,7 +382,7 @@ Triangulation Triangulation::GCtransform(unsigned k, unsigned l) const
    return t;
 }
 
-Triangulation Triangulation::halma_transform(int m, vector<map<edge_t,node_t>>* face_grids) const {
+Triangulation TriangulationView::halma_transform(int m, vector<map<edge_t,node_t>>* face_grids) const {
   if(m<0) return Triangulation(*this);
 
   map<arc_t,vector<node_t>> arc_nodes;
@@ -486,7 +486,7 @@ Triangulation Triangulation::halma_transform(int m, vector<map<edge_t,node_t>>* 
 // *********************************************************************
 
 
-bool Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3,
+bool TriangulationView::get_spiral(const node_t f1, const node_t f2, const node_t f3,
                                vector<int> &spiral, jumplist_t& jumps, vector<node_t>& permutation,
                                const bool general) const {
   return get_spiral_implementation(f1,f2,f3,spiral,jumps,permutation,general);
@@ -501,12 +501,12 @@ bool Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3
 // effectively deleting all edges incident to v. The last remaining
 // neighbour is cached in last_nbr for the terminal validation step.
 struct RemainingGraph {
-  const Triangulation& tri;
+  const TriangulationView& tri;
   vector<uint16_t> active;
   int count;
   node_t last_nbr = -1;
 
-  explicit RemainingGraph(const Triangulation& t)
+  explicit RemainingGraph(const TriangulationView& t)
     : tri(t), count(t.N), active(t.N)
   {
     assert(t.max_degree() <= 16);
@@ -578,7 +578,7 @@ struct SpiralState {
   int jump_count = 0;
   int step = 3;
 
-  SpiralState(const Triangulation& t, node_t f1, node_t f2, node_t f3,
+  SpiralState(const TriangulationView& t, node_t f1, node_t f2, node_t f3,
               jumplist_t& jumps_out)
     : R(t)
     , buf(3 * (int)ceil(sqrt(t.N)) + 12)
@@ -656,7 +656,7 @@ private:
 
 // Extract a (general) spiral from a starting triple.  Mirrors the Haskell
 // decomposition: orient → init3 → fold peel → validateTerminal.
-bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, const node_t f3, vector<int> &spiral,
+bool TriangulationView::get_spiral_implementation(const node_t f1, const node_t f2, const node_t f3, vector<int> &spiral,
                                               jumplist_t& jumps, vector<node_t> &permutation,
                                               const bool general, const vector<int>& S0, const jumplist_t &J0) const {
   spiral.assign(N, 0);  permutation.assign(N, 0);  jumps.clear();
@@ -692,7 +692,7 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
   return true;
 }
 
-void Triangulation::get_all_spirals(vector<vector<int>>& spirals, vector<jumplist_t>& jumps,
+void TriangulationView::get_all_spirals(vector<vector<int>>& spirals, vector<jumplist_t>& jumps,
                      vector<vector<node_t>>& permutations,
                      const bool only_special, const bool general) const
 {
@@ -728,14 +728,14 @@ void Triangulation::get_all_spirals(vector<vector<int>>& spirals, vector<jumplis
 }
 
 
-bool Triangulation::get_spiral(vector<int>& spiral, jumplist_t& jumps, const bool only_rarest_special, const bool general, const bool CW_only) const
+bool TriangulationView::get_spiral(vector<int>& spiral, jumplist_t& jumps, const bool only_rarest_special, const bool general, const bool CW_only) const
 {
   vector<vector<node_t>> permutations;
   bool success = get_spiral(spiral,jumps,permutations,only_rarest_special,general,CW_only);
   return success;
 }
 
-general_spiral Triangulation::get_general_spiral(const bool only_rarest_special, const bool CW_only) const
+general_spiral TriangulationView::get_general_spiral(const bool only_rarest_special, const bool CW_only) const
 {
   general_spiral gs;
   bool success = get_spiral(gs.spiral_code,gs.jumps,only_rarest_special,true,CW_only);
@@ -746,7 +746,7 @@ general_spiral Triangulation::get_general_spiral(const bool only_rarest_special,
 // Canonical spiral search: find the lexicographically smallest (general) spiral.
 // Mirrors Haskell: canonicalGeneralSpiral g = tryRegular triples <|> tryGeneral triples
 //   where triples = startingTriples g
-bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, vector<vector<node_t>>& permutations, const bool only_rarest_special, const bool general, const bool CW_only) const
+bool TriangulationView::get_spiral(vector<int> &spiral, jumplist_t &jumps, vector<vector<node_t>>& permutations, const bool only_rarest_special, const bool general, const bool CW_only) const
 {
   permutations.clear();
 
@@ -815,7 +815,7 @@ bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, vector<ve
 }
 
 
-void Triangulation::symmetry_information(int N_generators, Graph& coxeter_diagram, vector<int>& coxeter_labels) const
+void TriangulationView::symmetry_information(int N_generators, Graph& coxeter_diagram, vector<int>& coxeter_labels) const
 {
   vector<vector<int>> spirals;
   vector<vector<node_t>> permutations;
@@ -875,7 +875,7 @@ vector<int> draw_path(int major, int minor)
 // Assumes a,b >= 1.
 // TODO: Add special cases for (a,0) and (b,0) to make more general.
 // TODO: Better name.
-node_t Triangulation::end_of_the_line(node_t u0, int i, int a, int b) const
+node_t TriangulationView::end_of_the_line(node_t u0, int i, int a, int b) const
 {
   node_t q,r,s,t;                // Current square
 
@@ -942,7 +942,7 @@ node_t Triangulation::end_of_the_line(node_t u0, int i, int a, int b) const
 //   s---t
 //  / \ /
 // q---r
-vector<vector<node_t>> Triangulation::quads_of_the_line(node_t u0, int i, int a, int b) const
+vector<vector<node_t>> TriangulationView::quads_of_the_line(node_t u0, int i, int a, int b) const
 {
   node_t q,r,s,t;                // Current square
 
@@ -1004,7 +1004,7 @@ vector<vector<node_t>> Triangulation::quads_of_the_line(node_t u0, int i, int a,
   return quad_runs;                        // End node is upper right corner.
 }
 
-matrix<int> Triangulation::pentagon_distance_mtx() const {
+matrix<int> TriangulationView::pentagon_distance_mtx() const {
   vector<int> pentagon_indices(12);
   for(int u=0, i=0;u<N;u++) if(degree(u) == 5) pentagon_indices[i++] = u;
   return all_pairs_shortest_paths(pentagon_indices);
@@ -1012,8 +1012,8 @@ matrix<int> Triangulation::pentagon_distance_mtx() const {
 
 
 // TODO: Do we need to do Dijkstra on sqrt(H) after all?
-matrix<Triangulation::simple_geodesic>
-Triangulation::simple_geodesics(vector<node_t> nodes,
+matrix<TriangulationView::simple_geodesic>
+TriangulationView::simple_geodesics(vector<node_t> nodes,
 				bool calculate_self_geodesics) const
 {
   if(nodes.empty()){
@@ -1074,7 +1074,7 @@ Triangulation::simple_geodesics(vector<node_t> nodes,
   return G;
 }
 
-matrix<int> Triangulation::simple_square_surface_distances(vector<node_t> nodes,
+matrix<int> TriangulationView::simple_square_surface_distances(vector<node_t> nodes,
 							   bool calculate_self_geodesics) const
 {
   if(nodes.empty()){ nodes.resize(N); for(int i=0;i<N;i++) nodes[i] = i;  } // If no node list is given, calculate all distances
@@ -1136,7 +1136,7 @@ matrix<int> Triangulation::simple_square_surface_distances(vector<node_t> nodes,
 
 
 
-matrix<double> Triangulation::surface_distances(vector<node_t> nodes,
+matrix<double> TriangulationView::surface_distances(vector<node_t> nodes,
 						bool calculate_self_geodesics) const
 {
   matrix<double> H(simple_square_surface_distances(nodes,calculate_self_geodesics));
@@ -1152,7 +1152,7 @@ matrix<double> Triangulation::surface_distances(vector<node_t> nodes,
   // else return H;
 }
 
-Triangulation Triangulation::sort_nodes() const
+Triangulation TriangulationView::sort_nodes() const
 {
   vector< pair<int,int> > degrees(N);
 
@@ -1177,7 +1177,7 @@ Triangulation Triangulation::sort_nodes() const
   return Triangulation(new_neighbours);
 }
 
-spiral_nomenclature FullereneDual::name(bool rarest_start) const
+spiral_nomenclature FullereneDualView::name(bool rarest_start) const
 {
   return spiral_nomenclature(dual_graph(), spiral_nomenclature::FULLERENE,
 			     spiral_nomenclature::CUBIC,
@@ -1185,7 +1185,7 @@ spiral_nomenclature FullereneDual::name(bool rarest_start) const
 }
 
 // call for one general spiral and extract the pentagon indices
-bool FullereneDual::get_rspi(const node_t f1, const node_t f2, const node_t f3, vector<int>& rspi, jumplist_t& jumps, const bool general) const
+bool FullereneDualView::get_rspi(const node_t f1, const node_t f2, const node_t f3, vector<int>& rspi, jumplist_t& jumps, const bool general) const
 {
   rspi.resize(12);
   jumps.clear();
@@ -1201,7 +1201,7 @@ bool FullereneDual::get_rspi(const node_t f1, const node_t f2, const node_t f3, 
 }
 
 // call for the canonical general spiral and extract the pentagon indices
-bool FullereneDual::get_rspi(vector<int>& rspi, jumplist_t& jumps, const bool general, const bool pentagon_start) const
+bool FullereneDualView::get_rspi(vector<int>& rspi, jumplist_t& jumps, const bool general, const bool pentagon_start) const
 {
   rspi.resize(12);
   jumps.clear();
@@ -1215,7 +1215,7 @@ bool FullereneDual::get_rspi(vector<int>& rspi, jumplist_t& jumps, const bool ge
   return true;
 }
 
-general_spiral FullereneDual::get_rspi(const bool rarest_start) const
+general_spiral FullereneDualView::get_rspi(const bool rarest_start) const
 {
   general_spiral S;
   get_rspi(S.spiral_code,S.jumps,true,rarest_start);
@@ -1225,7 +1225,7 @@ general_spiral FullereneDual::get_rspi(const bool rarest_start) const
 // permutation of vertex numbers (ie, replace v by vertex_numbers[v], to get numbered vertices)
 // where permutations are as returned by T.get_spiral(J,S,perm)
 // locants are vertices that should have small vertex numbers (as far as permitted by symmetry equivalent canonical spirals)
-vector<node_t> Triangulation::vertex_numbers(vector<vector<node_t>> &permutations, const vector<node_t> &locants) const{
+vector<node_t> TriangulationView::vertex_numbers(vector<vector<node_t>> &permutations, const vector<node_t> &locants) const{
   assert(is_triangulation());
   vector<node_t> vertex_numbers(N);
   vector<node_t> vertex_numbers_inv(N,INT_MAX);
@@ -1256,7 +1256,7 @@ vector<node_t> Triangulation::vertex_numbers(vector<vector<node_t>> &permutation
 // takes a triangulation, and returns a dual of the inverse leapfrog
 // this is easy because we just remove a set of faces
 // the resulting planar graph is oriented because the input is oriented und we only remove vertices
-PlanarGraph Triangulation::inverse_leapfrog_dual() const
+PlanarGraph TriangulationView::inverse_leapfrog_dual() const
 {
   assert(is_consistently_oriented());
   PlanarGraph PG(*this);

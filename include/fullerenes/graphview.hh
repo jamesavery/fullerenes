@@ -26,6 +26,7 @@
 // Type aliases (Graph = Owned<GraphView>, etc.) are deferred until
 // the old class hierarchy is fully replaced. During migration, the
 // old classes inherit from these views.
+struct Graph;
 
 // ---------------------------------------------------------------------------
 // GraphView: general undirected/directed graph with adjacency lists.
@@ -205,6 +206,80 @@ struct FullereneGraphView : CubicGraphView {
 struct TriangulationView : PlanarGraphView {
     using PlanarGraphView::PlanarGraphView;
     static constexpr uint8_t default_dmax = 6;
+
+    // --- Nested types ---
+    struct simple_geodesic {
+        Eisenstein g;
+        int axis;
+        simple_geodesic(int a, int b=0, int axis=0) : g(a,b), axis(axis) {}
+    };
+
+    struct geodesic {
+        vector<Eisenstein> g;
+        double d;
+        int axis;
+    };
+
+    // --- Triangulation methods ---
+    PlanarGraph dual_graph() const;
+    vector<face_t> cubic_faces() const;
+    unordered_map<arc_t,arc_t> arc_translation() const;
+
+    size_t max_degree() const {
+        size_t max_deg = 0;
+        for (node_t u=0; u<N; u++) max_deg = std::max(max_deg, (size_t)degree(u));
+        return max_deg;
+    }
+
+    vector<uint8_t> n_degrees() const {
+        vector<uint8_t> nd(max_degree(),0);
+        for (node_t u=0; u<N; u++) nd[degree(u)-1]++;
+        return nd;
+    }
+
+    PlanarGraph inverse_leapfrog_dual() const;
+    pair<node_t,node_t> adjacent_tris(const arc_t& e) const;
+    vector<tri_t> compute_faces_oriented() const;
+
+    Triangulation GCtransform(unsigned k=1, unsigned l=0) const;
+    Triangulation halma_transform(int m, vector<map<edge_t,node_t>>* face_grids = nullptr) const;
+
+    // --- Spiral methods ---
+    bool get_spiral_implementation(node_t f1, node_t f2, node_t f3,
+                                   vector<int>& v, jumplist_t& j,
+                                   vector<node_t>& permutation, bool general=true,
+                                   const vector<int>& S0=vector<int>(),
+                                   const jumplist_t& J0=jumplist_t()) const;
+    bool get_spiral(node_t f1, node_t f2, node_t f3,
+                    vector<int>& v, jumplist_t& j,
+                    vector<node_t>& permutation, bool general=true) const;
+    bool get_spiral(vector<int>& v, jumplist_t& j,
+                    vector<vector<node_t>>& permutations,
+                    bool only_rarest_special=true, bool general=true, bool CW_only=false) const;
+    bool get_spiral(vector<int>& v, jumplist_t& j,
+                    bool rarest_start=true, bool general=true, bool CW_only=false) const;
+    general_spiral get_general_spiral(bool rarest_start=true, bool CW_only=false) const;
+    void get_all_spirals(vector<vector<int>>& spirals, vector<jumplist_t>& jumps,
+                         vector<vector<node_t>>& permutations,
+                         bool only_special=false, bool general=false) const;
+
+    void symmetry_information(int N_generators, Graph& coxeter_diagram, vector<int>& coxeter_labels) const;
+    vector<node_t> vertex_numbers(vector<vector<node_t>>& perms, const vector<node_t>& loc) const;
+
+    vector<tri_t> triangles() const { return compute_faces_oriented(); }
+    int n_triangles() const { return 2*N - 4; }
+
+    // --- Geodesic methods ---
+    matrix<int> pentagon_distance_mtx() const;
+    matrix<int> simple_square_surface_distances(vector<node_t> only_nodes={}, bool calculate_self_geodesics=false) const;
+    matrix<double> surface_distances(vector<node_t> only_nodes={}, bool calculate_self_geodesics=false) const;
+    matrix<geodesic> surface_geodesics(vector<node_t> only_nodes={}, bool calculate_self_geodesics=false) const;
+    matrix<simple_geodesic> simple_geodesics(vector<node_t> only_nodes={}, bool calculate_self_geodesics=false) const;
+
+    node_t end_of_the_line(node_t u0, int i, int a, int b) const;
+    vector<vector<node_t>> quads_of_the_line(node_t u0, int i, int a, int b) const;
+
+    Triangulation sort_nodes() const;
 };
 
 // ---------------------------------------------------------------------------
@@ -214,6 +289,14 @@ struct TriangulationView : PlanarGraphView {
 struct FullereneDualView : TriangulationView {
     using TriangulationView::TriangulationView;
     static constexpr uint8_t default_dmax = 6;
+
+    bool get_rspi(node_t f1, node_t f2, node_t f3,
+                  vector<int>& r, jumplist_t& j, bool general=true) const;
+    bool get_rspi(vector<int>& r, jumplist_t& j,
+                  bool general=true, bool pentagon_start=true) const;
+    general_spiral get_rspi(bool rarest_start=true) const;
+
+    spiral_nomenclature name(bool rarest_start=true) const;
 };
 
 // ---------------------------------------------------------------------------
