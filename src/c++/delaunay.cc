@@ -1079,20 +1079,20 @@ void DelaunayTriangulation::remove_flat_vertex(int v)
         int jm = (j - 1 + n) % n, jp = (j + 1) % n;
         int pp = poly[jm], pi = poly[j], pn = poly[jp];
 
-        if (nb[pp] == nb[pn]) continue;
-
-        // Multi-edge check via vertex circulation.
-        bool edge_exists = false;
-        { int h0 = v_out[nb[pp]], hc = h0;
-          if (h0 >= 0) do {
-            if (dest(hc) == nb[pn]) { edge_exists = true; break; }
-            hc = cw(hc);
-          } while (hc != h0); }
-        for (auto& d : diagonals)
-          if ((nb[d.prev_idx] == nb[pp] && nb[d.next_idx] == nb[pn]) ||
-              (nb[d.prev_idx] == nb[pn] && nb[d.next_idx] == nb[pp]))
-            { edge_exists = true; break; }
-        if (edge_exists) continue;
+        // Multi-edge check (non-self-loop only).
+        if (nb[pp] != nb[pn]) {
+          bool edge_exists = false;
+          { int h0 = v_out[nb[pp]], hc = h0;
+            if (h0 >= 0) do {
+              if (dest(hc) == nb[pn]) { edge_exists = true; break; }
+              hc = cw(hc);
+            } while (hc != h0); }
+          for (auto& d : diagonals)
+            if ((nb[d.prev_idx] == nb[pp] && nb[d.next_idx] == nb[pn]) ||
+                (nb[d.prev_idx] == nb[pn] && nb[d.next_idx] == nb[pp]))
+              { edge_exists = true; break; }
+          if (edge_exists) continue;
+        }
 
         if (ear_signed_area(pp, pi, pn) <= 1e-10) continue;
 
@@ -1220,6 +1220,28 @@ void DelaunayTriangulation::remove_flat_vertex(int v)
       local_arc[{d.prev_idx, d.next_idx}] = h_d;
       local_arc[{d.next_idx, d.prev_idx}] = h_d ^ 1;
       edge_len_map[{d.prev_idx, d.next_idx}] = edge_len_map[{d.next_idx, d.prev_idx}] = d.len;
+    }
+
+    // Create missing edges for the base triangle.  When self-loop diagonals
+    // cause non-adjacent fan positions to become adjacent in the final 3-gon,
+    // edges that span multiple removed positions are needed.
+    {
+      auto& base = tris.back();
+      int bv[3] = {base.v0, base.v1, base.v2};
+      for (int e = 0; e < 3; e++) {
+        int from = bv[e], to = bv[(e+1)%3];
+        if (local_arc.find({from, to}) == local_arc.end()) {
+          double len = diag_len(from, to);
+          int h_d = alloc_edge();
+          he_origin[h_d] = nb[from];
+          he_origin[h_d ^ 1] = nb[to];
+          he_length[h_d] = len;
+          he_length[h_d ^ 1] = len;
+          local_arc[{from, to}] = h_d;
+          local_arc[{to, from}] = h_d ^ 1;
+          edge_len_map[{from, to}] = edge_len_map[{to, from}] = len;
+        }
+      }
     }
 
     // Compute per-triangle origin assignment via per-sector local unfolding
@@ -1406,11 +1428,18 @@ void DelaunayTriangulation::remove_flat_vertex(int v)
     }
 
     // Fix v_out for neighbors: ensure they point to live outgoing half-edges.
+    // Prefer non-self-loop half-edges.
     for (int i = 0; i < k; i++) {
       int u = nb[i];
       if (v_out[u] < 0 || !alive(v_out[u]) || he_origin[v_out[u]] != u) {
-        for (auto& [arc, hid] : local_arc)
-          if (nb[arc.first] == u && alive(hid)) { v_out[u] = hid; break; }
+        int fallback = -1;
+        for (auto& [arc, hid] : local_arc) {
+          if (nb[arc.first] == u && alive(hid)) {
+            if (dest(hid) != u) { v_out[u] = hid; fallback = -1; break; }
+            if (fallback < 0) fallback = hid;
+          }
+        }
+        if (fallback >= 0) v_out[u] = fallback;
       }
     }
 
@@ -1582,73 +1611,221 @@ static int find_half_edge(const DelaunayTriangulation& D, int u, int v) {
   return -1;
 }
 
+// Insert a Steiner vertex at the center of a co-circular quad, splitting its
+// 2 triangles into 4.  The new vertex has zero curvature (flat).
+// h_diag: half-edge of the current diagonal of the quad.
+// Returns the index of the new vertex.
+static int insert_steiner_at_quad(DelaunayTriangulation& D, int h_diag) {
+  // The diamond around h_diag:
+  //      B
+  //     / \        upper face: h_diag(u->v), h1(v->B), h2(B->u)
+  //    /   \       lower face: h_twin(v->u), h4(u->D), h5(D->v)
+  //   u-----v
+  //    \   /
+  //     \ /
+  //      D
+  int h = h_diag, t = h ^ 1;
+  int u = D.he_origin[h], v = D.dest(h);
+  int h1 = D.he_next[h], h2 = D.he_next[h1];
+  int h4 = D.he_next[t], h5 = D.he_next[h4];
+  int B = D.he_origin[h2];  // = dest(h1)
+  int Dv = D.he_origin[h5]; // = dest(h4)
+
+  // Edge lengths of the quad.
+  double uB = D.he_length[h2], Bv = D.he_length[h1];
+  double vD = D.he_length[h5], Du = D.he_length[h4];
+  double uv = D.he_length[h];  // current diagonal
+
+  // Compute the alternative diagonal length (B-D).
+  // For a co-circular quad: use the law of cosines on the two triangles.
+  // In triangle (u,v,B): angle at B
+  double cos_B = (uB*uB + Bv*Bv - uv*uv) / (2*uB*Bv);
+  // In triangle (u,v,D): angle at D
+  double cos_D = (Du*Du + vD*vD - uv*uv) / (2*Du*vD);
+  // For co-circular: angle_B + angle_D = pi, so cos_D = -cos_B (verified by cot-sum=0).
+  // Diagonal BD via triangle (B,u,D): angle at u = angle_Bux + angle_xuD
+  // Simpler: use the 2D unfolding.
+  // Place u at origin, v along x-axis.
+  double ux = 0, uy = 0, vx = uv, vy = 0;
+  double ang_uB = acos(clamp((uv*uv + uB*uB - Bv*Bv)/(2*uv*uB), -1.0, 1.0));
+  double Bx = uB * cos(ang_uB), By = uB * sin(ang_uB);
+  double ang_uD = acos(clamp((uv*uv + Du*Du - vD*vD)/(2*uv*Du), -1.0, 1.0));
+  double Dx = Du * cos(-ang_uD), Dy = Du * sin(-ang_uD);  // below the u-v line
+
+  // Intersection of diagonals u-v and B-D.
+  // Line u-v: parametric (t*vx, 0) for t in [0,1].
+  // Line B-D: parametric B + s*(D-B) for s in [0,1].
+  // Solve: t*vx = Bx + s*(Dx-Bx), 0 = By + s*(Dy-By).
+  double s = -By / (Dy - By);
+  double cx = Bx + s * (Dx - Bx);
+  double cy = By + s * (Dy - By);
+
+  // Distances from center to quad vertices.
+  double cu = sqrt(cx*cx + cy*cy);
+  double cv = sqrt((cx-vx)*(cx-vx) + cy*cy);
+  double cB = sqrt((cx-Bx)*(cx-Bx) + (cy-By)*(cy-By));
+  double cD = sqrt((cx-Dx)*(cx-Dx) + (cy-Dy)*(cy-Dy));
+
+  // Allocate the new Steiner vertex.
+  int sv = D.nv++;
+  if (sv >= (int)D.v_out.size()) {
+    D.v_out.push_back(-1);
+    D.v_cone_angle.push_back(2.0 * M_PI);  // flat (zero curvature)
+    D.v_orig_degree.push_back(4);  // degree 4 in the new triangulation
+  } else {
+    D.v_out[sv] = -1;
+    D.v_cone_angle[sv] = 2.0 * M_PI;
+    D.v_orig_degree[sv] = 4;
+  }
+
+  // Delete the diagonal edge and both faces.
+  int fu = D.he_face[h], fl = D.he_face[t];
+  D.dealloc_face(fu);
+  D.dealloc_face(fl);
+  D.dealloc_edge(h);
+
+  // Create 4 new spoke edges: sv-u, sv-v, sv-B, sv-D.
+  int su = D.alloc_edge();  // su: sv->u, su^1: u->sv
+  int svv = D.alloc_edge(); // svv: sv->v, svv^1: v->sv
+  int sB = D.alloc_edge();  // sB: sv->B, sB^1: B->sv
+  int sD = D.alloc_edge();  // sD: sv->D, sD^1: D->sv
+
+  D.he_origin[su] = sv;  D.he_origin[su^1] = u;
+  D.he_origin[svv] = sv; D.he_origin[svv^1] = v;
+  D.he_origin[sB] = sv;  D.he_origin[sB^1] = B;
+  D.he_origin[sD] = sv;  D.he_origin[sD^1] = Dv;
+
+  D.he_length[su] = D.he_length[su^1] = cu;
+  D.he_length[svv] = D.he_length[svv^1] = cv;
+  D.he_length[sB] = D.he_length[sB^1] = cB;
+  D.he_length[sD] = D.he_length[sD^1] = cD;
+
+  D.v_out[sv] = su;
+
+  // Create 4 faces using the INNER rim half-edges (orphaned from deleted faces).
+  // Inner rim directions: h2(B->u), h1(v->B), h5(D->v), h4(u->D).
+  // Faces (CCW, matching inner rim direction):
+  //   Face A: (sv, B, u) — arcs sB(sv->B), h2(B->u), su^1(u->sv)
+  //   Face B: (sv, v, B) — arcs svv(sv->v), h1(v->B), sB^1(B->sv)
+  //   Face C: (sv, D, v) — arcs sD(sv->D), h5(D->v), svv^1(v->sv)
+  //   Face D: (sv, u, D) — arcs su(sv->u), h4(u->D), sD^1(D->sv)
+  auto make_face = [&](int a, int b, int c, double La, double Lb, double Lc) {
+    int fid = D.alloc_face();
+    D.he_next[a] = b; D.he_next[b] = c; D.he_next[c] = a;
+    D.he_face[a] = D.he_face[b] = D.he_face[c] = fid;
+    D.f_he[fid] = a;
+    auto ang = [](double s1, double s2, double opp) {
+      return acos(clamp((s1*s1+s2*s2-opp*opp)/(2*s1*s2), -1.0, 1.0));
+    };
+    D.he_angle[a] = ang(Lc, La, Lb);  // angle at origin(a)
+    D.he_angle[b] = ang(La, Lb, Lc);  // angle at origin(b)
+    D.he_angle[c] = ang(Lb, Lc, La);  // angle at origin(c)
+  };
+
+  make_face(sB, h2, su^1,  cB, uB, cu);   // Face A: sv->B->u->sv
+  make_face(svv, h1, sB^1,  cv, Bv, cB);   // Face B: sv->v->B->sv
+  make_face(sD, h5, svv^1,  cD, vD, cv);   // Face C: sv->D->v->sv
+  make_face(su, h4, sD^1,  cu, Du, cD);   // Face D: sv->u->D->sv
+
+  // Fix v_out for quad vertices if they pointed to the deleted diagonal.
+  if (D.v_out[u] == h) D.v_out[u] = su ^ 1;   // u->sv
+  if (D.v_out[v] == t) D.v_out[v] = svv ^ 1;  // v->sv
+  // B and Dv's v_out can't point to the diagonal (they're not endpoints of it).
+
+  return sv;
+}
+
+// Compute cot-sum for an edge.
+static double edge_cot_sum(const DelaunayTriangulation& D, int h) {
+  Diamond dm = D.diamond(h);
+  auto cot_opp = [](double e, double a, double b) {
+    double cos_C = (a*a + b*b - e*e) / (2*a*b);
+    double sin_C = sqrt(max(0.0, 1.0 - cos_C*cos_C));
+    return sin_C > 1e-15 ? cos_C / sin_C : 1e15;
+  };
+  return cot_opp(dm.e, dm.a, dm.b) + cot_opp(dm.e, dm.c, dm.d);
+}
+
 DelaunayTriangulation DelaunayTriangulation::compute_symmetric(
     const Triangulation& T, const Symmetry& S)
 {
-  // Step 1: Standard non-symmetric iDT (valid topology, possibly wrong lengths).
+  // Symmetric iDT via Steiner vertex insertion at self-dual co-circular quads.
+  //
+  // 1. Compute non-symmetric iDT, correct edge lengths to geodesic distances.
+  // 2. Identify self-dual co-circular edge orbits (quads with strictly Delaunay
+  //    rims where neither diagonal choice is G-invariant).
+  // 3. Insert a Steiner vertex at each quad center, splitting 2 triangles -> 4.
+  //    The Steiner vertices are flat (zero curvature) and related by the group
+  //    action, so the result is G-invariant by construction.
+
+  // Step 1: Non-symmetric iDT with geodesic distances.
   DelaunayTriangulation D = compute(T);
   if (D.nv != 12) return D;
 
   vector<vector<int>> G_full(S.G.begin(), S.G.end());
   auto cone_perms = restrict_to_cone_points(G_full, T);
-  if (cone_perms.empty() || D.check_edge_symmetry(cone_perms) == 0)
-    return D;
+  if (cone_perms.empty()) return D;
 
-  // Step 2: Replace edge lengths with true geodesic distances (G-invariant).
+  // Correct edge lengths.
   vector<int> cone_pts;
   for (int v = 0; v < T.N; v++)
     if (T.degree(v) != 6) cone_pts.push_back(v);
   auto dist2 = T.surface_distances(cone_pts);
-
   for (int h = 0; h < D.nh; h += 2) {
     if (!D.alive(h)) continue;
-    int u = D.he_origin[h], v = D.dest(h);
-    double L = sqrt(dist2(u, v));
-    D.he_length[h] = D.he_length[h ^ 1] = L;
+    D.he_length[h] = D.he_length[h^1] = sqrt(dist2(D.he_origin[h], D.dest(h)));
   }
   D.recompute_all_angles();
-
-  // Step 3: Flip to Delaunay with corrected distances.
   D.flip_to_delaunay();
 
-  // Step 4: Flip co-circular edges to restore G-invariance.
-  // With G-invariant distances, violating edges must be co-circular (cot-sum=0).
-  // Collect ALL violating diagonals and flip them simultaneously.
-  for (int pass = 0; pass < 20; pass++) {
-    set<pair<int,int>> edge_set;
-    for (int h = 0; h < D.nh; h += 2) {
-      if (!D.alive(h)) continue;
-      edge_set.insert({min(D.he_origin[h], D.dest(h)),
-                        max(D.he_origin[h], D.dest(h))});
+  if (D.check_edge_symmetry(cone_perms) == 0) return D;
+
+  // Step 2: Find self-dual co-circular quads.
+  // A co-circular edge is in a self-dual orbit if its orbit image is not present.
+  set<pair<int,int>> edge_set;
+  for (int h = 0; h < D.nh; h += 2)
+    if (D.alive(h))
+      edge_set.insert({min(D.he_origin[h],D.dest(h)), max(D.he_origin[h],D.dest(h))});
+
+  // Collect co-circular diagonal half-edges that have missing orbit images.
+  // Deduplicate by edge ID (each quad has one diagonal).
+  set<int> quads_to_split;  // edge IDs of co-circular diagonals to split
+  for (auto& perm : cone_perms)
+    for (auto& e : edge_set) {
+      auto pe = make_pair(min(perm[e.first],perm[e.second]),
+                          max(perm[e.first],perm[e.second]));
+      if (edge_set.count(pe)) continue;
+      // e is present but pe is missing -> e is in a self-dual orbit.
+      // Find the half-edge for e and check it's co-circular.
+      for (int h = 0; h < D.nh; h += 2) {
+        if (!D.alive(h)) continue;
+        int u = D.he_origin[h], v = D.dest(h);
+        if (make_pair(min(u,v),max(u,v)) == e) {
+          if (fabs(edge_cot_sum(D, h)) < 1e-8)
+            quads_to_split.insert(h >> 1);
+          break;
+        }
+      }
     }
 
-    set<int> to_flip;
-    for (auto& perm : cone_perms)
-      for (auto& e : edge_set) {
-        auto pe = make_pair(min(perm[e.first],perm[e.second]),
-                            max(perm[e.first],perm[e.second]));
-        if (edge_set.count(pe)) continue;
-        // Find current diagonal of the quad for the missing edge.
-        if (D.v_out[pe.first] < 0) continue;
-        vector<int> common;
-        int h0 = D.v_out[pe.first], h = h0;
-        do {
-          if (find_half_edge(D, D.dest(h), pe.second) >= 0)
-            common.push_back(D.dest(h));
-          h = D.cw(h);
-        } while (h != h0);
-        if (common.size() != 2) continue;
-        int dh = find_half_edge(D, common[0], common[1]);
-        if (dh >= 0 && D.diamond(dh).is_convex())
-          to_flip.insert(D.edge(dh) * 2);
-      }
+  if (quads_to_split.empty()) return D;
 
-    if (to_flip.empty()) break;
-    int nf = 0;
-    for (int h : to_flip) if (D.alive(h)) { D.flip_edge(h); nf++; }
-    int v = D.check_edge_symmetry(cone_perms);
-    fprintf(stderr, "  pass %d: flipped %d, violations %d\n", pass, nf, v);
-    if (v == 0) break;
+  // Step 3: Insert Steiner vertices at quad centers.
+  int n_inserted = 0;
+  for (int eid : quads_to_split) {
+    int h = eid * 2;
+    if (!D.alive(h)) continue;
+    insert_steiner_at_quad(D, h);
+    n_inserted++;
+  }
+
+  // Extend cone_perms to cover the new Steiner vertices.
+  // The Steiner vertices are in 1-to-1 correspondence with the quads,
+  // and the quads form an orbit under the group action.
+  // For now, just verify consistency.
+  if (!D.check_consistency()) {
+    fprintf(stderr, "  WARNING: DCEL inconsistent after %d Steiner insertions\n", n_inserted);
+    return compute(T);  // fallback
   }
 
   return D;

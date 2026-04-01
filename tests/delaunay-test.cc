@@ -2646,3 +2646,196 @@ TEST(DCELSymEmbed, C60_AllIsomers) {
   std::cout << "  sym:    " << n_poor_sym << " with >1% error, worst="
             << worst_sym   << " at #" << worst_idx_sym << std::endl;
 }
+
+TEST(SymmetricIDT, D2h_348_CotSumAnalysis) {
+  // Analyze ALL edges' cot-sums to determine which are co-circular.
+  // If the rim edges of the self-dual quads are co-circular, the quads
+  // might not exist in a different Delaunay triangulation, and the
+  // "topological obstruction" would be wrong.
+  Triangulation T = make_buckygen_dual(60, 348);
+  Symmetry S(T);
+
+  // Compute iDT with correct geodesic distances.
+  auto D = DelaunayTriangulation::compute(T);
+  ASSERT_EQ(D.nv, 12);
+
+  // Replace edge lengths with geodesic distances.
+  vector<int> cone_pts;
+  for (int v = 0; v < T.N; v++)
+    if (T.degree(v) != 6) cone_pts.push_back(v);
+  auto dist2 = T.surface_distances(cone_pts);
+  for (int h = 0; h < D.nh; h += 2) {
+    if (!D.alive(h)) continue;
+    D.he_length[h] = D.he_length[h^1] = sqrt(dist2(D.he_origin[h], D.dest(h)));
+  }
+  D.recompute_all_angles();
+  D.flip_to_delaunay();
+
+  // Compute cot-sum for each edge via the Diamond's side lengths.
+  auto cot_opp = [](double e, double a, double b) {
+    // cot of the angle opposite edge e in triangle with sides (e, a, b)
+    double cos_C = (a*a + b*b - e*e) / (2*a*b);
+    double sin_C = sqrt(std::max(0.0, 1.0 - cos_C*cos_C));
+    return sin_C > 1e-15 ? cos_C / sin_C : 1e15;
+  };
+
+  // Print cot-sum for ALL 30 edges.
+  int n_cocircular = 0, n_strict = 0;
+  std::cout << "  Edge cot-sums (after geodesic correction):" << std::endl;
+  for (int h = 0; h < D.nh; h += 2) {
+    if (!D.alive(h)) continue;
+    Diamond dm = D.diamond(h);
+    double cs = cot_opp(dm.e, dm.a, dm.b) + cot_opp(dm.e, dm.c, dm.d);
+    int u = D.he_origin[h], v = D.dest(h);
+    bool cocircular = fabs(cs) < 1e-8;
+    if (cocircular) n_cocircular++; else n_strict++;
+    std::cout << "    (" << u << "," << v << "): L=" << dm.e
+              << " cot_sum=" << cs << (cocircular ? " CO-CIRCULAR" : "") << std::endl;
+  }
+  std::cout << "  Total: " << n_strict << " strictly Delaunay, "
+            << n_cocircular << " co-circular" << std::endl;
+
+  // Now identify the self-dual orbit's quads and check their rim edges.
+  auto cone_perms = restrict_to_cone_points(
+      vector<vector<int>>(S.G.begin(), S.G.end()), T);
+  set<pair<int,int>> edge_set;
+  for (int h = 0; h < D.nh; h += 2)
+    if (D.alive(h))
+      edge_set.insert({min(D.he_origin[h],D.dest(h)), max(D.he_origin[h],D.dest(h))});
+
+  std::cout << "  Self-dual orbit quads:" << std::endl;
+  for (auto& perm : cone_perms)
+    for (auto& e : edge_set) {
+      auto pe = make_pair(min(perm[e.first],perm[e.second]),
+                          max(perm[e.first],perm[e.second]));
+      if (edge_set.count(pe)) continue;
+      // pe is missing. Find the quad.
+      if (D.v_out[pe.first] < 0) continue;
+      // Find common neighbors of pe.first and pe.second.
+      vector<int> common;
+      int h0 = D.v_out[pe.first], hh = h0;
+      do {
+        int nb = D.dest(hh);
+        // Check if nb is also a neighbor of pe.second.
+        int h2 = D.v_out[pe.second];
+        if (h2 >= 0) {
+          int hh2 = h2;
+          do {
+            if (D.dest(hh2) == nb) { common.push_back(nb); break; }
+            hh2 = D.cw(hh2);
+          } while (hh2 != h2);
+        }
+        hh = D.cw(hh);
+      } while (hh != h0);
+      if (common.size() != 2) continue;
+
+      std::cout << "    Quad: diag(" << common[0] << "," << common[1]
+                << ") alt(" << pe.first << "," << pe.second << ")" << std::endl;
+      // Check rim edges' cot-sums.
+      for (int c : common) {
+        for (int p : {pe.first, pe.second}) {
+          // Find half-edge from c to p or p to c.
+          int rh = -1;
+          int rh0 = D.v_out[c];
+          if (rh0 >= 0) {
+            int rhh = rh0;
+            do { if (D.dest(rhh)==p) { rh=rhh; break; } rhh=D.cw(rhh); } while(rhh!=rh0);
+          }
+          if (rh >= 0) {
+            Diamond rdm = D.diamond(rh);
+            double rcs = cot_opp(rdm.e,rdm.a,rdm.b)+cot_opp(rdm.e,rdm.c,rdm.d);
+            std::cout << "      rim(" << c << "," << p
+                      << ") cot_sum=" << rcs
+                      << (fabs(rcs)<1e-8 ? " CO-CIRCULAR" : " STRICT") << std::endl;
+          }
+        }
+      }
+      break;  // just one quad
+    }
+}
+
+TEST(SymmetricIDT, D2h_348) {
+  Triangulation T = make_buckygen_dual(60, 348);
+  Symmetry S(T);
+
+  // Compute Steiner-augmented iDT.
+  auto D = DelaunayTriangulation::compute_symmetric(T, S);
+  std::cout << "  Steiner iDT: nv=" << D.nv << " (12 cone + "
+            << D.nv - 12 << " Steiner)" << std::endl;
+  EXPECT_TRUE(D.check_consistency()) << "DCEL inconsistent after Steiner insertion";
+  // The Steiner insertion might create non-Delaunay edges at the boundary
+  // between old and new faces.  Fix with Lawson:
+  D.flip_to_delaunay();
+  EXPECT_TRUE(D.is_delaunay()) << "Not Delaunay after Steiner + Lawson";
+
+  // Build 16-vertex permutations.
+  // Steiner vertices 12..15 correspond to the 4 co-circular quads.
+  // Map each Steiner vertex to its quad's vertex set (sorted), then
+  // for each group element, find which Steiner vertex maps to which.
+  auto cone_perms = restrict_to_cone_points(
+      vector<vector<int>>(S.G.begin(), S.G.end()), T);
+
+  // Identify which Steiner vertex belongs to which quad.
+  // Each Steiner vertex (index >= 12) is connected to exactly 4 cone-point vertices.
+  vector<set<int>> steiner_quads;  // steiner_quads[i] = {4 cone-point neighbors}
+  for (int sv = 12; sv < D.nv; sv++) {
+    set<int> nbs;
+    int h0 = D.v_out[sv], h = h0;
+    if (h0 >= 0) do { nbs.insert(D.dest(h)); h = D.cw(h); } while (h != h0);
+    steiner_quads.push_back(nbs);
+  }
+
+  // For each group element, extend the 12-vertex perm to 16 vertices.
+  vector<vector<int>> full_perms;
+  for (auto& cp : cone_perms) {
+    vector<int> fp(D.nv);
+    for (int v = 0; v < 12; v++) fp[v] = cp[v];
+    // Map each Steiner vertex: its quad {a,b,c,d} maps to {cp[a],cp[b],cp[c],cp[d]}.
+    for (int si = 0; si < (int)steiner_quads.size(); si++) {
+      set<int> mapped_quad;
+      for (int v : steiner_quads[si]) mapped_quad.insert(cp[v]);
+      // Find which Steiner vertex has this mapped quad as neighbors.
+      int mapped_sv = -1;
+      for (int sj = 0; sj < (int)steiner_quads.size(); sj++)
+        if (steiner_quads[sj] == mapped_quad) { mapped_sv = 12 + sj; break; }
+      if (mapped_sv < 0) mapped_sv = 12 + si;  // fallback (shouldn't happen)
+      fp[12 + si] = mapped_sv;
+    }
+    full_perms.push_back(fp);
+  }
+
+  int violations = D.check_edge_symmetry(full_perms);
+  std::cout << "  Edge symmetry violations (16-vertex perms): " << violations << std::endl;
+  EXPECT_EQ(violations, 0) << "Steiner iDT edge set not G-invariant";
+
+  // Also test embed on the ORIGINAL (non-Steiner) iDT for comparison.
+  auto D_orig = DelaunayTriangulation::compute(T);
+  auto sym_constraint = make_sym_constraint(T);
+  auto coords_nosym = D_orig.embed_3d();
+  auto coords_sym = D_orig.embed_3d(sym_constraint);
+
+  // Measure max relative edge error.
+  auto measure_err = [&](const vector<coord3d>& coords) {
+    double max_err = 0;
+    map<pair<int,int>, double> sh;
+    for (int h = 0; h < D.nh; h += 2) {
+      if (!D.alive(h)) continue;
+      int u = D.he_origin[h], v = D.dest(h);
+      if (u > v) std::swap(u, v);
+      double L = D.he_length[h];
+      auto key = make_pair(u, v);
+      auto it = sh.find(key);
+      if (it == sh.end() || L < it->second) sh[key] = L;
+    }
+    for (auto& [key, target] : sh) {
+      double actual = (coords[key.first] - coords[key.second]).norm();
+      max_err = std::max(max_err, std::abs(actual - target) / target);
+    }
+    return max_err;
+  };
+  double err_nosym = measure_err(coords_nosym);
+  double err_sym = measure_err(coords_sym);
+
+  std::cout << "  D2h #348: nosym_err=" << err_nosym
+            << " sym_err=" << err_sym << std::endl;
+}
