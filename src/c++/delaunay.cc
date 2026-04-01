@@ -1079,20 +1079,20 @@ void DelaunayTriangulation::remove_flat_vertex(int v)
         int jm = (j - 1 + n) % n, jp = (j + 1) % n;
         int pp = poly[jm], pi = poly[j], pn = poly[jp];
 
-        // Multi-edge check (non-self-loop only).
-        if (nb[pp] != nb[pn]) {
-          bool edge_exists = false;
-          { int h0 = v_out[nb[pp]], hc = h0;
-            if (h0 >= 0) do {
-              if (dest(hc) == nb[pn]) { edge_exists = true; break; }
-              hc = cw(hc);
-            } while (hc != h0); }
-          for (auto& d : diagonals)
-            if ((nb[d.prev_idx] == nb[pp] && nb[d.next_idx] == nb[pn]) ||
-                (nb[d.prev_idx] == nb[pn] && nb[d.next_idx] == nb[pp]))
-              { edge_exists = true; break; }
-          if (edge_exists) continue;
-        }
+        if (nb[pp] == nb[pn]) continue;
+
+        // Multi-edge check via vertex circulation.
+        bool edge_exists = false;
+        { int h0 = v_out[nb[pp]], hc = h0;
+          if (h0 >= 0) do {
+            if (dest(hc) == nb[pn]) { edge_exists = true; break; }
+            hc = cw(hc);
+          } while (hc != h0); }
+        for (auto& d : diagonals)
+          if ((nb[d.prev_idx] == nb[pp] && nb[d.next_idx] == nb[pn]) ||
+              (nb[d.prev_idx] == nb[pn] && nb[d.next_idx] == nb[pp]))
+            { edge_exists = true; break; }
+        if (edge_exists) continue;
 
         if (ear_signed_area(pp, pi, pn) <= 1e-10) continue;
 
@@ -1220,28 +1220,6 @@ void DelaunayTriangulation::remove_flat_vertex(int v)
       local_arc[{d.prev_idx, d.next_idx}] = h_d;
       local_arc[{d.next_idx, d.prev_idx}] = h_d ^ 1;
       edge_len_map[{d.prev_idx, d.next_idx}] = edge_len_map[{d.next_idx, d.prev_idx}] = d.len;
-    }
-
-    // Create missing edges for the base triangle.  When self-loop diagonals
-    // cause non-adjacent fan positions to become adjacent in the final 3-gon,
-    // edges that span multiple removed positions are needed.
-    {
-      auto& base = tris.back();
-      int bv[3] = {base.v0, base.v1, base.v2};
-      for (int e = 0; e < 3; e++) {
-        int from = bv[e], to = bv[(e+1)%3];
-        if (local_arc.find({from, to}) == local_arc.end()) {
-          double len = diag_len(from, to);
-          int h_d = alloc_edge();
-          he_origin[h_d] = nb[from];
-          he_origin[h_d ^ 1] = nb[to];
-          he_length[h_d] = len;
-          he_length[h_d ^ 1] = len;
-          local_arc[{from, to}] = h_d;
-          local_arc[{to, from}] = h_d ^ 1;
-          edge_len_map[{from, to}] = edge_len_map[{to, from}] = len;
-        }
-      }
     }
 
     // Compute per-triangle origin assignment via per-sector local unfolding
@@ -1428,18 +1406,11 @@ void DelaunayTriangulation::remove_flat_vertex(int v)
     }
 
     // Fix v_out for neighbors: ensure they point to live outgoing half-edges.
-    // Prefer non-self-loop half-edges.
     for (int i = 0; i < k; i++) {
       int u = nb[i];
       if (v_out[u] < 0 || !alive(v_out[u]) || he_origin[v_out[u]] != u) {
-        int fallback = -1;
-        for (auto& [arc, hid] : local_arc) {
-          if (nb[arc.first] == u && alive(hid)) {
-            if (dest(hid) != u) { v_out[u] = hid; fallback = -1; break; }
-            if (fallback < 0) fallback = hid;
-          }
-        }
-        if (fallback >= 0) v_out[u] = fallback;
+        for (auto& [arc, hid] : local_arc)
+          if (nb[arc.first] == u && alive(hid)) { v_out[u] = hid; break; }
       }
     }
 
