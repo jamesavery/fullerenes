@@ -875,7 +875,10 @@ bool DelaunayTriangulation::flip_edge(int h)
   int u = he_origin[h], v = he_origin[t];
   int B = he_origin[h2], D = he_origin[h5];
 
-  // Geometric guards (self-loop flips B == D are allowed in the delta-complex).
+  // Topological guard: B == D means the flip would create a self-loop.
+  if (B == D) return false;
+
+  // Geometric guards.
   Diamond dm = diamond(h);
   if (!dm.is_convex()) return false;
   double f_len = dm.flipped_length();
@@ -925,18 +928,11 @@ bool DelaunayTriangulation::flip_edge(int h)
     sort(all.begin(), all.end());
     all.erase(unique(all.begin(), all.end()), all.end());
 
-    if (B != D) {
-      // Classify each original face by which side of B→D its centroid
-      // falls on, using Eisenstein turn() in the Z[omega] grid.
-      auto [left, right] = origin_tracker->classify_across_line(all, B, D);
-      f_origin[fh] = std::move(left);
-      f_origin[ft] = std::move(right);
-    } else {
-      // Self-loop flip: B == D. classify_across_line degenerates.
-      // Conservatively assign all origins to the left face.
-      f_origin[fh] = std::move(all);
-      f_origin[ft].clear();
-    }
+    // Classify each original face by which side of B→D its centroid
+    // falls on, using Eisenstein turn() in the Z[omega] grid.
+    auto [left, right] = origin_tracker->classify_across_line(all, B, D);
+    f_origin[fh] = std::move(left);
+    f_origin[ft] = std::move(right);
   }
 
   return true;
