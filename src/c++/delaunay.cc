@@ -1786,13 +1786,84 @@ DelaunayTriangulation DelaunayTriangulation::compute_symmetric(
     n_inserted++;
   }
 
-  // Extend cone_perms to cover the new Steiner vertices.
-  // The Steiner vertices are in 1-to-1 correspondence with the quads,
-  // and the quads form an orbit under the group action.
-  // For now, just verify consistency.
   if (!D.check_consistency()) {
     fprintf(stderr, "  WARNING: DCEL inconsistent after %d Steiner insertions\n", n_inserted);
     return compute(T);  // fallback
+  }
+
+  // Build extended permutations covering Steiner vertices.
+  vector<set<int>> steiner_nbs;
+  for (int sv = 12; sv < D.nv; sv++) {
+    set<int> nbs;
+    int h0 = D.v_out[sv], h = h0;
+    if (h0 >= 0) do { nbs.insert(D.dest(h)); h = D.cw(h); } while (h != h0);
+    steiner_nbs.push_back(nbs);
+  }
+
+  auto build_extended_perms = [&]() {
+    // Recompute Steiner neighbor sets (they change after flips).
+    steiner_nbs.clear();
+    for (int sv = 12; sv < D.nv; sv++) {
+      set<int> nbs;
+      int h0 = D.v_out[sv], h = h0;
+      if (h0 >= 0) do { nbs.insert(D.dest(h)); h = D.cw(h); } while (h != h0);
+      steiner_nbs.push_back(nbs);
+    }
+    vector<vector<int>> ext_perms;
+    for (auto& cp : cone_perms) {
+      vector<int> fp(D.nv);
+      for (int v = 0; v < 12; v++) fp[v] = cp[v];
+      for (int si = 0; si < (int)steiner_nbs.size(); si++) {
+        set<int> mapped;
+        for (int v : steiner_nbs[si]) if (v < 12) mapped.insert(cp[v]);
+        int mapped_sv = 12 + si;
+        for (int sj = 0; sj < (int)steiner_nbs.size(); sj++) {
+          set<int> sj_cone;
+          for (int v : steiner_nbs[sj]) if (v < 12) sj_cone.insert(v);
+          if (sj_cone == mapped) { mapped_sv = 12 + sj; break; }
+        }
+        fp[12 + si] = mapped_sv;
+      }
+      ext_perms.push_back(fp);
+    }
+    return ext_perms;
+  };
+
+  // Orbit-aware Lawson: flip non-Delaunay edges, but flip ALL orbit members
+  // simultaneously to preserve G-invariance.
+  for (int pass = 0; pass < 200; pass++) {
+    auto ext_perms = build_extended_perms();
+
+    // Find a non-Delaunay edge.
+    int flip_h = -1;
+    for (int h = 0; h < D.nh; h += 2) {
+      if (!D.alive(h)) continue;
+      if (!D.diamond(h).is_delaunay() && D.diamond(h).is_convex()) {
+        flip_h = h; break;
+      }
+    }
+    if (flip_h < 0) break;  // all Delaunay
+
+    // Find ALL orbit members of this edge and flip them all.
+    int fu = D.he_origin[flip_h], fv = D.dest(flip_h);
+    set<int> to_flip;
+    to_flip.insert(flip_h);
+    for (auto& perm : ext_perms) {
+      int pu = perm[fu], pv = perm[fv];
+      // Find the half-edge from pu to pv.
+      if (D.v_out[pu] >= 0) {
+        int h0 = D.v_out[pu], h = h0;
+        do {
+          if (D.dest(h) == pv) { to_flip.insert(h & ~1); break; }
+          h = D.cw(h);
+        } while (h != h0);
+      }
+    }
+
+    for (int h : to_flip) {
+      if (D.alive(h) && !D.diamond(h).is_delaunay() && D.diamond(h).is_convex())
+        D.flip_edge(h);
+    }
   }
 
   return D;
