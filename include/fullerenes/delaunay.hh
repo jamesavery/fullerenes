@@ -147,6 +147,12 @@ struct DelaunayTriangulation {
                                                   const Symmetry& S);
   int check_edge_symmetry(const vector<vector<int>>& cone_perms) const;
 
+  // Bisect all multi-edges by inserting midpoint vertices.
+  // Multi-edges (multiple geodesics between the same cone-point pair) can't be
+  // realized as distinct straight edges in R³.  Bisecting each with a midpoint
+  // makes them geometrically distinct.  Returns the number of vertices added.
+  int bisect_multi_edges();
+
   // --- Validation ---
   bool check_consistency() const;
 };

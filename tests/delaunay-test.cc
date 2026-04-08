@@ -739,6 +739,13 @@ TEST(DCELEmbed, C60_1264_MultiEdge) {
               << " cone=" << D.v_cone_angle[v]
               << " orig_deg=" << D.v_orig_degree[v] << std::endl;
 
+  // Bisect multi-edges before embedding.
+  int n_bisected = D.bisect_multi_edges();
+  if (n_bisected > 0) {
+    std::cout << "Bisected " << n_bisected << " multi-edges, nv=" << D.nv << std::endl;
+    EXPECT_TRUE(D.check_consistency()) << "Inconsistent after bisection";
+  }
+
   auto coords = D.embed_3d();
 
   // Report edge errors
@@ -791,6 +798,7 @@ TEST(DCELEmbed, C60_AllIsomers) {
   while (BuckyGen::next_fullerene(Q, T)) {
     auto D = DelaunayTriangulation::compute(T);
     if (D.nv != 12) { idx++; continue; }
+    D.bisect_multi_edges();
 
     auto coords = D.embed_3d();
 
@@ -913,7 +921,12 @@ TEST(DCELSymEmbed, C60_AllIsomers) {
     auto D = DelaunayTriangulation::compute(T);
     if (D.nv != 12) { idx++; continue; }
 
-    auto coords_nosym = D.embed_3d();
+    // Bisect multi-edges for nosym path only. The sym path uses
+    // full-space optimization from symmetric init and doesn't need bisection.
+    auto D_bisected = D;
+    D_bisected.bisect_multi_edges();
+
+    auto coords_nosym = D_bisected.embed_3d();
     auto coords_sym   = D.embed_3d(sym);
 
     auto measure_err = [&](const vector<coord3d>& coords) {

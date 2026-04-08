@@ -1713,6 +1713,178 @@ static double edge_cot_sum(const DelaunayTriangulation& D, int h) {
   return cot_opp(dm.e, dm.a, dm.b) + cot_opp(dm.e, dm.c, dm.d);
 }
 
+// Bisect a multi-edge by inserting a midpoint vertex.
+// h: one half-edge of the multi-edge to bisect (u -> v with length L).
+// The midpoint w is at distance L/2 from both u and v.
+// Each of the two adjacent faces (u,v,B) and (v,u,D) is split into two.
+// Returns the index of the new vertex w.
+//
+// Before:
+//      B                      B
+//     / \                    /|\
+//    a   b       After:     a | b'
+//   /     \                /  |  \
+//  u---e---v     =>    u--e/2-w-e/2-v
+//   \     /                \  |  /
+//    c   d                  c | d'
+//     \ /                    \|/
+//      D                      D
+//
+// New edges: u-w (L/2), w-v (L/2), w-B (computed), w-D (computed).
+// New faces: (u,w,B), (w,v,B), (v,w,D), (w,u,D).
+static int bisect_edge(DelaunayTriangulation& D, int h) {
+  int t = h ^ 1;
+  int u = D.he_origin[h], v = D.dest(h);
+  double L = D.he_length[h];
+
+  // Face of h: u -> v -> B -> u
+  int h_vB = D.he_next[h];        // v -> B
+  int h_Bu = D.he_next[h_vB];     // B -> u
+  int B = D.dest(h_vB);
+  double a = D.he_length[h_Bu];   // |B-u|
+  double b = D.he_length[h_vB];   // |v-B|
+
+  // Face of t: v -> u -> D -> v
+  int h_uD = D.he_next[t];        // u -> D
+  int h_Dv = D.he_next[h_uD];     // D -> v
+  int Dv = D.dest(h_uD);
+  double c = D.he_length[h_uD];   // |u-D|
+  double d = D.he_length[h_Dv];   // |D-v|
+
+  double half = L / 2.0;
+
+  // Compute |w-B| via Stewart's theorem or law of cosines.
+  // In triangle (u, v, B) with sides L (u-v), a (B-u), b (v-B):
+  // Angle at u: cos(A_u) = (L² + a² - b²) / (2*L*a)
+  // |w-B|² = (L/2)² + a² - 2*(L/2)*a*cos(A_u)
+  //        = L²/4 + a² - a*(L² + a² - b²)/L   (simplified from Stewart's)
+  //        = (a² + b²)/2 - L²/4                  (Stewart's median formula... not quite)
+  // Actually, Stewart's theorem for a cevian of length m from B to midpoint w of uv:
+  //   b²*(L/2) + a²*(L/2) - m²*L = (L/2)*(L/2)*L  ... no.
+  // Stewart's: if cevian from B to point w on uv at distance d_uw from u, d_wv from v:
+  //   b²*d_uw + a²*d_wv - m²*L = d_uw * d_wv * L
+  // For midpoint: d_uw = d_wv = L/2:
+  //   b²*(L/2) + a²*(L/2) - m²*L = (L/2)*(L/2)*L
+  //   (a² + b²)/2 - m² = L²/4
+  //   m² = (a² + b²)/2 - L²/4
+  double wB2 = (a*a + b*b) / 2.0 - L*L / 4.0;
+  double wB = wB2 > 0 ? sqrt(wB2) : 0;
+
+  // Similarly for |w-D|.
+  double wD2 = (c*c + d*d) / 2.0 - L*L / 4.0;
+  double wD = wD2 > 0 ? sqrt(wD2) : 0;
+
+  // Allocate new vertex w.
+  int w = D.nv++;
+  if (w >= (int)D.v_out.size()) {
+    D.v_out.push_back(-1);
+    D.v_cone_angle.push_back(2.0 * M_PI);  // flat
+    D.v_orig_degree.push_back(4);
+  } else {
+    D.v_out[w] = -1;
+    D.v_cone_angle[w] = 2.0 * M_PI;
+    D.v_orig_degree[w] = 4;
+  }
+
+  // Delete original edge and its two faces.
+  int fu = D.he_face[h], ft = D.he_face[t];
+  D.dealloc_face(fu);
+  D.dealloc_face(ft);
+  D.dealloc_edge(h);
+
+  // Allocate new edges: u-w, w-v, w-B, w-D.
+  int uw = D.alloc_edge();  // uw: u->w, uw^1: w->u
+  int wv = D.alloc_edge();  // wv: w->v, wv^1: v->w
+  int wB_he = D.alloc_edge();  // wB: w->B, wB^1: B->w
+  int wD_he = D.alloc_edge();  // wD: w->D, wD^1: D->w
+
+  D.he_origin[uw] = u;    D.he_origin[uw^1] = w;
+  D.he_origin[wv] = w;    D.he_origin[wv^1] = v;
+  D.he_origin[wB_he] = w; D.he_origin[wB_he^1] = B;
+  D.he_origin[wD_he] = w; D.he_origin[wD_he^1] = Dv;
+
+  D.he_length[uw] = D.he_length[uw^1] = half;
+  D.he_length[wv] = D.he_length[wv^1] = half;
+  D.he_length[wB_he] = D.he_length[wB_he^1] = wB;
+  D.he_length[wD_he] = D.he_length[wD_he^1] = wD;
+
+  D.v_out[w] = uw ^ 1;  // w -> u
+
+  // Create 4 faces using the surviving rim half-edges (h_vB, h_Bu, h_uD, h_Dv)
+  // and the new edges.
+  //
+  // Face 1: (u, w, B) — arcs: uw(u->w), wB(w->B), h_Bu(B->u)
+  // Face 2: (w, v, B) — arcs: wv(w->v), h_vB(v->B), wB^1(B->w)
+  // Face 3: (v, w, D) — arcs: wv^1(v->w), wD(w->D), h_Dv(D->v)  ... wait.
+  //
+  // The original face of t was: v -> u -> D -> v (half-edges t, h_uD, h_Dv).
+  // After removing t (u->v side), the surviving rim is h_uD (u->D) and h_Dv (D->v).
+  // But we split u-v into u-w and w-v. So:
+  // Face 3: (w, u, D) — arcs: uw^1(w->u), h_uD(u->D), wD^1(D->w)
+  // Face 4: (v, w, D) — arcs: wv^1(v->w), wD(w->D)... no, D->v is h_Dv.
+  //
+  // Let me be careful with orientation. The original faces were CCW:
+  // Face of h: u -> v -> B -> u  (CCW)
+  // Face of t: v -> u -> D -> v  (CCW)
+  //
+  // After bisection, the 4 new faces (all CCW):
+  // Face 1: u -> w -> B -> u    uses uw, wB_he, h_Bu
+  // Face 2: w -> v -> B -> w    uses wv, h_vB, wB_he^1
+  // Face 3: v -> w -> D -> v    uses wv^1, wD_he, h_Dv
+  // Face 4: w -> u -> D -> w    uses uw^1, h_uD, wD_he^1
+
+  auto safe_angle = [](double s1, double s2, double opp) {
+    return acos(std::clamp((s1*s1 + s2*s2 - opp*opp) / (2*s1*s2), -1.0, 1.0));
+  };
+
+  auto make_face = [&](int e1, int e2, int e3, double L1, double L2, double L3) {
+    int fid = D.alloc_face();
+    D.he_next[e1] = e2; D.he_next[e2] = e3; D.he_next[e3] = e1;
+    D.he_face[e1] = D.he_face[e2] = D.he_face[e3] = fid;
+    D.f_he[fid] = e1;
+    D.he_angle[e1] = safe_angle(L3, L1, L2);
+    D.he_angle[e2] = safe_angle(L1, L2, L3);
+    D.he_angle[e3] = safe_angle(L2, L3, L1);
+  };
+
+  // Face 1: u -> w -> B -> u  (sides: uw=half, wB, Bu=a)
+  make_face(uw, wB_he, h_Bu,  half, wB, a);
+  // Face 2: w -> v -> B -> w  (sides: wv=half, vB=b, Bw=wB)
+  make_face(wv, h_vB, wB_he^1,  half, b, wB);
+  // Face 3: v -> w -> D -> v  (sides: vw=half, wD, Dv=d)
+  make_face(wv^1, wD_he, h_Dv,  half, wD, d);
+  // Face 4: w -> u -> D -> w  (sides: wu=half, uD=c, Dw=wD)
+  make_face(uw^1, h_uD, wD_he^1,  half, c, wD);
+
+  // Fix v_out for u and v if they pointed to the deleted edge.
+  if (D.v_out[u] == h) D.v_out[u] = uw;
+  if (D.v_out[v] == t) D.v_out[v] = wv ^ 1;
+
+  return w;
+}
+
+int DelaunayTriangulation::bisect_multi_edges() {
+  // Find multi-edges: vertex pairs with >1 edge.
+  map<pair<int,int>, vector<int>> pair_to_hes;
+  for (int h = 0; h < nh; h += 2) {
+    if (!alive(h)) continue;
+    int u = he_origin[h], v = dest(h);
+    pair_to_hes[{min(u,v), max(u,v)}].push_back(h);
+  }
+
+  int n_inserted = 0;
+  for (auto& [vp, hes] : pair_to_hes) {
+    if (hes.size() <= 1) continue;
+    // Bisect each edge in this multi-edge group.
+    for (int h : hes) {
+      if (!alive(h)) continue;
+      bisect_edge(*this, h);
+      n_inserted++;
+    }
+  }
+  return n_inserted;
+}
+
 DelaunayTriangulation DelaunayTriangulation::compute_symmetric(
     const Triangulation& T, const Symmetry& S)
 {
@@ -2593,67 +2765,45 @@ vector<coord3d> DelaunayTriangulation::embed_3d(const SymmetryConstraint& sym) c
     x = steihaug_cg(std::move(x), eval, hv);
 
   } else {
-    // --- Fully symmetric reduced-parameter optimization ---
+    // --- Symmetric initialization + full-space optimization ---
     //
-    // 1. Align standard-frame matrices to MDS embedding frame (generalized intertwiner)
-    // 2. Compute orbit structure + fixed-point subspaces
-    // 3. Initialize reduced params via Reynolds projection of MDS positions
-    // 4. Optimize entirely in reduced parameter space
-    // 5. Expand to full vertex set
+    // The iDT edge set is NOT G-invariant (co-circular obstructions make a
+    // symmetric iDT impossible for some isomers). Optimizing in the reduced
+    // symmetric subspace loses gradient information from the asymmetric edges,
+    // creating phantom stationary points.
+    //
+    // Instead: use the symmetry to compute a good INITIALIZATION (Reynolds-
+    // projected MDS positions), then optimize in the FULL space (same as the
+    // nosym path). This gives the symmetric starting basin advantage without
+    // losing gradient information.
 
     SymmetryConstraint aligned = align_symmetry_to_embedding(x_mds, sym);
     auto orbit_info = compute_orbit_structure(nv, aligned);
 
-    // Debug: print orbit structure
-    fprintf(stderr, "[embed_3d sym] nv=%d |G|=%d n_orbits=%zu\n",
-            nv, (int)sym.perms.size(), orbit_info.size());
-    for (size_t k = 0; k < orbit_info.size(); k++) {
-      auto& oi = orbit_info[k];
-      fprintf(stderr, "  orbit %zu: rep=%d size=%zu dim=%d\n",
-              k, oi.rep, oi.members.size(), oi.subspace_dim);
-    }
-
+    // Symmetric initialization: Reynolds-project MDS into the symmetric subspace,
+    // expand to full vertex set. This is a better starting point than raw MDS
+    // because it respects the approximate symmetry of the polyhedron.
     V3 x_red = symmetry_aware_init(x_mds, D, orbit_info, aligned);
+    V3 x_sym = expand_to_full(x_red, orbit_info, nv, aligned);
 
-    // Debug: print init state
-    {
-      V3 x_init = expand_to_full(x_red, orbit_info, nv, aligned);
-      V3 g_init(nv);
-      double E_init = eval_full(x_init, g_init);
-      fprintf(stderr, "[embed_3d sym] E_init=%.6e\n", E_init);
-      for (size_t k = 0; k < orbit_info.size(); k++)
-        fprintf(stderr, "  x_red[%zu] = (%.6f, %.6f, %.6f)\n",
-                k, x_red[k][0], x_red[k][1], x_red[k][2]);
-    }
-
-    auto eval_red = [&](const V3& pos_red, V3& g_red) -> double {
-      V3 pos_full = expand_to_full(pos_red, orbit_info, nv, aligned);
-      V3 g_full(nv);
-      double E = eval_full(pos_full, g_full);
-      g_red = restrict_gradient(g_full, orbit_info, aligned);
+    // Full-space optimizer (same as nosym path).
+    auto eval = [&](const V3& pos, V3& g) -> double {
+      double E = eval_full(pos, g);
+      project_rigid_body(g, pos);
       return E;
     };
-    auto hv_red = [&](const V3& pos_red, const V3& dir_red, V3& Hv_red) {
-      V3 pos_full = expand_to_full(pos_red, orbit_info, nv, aligned);
-      V3 dir_full = expand_to_full(dir_red, orbit_info, nv, aligned);
-      V3 Hv_full(nv);
-      hv_full(pos_full, dir_full, Hv_full);
-      Hv_red = restrict_gradient(Hv_full, orbit_info, aligned);
+    auto hv = [&](const V3& pos, const V3& dir, V3& Hv) {
+      hv_full(pos, dir, Hv);
+      project_rigid_body(Hv, pos);
     };
 
-    x_red = steihaug_cg(std::move(x_red), eval_red, hv_red);
+    // Try symmetric init first; if it's worse than plain MDS, use MDS.
+    V3 g_sym(nv), g_mds(nv);
+    double E_sym = eval(x_sym, g_sym);
+    double E_mds = eval(x_mds, g_mds);
 
-    // Debug: print final state
-    {
-      V3 g_final(orbit_info.size());
-      double E_final = eval_red(x_red, g_final);
-      fprintf(stderr, "[embed_3d sym] E_final=%.6e\n", E_final);
-      for (size_t k = 0; k < orbit_info.size(); k++)
-        fprintf(stderr, "  x_red[%zu] = (%.6f, %.6f, %.6f)\n",
-                k, x_red[k][0], x_red[k][1], x_red[k][2]);
-    }
-
-    x = expand_to_full(x_red, orbit_info, nv, aligned);
+    x = (E_sym < E_mds) ? x_sym : x_mds;
+    x = steihaug_cg(std::move(x), eval, hv);
   }
 
   // --- Orient outward using DCEL face iteration ---
