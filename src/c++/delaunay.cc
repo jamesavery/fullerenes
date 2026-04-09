@@ -337,7 +337,18 @@ static V3 steihaug_cg(V3 x, Eval eval, HvProd hv_prod,
 
 // Classical MDS: APSP distances -> double-center -> Jacobi eigen -> top-3 embedding.
 // See initgeometry-BFSvMDS.tex for full description.
-static V3 mds_placement(const matrix<double>& D) {
+//
+// Collapse-aware eigenvector selection: for non-Euclidean distance matrices
+// (geodesic distances), the 3rd and 4th Gram eigenvalues can be near-degenerate.
+// When the top-3 eigenvectors all have the same symmetry character (e.g. all
+// symmetric under a Cs mirror), symmetry-related vertex pairs collapse to the
+// same point.  When edges are provided and collapse is detected, the 3rd
+// eigenvector is replaced with the best alternative from lower positive
+// eigenvalues.
+struct MDSEdge { int u, v; double L; };
+
+static V3 mds_placement(const matrix<double>& D,
+                         const vector<MDSEdge>& edges = {}) {
   int N = D.m;
 
   // Squared-distance matrix
@@ -348,20 +359,65 @@ static V3 mds_placement(const matrix<double>& D) {
 
   auto [evals, V] = jacobi_eigen(double_center(D_sq));
 
-  // Sort eigenvalues descending, embed using top 3
+  // Sort eigenvalues descending
   vector<int> order(N);
   iota(order.begin(), order.end(), 0);
   sort(order.begin(), order.end(), [&](int a, int b) { return evals[a] > evals[b]; });
 
-  V3 x(N);
-  for (int i = 0; i < N; i++)
-    for (int dim = 0; dim < 3; dim++) {
-      int col = order[dim];
-      x[i][dim] = V(i, col) * sqrt(max(0.0, evals[col]));
+  // Collect indices of positive eigenvalues (candidates for MDS axes).
+  vector<int> pos_idx;
+  for (int k = 0; k < N; k++)
+    if (evals[order[k]] > 1e-10) pos_idx.push_back(k);
+
+  // Helpers for collapse-aware eigenvector selection.
+  auto build_embedding = [&](int i0, int i1, int i2) -> V3 {
+    int cols[3] = {order[i0], order[i1], order[i2]};
+    V3 x(N);
+    for (int i = 0; i < N; i++)
+      for (int dim = 0; dim < 3; dim++)
+        x[i][dim] = V(i, cols[dim]) * sqrt(max(0.0, evals[cols[dim]]));
+    return x;
+  };
+
+  auto edge_stress = [&](const V3& x) -> double {
+    double stress = 0;
+    for (auto& e : edges) {
+      double d = (x[e.u] - x[e.v]).norm();
+      double err = d - e.L;
+      stress += err * err;
+    }
+    return stress;
+  };
+
+  // Default: top 3 eigenvalues.
+  V3 x = build_embedding(0, 1, min(2, N-1));
+
+  if (!edges.empty() && pos_idx.size() > 3) {
+    // Check for near-coincident vertex pairs: if any edge (u,v) has
+    // MDS distance < 10% of its target, the top-3 eigenvectors missed
+    // the component that separates them (typically due to symmetry-related
+    // near-degenerate eigenvalues).
+    bool has_collapse = false;
+    for (auto& e : edges) {
+      double d = (x[e.u] - x[e.v]).norm();
+      if (d < 0.1 * e.L) { has_collapse = true; break; }
     }
 
+    if (has_collapse) {
+      // Keep top-2 eigenvalues (large-scale shape) and search over
+      // which eigenvalue to use for the 3rd axis.
+      double best_stress = edge_stress(x);
+      int K = min((int)pos_idx.size(), 8);
+      for (int c = 2; c < K; c++) {
+        V3 candidate = build_embedding(pos_idx[0], pos_idx[1], pos_idx[c]);
+        double s = edge_stress(candidate);
+        if (s < best_stress) { best_stress = s; x = std::move(candidate); }
+      }
+    }
+  }
+
   // Flatness detection: if 3rd eigenvalue is degenerate, perturb
-  double lam3 = max(0.0, evals[order[2]]);
+  double lam3 = max(0.0, evals[order[min(2, N-1)]]);
   double lam1 = max(1e-30, evals[order[0]]);
   if (lam3 / lam1 < 1e-6)
     for (int i = 0; i < N; i++)
@@ -2639,7 +2695,9 @@ vector<coord3d> DelaunayTriangulation::embed_3d(const SymmetryConstraint& sym) c
         D(i, j) = min(D(i, j), D(i, k) + D(k, j));
 
   // --- Step 3: MDS initial placement ---
-  V3 x_mds = mds_placement(D);
+  vector<MDSEdge> mds_edges;
+  for (auto& e : edges) mds_edges.push_back({e.u, e.v, e.L});
+  V3 x_mds = mds_placement(D, mds_edges);
 
   // Center at origin (needed for Procrustes alignment in symmetry path)
   {
