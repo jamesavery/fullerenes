@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include "fullerenes/delaunay.hh"
+#include "fullerenes/delaunay_embed3d.hh"
 #include "fullerenes/delaunay_old.hh"
 #include "fullerenes/isomerdb.hh"
 #include "fullerenes/planargraph.hh"
@@ -629,7 +630,7 @@ TEST(DCELEmbed, C20_Icosahedron) {
   auto D = DelaunayTriangulation::compute(T);
   ASSERT_EQ(D.nv, 12);
 
-  auto coords = D.embed_3d();
+  auto coords = embed_delaunay_3d(D);
   verify_dcel_embedding(D, coords, 1e-6, "C20");
 
   // For C20, all iDT edges should have length 1 (regular icosahedron).
@@ -647,7 +648,7 @@ TEST(DCELEmbed, C60_Ih) {
   auto D = DelaunayTriangulation::compute(T);
   ASSERT_EQ(D.nv, 12);
 
-  auto coords = D.embed_3d();
+  auto coords = embed_delaunay_3d(D);
   verify_dcel_embedding(D, coords, 1e-4, "C60_Ih");
 }
 
@@ -663,7 +664,7 @@ TEST(DCELEmbed, SmallFullerenes) {
       auto D = DelaunayTriangulation::compute(T);
       if (D.nv != 12) { idx++; continue; }
 
-      auto coords = D.embed_3d();
+      auto coords = embed_delaunay_3d(D);
 
       // Check edge distance matching (shortest per pair)
       map<pair<int,int>, double> shortest;
@@ -746,7 +747,7 @@ TEST(DCELEmbed, C60_1264_MultiEdge) {
     EXPECT_TRUE(D.check_consistency()) << "Inconsistent after bisection";
   }
 
-  auto coords = D.embed_3d();
+  auto coords = embed_delaunay_3d(D);
 
   // Report edge errors
   double max_rel_err = 0;
@@ -800,7 +801,7 @@ TEST(DCELEmbed, C60_AllIsomers) {
     if (D.nv != 12) { idx++; continue; }
     D.bisect_multi_edges();
 
-    auto coords = D.embed_3d();
+    auto coords = embed_delaunay_3d(D);
 
     map<pair<int,int>, double> shortest;
     for (int h = 0; h < D.nh; h += 2) {
@@ -836,6 +837,100 @@ TEST(DCELEmbed, C60_AllIsomers) {
             << " at #" << worst_idx << std::endl;
 }
 
+static void test_embed_all(int N, double threshold = 0.05) {
+  BuckyGen::buckygen_queue Q = BuckyGen::start(N, false, false);
+  Triangulation T;
+  int idx = 0, n_poor = 0, total = 0;
+  double worst_err = 0;
+  int worst_idx = -1;
+  vector<double> all_errors;
+
+  while (BuckyGen::next_fullerene(Q, T)) {
+    auto D = DelaunayTriangulation::compute(T);
+    if (D.nv != 12) { idx++; continue; }
+    D.bisect_multi_edges();
+
+    auto coords = embed_delaunay_3d(D);
+
+    map<pair<int,int>, double> shortest;
+    for (int h = 0; h < D.nh; h += 2) {
+      if (!D.alive(h)) continue;
+      int u = D.he_origin[h], v = D.dest(h);
+      if (u > v) swap(u, v);
+      double L = D.he_length[h];
+      auto key = make_pair(u, v);
+      auto it = shortest.find(key);
+      if (it == shortest.end() || L < it->second)
+        shortest[key] = L;
+    }
+
+    double max_rel_err = 0;
+    for (auto& [key, target] : shortest) {
+      double actual = (coords[key.first] - coords[key.second]).norm();
+      max_rel_err = std::max(max_rel_err, fabs(actual - target) / target);
+    }
+
+    if (max_rel_err > worst_err) { worst_err = max_rel_err; worst_idx = idx; }
+    if (max_rel_err > 0.01) n_poor++;
+    if (max_rel_err > 0.25) {
+      // Detailed diagnosis of complete failures.
+      int n_multi = 0;
+      map<pair<int,int>, int> edge_count;
+      for (int h = 0; h < D.nh; h += 2) {
+        if (!D.alive(h)) continue;
+        int eu = D.he_origin[h], ev = D.dest(h);
+        edge_count[{min(eu,ev), max(eu,ev)}]++;
+      }
+      for (auto& [k, c] : edge_count) if (c > 1) n_multi += c - 1;
+
+      // Get RSPI (pentagon positions in the spiral).
+      vector<int> spiral;
+      jumplist_t jumps;
+      T.get_spiral(spiral, jumps);
+      std::cout << "  C" << N << " #" << idx << ": err=" << max_rel_err
+                << " nv=" << D.nv << " multi=" << n_multi
+                << " RSPI=[";
+      bool first = true;
+      for (size_t si = 0; si < spiral.size(); si++)
+        if (spiral[si] == 5) { if (!first) std::cout << ","; std::cout << si+1; first = false; }
+      std::cout << "]";
+      if (!jumps.empty()) {
+        std::cout << " jumps=[";
+        first = true;
+        for (auto& j : jumps) { if (!first) std::cout << ","; std::cout << "(" << j.first << "," << j.second << ")"; first = false; }
+        std::cout << "]";
+      }
+      std::cout << std::endl;
+    } else if (max_rel_err > 0.05) {
+      std::cout << "  C" << N << " #" << idx << ": err=" << max_rel_err
+                << " nv=" << D.nv << std::endl;
+    }
+    all_errors.push_back(max_rel_err);
+    total++;
+    idx++;
+  }
+  BuckyGen::stop(Q);
+
+  sort(all_errors.begin(), all_errors.end());
+  int n = all_errors.size();
+  std::cout << "C" << N << " Embed: " << total << " isomers, "
+            << n_poor << " with >1% error, worst=" << worst_err
+            << " at #" << worst_idx << std::endl;
+  if (n > 0) {
+    std::cout << "  Percentiles:";
+    for (double p : {90.0, 95.0, 99.0, 99.9, 99.99, 100.0}) {
+      int i = std::min((int)(p/100.0 * n), n-1);
+      std::cout << " p" << p << "=" << all_errors[i];
+    }
+    std::cout << std::endl;
+  }
+  EXPECT_EQ(n_poor, 0) << "Some isomers have >1% embedding error";
+}
+
+TEST(DCELEmbed, C70_AllIsomers)  { test_embed_all(70); }
+TEST(DCELEmbed, C80_AllIsomers)  { test_embed_all(80); }
+TEST(DCELEmbed, C100_AllIsomers) { test_embed_all(100); }
+
 // ============================================================================
 // Symmetry-constrained DCEL embedding tests
 // ============================================================================
@@ -870,8 +965,8 @@ TEST(DCELSymEmbed, C20_Ih) {
   auto D = DelaunayTriangulation::compute(T);
   ASSERT_EQ(D.nv, 12);
 
-  auto coords_nosym = D.embed_3d();
-  auto coords_sym   = D.embed_3d(sym);
+  auto coords_nosym = embed_delaunay_3d(D);
+  auto coords_sym   = embed_delaunay_3d(D, sym);
 
   // Both should give machine-precision results for C20 (regular icosahedron)
   verify_dcel_embedding(D, coords_nosym, 1e-6, "C20 no-sym");
@@ -903,7 +998,7 @@ TEST(DCELSymEmbed, C60_1264_MultiEdge) {
   }
   std::cout << std::endl;
 
-  auto coords = D.embed_3d(sym);
+  auto coords = embed_delaunay_3d(D, sym);
   verify_dcel_embedding(D, coords, 1e-4, "C60 #1264 sym");
 }
 
@@ -926,8 +1021,8 @@ TEST(DCELSymEmbed, C60_AllIsomers) {
     auto D_bisected = D;
     D_bisected.bisect_multi_edges();
 
-    auto coords_nosym = D_bisected.embed_3d();
-    auto coords_sym   = D.embed_3d(sym);
+    auto coords_nosym = embed_delaunay_3d(D_bisected);
+    auto coords_sym   = embed_delaunay_3d(D, sym);
 
     auto measure_err = [&](const vector<coord3d>& coords) {
       double max_err = 0;
@@ -970,743 +1065,3 @@ TEST(DCELSymEmbed, C60_AllIsomers) {
             << worst_sym   << " at #" << worst_idx_sym << std::endl;
 }
 
-TEST(SymmetricIDT, D2h_348_CotSumAnalysis) {
-  // Analyze ALL edges' cot-sums to determine which are co-circular.
-  // If the rim edges of the self-dual quads are co-circular, the quads
-  // might not exist in a different Delaunay triangulation, and the
-  // "topological obstruction" would be wrong.
-  Triangulation T = make_buckygen_dual(60, 348);
-  Symmetry S(T);
-
-  // Compute iDT with correct geodesic distances.
-  auto D = DelaunayTriangulation::compute(T);
-  ASSERT_EQ(D.nv, 12);
-
-  // Replace edge lengths with geodesic distances.
-  vector<int> cone_pts;
-  for (int v = 0; v < T.N; v++)
-    if (T.degree(v) != 6) cone_pts.push_back(v);
-  auto dist2 = T.surface_distances(cone_pts);
-  for (int h = 0; h < D.nh; h += 2) {
-    if (!D.alive(h)) continue;
-    D.he_length[h] = D.he_length[h^1] = sqrt(dist2(D.he_origin[h], D.dest(h)));
-  }
-  D.recompute_all_angles();
-  D.flip_to_delaunay();
-
-  // Compute cot-sum for each edge via the Diamond's side lengths.
-  auto cot_opp = [](double e, double a, double b) {
-    // cot of the angle opposite edge e in triangle with sides (e, a, b)
-    double cos_C = (a*a + b*b - e*e) / (2*a*b);
-    double sin_C = sqrt(std::max(0.0, 1.0 - cos_C*cos_C));
-    return sin_C > 1e-15 ? cos_C / sin_C : 1e15;
-  };
-
-  // Print cot-sum for ALL 30 edges.
-  int n_cocircular = 0, n_strict = 0;
-  std::cout << "  Edge cot-sums (after geodesic correction):" << std::endl;
-  for (int h = 0; h < D.nh; h += 2) {
-    if (!D.alive(h)) continue;
-    Diamond dm = D.diamond(h);
-    double cs = cot_opp(dm.e, dm.a, dm.b) + cot_opp(dm.e, dm.c, dm.d);
-    int u = D.he_origin[h], v = D.dest(h);
-    bool cocircular = fabs(cs) < 1e-8;
-    if (cocircular) n_cocircular++; else n_strict++;
-    std::cout << "    (" << u << "," << v << "): L=" << dm.e
-              << " cot_sum=" << cs << (cocircular ? " CO-CIRCULAR" : "") << std::endl;
-  }
-  std::cout << "  Total: " << n_strict << " strictly Delaunay, "
-            << n_cocircular << " co-circular" << std::endl;
-
-  // Now identify the self-dual orbit's quads and check their rim edges.
-  auto cone_perms = restrict_to_cone_points(
-      vector<vector<int>>(S.G.begin(), S.G.end()), T);
-  set<pair<int,int>> edge_set;
-  for (int h = 0; h < D.nh; h += 2)
-    if (D.alive(h))
-      edge_set.insert({min(D.he_origin[h],D.dest(h)), max(D.he_origin[h],D.dest(h))});
-
-  std::cout << "  Self-dual orbit quads:" << std::endl;
-  for (auto& perm : cone_perms)
-    for (auto& e : edge_set) {
-      auto pe = make_pair(min(perm[e.first],perm[e.second]),
-                          max(perm[e.first],perm[e.second]));
-      if (edge_set.count(pe)) continue;
-      // pe is missing. Find the quad.
-      if (D.v_out[pe.first] < 0) continue;
-      // Find common neighbors of pe.first and pe.second.
-      vector<int> common;
-      int h0 = D.v_out[pe.first], hh = h0;
-      do {
-        int nb = D.dest(hh);
-        // Check if nb is also a neighbor of pe.second.
-        int h2 = D.v_out[pe.second];
-        if (h2 >= 0) {
-          int hh2 = h2;
-          do {
-            if (D.dest(hh2) == nb) { common.push_back(nb); break; }
-            hh2 = D.cw(hh2);
-          } while (hh2 != h2);
-        }
-        hh = D.cw(hh);
-      } while (hh != h0);
-      if (common.size() != 2) continue;
-
-      std::cout << "    Quad: diag(" << common[0] << "," << common[1]
-                << ") alt(" << pe.first << "," << pe.second << ")" << std::endl;
-      // Check rim edges' cot-sums.
-      for (int c : common) {
-        for (int p : {pe.first, pe.second}) {
-          // Find half-edge from c to p or p to c.
-          int rh = -1;
-          int rh0 = D.v_out[c];
-          if (rh0 >= 0) {
-            int rhh = rh0;
-            do { if (D.dest(rhh)==p) { rh=rhh; break; } rhh=D.cw(rhh); } while(rhh!=rh0);
-          }
-          if (rh >= 0) {
-            Diamond rdm = D.diamond(rh);
-            double rcs = cot_opp(rdm.e,rdm.a,rdm.b)+cot_opp(rdm.e,rdm.c,rdm.d);
-            std::cout << "      rim(" << c << "," << p
-                      << ") cot_sum=" << rcs
-                      << (fabs(rcs)<1e-8 ? " CO-CIRCULAR" : " STRICT") << std::endl;
-          }
-        }
-      }
-      break;  // just one quad
-    }
-}
-
-TEST(SymmetricIDT, D2h_348) {
-  Triangulation T = make_buckygen_dual(60, 348);
-  Symmetry S(T);
-
-  // Compute Steiner-augmented iDT.
-  auto D = DelaunayTriangulation::compute_symmetric(T, S);
-  std::cout << "  Steiner iDT: nv=" << D.nv << " (12 cone + "
-            << D.nv - 12 << " Steiner)" << std::endl;
-  EXPECT_TRUE(D.check_consistency()) << "DCEL inconsistent after Steiner insertion";
-  // The Steiner insertion might create non-Delaunay edges at the boundary
-  // between old and new faces.  Fix with Lawson:
-  D.flip_to_delaunay();
-  EXPECT_TRUE(D.is_delaunay()) << "Not Delaunay after Steiner + Lawson";
-
-  // Build 16-vertex permutations.
-  // Steiner vertices 12..15 correspond to the 4 co-circular quads.
-  // Map each Steiner vertex to its quad's vertex set (sorted), then
-  // for each group element, find which Steiner vertex maps to which.
-  auto cone_perms = restrict_to_cone_points(
-      vector<vector<int>>(S.G.begin(), S.G.end()), T);
-
-  // Identify which Steiner vertex belongs to which quad.
-  // Each Steiner vertex (index >= 12) is connected to exactly 4 cone-point vertices.
-  vector<set<int>> steiner_quads;  // steiner_quads[i] = {4 cone-point neighbors}
-  for (int sv = 12; sv < D.nv; sv++) {
-    set<int> nbs;
-    int h0 = D.v_out[sv], h = h0;
-    if (h0 >= 0) do { nbs.insert(D.dest(h)); h = D.cw(h); } while (h != h0);
-    steiner_quads.push_back(nbs);
-  }
-
-  // For each group element, extend the 12-vertex perm to 16 vertices.
-  vector<vector<int>> full_perms;
-  for (auto& cp : cone_perms) {
-    vector<int> fp(D.nv);
-    for (int v = 0; v < 12; v++) fp[v] = cp[v];
-    // Map each Steiner vertex: its quad {a,b,c,d} maps to {cp[a],cp[b],cp[c],cp[d]}.
-    for (int si = 0; si < (int)steiner_quads.size(); si++) {
-      set<int> mapped_quad;
-      for (int v : steiner_quads[si]) mapped_quad.insert(cp[v]);
-      // Find which Steiner vertex has this mapped quad as neighbors.
-      int mapped_sv = -1;
-      for (int sj = 0; sj < (int)steiner_quads.size(); sj++)
-        if (steiner_quads[sj] == mapped_quad) { mapped_sv = 12 + sj; break; }
-      if (mapped_sv < 0) mapped_sv = 12 + si;  // fallback (shouldn't happen)
-      fp[12 + si] = mapped_sv;
-    }
-    full_perms.push_back(fp);
-  }
-
-  int violations = D.check_edge_symmetry(full_perms);
-  std::cout << "  Edge symmetry violations (16-vertex perms): " << violations << std::endl;
-  EXPECT_EQ(violations, 0) << "Steiner iDT edge set not G-invariant";
-
-  // Also test embed on the ORIGINAL (non-Steiner) iDT for comparison.
-  auto D_orig = DelaunayTriangulation::compute(T);
-  auto sym_constraint = make_sym_constraint(T);
-  auto coords_nosym = D_orig.embed_3d();
-  auto coords_sym = D_orig.embed_3d(sym_constraint);
-
-  // Measure max relative edge error.
-  auto measure_err = [&](const vector<coord3d>& coords) {
-    double max_err = 0;
-    map<pair<int,int>, double> sh;
-    for (int h = 0; h < D.nh; h += 2) {
-      if (!D.alive(h)) continue;
-      int u = D.he_origin[h], v = D.dest(h);
-      if (u > v) std::swap(u, v);
-      double L = D.he_length[h];
-      auto key = make_pair(u, v);
-      auto it = sh.find(key);
-      if (it == sh.end() || L < it->second) sh[key] = L;
-    }
-    for (auto& [key, target] : sh) {
-      double actual = (coords[key.first] - coords[key.second]).norm();
-      max_err = std::max(max_err, std::abs(actual - target) / target);
-    }
-    return max_err;
-  };
-  double err_nosym = measure_err(coords_nosym);
-  double err_sym = measure_err(coords_sym);
-
-  std::cout << "  D2h #348: nosym_err=" << err_nosym
-            << " sym_err=" << err_sym << std::endl;
-}
-
-static void survey_idt_features(int N) {
-  int total = 0;
-  int n_with_multi = 0, n_with_self_loop = 0, n_with_cocircular = 0;
-  int max_multi_edges = 0, max_self_loops = 0, max_cocircular = 0;
-  int total_multi = 0, total_loops = 0, total_cocircular = 0;
-
-  BuckyGen::buckygen_queue Q = BuckyGen::start(N, false, false);
-  Triangulation T;
-  int idx = 0;
-  while (BuckyGen::next_fullerene(Q, T)) {
-    auto D = DelaunayTriangulation::compute(T);
-    if (D.nv != 12) { idx++; continue; }
-
-    // Count multi-edges and self-loops.
-    map<pair<int,int>, int> edge_count;
-    int n_multi = 0, n_loops = 0;
-    for (int h = 0; h < D.nh; h += 2) {
-      if (!D.alive(h)) continue;
-      int u = D.he_origin[h], v = D.dest(h);
-      if (u == v) {
-        n_loops++;
-      } else {
-        auto key = make_pair(min(u,v), max(u,v));
-        edge_count[key]++;
-      }
-    }
-    for (auto& [key, cnt] : edge_count)
-      if (cnt > 1) n_multi += cnt - 1;  // extra edges beyond the first
-
-    // Count co-circular edges.
-    int n_cc = 0;
-    for (int h = 0; h < D.nh; h += 2) {
-      if (!D.alive(h)) continue;
-      Diamond dm = D.diamond(h);
-      auto cot_opp = [](double e, double a, double b) {
-        double cos_C = (a*a + b*b - e*e) / (2*a*b);
-        double sin_C = sqrt(std::max(0.0, 1.0 - cos_C*cos_C));
-        return sin_C > 1e-15 ? cos_C / sin_C : 1e15;
-      };
-      double cs = cot_opp(dm.e, dm.a, dm.b) + cot_opp(dm.e, dm.c, dm.d);
-      if (fabs(cs) < 1e-8) n_cc++;
-    }
-
-    if (n_multi > 0) n_with_multi++;
-    if (n_loops > 0) n_with_self_loop++;
-    if (n_cc > 0) n_with_cocircular++;
-    total_multi += n_multi;
-    total_loops += n_loops;
-    total_cocircular += n_cc;
-    max_multi_edges = std::max(max_multi_edges, n_multi);
-    max_self_loops = std::max(max_self_loops, n_loops);
-    max_cocircular = std::max(max_cocircular, n_cc);
-
-    if (n_loops > 0 || n_multi > 0)
-      std::cout << "  #" << idx << ": multi=" << n_multi
-                << " loops=" << n_loops << " cocircular=" << n_cc << std::endl;
-    total++;
-    idx++;
-  }
-  BuckyGen::stop(Q);
-
-  std::cout << "C" << N << " iDT survey (" << total << " isomers):" << std::endl;
-  std::cout << "  Multi-edges: " << n_with_multi << " isomers, "
-            << total_multi << " total, max " << max_multi_edges << " per isomer" << std::endl;
-  std::cout << "  Self-loops:  " << n_with_self_loop << " isomers, "
-            << total_loops << " total, max " << max_self_loops << " per isomer" << std::endl;
-  std::cout << "  Co-circular: " << n_with_cocircular << " isomers, "
-            << total_cocircular << " total, max " << max_cocircular << " per isomer" << std::endl;
-}
-
-TEST(SymmetricIDT, C60_MultiEdgeSurvey)  { survey_idt_features(60); }
-TEST(SymmetricIDT, C80_MultiEdgeSurvey)  { survey_idt_features(80); }
-TEST(SymmetricIDT, C100_MultiEdgeSurvey) { survey_idt_features(100); }
-
-// Comprehensive Steiner iDT diagnostic for a single isomer.
-// Dumps: quad structure, edge orbits, cot-sums, Steiner geometry,
-// pre/post-flip symmetry, and identifies the exact source of violations.
-static void diagnose_steiner_idt(int N, int target_idx) {
-  BuckyGen::buckygen_queue Q = BuckyGen::start(N, false, false);
-  Triangulation T;
-  int idx = 0;
-  while (BuckyGen::next_fullerene(Q, T)) { if (idx == target_idx) break; idx++; }
-  BuckyGen::stop(Q);
-
-  Symmetry S(T);
-  auto cone_perms = restrict_to_cone_points(
-      vector<vector<int>>(S.G.begin(), S.G.end()), T);
-
-  std::cout << "=== C" << N << " #" << target_idx
-            << " point_group=" << S.point_group() << " |G|=" << S.G.size()
-            << " ===" << std::endl;
-
-  // Step 1: Non-symmetric iDT.
-  auto D_orig = DelaunayTriangulation::compute(T);
-  int orig_violations = D_orig.check_edge_symmetry(cone_perms);
-  std::cout << "  Original iDT: nv=" << D_orig.nv
-            << " violations=" << orig_violations << std::endl;
-
-  // Step 2: Geodesic-corrected iDT (before Steiner).
-  auto D = DelaunayTriangulation::compute(T);
-  vector<int> cone_pts;
-  for (int v = 0; v < T.N; v++)
-    if (T.degree(v) != 6) cone_pts.push_back(v);
-  auto dist2 = T.surface_distances(cone_pts);
-  for (int h = 0; h < D.nh; h += 2) {
-    if (!D.alive(h)) continue;
-    D.he_length[h] = D.he_length[h^1] = sqrt(dist2(D.he_origin[h], D.dest(h)));
-  }
-  D.recompute_all_angles();
-  D.flip_to_delaunay();
-
-  int geo_violations = D.check_edge_symmetry(cone_perms);
-  std::cout << "  Geodesic-corrected iDT: violations=" << geo_violations << std::endl;
-
-  // Step 3: Identify ALL co-circular edges and their orbit structure.
-  auto cot_opp = [](double e, double a, double b) {
-    double cos_C = (a*a + b*b - e*e) / (2*a*b);
-    double sin_C = sqrt(std::max(0.0, 1.0 - cos_C*cos_C));
-    return sin_C > 1e-15 ? cos_C / sin_C : 1e15;
-  };
-
-  set<pair<int,int>> edge_set;
-  map<pair<int,int>, double> edge_cot;
-  for (int h = 0; h < D.nh; h += 2) {
-    if (!D.alive(h)) continue;
-    int u = D.he_origin[h], v = D.dest(h);
-    auto key = make_pair(min(u,v), max(u,v));
-    edge_set.insert(key);
-    Diamond dm = D.diamond(h);
-    edge_cot[key] = cot_opp(dm.e, dm.a, dm.b) + cot_opp(dm.e, dm.c, dm.d);
-  }
-
-  // Find edge orbits and classify.
-  map<pair<int,int>, int> edge_orbit_id;
-  vector<vector<pair<int,int>>> edge_orbits;
-  int next_orbit = 0;
-  for (auto& e : edge_set) {
-    if (edge_orbit_id.count(e)) continue;
-    vector<pair<int,int>> orbit;
-    set<pair<int,int>> orbit_set;
-    // BFS through orbit.
-    vector<pair<int,int>> queue = {e};
-    orbit_set.insert(e);
-    while (!queue.empty()) {
-      auto cur = queue.back(); queue.pop_back();
-      orbit.push_back(cur);
-      for (auto& perm : cone_perms) {
-        auto img = make_pair(min(perm[cur.first],perm[cur.second]),
-                             max(perm[cur.first],perm[cur.second]));
-        if (!orbit_set.count(img) && edge_set.count(img)) {
-          orbit_set.insert(img);
-          queue.push_back(img);
-        }
-      }
-    }
-    for (auto& oe : orbit) edge_orbit_id[oe] = next_orbit;
-    edge_orbits.push_back(orbit);
-    next_orbit++;
-  }
-
-  std::cout << "  " << edge_orbits.size() << " edge orbits:" << std::endl;
-  for (int oi = 0; oi < (int)edge_orbits.size(); oi++) {
-    auto& orbit = edge_orbits[oi];
-    double cs = edge_cot[orbit[0]];
-    bool cocircular = fabs(cs) < 1e-8;
-
-    // Check if orbit is complete (all images present).
-    bool complete = true;
-    set<pair<int,int>> full_orbit;
-    for (auto& oe : orbit)
-      for (auto& perm : cone_perms) {
-        auto img = make_pair(min(perm[oe.first],perm[oe.second]),
-                             max(perm[oe.first],perm[oe.second]));
-        full_orbit.insert(img);
-      }
-    for (auto& img : full_orbit)
-      if (!edge_set.count(img)) { complete = false; break; }
-
-    int full_size = full_orbit.size();
-    std::cout << "    orbit " << oi << ": size=" << orbit.size()
-              << "/" << full_size
-              << " cot_sum=" << cs
-              << (cocircular ? " CO-CIRC" : "")
-              << (!complete ? " INCOMPLETE" : "")
-              << " edges:";
-    for (auto& oe : orbit) std::cout << " (" << oe.first << "," << oe.second << ")";
-    if (!complete) {
-      std::cout << " missing:";
-      for (auto& img : full_orbit)
-        if (!edge_set.count(img)) std::cout << " (" << img.first << "," << img.second << ")";
-    }
-    std::cout << std::endl;
-
-    // For incomplete co-circular orbits, show quad structure.
-    if (!complete && cocircular) {
-      // Each present edge is a diagonal of a quad. Find the quad vertices.
-      for (auto& oe : orbit) {
-        int u = oe.first, v = oe.second;
-        // Find B and D: the two faces adjacent to edge (u,v).
-        int he = -1;
-        for (int h = 0; h < D.nh; h += 2)
-          if (D.alive(h) && min(D.he_origin[h],D.dest(h))==u && max(D.he_origin[h],D.dest(h))==v)
-            { he = h; break; }
-        if (he < 0) continue;
-        int B = D.dest(D.he_next[he]);
-        int Dv = D.dest(D.he_next[he^1]);
-        auto alt = make_pair(min(B,Dv), max(B,Dv));
-        std::cout << "      quad: diag(" << u << "," << v << ") alt(" << alt.first << "," << alt.second
-                  << ") present=" << (edge_set.count(alt) ? "yes" : "no") << std::endl;
-      }
-      // Show missing edges' quads (if we can find them).
-      for (auto& img : full_orbit) {
-        if (edge_set.count(img)) continue;
-        // Missing edge (img.first, img.second): find common neighbors.
-        int pu = img.first, pv = img.second;
-        vector<int> common;
-        int h0 = D.v_out[pu], h = h0;
-        if (h0 >= 0) do {
-          int nb = D.dest(h);
-          // Check if nb is also neighbor of pv.
-          int h2 = D.v_out[pv];
-          if (h2 >= 0) { int hh = h2; do { if (D.dest(hh)==nb) { common.push_back(nb); break; } hh=D.cw(hh); } while(hh!=h2); }
-          h = D.cw(h);
-        } while (h != h0);
-        if (common.size() == 2) {
-          auto cur_diag = make_pair(min(common[0],common[1]), max(common[0],common[1]));
-          std::cout << "      missing (" << pu << "," << pv << "): quad with cur_diag("
-                    << cur_diag.first << "," << cur_diag.second
-                    << ") present=" << (edge_set.count(cur_diag) ? "yes" : "no")
-                    << " in_orbit=" << (full_orbit.count(cur_diag) ? "yes" : "no") << std::endl;
-        } else {
-          std::cout << "      missing (" << pu << "," << pv << "): "
-                    << common.size() << " common neighbors (no quad)" << std::endl;
-        }
-      }
-    }
-  }
-
-  // Step 4: Run compute_symmetric and compare.
-  auto D_sym = DelaunayTriangulation::compute_symmetric(T, S);
-  int steiner_count = D_sym.nv - 12;
-
-  // Build extended perms for the Steiner-augmented DCEL.
-  vector<set<int>> steiner_quads;
-  for (int sv = 12; sv < D_sym.nv; sv++) {
-    set<int> nbs;
-    int h0 = D_sym.v_out[sv], h = h0;
-    if (h0 >= 0) do { nbs.insert(D_sym.dest(h)); h = D_sym.cw(h); } while (h != h0);
-    steiner_quads.push_back(nbs);
-  }
-
-  vector<vector<int>> full_perms;
-  for (auto& cp : cone_perms) {
-    vector<int> fp(D_sym.nv);
-    for (int v = 0; v < 12; v++) fp[v] = cp[v];
-    for (int si = 0; si < (int)steiner_quads.size(); si++) {
-      set<int> mapped;
-      for (int v : steiner_quads[si]) mapped.insert(cp[v]);
-      int mapped_sv = 12 + si;
-      for (int sj = 0; sj < (int)steiner_quads.size(); sj++)
-        if (steiner_quads[sj] == mapped) { mapped_sv = 12 + sj; break; }
-      fp[12 + si] = mapped_sv;
-    }
-    full_perms.push_back(fp);
-  }
-
-  int sym_violations = D_sym.check_edge_symmetry(full_perms);
-  std::cout << "  Steiner iDT: nv=" << D_sym.nv << " (" << steiner_count
-            << " Steiner) violations=" << sym_violations
-            << " Delaunay=" << D_sym.is_delaunay()
-            << " consistent=" << D_sym.check_consistency() << std::endl;
-
-  // Step 5: If violations remain, identify exactly which edges are broken.
-  if (sym_violations > 0) {
-    set<pair<int,int>> sym_edges;
-    for (int h = 0; h < D_sym.nh; h += 2)
-      if (D_sym.alive(h))
-        sym_edges.insert({min(D_sym.he_origin[h],D_sym.dest(h)),
-                          max(D_sym.he_origin[h],D_sym.dest(h))});
-
-    std::cout << "  Violations:" << std::endl;
-    int shown = 0;
-    for (auto& fp : full_perms)
-      for (auto& e : sym_edges) {
-        auto pe = make_pair(min(fp[e.first],fp[e.second]),
-                            max(fp[e.first],fp[e.second]));
-        if (!sym_edges.count(pe) && shown++ < 10)
-          std::cout << "    (" << e.first << "," << e.second << ") -> ("
-                    << pe.first << "," << pe.second << ") MISSING" << std::endl;
-      }
-
-    // Check which edges are co-circular in the Steiner iDT.
-    int n_cc_sym = 0;
-    for (int h = 0; h < D_sym.nh; h += 2) {
-      if (!D_sym.alive(h)) continue;
-      Diamond dm = D_sym.diamond(h);
-      double cs = cot_opp(dm.e, dm.a, dm.b) + cot_opp(dm.e, dm.c, dm.d);
-      if (fabs(cs) < 1e-8) n_cc_sym++;
-    }
-    std::cout << "  Steiner iDT co-circular edges: " << n_cc_sym << std::endl;
-  }
-
-  // Step 6: Print Steiner vertex info.
-  for (int sv = 12; sv < D_sym.nv; sv++) {
-    std::cout << "  Steiner v" << sv << ": neighbors={";
-    int h0 = D_sym.v_out[sv], h = h0;
-    bool first = true;
-    if (h0 >= 0) do {
-      if (!first) std::cout << ",";
-      std::cout << D_sym.dest(h);
-      first = false;
-      h = D_sym.cw(h);
-    } while (h != h0);
-    std::cout << "} spoke_lengths={";
-    h = h0; first = true;
-    if (h0 >= 0) do {
-      if (!first) std::cout << ",";
-      std::cout << D_sym.he_length[h];
-      first = false;
-      h = D_sym.cw(h);
-    } while (h != h0);
-    std::cout << "}" << std::endl;
-  }
-}
-
-// Run diagnostic on specific cases.
-TEST(SymmetricIDT, DiagnoseSteinerFailures) {
-  diagnose_steiner_idt(24, 0);  // C24 D6d: 6 Steiner, symmetry fail
-  diagnose_steiner_idt(60, 348); // C60 D2h: 4 Steiner, symmetry pass
-}
-
-// Survey: for each isomer with nontrivial symmetry, classify self-dual orbit
-// members as "quad alternates" (2 common neighbors) vs "non-local" (< 2).
-static void survey_nonlocal_edges(int N) {
-  int total = 0, n_with_steiner = 0;
-  int n_all_local = 0, n_has_nonlocal = 0;
-
-  BuckyGen::buckygen_queue Q = BuckyGen::start(N, false, false);
-  Triangulation T;
-  int idx = 0;
-  while (BuckyGen::next_fullerene(Q, T)) {
-    Symmetry S(T);
-    if (S.G.size() <= 1) { idx++; continue; }
-    total++;
-
-    // Geodesic-corrected iDT.
-    auto D = DelaunayTriangulation::compute(T);
-    if (D.nv != 12) { idx++; continue; }
-
-    vector<int> cone_pts;
-    for (int v = 0; v < T.N; v++)
-      if (T.degree(v) != 6) cone_pts.push_back(v);
-    auto dist2 = T.surface_distances(cone_pts);
-    for (int h = 0; h < D.nh; h += 2) {
-      if (!D.alive(h)) continue;
-      D.he_length[h] = D.he_length[h^1] = sqrt(dist2(D.he_origin[h], D.dest(h)));
-    }
-    D.recompute_all_angles();
-    D.flip_to_delaunay();
-
-    auto cone_perms = restrict_to_cone_points(
-        vector<vector<int>>(S.G.begin(), S.G.end()), T);
-
-    // Find incomplete co-circular orbits.
-    auto cot_opp = [](double e, double a, double b) {
-      double cos_C = (a*a + b*b - e*e) / (2*a*b);
-      double sin_C = sqrt(std::max(0.0, 1.0 - cos_C*cos_C));
-      return sin_C > 1e-15 ? cos_C / sin_C : 1e15;
-    };
-
-    set<pair<int,int>> edge_set;
-    for (int h = 0; h < D.nh; h += 2)
-      if (D.alive(h))
-        edge_set.insert({min(D.he_origin[h],D.dest(h)), max(D.he_origin[h],D.dest(h))});
-
-    bool has_steiner = false;
-    bool has_nonlocal = false;
-
-    // Check each present edge for incomplete orbit.
-    set<pair<int,int>> checked;
-    for (auto& e : edge_set) {
-      if (checked.count(e)) continue;
-
-      // Compute full orbit.
-      set<pair<int,int>> full_orbit;
-      for (auto& perm : cone_perms) {
-        auto img = make_pair(min(perm[e.first],perm[e.second]),
-                             max(perm[e.first],perm[e.second]));
-        full_orbit.insert(img);
-      }
-      for (auto& oe : full_orbit)
-        if (edge_set.count(oe)) checked.insert(oe);
-
-      // Check if incomplete and co-circular.
-      bool complete = true;
-      for (auto& img : full_orbit)
-        if (!edge_set.count(img)) { complete = false; break; }
-      if (complete) continue;
-
-      // Check co-circular.
-      int he = -1;
-      for (int h = 0; h < D.nh; h += 2)
-        if (D.alive(h) && min(D.he_origin[h],D.dest(h))==e.first
-            && max(D.he_origin[h],D.dest(h))==e.second) { he = h; break; }
-      if (he < 0) continue;
-      Diamond dm = D.diamond(he);
-      double cs = cot_opp(dm.e, dm.a, dm.b) + cot_opp(dm.e, dm.c, dm.d);
-      if (fabs(cs) > 1e-8) continue;
-
-      has_steiner = true;
-
-      // Check each missing orbit member: quad alternate or non-local?
-      for (auto& img : full_orbit) {
-        if (edge_set.count(img)) continue;
-        // Count common neighbors.
-        int pu = img.first, pv = img.second;
-        int n_common = 0;
-        int h0 = D.v_out[pu], h = h0;
-        if (h0 >= 0) do {
-          int nb = D.dest(h);
-          int h2 = D.v_out[pv];
-          if (h2 >= 0) { int hh = h2; do { if (D.dest(hh)==nb) { n_common++; break; } hh=D.cw(hh); } while(hh!=h2); }
-          h = D.cw(h);
-        } while (h != h0);
-        if (n_common < 2) has_nonlocal = true;
-      }
-    }
-
-    if (has_steiner) {
-      n_with_steiner++;
-      if (has_nonlocal) {
-        n_has_nonlocal++;
-        if (n_has_nonlocal <= 10)
-          std::cout << "  C" << N << " #" << idx << " " << S.point_group()
-                    << " |G|=" << S.G.size() << " has non-local edges" << std::endl;
-      } else {
-        n_all_local++;
-      }
-    }
-
-    idx++;
-  }
-  BuckyGen::stop(Q);
-
-  std::cout << "C" << N << " non-local edge survey (" << total << " with |G|>1):" << std::endl;
-  std::cout << "  Need Steiner: " << n_with_steiner << std::endl;
-  std::cout << "  All quad-local: " << n_all_local
-            << " (Steiner alone works)" << std::endl;
-  std::cout << "  Has non-local:  " << n_has_nonlocal
-            << " (needs additional technique)" << std::endl;
-}
-
-TEST(SymmetricIDT, NonlocalSurvey_SmallFullerenes) {
-  for (int N = 20; N <= 50; N += 2) {
-    if (N == 22) continue;
-    survey_nonlocal_edges(N);
-  }
-}
-TEST(SymmetricIDT, NonlocalSurvey_C60)  { survey_nonlocal_edges(60); }
-TEST(SymmetricIDT, NonlocalSurvey_C80)  { survey_nonlocal_edges(80); }
-TEST(SymmetricIDT, NonlocalSurvey_C100) { survey_nonlocal_edges(100); }
-
-// Validate Steiner-augmented iDT: consistency, Delaunay, G-invariance.
-static void validate_steiner_idt(int N) {
-  int total = 0, n_steiner = 0, n_fail_consistency = 0, n_fail_delaunay = 0;
-  int n_fail_symmetry = 0, max_steiner = 0, total_steiner_verts = 0;
-
-  BuckyGen::buckygen_queue Q = BuckyGen::start(N, false, false);
-  Triangulation T;
-  int idx = 0;
-  while (BuckyGen::next_fullerene(Q, T)) {
-    Symmetry S(T);
-    if (S.G.size() <= 1) { idx++; continue; }
-
-    auto D = DelaunayTriangulation::compute_symmetric(T, S);
-    int extra = D.nv - 12;
-
-    if (!D.check_consistency()) n_fail_consistency++;
-    if (!D.is_delaunay()) n_fail_delaunay++;
-
-    // Build extended permutations for G-invariance check.
-    auto cone_perms = restrict_to_cone_points(
-        vector<vector<int>>(S.G.begin(), S.G.end()), T);
-
-    if (extra > 0) {
-      n_steiner++;
-      total_steiner_verts += extra;
-      max_steiner = std::max(max_steiner, extra);
-
-      // Build Steiner vertex neighbor sets for permutation extension.
-      vector<set<int>> steiner_quads;
-      for (int sv = 12; sv < D.nv; sv++) {
-        set<int> nbs;
-        int h0 = D.v_out[sv], h = h0;
-        if (h0 >= 0) do { nbs.insert(D.dest(h)); h = D.cw(h); } while (h != h0);
-        steiner_quads.push_back(nbs);
-      }
-
-      vector<vector<int>> full_perms;
-      for (auto& cp : cone_perms) {
-        vector<int> fp(D.nv);
-        for (int v = 0; v < 12; v++) fp[v] = cp[v];
-        for (int si = 0; si < (int)steiner_quads.size(); si++) {
-          set<int> mapped;
-          for (int v : steiner_quads[si]) mapped.insert(cp[v]);
-          int mapped_sv = 12 + si;  // default
-          for (int sj = 0; sj < (int)steiner_quads.size(); sj++)
-            if (steiner_quads[sj] == mapped) { mapped_sv = 12 + sj; break; }
-          fp[12 + si] = mapped_sv;
-        }
-        full_perms.push_back(fp);
-      }
-
-      if (D.check_edge_symmetry(full_perms) > 0) {
-        n_fail_symmetry++;
-        if (n_fail_symmetry <= 5)
-          std::cout << "  C" << N << " #" << idx << ": " << extra
-                    << " Steiner verts, symmetry violations!" << std::endl;
-      }
-    }
-
-    total++;
-    idx++;
-  }
-  BuckyGen::stop(Q);
-
-  std::cout << "C" << N << " Steiner iDT (" << total << " isomers with |G|>1):" << std::endl;
-  std::cout << "  Steiner insertions: " << n_steiner << " isomers, "
-            << total_steiner_verts << " total verts, max " << max_steiner << " per isomer" << std::endl;
-  std::cout << "  Consistency failures: " << n_fail_consistency << std::endl;
-  std::cout << "  Delaunay failures:    " << n_fail_delaunay << std::endl;
-  std::cout << "  Symmetry failures:    " << n_fail_symmetry << std::endl;
-
-  EXPECT_EQ(n_fail_consistency, 0);
-  EXPECT_EQ(n_fail_delaunay, 0);
-  EXPECT_EQ(n_fail_symmetry, 0);
-}
-
-TEST(SymmetricIDT, SteinerValidation_C20_to_C50) {
-  for (int N = 20; N <= 50; N += 2) {
-    if (N == 22) continue;
-    validate_steiner_idt(N);
-  }
-}
-TEST(SymmetricIDT, SteinerValidation_C60)  { validate_steiner_idt(60); }
-TEST(SymmetricIDT, SteinerValidation_C80)  { validate_steiner_idt(80); }
-TEST(SymmetricIDT, SteinerValidation_C100) { validate_steiner_idt(100); }

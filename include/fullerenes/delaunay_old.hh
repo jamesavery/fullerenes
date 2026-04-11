@@ -47,7 +47,7 @@ public:
 
   // --- 3D Embedding ---
   matrix<double> all_pairs_distances() const;
-  // embed_3d() not available — use DelaunayTriangulation::embed_3d() instead.
+  // embed_3d() not available — use embed_delaunay_3d() instead.
 };
 
 struct IDTAudit {
