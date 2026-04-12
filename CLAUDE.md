@@ -135,8 +135,9 @@ Fullerenes exist for all even N >= 20 except N=22.
 - **No git commits**: Never commit to git yourself. Stage the changed files with git add and propose a commit message. The user always reviews and commits manually.
 - **No backticks in commit messages**: Commit messages get pasted into an editor where backticks cause problems. Use plain text instead.
 - **Never stage claude-projects/**: The `claude-projects/` directory has its own separate git repo. Never add, stage, or commit files under `claude-projects/` to the fullerene repository. It is listed in `.gitignore`.
-- **NEVER kill background processes without EXPLICIT user approval**: This is the HIGHEST PRIORITY rule. Long-running computations (benchmarks, enumerations) may represent hours of irreplaceable work. ALWAYS ask "Can I stop task X? It has been running for Y time and has Z partial results" and WAIT for the user to confirm. Even if you discover a bug and want to relaunch, do NOT stop running processes — modify code, rebuild separately, and ask the user whether to stop the old run. This applies to TaskStop, Ctrl-C, `kill`, and any other means of termination. NO EXCEPTIONS.
-- **Long-running experiments must support partial results and resumption**: When writing benchmarks or experiments that may run for a long time: (1) Write partial results incrementally (e.g., flush JSON after each isomer, or write checkpoints periodically) so that killing or crashing doesn't lose all progress. (2) Where possible, support restarting from a partially completed state (e.g., save enumeration state, or accept a "start from" parameter). Never design an experiment that only writes output at the very end.
+- **NEVER kill background processes without EXPLICIT user approval**: Long-running computations (benchmarks, enumerations) may represent hours of irreplaceable work. ALWAYS ask "Can I stop task X? It has been running for Y time and has Z partial results" and WAIT for the user to confirm. Even if you discover a bug and want to relaunch, do NOT stop running processes — modify code, rebuild separately, and ask the user whether to stop the old run. This applies to TaskStop, Ctrl-C, `kill`, and any other means of termination. NO EXCEPTIONS.
+- **NEVER do a git reset without EXPLICIT user approval**: This may throw away days of work. Always ask the user.
+- **Long-running experiments must support partial results and resumption**: When writing benchmarks or experiments that may run for a long time: (1) Write partial results incrementally (e.g., flush JSON after each isomer, or write checkpoints periodically) so that killing or crashing doesn't lose all progress. (2) Where possible, support restarting from a partially completed state (e.g., save enumeration state, or accept a "start from" parameter). Never design an experiment that only writes output at the very end. (3) Use un-buffered output.
 - **NEVER relax guards or validation thresholds**: When a guard condition, assertion, or validation test fails, the solution is NEVER to relax the constraint to make it pass. Guards exist to detect errors — finding errors is essential for correct code. Instead: investigate the root cause, fix the underlying algorithm, not the check. Only change a threshold if there is a clear mathematical proof that the new value is correct. The goal is not a passing test — the goal is correct code that never produces the wrong result.
 - **Never prefix Bash commands with `cd dir &&`**: The permissions system matches the entire command string against glob patterns like `Bash(cmake*)`. A command `cd /some/dir && cmake ...` does NOT match `Bash(cmake*)` because it starts with `cd`. Instead, use absolute paths: `cmake --build /path/to/build` or `cmake -S /path/to/src -B /path/to/build`.
 
@@ -190,43 +191,6 @@ When angle_tol is set, the optimizer tracks whether energy decreases meaningfull
 
 Build (from build2/): `cmake --build . --target bench_epopt` (or bench_quality_pipeline, patch_diag, step_mol2).
 
-## Delaunay Geometry Initial Embedding (Active Sub-project)
-
-Using the intrinsic Delaunay triangulation (iDT) to produce initial 3D geometries for the Deltahedron optimizer. Pipeline: compute iDT between the 12 cone points (exact surface geodesics) -> optimize a 12-vertex polyhedron to match those distances -> unfold the original triangulation into per-iDT-triangle charts -> place degree-6 vertices via barycentric interpolation -> relax with the full optimizer. See `claude-projects/delaunay-geometry/PROGRESS.md` for detailed task breakdown.
-
-Key files: `include/fullerenes/delaunay.hh`, `src/c++/delaunay.cc` (iDT computation), `include/fullerenes/unfold.hh`, `src/c++/unfold.cc` and `src/c++/fold.cc` (Eisenstein grid unfold/fold machinery).
-
-### Current Mission: Symmetric embed_3d via A-Priori Symmetry Reduction
-
-Goal: make the symmetric path of `DelaunayTriangulation::embed_3d` achieve 0 failures across all C60 isomers (1812), scaling to 2*10^11 isomers up to C400. The algorithm must NEVER fail -- no numerical tuning, no fragile lambda parameters.
-
-The approach is a-priori symmetry reduction:
-1. Orbit-reduced MDS from intrinsic distances -- the K x K reduced Gram matrices (K = number of orbits) have NO symmetry-forced eigenvalue degeneracies. Each eigenvalue maps to exactly one axis. No Jacobi rotation or degeneracy handling needed.
-2. Multi-start with 3 MDS strategies: T_g eigenvector MDS, block-diagonal Gram MDS (diagonal groups), and plain MDS + Reynolds projection. Score by E_edge energy, optimize from best 2.
-3. Optimize in reduced space with Steihaug-CG using E_edge ONLY. E_face_angle was tested but found HARMFUL -- creates spurious local minima (15 failures vs 12 without). Cauchy rigidity (12 vertices, 30 edges) makes E_edge sufficient.
-
-What NOT to do:
-- Never run a full-space nosym optimizer and then try to extract the frame from its result (that is coordinate-based symmetry inference, which violates the project invariant).
-- Never use E_face_angle -- it creates spurious local minima that trap the optimizer, especially for multi-edge cases.
-- Never resolve degeneracies with Jacobi rotations on the full 12x12 Gram -- use orbit reduction to eliminate degeneracies a priori.
-
-Current status (2026-03-17): A-priori orbit-reduced MDS + multi-start + E_edge only. Result: 12 failures on C60 (1812 isomers), down from 22 with the old approach.
-
-Failure breakdown (C60, 12 failures with >1% error, 4 with >5%):
-- C2: 7/189 (1-3% errors, wrong-basin convergence)
-- Cs: 1/67 (1.1%)
-- D2h: #348 (51%), C2h: #1638 (34%), D2d: #1267 (6.4%), D6h: #1804 (4.1%)
-
-Root cause analysis: The APSP (shortest-path) distances used to build the Gram matrix are SURFACE GEODESIC distances, not Euclidean distances. For non-adjacent vertex pairs, d_surface > d_Euclidean. This distorts the per-axis Gram matrices GA[a], producing wrong orbit-rep coordinates. The optimizer cannot escape the resulting wrong basin.
-
-Key architectural components (all in src/c++/delaunay.cc):
-- `block_gram_mds` (~line 2186): Orbit-reduced Gram separation for diagonal groups. Computes per-axis K x K Gram matrices GA[a] from APSP distances + group character averaging.
-- `tg_symmetry_adapted_mds` (~line 2156): T_g eigenvector-character approach for general groups.
-- `embed_3d` symmetric path (~line 2609): Multi-start MDS init -> Reynolds project -> reduced-space Steihaug with E_edge only.
-
-Next steps: improve the MDS initialization quality. The APSP-distance-based Gram is the bottleneck. Options:
-1. Build Gram from iDT edge lengths + face angles instead of APSP (avoids surface-distance distortion for non-adjacent pairs).
-2. Better distance estimates: use face structure to estimate Euclidean distances instead of APSP surface distances.
 
 ## Recent Development Notes
 
