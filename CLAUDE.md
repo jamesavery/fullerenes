@@ -9,9 +9,15 @@ Fullerenes is a C++17/Fortran application for topological analysis and 3D struct
 ## Build Commands
 
 ```bash
-# Configure (from repo root)
+# Configure (from repo root). Pin the toolchain to gcc-13 / gfortran-13:
+# gcc-14 + -std=gnu++23 miscompiles the file-scope vector<vector<string>>
+# initializers in isomerdb.cc / polyhedron-io.cc / planargraph-io.cc, and the
+# resulting libfullerenes.so aborts with length_error during dynamic-load
+# static init. Stick with gcc-13 until the code is audited for this.
 mkdir build && cd build
-cmake ..
+cmake -DCMAKE_C_COMPILER=gcc-13 \
+      -DCMAKE_CXX_COMPILER=g++-13 \
+      -DCMAKE_Fortran_COMPILER=gfortran-13 ..
 
 # Build everything
 cmake --build build

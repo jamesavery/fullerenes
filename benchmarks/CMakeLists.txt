@@ -32,6 +32,12 @@ target_link_libraries(step_mol2 fullerenes)
 add_executable(bench_epopt bench_epopt.cc)
 target_link_libraries(bench_epopt fullerenes)
 
+add_executable(bench_alexandrov bench_alexandrov.cc)
+target_link_libraries(bench_alexandrov fullerenes)
+if(OpenMP_CXX_FOUND)
+  target_link_libraries(bench_alexandrov OpenMP::OpenMP_CXX)
+endif()
+
 add_executable(replay_perstep replay_perstep.cc)
 target_link_libraries(replay_perstep fullerenes)
 
