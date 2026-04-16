@@ -674,6 +674,7 @@ vector<coord3d> AlexandrovSolver::solve() {
 
   // 3. Endgame: extrapolate to t = 0
   stats_extrap_kappa = 0;
+  r_before_extrap = r;
   if (!history.empty()) {
     auto r_ext = PALC::extrapolate(history);
     if (!r_ext.empty()) r = r_ext;

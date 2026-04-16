@@ -26,6 +26,7 @@ struct AlexandrovSolver {
   int stats_steps = 0, stats_flips = 0, stats_newton_total = 0;
   double stats_final_kappa = 0;
   double stats_extrap_kappa = 0;   // max|kappa| right after endgame extrapolation
+  std::vector<double> r_before_extrap;   // last PALC iterate (for diagnostics)
 
   // One entry per PALC step (if trace_jacobian) or Newton step (phase='N').
   struct TraceEntry {
