@@ -52,4 +52,25 @@ struct AlexandrovSolver {
   // gross inconsistency (negative perpendicular squared distance).
   static std::vector<coord3d> reconstruct(const DelaunayTriangulation& T,
                                           const std::vector<double>& r);
+
+  // ------ Diagnostic accessors (exposed for verification / unit tests) ------
+
+  // κ(T, r): per-vertex angle deficit at the radial edge a−v.
+  static std::vector<double> kappa(const DelaunayTriangulation& T,
+                                    const std::vector<double>& r);
+
+  // BI total scalar curvature H(T, r) = Σ_v r_v κ_v + Σ_e ℓ_e (π − θ_e).
+  // ∂H/∂r_v = κ_v(r) (BI 2008, Proposition 5, eq. 13).  Hessian is
+  // Lorentzian (signature (1, n−1)) by BI Theorem 4 + Lemma 3.4.
+  static double H(const DelaunayTriangulation& T,
+                   const std::vector<double>& r);
+
+  // Eigenvalues of J = ∂κ/∂r at (T, r), sorted ascending.
+  // Empty on LAPACK failure.
+  static std::vector<double> jacobian_eigvals(const DelaunayTriangulation& T,
+                                               const std::vector<double>& r);
+
+  // Feasibility predicate: r ∈ F(T) iff every incident pyramid closes.
+  static bool feasible(const DelaunayTriangulation& T,
+                        const std::vector<double>& r);
 };

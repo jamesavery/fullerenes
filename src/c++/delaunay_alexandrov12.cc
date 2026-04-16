@@ -147,6 +147,24 @@ vector<double> kappa(const DelaunayTriangulation& T, const vector<double>& r) {
   return k;
 }
 
+// Bobenko–Izmestiev total scalar curvature (BI 2008, Definition 3.1):
+//   H(T, r) = Σ_v r_v · κ_v(r) + Σ_e ℓ_e · (π − θ_e(r))
+// where θ_e = α_e + α_{e^1} is the full dihedral at base edge e.
+// Per BI Proposition 5 eq. (13), ∂H/∂r_v = κ_v exactly.
+// Note: H is NOT strictly concave — the Hessian has Lorentzian signature
+// (1, n−1) by BI Theorem 4 + Lemma 3.4.  H is exposed for diagnostics
+// and verification, not as a merit function for direct optimisation.
+double H(const DelaunayTriangulation& T, const vector<double>& r) {
+  double s = 0;
+  auto kv = kappa(T, r);
+  for (int v = 0; v < T.nv; v++) s += r[v] * kv[v];
+  for (int h = 0; h < T.nh; h += 2) {
+    if (!T.alive(h)) continue;
+    s += T.he_length[h] * (M_PI - theta(T, r, h));
+  }
+  return s;
+}
+
 // Feasibility: r ∈ F(T) iff every incident pyramid closes.  Any guard in
 // alpha() (wy_sq<0 or h_sq<0) yields NAN; a single non-finite return
 // short-circuits the scan.
@@ -726,4 +744,24 @@ vector<coord3d> AlexandrovSolver::solve() {
 vector<coord3d> AlexandrovSolver::reconstruct(const DelaunayTriangulation& T,
                                               const vector<double>& r) {
   return Reconstruct::from_radii(T, r);
+}
+
+vector<double> AlexandrovSolver::kappa(const DelaunayTriangulation& T,
+                                        const vector<double>& r) {
+  return GCP::kappa(T, r);
+}
+
+double AlexandrovSolver::H(const DelaunayTriangulation& T,
+                            const vector<double>& r) {
+  return GCP::H(T, r);
+}
+
+vector<double> AlexandrovSolver::jacobian_eigvals(const DelaunayTriangulation& T,
+                                                    const vector<double>& r) {
+  return sym_eigvals(GCP::jacobian(T, r));
+}
+
+bool AlexandrovSolver::feasible(const DelaunayTriangulation& T,
+                                 const vector<double>& r) {
+  return GCP::feasible(T, r);
 }
