@@ -70,6 +70,11 @@ struct AlexandrovSolver {
   static std::vector<double> jacobian_eigvals(const DelaunayTriangulation& T,
                                                const std::vector<double>& r);
 
+  // sign(det J(T, r)), computed via LU pivot product.  Returns 0 on
+  // numerical singularity or LAPACK failure.  Used as a fold detector.
+  static int jacobian_det_sign(const DelaunayTriangulation& T,
+                                const std::vector<double>& r);
+
   // Feasibility predicate: r ∈ F(T) iff every incident pyramid closes.
   static bool feasible(const DelaunayTriangulation& T,
                         const std::vector<double>& r);

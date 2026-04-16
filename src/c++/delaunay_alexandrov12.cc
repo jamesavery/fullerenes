@@ -27,6 +27,7 @@
 #include <cmath>
 #include <vector>
 #include <algorithm>
+#include <expected>
 
 using namespace std;
 
@@ -276,8 +277,15 @@ double energy(const V& v) { return 0.5 * sum_sq(v); }
 
 // --- Linear solvers ---
 
-// Solve A·x = b via LAPACK.  Returns zero vector on failure.
-V solve(const matrix<double>& A, const V& b) {
+// LU-with-sign solve: returns (x, det_sign) on success.
+// det_sign ∈ {−1, +1} is sign(det A), computed as the product of:
+//   (−1)^{# row swaps from ipiv}  ×  product of signs of diag(U).
+// Failures are tagged: Singular for a zero pivot, LapackError for bad info.
+struct LuSolved { V x; int det_sign; };
+enum class LuFail { Singular, LapackError };
+
+std::expected<LuSolved, LuFail>
+solve_with_sign(const matrix<double>& A, const V& b) {
   int n = A.m;
   vector<double> Af(n*n);
   V x(b);
@@ -287,8 +295,23 @@ V solve(const matrix<double>& A, const V& b) {
   vector<int> ipiv(n);
   int nrhs = 1, info;
   dgesv_(&n, &nrhs, Af.data(), &n, ipiv.data(), x.data(), &n, &info);
-  if (info != 0) return V(n, 0.0);
-  return x;
+  if (info < 0) return std::unexpected(LuFail::LapackError);
+  if (info > 0) return std::unexpected(LuFail::Singular);
+  int sign = 1;
+  for (int i = 0; i < n; i++) {
+    if (ipiv[i] != i + 1) sign = -sign;       // row swap parity
+    double d = Af[i*n + i];                   // diagonal of U
+    if (d < 0)       sign = -sign;
+    else if (d == 0) return std::unexpected(LuFail::Singular);
+  }
+  return LuSolved{std::move(x), sign};
+}
+
+// Solve A·x = b via LAPACK.  Returns zero vector on failure.
+// (Backward-compat wrapper around solve_with_sign that discards the sign.)
+V solve(const matrix<double>& A, const V& b) {
+  auto r = solve_with_sign(A, b);
+  return r ? std::move(r->x) : V(A.m, 0.0);
 }
 
 // Solve (A + λI)·x = b.
@@ -759,6 +782,14 @@ double AlexandrovSolver::H(const DelaunayTriangulation& T,
 vector<double> AlexandrovSolver::jacobian_eigvals(const DelaunayTriangulation& T,
                                                     const vector<double>& r) {
   return sym_eigvals(GCP::jacobian(T, r));
+}
+
+int AlexandrovSolver::jacobian_det_sign(const DelaunayTriangulation& T,
+                                          const vector<double>& r) {
+  auto J = GCP::jacobian(T, r);
+  V dummy(J.m, 0.0);
+  auto sol = LinAlg::solve_with_sign(J, dummy);
+  return sol ? sol->det_sign : 0;
 }
 
 bool AlexandrovSolver::feasible(const DelaunayTriangulation& T,
