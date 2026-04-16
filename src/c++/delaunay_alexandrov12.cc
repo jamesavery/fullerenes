@@ -147,6 +147,37 @@ vector<double> kappa(const DelaunayTriangulation& T, const vector<double>& r) {
   return k;
 }
 
+// Feasibility: r ∈ F(T) iff every incident pyramid closes.  Any guard in
+// alpha() (wy_sq<0 or h_sq<0) yields NAN; a single non-finite return
+// short-circuits the scan.
+bool feasible(const DelaunayTriangulation& T, const vector<double>& r) {
+  for (int h = 0; h < T.nh; h++) {
+    if (!T.alive(h)) continue;
+    if (!isfinite(alpha(T, r, h))) return false;
+  }
+  return true;
+}
+
+// Largest s ∈ [0, 1] such that r_from + s·(r_to − r_from) ∈ F(T).
+// Assumes r_from ∈ F.  Returns 1 if the entire segment is feasible;
+// otherwise bisects in s to ~2⁻ⁿ precision.  Used by the endgame guard
+// (Tier 1) and prospectively by any other line search constrained to F.
+double feasibility_max_step(const DelaunayTriangulation& T,
+                             const vector<double>& r_from,
+                             const vector<double>& r_to,
+                             int n_iter = 40) {
+  if (feasible(T, r_to)) return 1.0;
+  vector<double> rs(r_from.size());
+  double lo = 0, hi = 1;
+  for (int it = 0; it < n_iter; it++) {
+    double mid = 0.5 * (lo + hi);
+    for (size_t i = 0; i < r_from.size(); i++)
+      rs[i] = r_from[i] + mid * (r_to[i] - r_from[i]);
+    if (feasible(T, rs)) lo = mid; else hi = mid;
+  }
+  return lo;
+}
+
 // Per-oriented-edge Jacobian contribution.
 // For half-edge h (oriented edge e: i→j):
 //   J_e = (cot α_e + cot α_{−e}) / (ℓ_e sin ρ_e sin ρ_{−e})
@@ -263,6 +294,16 @@ V matvec(const matrix<double>& A, const V& v) {
 
 // Bring vector ops into scope for readability
 using LinAlg::V;
+
+// Pack one PALC- or Newton-step diagnostic into a TraceEntry.  Caller
+// decides whether to record (avoids the cost of κ and J spectrum when
+// trace_jacobian is off); this just bundles the fields.
+static AlexandrovSolver::TraceEntry make_trace(
+    char phase, int step, double t, double ds, int nit,
+    const V& kappa, const matrix<double>& J) {
+  return {phase, step, t, ds, nit,
+          LinAlg::max_abs(kappa), LinAlg::norm(kappa), sym_eigvals(J)};
+}
 
 // ============================================================================
 // Layer 3: Trust-region subproblem
@@ -481,18 +522,8 @@ pair<bool, double> polish(DelaunayTriangulation& T, V& r,
 
     auto [ok, D2] = TrustRegion::update(E - E_trial, pred, norm(delta), Delta, Delta_max);
     Delta = D2;
-    if (out_trace) {
-      AlexandrovSolver::TraceEntry te;
-      te.phase = 'N';
-      te.step  = iter;
-      te.t     = 0.0;
-      te.ds    = Delta;
-      te.nit   = ok ? 1 : 0;                   // 1 = accepted, 0 = rejected
-      te.kappa_max  = max_abs(kappa);
-      te.kappa_norm = norm(kappa);
-      te.eigvals    = sym_eigvals(J);
-      out_trace->push_back(std::move(te));
-    }
+    if (out_trace)
+      out_trace->push_back(make_trace('N', iter, 0.0, Delta, ok ? 1 : 0, kappa, J));
     if (ok) { r = r_trial; Topology::flip_to_delaunay(T, r); rejects = 0; }
     else rejects++;
   }
@@ -655,29 +686,26 @@ vector<coord3d> AlexandrovSolver::solve() {
       ds *= 0.5;
       if (ds < 1e-15) break;
     }
-    if (trace_jacobian) {
-      auto kappa_now = GCP::kappa(D, r);
-      TraceEntry te;
-      te.phase = 'P';
-      te.step  = step;
-      te.t     = t;
-      te.ds    = ds;
-      te.nit   = nit;
-      te.kappa_max  = LinAlg::max_abs(kappa_now);
-      te.kappa_norm = LinAlg::norm(kappa_now);
-      te.eigvals    = sym_eigvals(J0);
-      trace.push_back(std::move(te));
-    }
+    if (trace_jacobian)
+      trace.push_back(make_trace('P', step, t, ds, nit, GCP::kappa(D, r), J0));
     stats_steps++;
     stats_newton_total += max(nit, 0);
   }
 
-  // 3. Endgame: extrapolate to t = 0
+  // 3. Endgame: extrapolate to t = 0, with Tier-1 feasibility guard.
+  // Lagrange extrapolation can overstep the pyramid-closure boundary when
+  // the PALC path bends near a fold-fold singularity (observed on
+  // C120 #1061350 and C140 #5207982).  When r_ext leaves F, we land on
+  // the line from r_last to r_ext at 0.95·s_max for a conditioning margin.
   stats_extrap_kappa = 0;
   r_before_extrap = r;
   if (!history.empty()) {
     auto r_ext = PALC::extrapolate(history);
-    if (!r_ext.empty()) r = r_ext;
+    if (!r_ext.empty()) {
+      double s_max = GCP::feasibility_max_step(D, r, r_ext);
+      double s = (s_max < 1.0) ? 0.95 * s_max : 1.0;
+      for (size_t i = 0; i < r.size(); i++) r[i] += s * (r_ext[i] - r[i]);
+    }
     stats_extrap_kappa = LinAlg::max_abs(GCP::kappa(D, r));
   }
 
