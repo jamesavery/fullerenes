@@ -1218,29 +1218,36 @@ static void flip_away_self_loops(DelaunayTriangulation& D, int v) {
 
 void DelaunayTriangulation::remove_flat_vertices()
 {
-  while (nv > 0 && v_orig_degree[nv - 1] == 6 && v_out[nv - 1] >= 0) {
-    int target = nv - 1;
-
-    flip_away_self_loops(*this, target);
-    remove_flat_vertex(target);
-
-    // Check if removal succeeded (vertex is now dead).
-    if (v_out[nv - 1] >= 0) {
-      // Stuck — try restructuring with Delaunay flips.
-      bool removed = false;
-      for (int retry = 0; retry < 5; retry++) {
-        flip_to_delaunay();
-        remove_flat_vertex(nv - 1);
-        if (v_out[nv - 1] < 0) { removed = true; break; }
+  // Scan all live flat vertices top-down; any single removable vertex keeps
+  // the algorithm moving.  Repeat until a pass produces no removals, then
+  // apply a Delaunay restructuring sweep and try once more.  Only after
+  // two consecutive fruitless passes do we declare the graph truly stuck.
+  //
+  // Rationale: removing in strict descending-index order aborts as soon as
+  // the highest-index flat vertex resists, even when other flat vertices
+  // are still removable — which strands labeling-dependent multi-edge
+  // clusters and leaves the iDT with > 12 vertices.  A full-scan pass is
+  // O(N) per iteration and has no worse asymptotic cost than the old loop.
+  auto remove_any_flat = [&]() {
+    bool progress = false;
+    for (int v = nv - 1; v >= 0; v--) {
+      if (v_out[v] < 0 || v_orig_degree[v] != 6) continue;
+      flip_away_self_loops(*this, v);
+      remove_flat_vertex(v);
+      if (v_out[v] < 0) {
+        progress = true;
+        while (nv > 0 && v_out[nv - 1] < 0) nv--;
+        lawson_sweep();
       }
-      if (!removed) break;
     }
+    return progress;
+  };
 
-    // "Remove" vertex: decrement nv (dead vertices stay in arrays but are skipped).
-    // Actually, we just mark it dead via v_out[v] = -1. Decrement nv.
-    while (nv > 0 && v_out[nv - 1] < 0) nv--;
-
-    lawson_sweep();
+  while (true) {
+    if (remove_any_flat()) continue;
+    // Nothing removable this pass; restructure via full Delaunay sweep and retry.
+    flip_to_delaunay();
+    if (!remove_any_flat()) break;
   }
 
   flip_to_delaunay();
