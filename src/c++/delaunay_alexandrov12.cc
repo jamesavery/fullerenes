@@ -527,6 +527,94 @@ double adapt_ds(double ds, int nit, int max_nit, double ds_max) {
   return min(fabs(ds), ds_max);
 }
 
+// ---- Structured PALC primitives (step 3 of Tier-2 plan) ----
+
+constexpr int CORRECTOR_MAX_ITER = 8;
+constexpr double CORRECTOR_TOL = 1e-12;
+constexpr double DS_MIN = 1e-15;
+constexpr double DS_MAX = 0.5;
+
+// One predictor-corrector step.  Returns the corrector iteration count
+// alongside the (t, r) iterate — always present; "accepted" iff
+// nit ∈ [0, CORRECTOR_MAX_ITER).  t, r are valid only if accepted.
+struct StepResult {
+  int nit;
+  double t; V r;
+  bool accepted() const { return nit >= 0 && nit < CORRECTOR_MAX_ITER; }
+};
+
+// Pre:  (t₀, r₀) ∈ F(T) with 0 < κᵢ(t₀, r₀) for the BI homotopy.
+// Post: if accepted(), (t, r) is on the homotopy path at arc-length
+//       distance ds from (t₀, r₀), to within CORRECTOR_TOL.
+StepResult palc_step(const DelaunayTriangulation& T,
+                      double t0, const V& r0, const V& kappa1,
+                      const matrix<double>& J, double ds) {
+  auto tau = compute_tangent(J, kappa1);
+  auto [tp, rp] = predict(t0, r0, tau, ds);
+  double tc = tp; V rc = rp;
+  int nit = correct(T, tc, rc, kappa1, tau, t0, r0, ds,
+                     CORRECTOR_MAX_ITER, CORRECTOR_TOL);
+  return {nit, tc, std::move(rc)};
+}
+
+struct PALCStats {
+  int steps = 0, flips = 0, newton_total = 0;
+};
+
+struct TrackResult {
+  double t_final;
+  V r_final;
+  vector<pair<double, V>> history;
+  PALCStats stats;
+};
+
+// Initial radii for the BI homotopy: r = 2·R_max·1.
+// Pre:  T is a valid iDT with positive edge lengths.
+// Post: r ∈ F(T) and 0 < κ_i(T, r) < δ_i (BI admissibility).
+V initial_radii(const DelaunayTriangulation& T) {
+  double R = 0;
+  for (int h = 0; h < T.nh; h += 2)
+    if (T.alive(h)) R = max(R, T.he_length[h]);
+  return V(T.nv, 2 * R);
+}
+
+// Track the homotopy κ(r) = t·κ₁ from t=1 toward t_target.
+//
+// Pre:  r ∈ F(T), 0 < κᵢ(T, r) < δᵢ, t_target > 0.
+// Post: t_final ≤ t_target (if PALC converges) or t_final > t_target
+//       (if PALC stalls — caller should fall back to Tier-2).
+TrackResult palc_track(DelaunayTriangulation& T, V r, const V& kappa1,
+                        double t_target, double ds_init,
+                        vector<AlexandrovSolver::TraceEntry>* trace) {
+  double t = 1.0, ds = ds_init;
+  vector<pair<double, V>> history;
+  PALCStats stats;
+
+  for (int step = 0; step < 500 && t > t_target; step++) {
+    auto J = GCP::jacobian(T, r);
+    auto result = palc_step(T, t, r, kappa1, J, ds);
+
+    if (result.accepted()) {
+      t = result.t; r = std::move(result.r);
+      stats.flips += Topology::flip_to_delaunay(T, r);
+      if (!history.empty() && fabs(t - history.back().first) < 1e-14)
+        history.back() = {t, r};
+      else
+        history.push_back({t, r});
+      ds = adapt_ds(ds, result.nit, CORRECTOR_MAX_ITER, DS_MAX);
+    } else {
+      ds *= 0.5;
+      if (ds < DS_MIN) break;
+    }
+    if (trace)
+      trace->push_back(make_trace('P', step, t, ds, result.nit,
+                                   GCP::kappa(T, r), J));
+    stats.steps++;
+    stats.newton_total += max(result.nit, 0);
+  }
+  return {t, std::move(r), std::move(history), stats};
+}
+
 // Polynomial extrapolation: given (t_i, r_i) pairs approaching t=0,
 // fit a polynomial r(t) and evaluate at t=0.
 vector<double> extrapolate(const vector<pair<double, vector<double>>>& history) {
@@ -717,55 +805,26 @@ vector<coord3d> from_radii(const DelaunayTriangulation& T, const V& r) {
 // ============================================================================
 
 vector<coord3d> AlexandrovSolver::solve() {
-  int n = D.nv;
   stats_steps = stats_flips = stats_newton_total = 0;
   trace.clear();
 
   // 1. Initialize: uniform radii
-  double R = 0;
-  for (int h = 0; h < D.nh; h += 2)
-    if (D.alive(h)) R = max(R, D.he_length[h]);
-  r.assign(n, 2 * R);
-
-  // 2. PALC: trace κ(r) = t·κ₁ from t=1 toward the endgame zone
+  r = PALC::initial_radii(D);
   auto kappa1 = GCP::kappa(D, r);
-  double t = 1.0, ds = 0.1;
-  vector<pair<double, vector<double>>> history;
 
-  for (int step = 0; step < 500 && t > 0.1; step++) {
-    auto J0 = GCP::jacobian(D, r);
-    auto tau = PALC::compute_tangent(J0, kappa1);
-    auto [tp, rp] = PALC::predict(t, r, tau, ds);
-    double tc = tp; auto rc = rp;
-    int nit = PALC::correct(D, tc, rc, kappa1, tau, t, r, ds, 8, 1e-12);
+  // 2. PALC: trace κ(r) = t·κ₁ from t=1 toward t_target
+  auto track = PALC::palc_track(D, r, kappa1, /*t_target=*/0.1, /*ds_init=*/0.1,
+                                 trace_jacobian ? &trace : nullptr);
+  r = std::move(track.r_final);
+  stats_steps        = track.stats.steps;
+  stats_flips        = track.stats.flips;
+  stats_newton_total = track.stats.newton_total;
 
-    if (nit >= 0 && nit < 8) {
-      t = tc; r = rc;
-      stats_flips += Topology::flip_to_delaunay(D, r);
-      if (!history.empty() && fabs(t - history.back().first) < 1e-14)
-        history.back() = {t, r};
-      else
-        history.push_back({t, r});
-      ds = PALC::adapt_ds(ds, nit, 8, 0.5);
-    } else {
-      ds *= 0.5;
-      if (ds < 1e-15) break;
-    }
-    if (trace_jacobian)
-      trace.push_back(make_trace('P', step, t, ds, nit, GCP::kappa(D, r), J0));
-    stats_steps++;
-    stats_newton_total += max(nit, 0);
-  }
-
-  // 3. Endgame: extrapolate to t = 0, with Tier-1 feasibility guard.
-  // Lagrange extrapolation can overstep the pyramid-closure boundary when
-  // the PALC path bends near a fold-fold singularity (observed on
-  // C120 #1061350 and C140 #5207982).  When r_ext leaves F, we land on
-  // the line from r_last to r_ext at 0.95·s_max for a conditioning margin.
+  // 3. Endgame: guarded extrapolation (Tier 1)
   stats_extrap_kappa = 0;
   r_before_extrap = r;
-  if (!history.empty()) {
-    auto r_ext = PALC::extrapolate(history);
+  if (!track.history.empty()) {
+    auto r_ext = PALC::extrapolate(track.history);
     if (!r_ext.empty()) {
       double s_max = GCP::feasibility_max_step(D, r, r_ext);
       double s = (s_max < 1.0) ? 0.95 * s_max : 1.0;
