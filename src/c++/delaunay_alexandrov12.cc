@@ -314,6 +314,41 @@ V solve(const matrix<double>& A, const V& b) {
   return r ? std::move(r->x) : V(A.m, 0.0);
 }
 
+// Pseudo-arc-length bordered system, treated as a first-class object:
+//
+//   B = [   J         −κ₁     ]    (n × (n+1))
+//       [   r_dotᵀ     t_dot  ]    (1 × (n+1))
+//
+// .solve(neg_F, g) returns (δr, δt, sign(det B)) by the bordering
+// algorithm: two n-solves with J share an LU, and
+//   det(B) = det(J) · (t_dot + r_dotᵀ · J⁻¹ · κ₁)
+// by Schur complement, so the sign is free.
+struct Bordered {
+  const matrix<double>& J;
+  const V&              kappa1;
+  const V&              r_dot;
+  double                t_dot;
+
+  struct Solution { V dr; double dt; int det_sign; };
+
+  // Pre: J is n×n; kappa1, r_dot are n-vectors; neg_F is n-vector; g is scalar.
+  // Post on success: B · [dr; dt] = [neg_F; g] within LAPACK precision,
+  //                  and det_sign ∈ {−1, +1} is sign(det B).
+  // Post on failure: LuFail::Singular if J near-singular or denominator near 0.
+  std::expected<Solution, LuFail> solve(const V& neg_F, double g) const {
+    auto z1 = solve_with_sign(J, neg_F);
+    if (!z1) return std::unexpected(z1.error());
+    auto z2 = solve_with_sign(J, kappa1);
+    if (!z2) return std::unexpected(z2.error());
+    double den = t_dot + dot(r_dot, z2->x);
+    if (fabs(den) < 1e-30) return std::unexpected(LuFail::Singular);
+    double dt = (g - dot(r_dot, z1->x)) / den;
+    V      dr = z1->x + z2->x * dt;
+    int sign_den = (den > 0) - (den < 0);   // {−1, +1}
+    return Solution{std::move(dr), dt, z1->det_sign * sign_den};
+  }
+};
+
 // Solve (A + λI)·x = b.
 V solve_shifted(const matrix<double>& A, const V& b, double lambda) {
   matrix<double> Al = A;
@@ -456,15 +491,10 @@ pair<double, V> predict(double t, const V& r, const Tangent& tau, double ds) {
   return { t + tau.t_dot * ds,  r + tau.r_dot * ds };
 }
 
-// Corrector: Newton on the bordered system using the bordering algorithm.
-//
-//   [ J    −κ₁ ] [δr]   [−F                        ]
-//   [ ṙ₀ᵀ   ṫ₀] [δt] = [ds − ṙ₀ᵀ(r−r₀) − ṫ₀(t−t₀)]
-//
-// Solved via two n×n solves per iteration:
-//   z₁ = J⁻¹(−F),  z₂ = J⁻¹(κ₁)
-//   δt = (g − ṙ₀·z₁) / (ṫ₀ + ṙ₀·z₂)     where g = ds − ṙ₀·(r−r₀) − ṫ₀(t−t₀)
-//   δr = z₁ + δt·z₂
+// Corrector: Newton on the bordered system at each iterate.
+// One Bordered::solve per Newton iteration; the bordered det_sign is
+// computed but unused at this layer (consumed by the fold detector
+// when AUTO mode is added in Tier-2 step 4).
 //
 // Returns number of iterations (−1 on failure).
 int correct(const DelaunayTriangulation& T, double& t, V& r,
@@ -473,23 +503,17 @@ int correct(const DelaunayTriangulation& T, double& t, V& r,
             int max_iter, double tol) {
   using LinAlg::dot;
   for (int nit = 0; nit < max_iter; nit++) {
-    V F = GCP::kappa(T, r) - kappa1 * t;                    // residual
+    V F = GCP::kappa(T, r) - kappa1 * t;                  // residual
     if (LinAlg::max_abs(F) < tol) return nit;
 
     auto J = GCP::jacobian(T, r);
-    auto z1 = LinAlg::solve(J, -F);                          // J·z₁ = −F
-    auto z2 = LinAlg::solve(J, kappa1);                      // J·z₂ = κ₁
-    if (!LinAlg::is_valid(z1) || !LinAlg::is_valid(z2)) return -1;
+    LinAlg::Bordered B{J, kappa1, tau0.r_dot, tau0.t_dot};
+    double g = ds - dot(tau0.r_dot, r - r0) - tau0.t_dot * (t - t0);
+    auto sol = B.solve(-F, g);
+    if (!sol) return -1;
 
-    double g   = ds - dot(tau0.r_dot, r - r0) - tau0.t_dot * (t - t0);
-    double den = tau0.t_dot + dot(tau0.r_dot, z2);
-    if (fabs(den) < 1e-30) return -1;
-
-    double dt = (g - dot(tau0.r_dot, z1)) / den;
-    V dr = z1 + z2 * dt;
-
-    t += dt;
-    r = r + dr;
+    t += sol->dt;
+    r = r + sol->dr;
   }
   return max_iter;
 }
