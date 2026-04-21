@@ -574,6 +574,137 @@ TEST(LayoutScratch, SliceSharesStorage) {
     EXPECT_EQ(sub[1][Nf-1].second, float(Nf - 1));
 }
 
+// ---------------------------------------------------------------------------
+// Phase 6: BatchQueue<V>
+// ---------------------------------------------------------------------------
+#include <fullerenes/batch/batch_queue.hh>
+
+TEST(BatchQueue, PushBackAndFrontAccess) {
+    Graph G20 = FullereneGraph::C20();
+    CubicGraph CG(G20);
+
+    batch::BatchQueue<CubicGraphView> Q(CG.N, /*capacity=*/4, CG.dmax);
+    EXPECT_TRUE(Q.empty());
+
+    Q.push_back(CG, /*id=*/7, StatusFlag{StatusEnum::CUBIC_INITIALIZED}, /*iter=*/0);
+    Q.push_back(CG, /*id=*/8, StatusFlag{StatusEnum::DUAL_INITIALIZED},  /*iter=*/1);
+    EXPECT_EQ(Q.size(), 2);
+    EXPECT_EQ(Q.front_index(), 0);
+    EXPECT_EQ(Q.back_index(),  1);
+
+    // Logical-index access.
+    auto e0 = Q.at(0);
+    EXPECT_EQ(e0.N, CG.N);
+    uint64_t id; StatusFlag f; int32_t it;
+    Q.state().read_slot(Q.front_index(), id, f, it);
+    EXPECT_EQ(id, 7u);
+    EXPECT_EQ(it, 0);
+}
+
+TEST(BatchQueue, CircularWrapAround) {
+    Graph G20 = FullereneGraph::C20();
+    CubicGraph CG(G20);
+
+    batch::BatchQueue<CubicGraphView> Q(CG.N, 3, CG.dmax);
+    Q.push_back(CG, 10);
+    Q.push_back(CG, 11);
+    Q.push_back(CG, 12);
+    EXPECT_EQ(Q.size(), 3);
+
+    // Pop one, push one: should wrap back_ around slot 0.
+    EXPECT_TRUE(Q.discard_front());
+    Q.push_back(CG, 13);
+    EXPECT_EQ(Q.size(), 3);
+    EXPECT_EQ(Q.front_index(), 1);
+    EXPECT_EQ(Q.back_index(),  0);
+
+    // Logical order should still be 11, 12, 13.
+    uint64_t id; StatusFlag f; int32_t it;
+    Q.state().read_slot(Q.slot_of(0), id, f, it); EXPECT_EQ(id, 11u);
+    Q.state().read_slot(Q.slot_of(1), id, f, it); EXPECT_EQ(id, 12u);
+    Q.state().read_slot(Q.slot_of(2), id, f, it); EXPECT_EQ(id, 13u);
+}
+
+TEST(BatchQueue, GrowPreservesOrder) {
+    Graph G20 = FullereneGraph::C20();
+    CubicGraph CG(G20);
+
+    batch::BatchQueue<CubicGraphView> Q(CG.N, 2, CG.dmax);
+    Q.push_back(CG, 100);
+    Q.push_back(CG, 101);
+    EXPECT_EQ(Q.capacity(), 2);
+    Q.push_back(CG, 102);   // triggers grow to 4
+    EXPECT_GE(Q.capacity(), 3);
+    EXPECT_EQ(Q.size(), 3);
+    EXPECT_EQ(Q.front_index(), 0);
+
+    uint64_t id; StatusFlag f; int32_t it;
+    Q.state().read_slot(Q.slot_of(0), id, f, it); EXPECT_EQ(id, 100u);
+    Q.state().read_slot(Q.slot_of(2), id, f, it); EXPECT_EQ(id, 102u);
+}
+
+TEST(BatchQueue, TransferBatchToQueueWithPredicate) {
+    Graph G20 = FullereneGraph::C20();
+    CubicGraph CG(G20);
+
+    // Source batch + state of 4 entries, mixed statuses.
+    batch::Batch<CubicGraphView> src_batch(CG.N, 4, CG.dmax);
+    batch::BatchState            src_state(4);
+    for (int i = 0; i < 4; ++i) {
+        src_batch.push_back(CG);
+        StatusEnum s = (i % 2 == 0) ? StatusEnum::CUBIC_INITIALIZED
+                                    : StatusEnum::DUAL_INITIALIZED;
+        src_state.push_back(uint64_t(200 + i), StatusFlag{s}, 0, -1);
+    }
+
+    batch::BatchQueue<CubicGraphView> Q(CG.N, 4, CG.dmax);
+    batch::StatusPredicate pred(StatusEnum::DUAL_INITIALIZED);
+
+    int pushed = batch::queue_push(Q, src_batch, src_state, pred, StatusEnum::PLZ_CHECK);
+    EXPECT_EQ(pushed, 2);
+    EXPECT_EQ(Q.size(), 2);
+
+    // Queue entries should carry ids 201 and 203 (the DUAL_INITIALIZED ones).
+    uint64_t id; StatusFlag f; int32_t it;
+    Q.state().read_slot(Q.slot_of(0), id, f, it); EXPECT_EQ(id, 201u);
+    Q.state().read_slot(Q.slot_of(1), id, f, it); EXPECT_EQ(id, 203u);
+
+    // Source entries that matched should have PLZ_CHECK ORed in.
+    auto sv = src_state.view();
+    EXPECT_FALSE(int(sv.status[0]) & int(StatusEnum::PLZ_CHECK));
+    EXPECT_TRUE (int(sv.status[1]) & int(StatusEnum::PLZ_CHECK));
+    EXPECT_FALSE(int(sv.status[2]) & int(StatusEnum::PLZ_CHECK));
+    EXPECT_TRUE (int(sv.status[3]) & int(StatusEnum::PLZ_CHECK));
+}
+
+TEST(BatchQueue, TransferQueueToBatchConsumesFront) {
+    Graph G20 = FullereneGraph::C20();
+    CubicGraph CG(G20);
+
+    batch::BatchQueue<CubicGraphView> Q(CG.N, 5, CG.dmax);
+    for (int i = 0; i < 4; ++i)
+        Q.push_back(CG, uint64_t(300 + i),
+                    StatusFlag{StatusEnum::FULLERENEGRAPH_PREPARED}, 0);
+
+    batch::Batch<CubicGraphView> dst_batch(CG.N, 3, CG.dmax);
+    batch::BatchState            dst_state(3);
+
+    int moved = batch::queue_push(dst_batch, dst_state, Q,
+                                  batch::StatusPredicate(StatusEnum::FULLERENEGRAPH_PREPARED),
+                                  StatusEnum::CONVERGED_2D);
+    EXPECT_EQ(moved, 3);                 // bounded by dst capacity
+    EXPECT_EQ(dst_batch.size(), 3);
+    EXPECT_EQ(Q.size(), 1);              // one left in the queue
+    EXPECT_EQ(Q.at(0).N, CG.N);
+
+    auto ds = dst_state.view();
+    EXPECT_EQ(ds.id[0], 300u);
+    EXPECT_EQ(ds.id[2], 302u);
+    // CONVERGED_2D should have been ORed into each transferred entry.
+    for (int i = 0; i < 3; ++i)
+        EXPECT_TRUE(int(ds.status[i]) & int(StatusEnum::CONVERGED_2D));
+}
+
 TEST(Batch, WritesThroughEntryViewUpdateStorage) {
     Graph G20 = FullereneGraph::C20();
     CubicGraph CG(G20);

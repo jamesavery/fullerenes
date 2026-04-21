@@ -98,6 +98,22 @@ public:
     std::span<int32_t>    iteration()   const { return view().iteration; }
     std::span<int32_t>    valid_index() const { return view().valid_index; }
 
+    // Raw slot access (capacity-sized, bypasses logical size).  Used by
+    // BatchQueue<V> which addresses slots directly.
+    void write_slot(int slot, uint64_t id_v, StatusFlag flag, int32_t iter, int32_t vi = -1) {
+        assert(slot >= 0 && slot < capacity_);
+        id_[slot]          = id_v;
+        status_[slot]      = flag;
+        iteration_[slot]   = iter;
+        valid_index_[slot] = vi;
+    }
+    void read_slot(int slot, uint64_t& id_v, StatusFlag& flag, int32_t& iter) const {
+        assert(slot >= 0 && slot < capacity_);
+        id_v = id_[slot];
+        flag = status_[slot];
+        iter = iteration_[slot];
+    }
+
 private:
     void allocate_() {
         id_         .resize(capacity_);

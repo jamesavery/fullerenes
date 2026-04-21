@@ -212,6 +212,11 @@ public:
     BatchView<V> view() const {
         return BatchView<V>(N_, dmax_, size_, build_spans_(capacity_));
     }
+    // View covering every slot (size == capacity). Used by BatchQueue<V>
+    // which addresses entries by raw slot rather than by logical index.
+    BatchView<V> view_capacity() const {
+        return BatchView<V>(N_, dmax_, capacity_, build_spans_(capacity_));
+    }
     BatchView<V> slice(std::size_t offset, int count) const {
         return view().slice(offset, count);
     }
