@@ -9,6 +9,75 @@
 #include <fullerenes/triangulation.hh>
 #include <fullerenes/polyhedron.hh>
 #include <fullerenes/isomerdb.hh>
+#include <fullerenes/batch/batchable.hh>
+
+// ---------------------------------------------------------------------------
+// Phase 1: intrinsic batchability contract
+// ---------------------------------------------------------------------------
+static_assert(batch::batchable_view<GraphView>);
+static_assert(batch::batchable_view<PlanarGraphView>);
+static_assert(batch::batchable_view<CubicGraphView>);
+static_assert(batch::batchable_view<FullereneGraphView>);
+static_assert(batch::batchable_view<TriangulationView>);
+static_assert(batch::batchable_view<FullereneDualView>);
+static_assert(batch::batchable_view<PolyhedronView<double>>);
+static_assert(batch::batchable_view<PolyhedronView<float>>);
+static_assert(batch::batchable_view<DeltahedronView>);
+
+static_assert(GraphView::n_fields         == 3);
+static_assert(CubicGraphView::n_fields    == 3);
+static_assert(TriangulationView::n_fields == 3);
+static_assert(PolyhedronView<double>::n_fields == 4);
+static_assert(DeltahedronView::n_fields        == 4);
+
+// Graph-like views must share layout with each other.
+static_assert([]{
+    return batch::layout_compatible<GraphView, CubicGraphView>(60, 3)
+        && batch::layout_compatible<GraphView, TriangulationView>(32, 6)
+        && batch::layout_compatible<CubicGraphView, FullereneGraphView>(60, 3)
+        && batch::layout_compatible<TriangulationView, FullereneDualView>(32, 6);
+}());
+
+// Geometry views share their graph fields with plain graph views.
+static_assert([]{
+    return batch::layout_compatible<PolyhedronView<double>, PlanarGraphView>(60, 10);
+}());
+
+// ---------------------------------------------------------------------------
+// Phase 1 contract: runtime checks of to_tuple() / size factors
+// ---------------------------------------------------------------------------
+TEST(BatchContract, GraphSizeFactors) {
+    auto f = GraphView::get_size_factors(60, 10);
+    EXPECT_EQ(f[0], 10u);  // neighbours = dmax per vertex
+    EXPECT_EQ(f[1], 1u);   // deg = 1 per vertex
+    EXPECT_EQ(f[2], 10u);  // twin = dmax per vertex
+}
+
+TEST(BatchContract, PolyhedronSizeFactors) {
+    auto f = PolyhedronView<double>::get_size_factors(60, 10);
+    ASSERT_EQ(f.size(), 4u);
+    EXPECT_EQ(f[0], 10u);
+    EXPECT_EQ(f[1], 1u);
+    EXPECT_EQ(f[2], 10u);
+    EXPECT_EQ(f[3], 1u);  // points = 1 per vertex
+}
+
+TEST(BatchContract, ToTupleAliasesGraphFields) {
+    Graph G = FullereneGraph::C20();
+    auto t = G.to_tuple();
+    static_assert(std::tuple_size_v<decltype(t)> == 3);
+    EXPECT_EQ(std::get<0>(t).data(), G.neighbours.data());
+    EXPECT_EQ(std::get<1>(t).data(), G.deg.data());
+    EXPECT_EQ(std::get<0>(t).size(), (size_t)(G.N * G.dmax));
+}
+
+TEST(BatchContract, PolyhedronToTupleIncludesPoints) {
+    Polyhedron P = Polyhedron::C20();
+    auto t = P.to_tuple();
+    static_assert(std::tuple_size_v<decltype(t)> == 4);
+    EXPECT_EQ(std::get<3>(t).data(), P.points.data());
+    EXPECT_EQ(std::get<3>(t).size(), (size_t)P.N);
+}
 
 // ---------------------------------------------------------------------------
 // Graph: owned vs view
@@ -133,7 +202,6 @@ TEST(PolyhedronView, OwnedPolyhedron) {
     Polyhedron P = Polyhedron::C20();
     EXPECT_EQ(P.N, 20);
     EXPECT_TRUE(P.owns_memory());  // owns coordinates
-
     auto fs = P.faces();
     EXPECT_EQ(int(fs.size()), 12);  // C20 has 12 pentagonal faces
     for (auto& f : fs) EXPECT_EQ(int(f.size()), 5);
