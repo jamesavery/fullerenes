@@ -2,6 +2,7 @@
 #include "fullerenes/symmetry.hh"
 #include "fullerenes/buckygen-wrapper.hh"
 #include <sys/wait.h>
+#include <unistd.h>
 #include <csignal>
 
 // All tests in a single pass per isomer.

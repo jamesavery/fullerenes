@@ -27,6 +27,16 @@ target_link_libraries(fortran_opt PRIVATE fortran_config)
 target_link_libraries(fortran_lib PRIVATE fortran_config)
 target_link_libraries(fullerene_program fortran_config fortran_opt fortran_lib fullerenes ${OpenMP_CXX_LIBRARIES})
 
+# When using Apple Clang for C++ and Homebrew gfortran for Fortran, the Fortran
+# linker needs the macOS SDK library path to find libc++ (propagated from the
+# C++ shared library).
+if(APPLE AND CMAKE_CXX_COMPILER_ID MATCHES "Clang|AppleClang")
+  execute_process(COMMAND xcrun --show-sdk-path OUTPUT_VARIABLE _sdk_path OUTPUT_STRIP_TRAILING_WHITESPACE)
+  if(_sdk_path)
+    target_link_options(fullerene_program PRIVATE "-L${_sdk_path}/usr/lib" "-F${_sdk_path}/System/Library/Frameworks")
+  endif()
+endif()
+
 set_property(TARGET fortran_config PROPERTY LINKER_LANGUAGE Fortran)
 set_property(TARGET fortran_lib    PROPERTY LINKER_LANGUAGE Fortran)
 set_property(TARGET fortran_opt    PROPERTY LINKER_LANGUAGE Fortran)

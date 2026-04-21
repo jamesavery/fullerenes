@@ -1,6 +1,7 @@
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/buckygen-wrapper.hh"
 #include <sys/wait.h>
+#include <unistd.h>
 #include <csignal>
 
 int test_triple(const Triangulation& T, node_t u, node_t v, node_t w, bool general)

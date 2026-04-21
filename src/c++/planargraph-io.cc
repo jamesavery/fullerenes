@@ -236,7 +236,7 @@ PlanarGraph PlanarGraph::from_spiral(FILE *f, const size_t index)  {
     read_ok = getline(f,line);
     if(!read_ok){
       perror("getline");
-      return {};
+      return PlanarGraph{};
     } // else {
     //   printf("result: %s, line: %s\n",read_ok,line);
     // }
