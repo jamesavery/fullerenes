@@ -19,7 +19,7 @@ protected:
     BuckyGen::buckygen_queue BQ = BuckyGen::start(N, false, false);
     FullereneBatch<T, K> batch_1;
     FullereneBatch<T, K> batch_2;
-    Graph G(N/2 + 2, GRAPH_DMAX);
+    Graph G = Graph(N/2 + 2, GRAPH_DMAX);
     
     
     void SetUp() override {

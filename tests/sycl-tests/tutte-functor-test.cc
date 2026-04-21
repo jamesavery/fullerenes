@@ -44,7 +44,7 @@ protected:
     TutteFunctor<T, uint16_t> tutte16;
     SphericalProjectionFunctor<T, K> spherical_projection;
     SphericalProjectionFunctor<T, uint16_t> spherical_projection16;
-    Graph G(N/2 + 2, GRAPH_DMAX);
+    Graph G = Graph(N/2 + 2, GRAPH_DMAX);
     FullereneBatch<T, K> bigbatch;
     FullereneBatch<T, uint16_t> batch;
 
@@ -68,7 +68,7 @@ protected:
     using K = uint16_t;
     BuckyGen::buckygen_queue BQ = BuckyGen::start(N, false, false);
     FullereneBatch<T, K> batch;
-    Graph G(N/2 + 2, GRAPH_DMAX);
+    Graph G = Graph(N/2 + 2, GRAPH_DMAX);
     
     
     void SetUp() override {
