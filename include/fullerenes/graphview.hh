@@ -417,20 +417,21 @@ template<> bool PolyhedronView<double>::optimize_other(bool optimize_angles, map
 // Forward declaration for return types.
 class Deltahedron;
 
+template<typename T = double>
 struct DeltahedronView : TriangulationView {
-    std::span<coord3d> points;
+    std::span<coord3<T>> points;
     static constexpr uint8_t default_dmax = 6;
 
     DeltahedronView() = default;
 
     // Construct from adjacency view + coordinate span.
-    DeltahedronView(const TriangulationView& t, std::span<coord3d> pts)
+    DeltahedronView(const TriangulationView& t, std::span<coord3<T>> pts)
         : TriangulationView(t), points(pts) {}
 
     // Full view constructor (adjacency + coordinates).
     DeltahedronView(node_t N, int dmax,
                     std::span<node_t> neighbours, std::span<uint8_t> deg,
-                    std::span<coord3d> pts,
+                    std::span<coord3<T>> pts,
                     std::span<uint8_t> twin = {})
         : TriangulationView(N, dmax, neighbours, deg, twin), points(pts) {}
 
@@ -463,15 +464,37 @@ struct DeltahedronView : TriangulationView {
     Deltahedron halma_transform(int m) const;
 
     // optimize() and optimize_patch() stay on Deltahedron (use optimizer state fields).
-    int reflect_concave(std::span<coord3d> pts, double threshold=0,
+    int reflect_concave(std::span<coord3<T>> pts, double threshold=0,
                         const vector<bool>& fixed={}) const;
-    int reflect_all_concave(std::span<coord3d> pts, double threshold=0,
+    int reflect_all_concave(std::span<coord3<T>> pts, double threshold=0,
                             const vector<bool>& fixed={}) const;
-    double gradient_check(std::span<const coord3d> geometry, double target_L=0, double eps=1e-6) const;
-    double hessian_check(std::span<const coord3d> geometry, const vector<bool>& free_mask,
+    double gradient_check(std::span<const coord3<T>> geometry, double target_L=0, double eps=1e-6) const;
+    double hessian_check(std::span<const coord3<T>> geometry, const vector<bool>& free_mask,
                          const vector<bool>& interior_mask={}, double target_L=0,
                          double eps=1e-5, bool verbose=false) const;
 };
+
+// ---------------------------------------------------------------------------
+// Explicit specialization declarations for DeltahedronView<double>.
+// Definitions live in src/c++/deltahedron.cc.
+// ---------------------------------------------------------------------------
+template<> double DeltahedronView<double>::max_angle_relerr() const;
+template<> int    DeltahedronView<double>::count_concave() const;
+template<> vector<face_t> DeltahedronView<double>::compute_dual_faces() const;
+template<> void   DeltahedronView<double>::smooth(double q);
+template<> Deltahedron DeltahedronView<double>::GCtransform(unsigned k, unsigned l) const;
+template<> Deltahedron DeltahedronView<double>::halma_transform(int m) const;
+template<> int DeltahedronView<double>::reflect_concave(std::span<coord3d> pts, double threshold,
+                                                        const vector<bool>& fixed) const;
+template<> int DeltahedronView<double>::reflect_all_concave(std::span<coord3d> pts, double threshold,
+                                                            const vector<bool>& fixed) const;
+template<> double DeltahedronView<double>::gradient_check(std::span<const coord3d> geometry,
+                                                          double target_L, double eps) const;
+template<> double DeltahedronView<double>::hessian_check(std::span<const coord3d> geometry,
+                                                         const vector<bool>& free_mask,
+                                                         const vector<bool>& interior_mask,
+                                                         double target_L, double eps,
+                                                         bool verbose) const;
 
 // ---------------------------------------------------------------------------
 // TC verification: all view types must be trivially copyable.
@@ -492,8 +515,11 @@ static_assert(std::is_trivially_copyable_v<PolyhedronView<double>>,
     "PolyhedronView<double> must be trivially copyable");
 static_assert(std::is_trivially_copyable_v<PolyhedronView<float>>,
     "PolyhedronView<float> must be trivially copyable");
-static_assert(std::is_trivially_copyable_v<DeltahedronView>,
-    "DeltahedronView must be trivially copyable");
+static_assert(std::is_trivially_copyable_v<DeltahedronView<double>>,
+    "DeltahedronView<double> must be trivially copyable");
+static_assert(std::is_trivially_copyable_v<DeltahedronView<float>>,
+    "DeltahedronView<float> must be trivially copyable");
+
 
 // Verify correct hierarchy relationships
 static_assert(std::is_base_of_v<GraphView, PlanarGraphView>);
@@ -503,4 +529,5 @@ static_assert(std::is_base_of_v<PlanarGraphView, TriangulationView>);
 static_assert(std::is_base_of_v<TriangulationView, FullereneDualView>);
 static_assert(std::is_base_of_v<PlanarGraphView, PolyhedronView<double>>);
 static_assert(std::is_base_of_v<PlanarGraphView, PolyhedronView<float>>);
-static_assert(std::is_base_of_v<TriangulationView, DeltahedronView>);
+static_assert(std::is_base_of_v<TriangulationView, DeltahedronView<double>>);
+static_assert(std::is_base_of_v<TriangulationView, DeltahedronView<float>>);

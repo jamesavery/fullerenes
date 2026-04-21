@@ -10,10 +10,10 @@ namespace buckinverse { struct ExtensionPath; }
 enum class OptMethod { CG, LBFGS, STEIHAUG };
 
 // Deltahedron: owned triangulation with 3D vertex coordinates.
-// Inherits geometry/optimizer methods from DeltahedronView via Owned<DeltahedronView>.
+// Inherits geometry/optimizer methods from DeltahedronView<double> via Owned.
 // Adds optimizer state fields and static factory methods.
-class Deltahedron : public Owned<DeltahedronView> {
-  using base_t = Owned<DeltahedronView>;
+class Deltahedron : public Owned<DeltahedronView<double>> {
+  using base_t = Owned<DeltahedronView<double>>;
 public:
   // Callback for fromExtensionPathOptimized diagnostics.
   using StepCallback = std::function<void(int step, const char* phase, const Deltahedron& D)>;
