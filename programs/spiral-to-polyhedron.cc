@@ -43,9 +43,9 @@ static void print_help(const char* prog)
     "  --dual            Dual triangulation (one vertex per 5/6-ring)\n"
     "\n"
     "Initial geometry:\n"
-    "  --zero-order      Tutte layout + spherical projection [default]\n"
     "  --deltahedron     Extension-path Deltahedron optimizer on the dual\n"
-    "                    (equilateral-triangle embedding; Alexandrov's theorem)\n"
+    "                    (equilateral-triangle embedding; Alexandrov's theorem) [default]\n"
+    "  --zero-order      Tutte layout + spherical projection\n"
     "\n"
     "Refinement:\n"
     "  --optimize        Run the cubic force-field optimizer after placement [default]\n"
@@ -59,15 +59,15 @@ static void print_help(const char* prog)
     "\n"
     "Examples:\n"
     "  %s 'C60-[1,7,9,11,13,15,18,20,22,24,26,32]-fullerene' C60.mol2\n"
-    "  %s --deltahedron 'C240-[1,2,3,4,5,6,121,122,237,238,239,240]-fullerene' C240.mol2\n"
-    "  %s --deltahedron --dual 'C60-[1,7,9,11,13,15,18,20,22,24,26,32]-fullerene' C60-dual.mol2\n",
+    "  %s --dual 'C60-[1,7,9,11,13,15,18,20,22,24,26,32]-fullerene' C60-dual.mol2\n"
+    "  %s --zero-order --no-optimize 'C240-[1,2,3,4,5,6,121,122,237,238,239,240]-fullerene' C240-raw.mol2\n",
     prog, prog, prog, prog);
 }
 
 int main(int ac, char **av)
 {
   OutputMode out_mode = OUT_CUBIC;
-  InitGeom   init     = INIT_ZERO;
+  InitGeom   init     = INIT_DELTAHEDRON;
   bool       do_opt   = true;
   vector<string> pos;
 
