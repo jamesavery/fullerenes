@@ -61,7 +61,7 @@ struct Fullerene
         for (size_t i = 0; i < count; i++) {
             auto degree = is_cubic ? 3 : d_.deg_[i];
             for (size_t j = 0; j < degree; j++) {
-                adj[i].push_back(A[i * (is_cubic ? 3 : 6) + j]);
+                adj.push_back(node_t(i), node_t(A[i * (is_cubic ? 3 : 6) + j]));
             }
         }
         return Graph(adj);
@@ -74,14 +74,12 @@ struct Fullerene
         const ConditionFunctor geometry_condition(0, 0, StatusEnum::NOT_CONVERGED | StatusEnum::CONVERGED_3D | StatusEnum::FAILED_3D);
         bool is_polyhedron = graph_condition(m_.flags_.get()) && geometry_condition(m_.flags_.get());
         if (!is_polyhedron) {throw std::invalid_argument("Fullerene is not a valid polyhedron, Flag: " + std::to_string(m_.flags_.get()));}
-        Polyhedron P;
-        using points_t = decltype(P.points);
-        points_t points(N_);
+        std::vector<coord3d> points(N_);
         Graph neighbours(N_, GRAPH_DMAX);
         auto& A = d_.A_cubic_;
         for (size_t i = 0; i < N_; i++) {
             for (size_t j = 0; j < 3; j++) {
-                neighbours[i].push_back(A[i][j]);
+                neighbours.push_back(node_t(i), node_t(A[i][j]));
                 points[i][j] = d_.X_cubic_[i][j];
             }
         }

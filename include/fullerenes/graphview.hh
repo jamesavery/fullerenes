@@ -305,22 +305,42 @@ struct FullereneDualView : TriangulationView {
 // Forward declaration for return types.
 class Polyhedron;
 
+template<typename T = double>
 struct PolyhedronView : PlanarGraphView {
-    std::span<coord3d> points;
+    std::span<coord3<T>> points;
     static constexpr uint8_t default_dmax = 10;
 
     PolyhedronView() = default;
 
     // Construct from adjacency view + coordinate span.
-    PolyhedronView(const PlanarGraphView& g, std::span<coord3d> pts)
+    PolyhedronView(const PlanarGraphView& g, std::span<coord3<T>> pts)
         : PlanarGraphView(g), points(pts) {}
 
     // Full view constructor (adjacency + coordinates).
     PolyhedronView(node_t N, int dmax,
                    std::span<node_t> neighbours, std::span<uint8_t> deg,
-                   std::span<coord3d> pts,
+                   std::span<coord3<T>> pts,
                    std::span<uint8_t> twin = {})
         : PlanarGraphView(N, dmax, neighbours, deg, twin), points(pts) {}
+
+    // -----------------------------------------------------------------------
+    // Batchability contract (extends graph fields with `points`).
+    // Canonical tuple order: {neighbours, deg, twin, points}.
+    //   points : 1 coord per vertex  (N total)
+    // -----------------------------------------------------------------------
+    static constexpr std::size_t n_fields = 4;
+
+    auto to_tuple() {
+        return std::forward_as_tuple(this->neighbours, this->deg, this->twin, points);
+    }
+    auto to_tuple() const {
+        return std::forward_as_tuple(this->neighbours, this->deg, this->twin, points);
+    }
+
+    static constexpr std::array<std::size_t, n_fields>
+    get_size_factors(int /*N*/, int dmax) {
+        return { (std::size_t)dmax, (std::size_t)1, (std::size_t)dmax, (std::size_t)1 };
+    }
 
     // --- Geometry queries ---
     double surface_area() const;
@@ -328,8 +348,8 @@ struct PolyhedronView : PlanarGraphView {
     double volume_tetra() const;
     double volume_divergence() const;
     double diameter() const;
-    pair<coord3d,coord3d> bounding_box() const;
-    coord3d width_height_depth() const;
+    pair<coord3<T>,coord3<T>> bounding_box() const;
+    coord3<T> width_height_depth() const;
     matrix3d inertia_matrix() const;
     matrix3d principal_axes() const;
     bool is_invalid() const;
@@ -343,26 +363,52 @@ struct PolyhedronView : PlanarGraphView {
 
     vector<face_t> faces(int face_max=INT_MAX) const { return compute_faces(face_max); }
 
-    void scale(const coord3d& x) { for(node_t u=0;u<N;u++) points[u] *= x; }
-    void move(const coord3d& x) { for(node_t u=0;u<N;u++) points[u] += x; }
-    void move_to_origin() { move(-centre3d(points)); }
+    void scale(const coord3<T>& s) { for(node_t u=0;u<N;u++) points[u] *= s; }
+    void move(const coord3<T>& d)  { for(node_t u=0;u<N;u++) points[u] += d; }
+    void move_to_origin() {
+        coord3<T> c(0,0,0);
+        for(node_t u=0;u<N;u++) c += points[u];
+        c /= (T)N;
+        move(-c);
+    }
     void align_with_axes() { matrix3d If(principal_axes()); for(node_t u=0;u<N;u++) points[u] = If * points[u]; }
 
     vector<coord2d> polar_angles() const {
         vector<coord2d> angles(N);
-        for(node_t u=0;u<N;u++) angles[u] = points[u].polar_angle();
+        for(node_t u=0;u<N;u++) angles[u] = coord3d(points[u][0],points[u][1],points[u][2]).polar_angle();
         return angles;
     }
 
-    static vector<coord3d> polar_mapping(const vector<coord2d>& angles) {
-        vector<coord3d> surface(angles.size());
+    static vector<coord3<T>> polar_mapping(const vector<coord2d>& angles) {
+        vector<coord3<T>> surface(angles.size());
         for(size_t u=0;u<surface.size();u++){
-            const double &theta = angles[u].first, &phi = angles[u].second;
-            surface[u] = coord3d(cos(theta)*sin(phi), sin(theta)*sin(phi), cos(phi));
+            const double theta = angles[u].first, phi = angles[u].second;
+            surface[u] = coord3<T>((T)(cos(theta)*sin(phi)), (T)(sin(theta)*sin(phi)), (T)cos(phi));
         }
         return surface;
     }
 };
+
+// ---------------------------------------------------------------------------
+// Explicit specialization declarations for PolyhedronView<double>.
+// Prevent "specialization after instantiation" errors: the compiler sees these
+// declarations before any implicit instantiation of PolyhedronView<double>.
+// Definitions are in src/c++/polyhedron.cc and polyhedron-optimize.cc.
+// ---------------------------------------------------------------------------
+template<> double PolyhedronView<double>::diameter() const;
+template<> double PolyhedronView<double>::surface_area() const;
+template<> double PolyhedronView<double>::volume_divergence() const;
+template<> double PolyhedronView<double>::volume_tetra() const;
+template<> pair<coord3d,coord3d> PolyhedronView<double>::bounding_box() const;
+template<> coord3d PolyhedronView<double>::width_height_depth() const;
+template<> matrix3d PolyhedronView<double>::inertia_matrix() const;
+template<> matrix3d PolyhedronView<double>::principal_axes() const;
+template<> bool PolyhedronView<double>::is_invalid() const;
+template<> Polyhedron PolyhedronView<double>::incremental_convex_hull() const;
+template<> Polyhedron PolyhedronView<double>::dual() const;
+template<> Polyhedron PolyhedronView<double>::leapfrog_dual() const;
+template<> bool PolyhedronView<double>::optimize(int opt_method, double ftol);
+template<> bool PolyhedronView<double>::optimize_other(bool optimize_angles, map<edge_t,double> zero_values_dist);
 
 // ---------------------------------------------------------------------------
 // DeltahedronView: triangulation with 3D vertex coordinates (equilateral
@@ -387,6 +433,24 @@ struct DeltahedronView : TriangulationView {
                     std::span<coord3d> pts,
                     std::span<uint8_t> twin = {})
         : TriangulationView(N, dmax, neighbours, deg, twin), points(pts) {}
+
+    // -----------------------------------------------------------------------
+    // Batchability contract (extends graph fields with `points`).
+    // Canonical tuple order: {neighbours, deg, twin, points}.
+    // -----------------------------------------------------------------------
+    static constexpr std::size_t n_fields = 4;
+
+    auto to_tuple() {
+        return std::forward_as_tuple(this->neighbours, this->deg, this->twin, points);
+    }
+    auto to_tuple() const {
+        return std::forward_as_tuple(this->neighbours, this->deg, this->twin, points);
+    }
+
+    static constexpr std::array<std::size_t, n_fields>
+    get_size_factors(int /*N*/, int dmax) {
+        return { (std::size_t)dmax, (std::size_t)1, (std::size_t)dmax, (std::size_t)1 };
+    }
 
     // --- Quality metrics ---
     double max_angle_relerr() const;
@@ -424,8 +488,10 @@ static_assert(std::is_trivially_copyable_v<TriangulationView>,
     "TriangulationView must be trivially copyable");
 static_assert(std::is_trivially_copyable_v<FullereneDualView>,
     "FullereneDualView must be trivially copyable");
-static_assert(std::is_trivially_copyable_v<PolyhedronView>,
-    "PolyhedronView must be trivially copyable");
+static_assert(std::is_trivially_copyable_v<PolyhedronView<double>>,
+    "PolyhedronView<double> must be trivially copyable");
+static_assert(std::is_trivially_copyable_v<PolyhedronView<float>>,
+    "PolyhedronView<float> must be trivially copyable");
 static_assert(std::is_trivially_copyable_v<DeltahedronView>,
     "DeltahedronView must be trivially copyable");
 
@@ -435,5 +501,6 @@ static_assert(std::is_base_of_v<PlanarGraphView, CubicGraphView>);
 static_assert(std::is_base_of_v<CubicGraphView, FullereneGraphView>);
 static_assert(std::is_base_of_v<PlanarGraphView, TriangulationView>);
 static_assert(std::is_base_of_v<TriangulationView, FullereneDualView>);
-static_assert(std::is_base_of_v<PlanarGraphView, PolyhedronView>);
+static_assert(std::is_base_of_v<PlanarGraphView, PolyhedronView<double>>);
+static_assert(std::is_base_of_v<PlanarGraphView, PolyhedronView<float>>);
 static_assert(std::is_base_of_v<TriangulationView, DeltahedronView>);

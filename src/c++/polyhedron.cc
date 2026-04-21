@@ -6,7 +6,8 @@
 #include "fullerenes/layout2d.hh"
 
 
-double PolyhedronView::diameter() const {
+template<>
+double PolyhedronView<double>::diameter() const {
   double dmax = -INFINITY;
   for(int i=0;i<N;i++)
     for(int j=i+1;j<N;j++){
@@ -24,7 +25,8 @@ static vector<coord3d> centroid_points(std::span<const coord3d> points, const ve
   return pts;
 }
 
-double PolyhedronView::surface_area() const {
+template<>
+double PolyhedronView<double>::surface_area() const {
   auto fs = faces();
   vector<tri_t>  tris(centroid_triangulation(fs));
   vector<coord3d> pts(centroid_points(points, fs));
@@ -38,7 +40,8 @@ double PolyhedronView::surface_area() const {
 // Signed volume via the divergence theorem: V = (1/3) ∮ r·n̂ dA.
 // For a flat triangle, a·n̂ = b·n̂ = c·n̂ (constant on plane), so using
 // any vertex gives the exact integral over the triangle.
-double PolyhedronView::volume_divergence() const {
+template<>
+double PolyhedronView<double>::volume_divergence() const {
   auto fs = faces();
   vector<tri_t>   tris(centroid_triangulation(fs));
   vector<coord3d> pts(centroid_points(points, fs));
@@ -53,7 +56,8 @@ double PolyhedronView::volume_divergence() const {
 
 // Signed volume via signed tetrahedra from the origin:
 // V = (1/6) Σ a·(b×c) for each triangle (a,b,c).
-double PolyhedronView::volume_tetra() const {
+template<>
+double PolyhedronView<double>::volume_tetra() const {
   auto fs = faces();
   vector<tri_t>   tris(centroid_triangulation(fs));
   vector<coord3d> pts(centroid_points(points, fs));
@@ -66,7 +70,8 @@ double PolyhedronView::volume_tetra() const {
   return fabs(V / 6.0);
 }
 
-Polyhedron PolyhedronView::incremental_convex_hull() const {
+template<>
+Polyhedron PolyhedronView<double>::incremental_convex_hull() const {
   list<tri_t> output;
   typedef list<tri_t>::iterator triit;
   srandom(42); // Seed random numbers with constant for reproducible behaviour
@@ -304,7 +309,8 @@ Polyhedron::Polyhedron(const vector<coord3d>& xs, double tolerance)
 }
 
 
-matrix3d PolyhedronView::inertia_matrix() const
+template<>
+matrix3d PolyhedronView<double>::inertia_matrix() const
 {
   matrix3d I;
 
@@ -321,7 +327,8 @@ matrix3d PolyhedronView::inertia_matrix() const
   return I;
 }
 
-matrix3d PolyhedronView::principal_axes() const
+template<>
+matrix3d PolyhedronView<double>::principal_axes() const
 {
   const matrix3d I(inertia_matrix());
   pair<coord3d,matrix3d> ES(I.eigensystem());
@@ -351,7 +358,8 @@ matrix3d PolyhedronView::principal_axes() const
   return ES.second;
 }
 
-coord3d PolyhedronView::width_height_depth() const {
+template<>
+coord3d PolyhedronView<double>::width_height_depth() const {
   double xmin=INFINITY,xmax=-INFINITY,ymin=INFINITY,ymax=-INFINITY,zmin=INFINITY,zmax=-INFINITY;
   for(node_t u=0;u<N;u++){
     const coord3d& x(points[u]);
@@ -367,7 +375,8 @@ coord3d PolyhedronView::width_height_depth() const {
 
 
 
-Polyhedron PolyhedronView::dual() const
+template<>
+Polyhedron PolyhedronView<double>::dual() const
 {
   PlanarGraph d(dual_graph());
   auto fs = faces();
@@ -384,15 +393,16 @@ Polyhedron PolyhedronView::dual() const
 }
 
 
-Polyhedron PolyhedronView::leapfrog_dual() const
+template<>
+Polyhedron PolyhedronView<double>::leapfrog_dual() const
 {
   assert(is_consistently_oriented());
   auto fs = faces();
   size_t Nf = fs.size();
 
   Polyhedron Plf;
-  static_cast<Owned<PolyhedronView>&>(Plf) = Owned<PolyhedronView>(int(N+Nf));
-  // points already allocated by Owned<PolyhedronView>(N+Nf)
+  static_cast<Owned<PolyhedronView<double>>&>(Plf) = Owned<PolyhedronView<double>>(int(N+Nf));
+  // points already allocated by Owned<PolyhedronView<double>>(N+Nf)
 
   // Start with all the existing nodes
   for(node_t u=0;u<N;u++){
@@ -436,7 +446,8 @@ Polyhedron Polyhedron::fullerene_polyhedron(FullereneGraph G)
   return P;
 }
 
-bool PolyhedronView::optimize(int opt_method, double ftol)
+template<>
+bool PolyhedronView<double>::optimize(int opt_method, double ftol)
 {
   if(is_a_fullerene()){
     FullereneGraph g(*this);
@@ -492,7 +503,8 @@ bool Polyhedron::is_triangulation() const {
 
 // TODO: Add function for checking if forcefield convergence is achieved
 
-bool PolyhedronView::is_invalid() const {
+template<>
+bool PolyhedronView<double>::is_invalid() const {
   bool has_nans = false;
   for(auto p: points){
     if(std::isnan(p[0])||std::isnan(p[1])||std::isnan(p[2])) has_nans = true;
@@ -500,7 +512,8 @@ bool PolyhedronView::is_invalid() const {
   return has_nans;
 }
 
-pair<coord3d,coord3d> PolyhedronView::bounding_box() const {
+template<>
+pair<coord3d,coord3d> PolyhedronView<double>::bounding_box() const {
   coord3d xmin{INFINITY,INFINITY,INFINITY},xmax{-INFINITY,-INFINITY,-INFINITY};
   for(const auto& p: points)
     for(int i=0;i<3;i++){

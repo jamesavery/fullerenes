@@ -477,7 +477,7 @@ Polyhedron Polyhedron::from_mol2(FILE *file)
   }
 
   Polyhedron P;
-  static_cast<Owned<PolyhedronView>&>(P) = static_cast<const GraphView&>(G);
+  static_cast<Owned<PolyhedronView<double>>&>(P) = static_cast<const GraphView&>(G);
   P.owned_points = std::move(points);
   P.repoint();
   {

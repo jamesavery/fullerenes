@@ -10,9 +10,9 @@
 using namespace std;
 
 // Polyhedron: owned planar graph with 3D vertex coordinates.
-// Inherits geometry methods from PolyhedronView via Owned<PolyhedronView>.
-struct Polyhedron : public Owned<PolyhedronView> {
-  using base_t = Owned<PolyhedronView>;
+// Inherits geometry methods from PolyhedronView via Owned<PolyhedronView<double>>.
+struct Polyhedron : public Owned<PolyhedronView<double>> {
+  using base_t = Owned<PolyhedronView<double>>;
   int face_max = INT_MAX;
 
   //---- Constructors ----//

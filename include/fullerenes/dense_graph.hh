@@ -2,6 +2,9 @@
 
 #include <vector>
 #include <span>
+#include <array>
+#include <tuple>
+#include <cstddef>
 #include <cstdint>
 #include <cassert>
 #include <algorithm>
@@ -50,6 +53,34 @@ struct RSRAdjacencyView {
     RSRAdjacencyView(K N, int dmax, std::span<K> neighbours, std::span<uint8_t> deg,
                      std::span<uint8_t> twin = {})
         : N(N), dmax(dmax), neighbours(neighbours), deg(deg), twin(twin) {}
+
+    // -----------------------------------------------------------------------
+    // Batchability contract (see include/fullerenes/batch/batchable.hh).
+    //
+    // Tuple of span-typed fields in canonical order: {neighbours, deg, twin}.
+    // Per-field size factor: element count per vertex = factor, so the total
+    // number of elements in field k for one batch entry with N vertices is
+    // N * size_factor[k].
+    //   neighbours : dmax per vertex  (N * dmax total)
+    //   deg        : 1    per vertex  (N      total)
+    //   twin       : dmax per vertex  (N * dmax total; empty until computed)
+    //
+    // Derived views that add span fields (e.g. PolyhedronView adds `points`)
+    // override n_fields / to_tuple / get_size_factors to extend the tuple.
+    // -----------------------------------------------------------------------
+    static constexpr std::size_t n_fields = 3;
+
+    auto to_tuple() {
+        return std::forward_as_tuple(neighbours, deg, twin);
+    }
+    auto to_tuple() const {
+        return std::forward_as_tuple(neighbours, deg, twin);
+    }
+
+    static constexpr std::array<std::size_t, n_fields>
+    get_size_factors(int /*N*/, int dmax) {
+        return { (std::size_t)dmax, (std::size_t)1, (std::size_t)dmax };
+    }
 
     // --- operator[] returns span over active entries ---
 
@@ -186,6 +217,16 @@ struct RSRAdjacencyView {
     // --- Backward compat with vector<vector<>> interface ---
 
     int size() const { return N; }
+
+    bool operator==(const RSRAdjacencyView& other) const {
+        if (N != other.N || dmax != other.dmax) return false;
+        for (K u = 0; u < N; ++u) {
+            auto a = (*this)[u], b = other[u];
+            if (a.size() != b.size()) return false;
+            if (!std::equal(a.begin(), a.end(), b.begin())) return false;
+        }
+        return true;
+    }
 
     std::vector<std::vector<K>> to_vectors() const {
         std::vector<std::vector<K>> adj(N);
