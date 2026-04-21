@@ -3,7 +3,6 @@
 
 #include "triangulation.hh"
 #include "geometry.hh"
-#include <memory>
 
 
 // Diamond: the local geometry around an edge in a metrized triangulation.
@@ -61,18 +60,11 @@ struct DelaunayTriangulation {
   vector<int>    v_orig_degree;  // degree in original equilateral triangulation
 
   // --- Per-face (indexed 0..nf-1) ---
-  vector<int>         f_he;      // one boundary half-edge (-1 = dead face)
-  vector<vector<int>> f_origin;  // original face IDs covered by this iDT face
+  vector<int> f_he;        // one boundary half-edge (-1 = dead face)
 
   // --- Free lists ---
   vector<int> free_edges;  // recycled edge slots (half-edge id / 2)
   vector<int> free_faces;  // recycled face slots
-
-  // --- Exact face-origin tracking ---
-  // flip_edge() and remove_flat_vertex() use exact Eisenstein arithmetic
-  // (turn predicate on the Z[omega] grid) to repartition f_origin.
-  struct OriginTracker;
-  std::shared_ptr<const OriginTracker> origin_tracker;
 
   // --- Clean accessors ---
   int  twin(int h)  const { return h ^ 1; }
@@ -115,13 +107,26 @@ struct DelaunayTriangulation {
   void dealloc_edge(int h);  // mark edge as dead, add to free list
   void dealloc_face(int f);  // mark face as dead, add to free list
 
+  // Allocate an edge and set its endpoints and length.
+  // Returns the half-edge h with origin(h) = u, origin(twin h) = v,
+  // length = L on both sides.  Faces remain unassigned.
+  int  alloc_directed_edge(int u, int v, double L);
+
+  // Wire three half-edges into a CCW triangle face and compute its angles
+  // from the stored edge lengths.  Returns the new face id.
+  // Preconditions: h0, h1, h2 already have their origin and length set;
+  // their endpoints form a triangle with origin(h0)=u, dest(h0)=v=origin(h1),
+  // dest(h1)=w=origin(h2), dest(h2)=u.
+  int  wire_triangle(int h0, int h1, int h2);
+
+  // Ensure v_out[v] points to a live outgoing half-edge from v.
+  // Walks the CW ring at v if the current pointer is stale.  Leaves v_out[v]
+  // at -1 iff v has no incident live edge (i.e. v is dead).
+  void ensure_v_out(int v);
+
   // --- Full algorithm ---
   // Computes the intrinsic Delaunay triangulation.
-  // track_origins: when true, f_origin is computed exactly using Eisenstein
-  // arithmetic during every flip and vertex removal.  When false, f_origin
-  // is left empty (no origin tracking).
-  static DelaunayTriangulation compute(const Triangulation& T,
-                                       bool track_origins = false);
+  static DelaunayTriangulation compute(const Triangulation& T);
 
   // Bisect all multi-edges by inserting midpoint vertices.
   // Multi-edges (multiple geodesics between the same cone-point pair) can't be

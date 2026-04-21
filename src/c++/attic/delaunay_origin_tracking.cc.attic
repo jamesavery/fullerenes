@@ -1,0 +1,493 @@
+// ============================================================================
+// Origin tracking for the iDT — archived 2026-04-21
+// ============================================================================
+//
+// This code once maintained an exact mapping from each iDT face to the
+// original equilateral-triangle face IDs it covers, using Eisenstein
+// (Z[omega]) arithmetic so the partition was computed without floating-point
+// error during every flip and vertex removal.
+//
+// It was removed from the live algorithm because no downstream pipeline
+// consulted f_origin — the iDT itself (vertices, edges, lengths) is the
+// interesting output; the origin-to-iDT-face mapping turned out to be dead
+// weight.  The code is preserved here verbatim so the technique — BFS
+// unfolding of equilateral triangles into Z[omega] plus exact turn-predicate
+// classification — can be resurrected without archaeology.
+//
+// Original locations before deletion:
+//   - DelaunayTriangulation::OriginTracker struct: src/c++/delaunay.cc
+//   - OriginTracker methods (ctor, unfold_patch, classify_across_line,
+//     classify_into_triangles): src/c++/delaunay.cc
+//   - compute_origin_assignment + helpers (cross2d_sign, point_in_ear,
+//     sector_fallback, union_face_origins): src/c++/delaunay.cc
+//   - origin-tracking hooks inside flip_edge, remove_degree3, splice_fan:
+//     src/c++/delaunay.cc
+//   - Public surface: f_origin, origin_tracker, compute(..., track_origins):
+//     include/fullerenes/delaunay.hh
+//   - Tests: DCEL.ExactOrigins_C20, C60_Ih, C60_AllIsomers in
+//     tests/delaunay-test.cc
+//
+// ----------------------------------------------------------------------------
+// Public interface (from delaunay.hh)
+// ----------------------------------------------------------------------------
+//
+//   struct DelaunayTriangulation {
+//     ...
+//     vector<vector<int>> f_origin;   // original face IDs per iDT face
+//
+//     struct OriginTracker;
+//     std::shared_ptr<const OriginTracker> origin_tracker;
+//     ...
+//     static DelaunayTriangulation compute(const Triangulation& T,
+//                                          bool track_origins = false);
+//   };
+//
+// ----------------------------------------------------------------------------
+// OriginTracker struct + methods
+// ----------------------------------------------------------------------------
+
+#if 0
+struct DelaunayTriangulation::OriginTracker {
+  int N;                                    // vertex count in original triangulation
+  vector<array<int,3>> face_verts;          // face_verts[fid] = {u, v, w} CCW
+  unordered_map<int64_t, int> arc_to_face;  // directed arc (u,v) -> face ID
+
+  OriginTracker(const Triangulation& T, int num_faces);
+
+  // BFS-unfold original equilateral faces into Z[omega].  Two-phase BFS:
+  // first through target faces only (to avoid wrapping on closed surfaces),
+  // then through all faces if required vertices are still unreached.  If
+  // anchor_vertex >= 0, starts from a target face containing that vertex
+  // (ensures the unfolding is centered on the fan).  Returns a map from
+  // original vertex ID to Eisenstein grid position.
+  unordered_map<int, Eisenstein> unfold_patch(
+      const vector<int>& face_ids,
+      const vector<int>& required_vertices = {},
+      int anchor_vertex = -1) const;
+
+  // Classify original faces across the directed line vtx_A -> vtx_B.
+  // Returns (left_of_line, right_of_line).  Faces whose centroid is exactly
+  // on the line are assigned to both sides.
+  pair<vector<int>, vector<int>>
+  classify_across_line(const vector<int>& face_ids,
+                       int vtx_A, int vtx_B) const;
+
+  // Classify original faces into a set of triangles (for ear-clipping).
+  // tri_verts[j] = {a, b, c} gives the CCW vertex IDs of triangle j.
+  // anchor_vertex: the removed flat vertex (ensures unfolding is fan-centered).
+  // Returns assignment[j] = list of original face IDs inside triangle j.
+  vector<vector<int>>
+  classify_into_triangles(const vector<int>& face_ids,
+                          const vector<array<int,3>>& tri_verts,
+                          int anchor_vertex = -1) const;
+};
+
+DelaunayTriangulation::OriginTracker::OriginTracker(
+    const Triangulation& T, int num_faces) : N(T.N)
+{
+  face_verts.resize(num_faces);
+  int fid = 0;
+  for (node_t u = 0; u < T.N; u++) {
+    auto row = T[u];
+    int deg = row.size();
+    for (int j = 0; j < deg; j++) {
+      node_t v = row[j], w = row[(j+1) % deg];
+      if (u < v && u < w) {
+        face_verts[fid] = {u, v, w};
+        arc_to_face[int64_t(u) * N + v] = fid;
+        arc_to_face[int64_t(v) * N + w] = fid;
+        arc_to_face[int64_t(w) * N + u] = fid;
+        fid++;
+      }
+    }
+  }
+  assert(fid == num_faces);
+}
+
+unordered_map<int, Eisenstein>
+DelaunayTriangulation::OriginTracker::unfold_patch(
+    const vector<int>& face_ids,
+    const vector<int>& required_vertices,
+    int anchor_vertex) const
+{
+  if (face_ids.empty()) return {};
+
+  // Two-phase BFS unfolding.
+  //
+  // On a closed surface, naive BFS can reach a vertex via a path that wraps
+  // around the surface, giving it coordinates inconsistent with the local
+  // geometry of the target patch.  To avoid this:
+  //
+  // Phase 1: expand only through TARGET faces.  This keeps the unfolding
+  //   within the patch (e.g., a fan polygon around a removed vertex).
+  //   All target face vertices get consistent local coordinates.
+  //
+  // Phase 2: if required vertices are still unreached, expand through
+  //   ALL adjacent faces to find them.  Positions set in phase 1 are
+  //   never overwritten.
+
+  unordered_set<int> target_faces(face_ids.begin(), face_ids.end());
+  unordered_set<int> target_verts(required_vertices.begin(),
+                                  required_vertices.end());
+  unordered_map<int, Eisenstein> pos;
+  unordered_set<int> placed;
+  queue<int> Q;
+
+  int faces_remaining = target_faces.size();
+  int verts_remaining = target_verts.size();
+
+  auto done = [&]() { return faces_remaining <= 0 && verts_remaining <= 0; };
+
+  auto place_vertex = [&](int vtx, Eisenstein p) {
+    if (!pos.count(vtx)) {
+      pos[vtx] = p;
+      if (target_verts.count(vtx)) verts_remaining--;
+    }
+  };
+
+  // Helper: expand from face f, placing the third vertex of each adjacent
+  // face.  If target_only, skip non-target adjacent faces.
+  auto expand = [&](int f, bool target_only) {
+    auto& v = face_verts[f];
+    for (int i = 0; i < 3; i++) {
+      int eu = v[i], ev = v[(i+1) % 3];
+      auto it = arc_to_face.find(int64_t(ev) * N + eu);
+      if (it == arc_to_face.end()) continue;
+      int adj = it->second;
+      if (placed.count(adj)) continue;
+      if (target_only && !target_faces.count(adj)) continue;
+
+      auto& av = face_verts[adj];
+      int third = av[0];
+      if (third == eu || third == ev) third = av[1];
+      if (third == eu || third == ev) third = av[2];
+
+      place_vertex(third, pos[ev] + (pos[eu] - pos[ev]).nextCCW());
+      placed.insert(adj);
+      if (target_faces.count(adj)) faces_remaining--;
+      Q.push(adj);
+    }
+  };
+
+  // Choose starting face: prefer one containing anchor_vertex (ensures the
+  // unfolding starts at the fan center for vertex removal).
+  int f0 = face_ids[0];
+  if (anchor_vertex >= 0) {
+    for (int fid : face_ids) {
+      auto& fv2 = face_verts[fid];
+      if (fv2[0] == anchor_vertex || fv2[1] == anchor_vertex || fv2[2] == anchor_vertex) {
+        f0 = fid;
+        break;
+      }
+    }
+  }
+  auto& fv = face_verts[f0];
+  place_vertex(fv[0], Eisenstein(0, 0));
+  place_vertex(fv[1], Eisenstein(1, 0));
+  place_vertex(fv[2], Eisenstein(0, 1));
+  placed.insert(f0);
+  faces_remaining--;
+  Q.push(f0);
+
+  // Phase 1: BFS through target faces only.
+  while (!Q.empty() && !done()) {
+    int f = Q.front(); Q.pop();
+    expand(f, /*target_only=*/true);
+  }
+
+  // If target faces are disconnected, seed each unvisited component.
+  if (faces_remaining > 0) {
+    for (int fid : face_ids) {
+      if (placed.count(fid)) continue;
+      auto& fv2 = face_verts[fid];
+      bool seeded = false;
+      for (int i = 0; i < 3 && !seeded; i++) {
+        int eu = fv2[i], ev = fv2[(i+1) % 3];
+        auto it = arc_to_face.find(int64_t(ev) * N + eu);
+        if (it != arc_to_face.end() && placed.count(it->second)) {
+          int third = fv2[0];
+          if (third == eu || third == ev) third = fv2[1];
+          if (third == eu || third == ev) third = fv2[2];
+          place_vertex(third, pos[ev] + (pos[eu] - pos[ev]).nextCCW());
+          placed.insert(fid);
+          faces_remaining--;
+          Q.push(fid);
+          seeded = true;
+        }
+      }
+      if (!seeded) {
+        // Bridge through non-target faces to reach this component.
+        queue<int> bridge_Q;
+        for (int p : placed) bridge_Q.push(p);
+        while (!bridge_Q.empty() && !placed.count(fid)) {
+          int f = bridge_Q.front(); bridge_Q.pop();
+          auto& v = face_verts[f];
+          for (int i = 0; i < 3; i++) {
+            int eu = v[i], ev = v[(i+1) % 3];
+            auto it = arc_to_face.find(int64_t(ev) * N + eu);
+            if (it == arc_to_face.end()) continue;
+            int adj = it->second;
+            if (placed.count(adj)) continue;
+            auto& av = face_verts[adj];
+            int third = av[0];
+            if (third == eu || third == ev) third = av[1];
+            if (third == eu || third == ev) third = av[2];
+            place_vertex(third, pos[ev] + (pos[eu] - pos[ev]).nextCCW());
+            placed.insert(adj);
+            if (target_faces.count(adj)) faces_remaining--;
+            bridge_Q.push(adj);
+          }
+        }
+      }
+      while (!Q.empty() && !done()) {
+        int f = Q.front(); Q.pop();
+        expand(f, /*target_only=*/true);
+      }
+    }
+  }
+
+  // Phase 2: expand through all faces if required vertices still unreached.
+  if (verts_remaining > 0) {
+    queue<int>().swap(Q);
+    for (int f : placed) Q.push(f);
+    while (!Q.empty() && !done()) {
+      int f = Q.front(); Q.pop();
+      expand(f, /*target_only=*/false);
+    }
+  }
+
+  return pos;
+}
+
+pair<vector<int>, vector<int>>
+DelaunayTriangulation::OriginTracker::classify_across_line(
+    const vector<int>& face_ids, int vtx_A, int vtx_B) const
+{
+  if (face_ids.empty()) return {{}, {}};
+  auto pos = unfold_patch(face_ids, {vtx_A, vtx_B});
+
+  // Scale line endpoints by 3 so we can test the centroid (p+q+r)
+  // without dividing by 3.  sign(turn(3A, 3B, p+q+r)) = sign(turn(A, B, centroid)).
+  Eisenstein A3 = pos.at(vtx_A) * 3;
+  Eisenstein B3 = pos.at(vtx_B) * 3;
+
+  vector<int> left, right;
+  for (int fid : face_ids) {
+    auto& fv = face_verts[fid];
+    Eisenstein sum = pos.at(fv[0]) + pos.at(fv[1]) + pos.at(fv[2]);
+    int t = Eisenstein::turn(A3, B3, sum);
+    if (t >= 0) left.push_back(fid);
+    else right.push_back(fid);
+  }
+  return {left, right};
+}
+
+vector<vector<int>>
+DelaunayTriangulation::OriginTracker::classify_into_triangles(
+    const vector<int>& face_ids,
+    const vector<array<int,3>>& tri_verts,
+    int anchor_vertex) const
+{
+  vector<int> req;
+  for (auto& tv : tri_verts) for (int v : tv) req.push_back(v);
+
+  auto pos = unfold_patch(face_ids, req, anchor_vertex);
+  int nt = tri_verts.size();
+  vector<vector<int>> assignment(nt);
+
+  vector<array<Eisenstein,3>> corners(nt);
+  for (int j = 0; j < nt; j++)
+    for (int k = 0; k < 3; k++)
+      corners[j][k] = pos.at(tri_verts[j][k]) * 3;
+
+  for (int fid : face_ids) {
+    auto& fv = face_verts[fid];
+    Eisenstein sum = pos.at(fv[0]) + pos.at(fv[1]) + pos.at(fv[2]);
+    for (int j = 0; j < nt; j++) {
+      auto& c = corners[j];
+      int t0 = Eisenstein::turn(c[0], c[1], sum);
+      int t1 = Eisenstein::turn(c[1], c[2], sum);
+      int t2 = Eisenstein::turn(c[2], c[0], sum);
+      if ((t0 >= 0 && t1 >= 0 && t2 >= 0) ||
+          (t0 <= 0 && t1 <= 0 && t2 <= 0)) {
+        assignment[j].push_back(fid);
+        break;
+      }
+    }
+  }
+  return assignment;
+}
+
+// ----------------------------------------------------------------------------
+// union_face_origins — merge + sort + unique the f_origin lists of the
+// given faces.  Called by flip_edge and remove_degree3 before repartitioning.
+// ----------------------------------------------------------------------------
+static vector<int> union_face_origins(const DelaunayTriangulation& D,
+                                      std::initializer_list<int> face_ids) {
+  vector<int> out;
+  for (int f : face_ids)
+    out.insert(out.end(), D.f_origin[f].begin(), D.f_origin[f].end());
+  sort(out.begin(), out.end());
+  out.erase(unique(out.begin(), out.end()), out.end());
+  return out;
+}
+
+// ----------------------------------------------------------------------------
+// compute_origin_assignment — distributes each original face covered by the
+// star of flat vertex v among the new ear triangles after splice_fan.
+// Uses per-sector Eisenstein unfolding to avoid wrapping across cone points,
+// then affine-maps the centroid to fan 2D and locates it in an ear.
+// ----------------------------------------------------------------------------
+static int cross2d_sign(double ax, double ay, double bx, double by,
+                        double px, double py) {
+  double c = (bx - ax) * (py - ay) - (by - ay) * (px - ax);
+  return (c > 1e-12) ? 1 : (c < -1e-12) ? -1 : 0;
+}
+
+static int point_in_ear(double px, double py,
+                        const FanPolygon& fan, const FanTriangulation& tri) {
+  int nt = tri.triangles.size();
+  for (int ti = 0; ti < nt; ti++) {
+    auto& t = tri.triangles[ti];
+    double x0 = fan.x(t.v0), y0 = fan.y(t.v0);
+    double x1 = fan.x(t.v1), y1 = fan.y(t.v1);
+    double x2 = fan.x(t.v2), y2 = fan.y(t.v2);
+    int s0 = cross2d_sign(x0, y0, x1, y1, px, py);
+    int s1 = cross2d_sign(x1, y1, x2, y2, px, py);
+    int s2 = cross2d_sign(x2, y2, x0, y0, px, py);
+    if ((s0 >= 0 && s1 >= 0 && s2 >= 0) || (s0 <= 0 && s1 <= 0 && s2 <= 0))
+      return ti;
+  }
+  return -1;
+}
+
+static int sector_fallback(int sec, int k, const FanTriangulation& tri) {
+  int sn = (sec + 1) % k;
+  int nt = tri.triangles.size();
+  for (int ti = 0; ti < nt; ti++) {
+    auto& t = tri.triangles[ti];
+    bool has_sec = (t.v0 == sec || t.v1 == sec || t.v2 == sec);
+    bool has_sn  = (t.v0 == sn  || t.v1 == sn  || t.v2 == sn);
+    if (has_sec && has_sn) return ti;
+  }
+  return 0;
+}
+
+static vector<vector<int>> compute_origin_assignment(
+    const DelaunayTriangulation& D, int v,
+    const FanPolygon& fan, const FanTriangulation& tri,
+    const vector<vector<int>>& sector_origins)
+{
+  int k = fan.k;
+  int nt = tri.triangles.size();
+  vector<vector<int>> assignment(nt);
+
+  for (int sec = 0; sec < k; sec++) {
+    auto& sec_origs = sector_origins[sec];
+    if (sec_origs.empty()) continue;
+
+    int nb_a = fan.nb[sec], nb_b = fan.nb[(sec + 1) % k];
+    auto pos = D.origin_tracker->unfold_patch(sec_origs, {v, nb_a, nb_b}, v);
+
+    auto it_v = pos.find(v);
+    auto it_a = pos.find(nb_a);
+    auto it_b = pos.find(nb_b);
+    if (it_v == pos.end() || it_a == pos.end() || it_b == pos.end()) {
+      int fb = sector_fallback(sec, k, tri);
+      for (int fid : sec_origs) assignment[fb].push_back(fid);
+      continue;
+    }
+
+    double eVx = it_v->second.first, eVy = it_v->second.second;
+    double eAx = it_a->second.first, eAy = it_a->second.second;
+    double eBx = it_b->second.first, eBy = it_b->second.second;
+    double fAx = fan.x(sec),         fAy = fan.y(sec);
+    double fBx = fan.x((sec+1) % k), fBy = fan.y((sec+1) % k);
+    double det = (eAx - eVx) * (eBy - eVy) - (eBx - eVx) * (eAy - eVy);
+    bool degenerate = std::abs(det) < 1e-15;
+
+    for (int fid : sec_origs) {
+      auto& fverts = D.origin_tracker->face_verts[fid];
+      double cx = 0, cy = 0;
+      bool all_found = true;
+      for (int vi = 0; vi < 3; vi++) {
+        auto it = pos.find(fverts[vi]);
+        if (it == pos.end()) { all_found = false; break; }
+        cx += it->second.first; cy += it->second.second;
+      }
+      if (!all_found || degenerate) {
+        assignment[sector_fallback(sec, k, tri)].push_back(fid);
+        continue;
+      }
+      cx /= 3.0; cy /= 3.0;
+      double ba = ((cx - eVx)*(eBy - eVy) - (cy - eVy)*(eBx - eVx)) / det;
+      double bb = ((cy - eVy)*(eAx - eVx) - (cx - eVx)*(eAy - eVy)) / det;
+      double fan_px = ba * fAx + bb * fBx;
+      double fan_py = ba * fAy + bb * fBy;
+      int ti = point_in_ear(fan_px, fan_py, fan, tri);
+      assignment[ti >= 0 ? ti : sector_fallback(sec, k, tri)].push_back(fid);
+    }
+  }
+  return assignment;
+}
+
+// ----------------------------------------------------------------------------
+// Call sites in the live algorithm — these blocks were guarded by
+// `if (origin_tracker)` and ran after the main DCEL surgery.
+// ----------------------------------------------------------------------------
+
+// --- from_triangulation() seed ---
+// Each face starts as its own origin:
+//   D.f_origin.push_back({fid});
+
+// --- flip_edge() ---
+//   int fh = he_face[h], ft = he_face[t];
+//   vector<int> all;
+//   if (origin_tracker) all = union_face_origins(*this, {fh, ft});
+//   ... DCEL surgery ...
+//   if (origin_tracker) {
+//     auto [left, right] = origin_tracker->classify_across_line(all, B, D);
+//     f_origin[fh] = std::move(left);
+//     f_origin[ft] = std::move(right);
+//   }
+
+// --- remove_degree3() ---
+//   vector<int> all_origins;
+//   if (D.origin_tracker) all_origins = union_face_origins(D, {f0, f1, f2});
+//   ... DCEL surgery ...
+//   int fid = D.wire_triangle(inner0, inner1, inner2);
+//   if (D.origin_tracker) D.f_origin[fid] = std::move(all_origins);
+
+// --- splice_fan() ---
+//   vector<vector<int>> sector_origins(k);
+//   if (D.origin_tracker) {
+//     int h0 = D.v_out[v], h = h0;
+//     int sec = 0;
+//     unordered_set<int> seen;
+//     do {
+//       int f = D.he_face[h];
+//       for (int fid : D.f_origin[f])
+//         if (seen.insert(fid).second)
+//           sector_origins[sec].push_back(fid);
+//       h = D.ccw(h);
+//       sec++;
+//     } while (h != h0);
+//   }
+//   ... DCEL surgery ...
+//   vector<vector<int>> origin_assignment;
+//   if (D.origin_tracker)
+//     origin_assignment = compute_origin_assignment(D, v, fan, tri, sector_origins);
+//   for (size_t ti = 0; ti < tri.triangles.size(); ti++) {
+//     ...
+//     if (D.origin_tracker) D.f_origin[fid] = std::move(origin_assignment[ti]);
+//   }
+
+// --- compute() ---
+//   Triangulation sorted = T.sort_flat_last();
+//   DelaunayTriangulation D = from_triangulation(sorted);
+//   if (track_origins)
+//     D.origin_tracker = std::make_shared<OriginTracker>(sorted, D.nf);
+//   D.remove_flat_vertices();
+//   return D;
+
+#endif

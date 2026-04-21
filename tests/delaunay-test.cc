@@ -247,87 +247,10 @@ TEST(DCEL, C60_AllIsomers) {
   print_timing_stats("DCEL C60 iDT", times_us);
 }
 
-// Verify exact Eisenstein face-origin tracking: every original face must
-// appear in exactly one iDT face's f_origin (modulo boundary faces that
-// appear in exactly two), and the total count must equal N_original_faces.
-static void verify_exact_origins(const DelaunayTriangulation& D,
-                                 int N_original_faces) {
-  // Collect all origin assignments.
-  std::map<int, int> origin_count;  // original face ID → number of iDT faces claiming it
-  int total = 0;
-  for (int f = 0; f < D.nf; f++) {
-    if (D.f_he[f] < 0) continue;  // dead face
-    for (int orig : D.f_origin[f])
-      origin_count[orig]++;
-    total += D.f_origin[f].size();
-  }
-
-  // Every original face must appear at least once.
-  int missing = 0, singly = 0, doubly = 0, multi = 0;
-  for (int i = 0; i < N_original_faces; i++) {
-    auto it = origin_count.find(i);
-    if (it == origin_count.end()) missing++;
-    else if (it->second == 1) singly++;
-    else if (it->second == 2) doubly++;
-    else multi++;
-  }
-
-  EXPECT_EQ(missing, 0) << missing << " original faces not assigned to any iDT face";
-  EXPECT_EQ(multi, 0) << multi << " original faces assigned to 3+ iDT faces";
-  // Boundary faces (split by a geodesic) appear in exactly 2 iDT faces.
-  // Interior faces appear in exactly 1.  Both are acceptable.
-  // But no face should appear in 0 or 3+.
-
-  // No spurious face IDs outside [0, N_original_faces).
-  for (auto& [fid, cnt] : origin_count)
-    EXPECT_LT(fid, N_original_faces) << "Spurious origin face ID " << fid;
-}
-
-// Exact origin tracking on C20 (no flat vertices to remove).
-TEST(DCEL, ExactOrigins_C20) {
-  Triangulation T = make_dual(20, 0, false);
-  auto D = DelaunayTriangulation::compute(T, /*track_origins=*/true);
-  EXPECT_EQ(D.nv, 12);
-  EXPECT_TRUE(D.is_delaunay());
-  verify_exact_origins(D, 20);
-}
-
-// Exact origin tracking on C60 Ih.
-TEST(DCEL, ExactOrigins_C60_Ih) {
-  Triangulation T = make_dual(60, 0, true);
-  auto D = DelaunayTriangulation::compute(T, /*track_origins=*/true);
-  EXPECT_EQ(D.nv, 12);
-  EXPECT_TRUE(D.is_delaunay());
-  verify_exact_origins(D, 60);
-}
-
-TEST(DCEL, ExactOrigins_C60_AllIsomers) {
-  BuckyGen::buckygen_queue Q = BuckyGen::start(60, false, false);
-  Triangulation T;
-  std::vector<double> times_us;
-  int idx = 0;
-  int n_fail = 0;
-  while (BuckyGen::next_fullerene(Q, T)) {
-    SCOPED_TRACE("C60 #" + std::to_string(idx));
-    try {
-      auto t0 = std::chrono::high_resolution_clock::now();
-      auto D = DelaunayTriangulation::compute(T, /*track_origins=*/true);
-      auto t1 = std::chrono::high_resolution_clock::now();
-      times_us.push_back(std::chrono::duration<double, std::micro>(t1 - t0).count());
-      verify_dcel_reduced(D, 12, 60);
-      verify_exact_origins(D, 60);
-      if (D.nv != 12 || !D.is_delaunay()) n_fail++;
-    } catch (const std::exception& e) {
-      ADD_FAILURE() << "C60 #" << idx << ": exception: " << e.what();
-      n_fail++;
-    }
-    idx++;
-  }
-  BuckyGen::stop(Q);
-  EXPECT_EQ(idx, 1812);
-  EXPECT_EQ(n_fail, 0);
-  print_timing_stats("DCEL C60 exact origins", times_us);
-}
+// Origin tracking tests (ExactOrigins_C20, C60_Ih, C60_AllIsomers,
+// DISABLED_ExactOrigins_C80_AllIsomers, DISABLED_ExactOrigins_C100_AllIsomers)
+// were removed when the f_origin / OriginTracker machinery was archived.
+// See src/c++/attic/delaunay_origin_tracking.cc.attic for the original code.
 
 TEST(DCEL, DISABLED_C80_AllIsomers) {
   BuckyGen::buckygen_queue Q = BuckyGen::start(80, false, false);
@@ -350,33 +273,6 @@ TEST(DCEL, DISABLED_C80_AllIsomers) {
   print_timing_stats("DCEL C80 iDT", times_us);
 }
 
-TEST(DCEL, DISABLED_ExactOrigins_C80_AllIsomers) {
-  BuckyGen::buckygen_queue Q = BuckyGen::start(80, false, false);
-  Triangulation T;
-  std::vector<double> times_us;
-  int idx = 0;
-  int n_fail = 0;
-  while (BuckyGen::next_fullerene(Q, T)) {
-    SCOPED_TRACE("C80 #" + std::to_string(idx));
-    try {
-      auto t0 = std::chrono::high_resolution_clock::now();
-      auto D = DelaunayTriangulation::compute(T, /*track_origins=*/true);
-      auto t1 = std::chrono::high_resolution_clock::now();
-      times_us.push_back(std::chrono::duration<double, std::micro>(t1 - t0).count());
-      verify_dcel_reduced(D, 12, 80);
-      verify_exact_origins(D, 80);
-      if (D.nv != 12 || !D.is_delaunay()) n_fail++;
-    } catch (const std::exception& e) {
-      ADD_FAILURE() << "C80 #" << idx << ": exception: " << e.what();
-      n_fail++;
-    }
-    idx++;
-  }
-  BuckyGen::stop(Q);
-  EXPECT_EQ(n_fail, 0);
-  print_timing_stats("DCEL C80 exact origins", times_us);
-}
-
 TEST(DCEL, DISABLED_C100_AllIsomers) {
   BuckyGen::buckygen_queue Q = BuckyGen::start(100, false, false);
   Triangulation T;
@@ -396,33 +292,6 @@ TEST(DCEL, DISABLED_C100_AllIsomers) {
   BuckyGen::stop(Q);
   EXPECT_EQ(n_fail, 0);
   print_timing_stats("DCEL C100 iDT", times_us);
-}
-
-TEST(DCEL, DISABLED_ExactOrigins_C100_AllIsomers) {
-  BuckyGen::buckygen_queue Q = BuckyGen::start(100, false, false);
-  Triangulation T;
-  std::vector<double> times_us;
-  int idx = 0;
-  int n_fail = 0;
-  while (BuckyGen::next_fullerene(Q, T)) {
-    SCOPED_TRACE("C100 #" + std::to_string(idx));
-    try {
-      auto t0 = std::chrono::high_resolution_clock::now();
-      auto D = DelaunayTriangulation::compute(T, /*track_origins=*/true);
-      auto t1 = std::chrono::high_resolution_clock::now();
-      times_us.push_back(std::chrono::duration<double, std::micro>(t1 - t0).count());
-      verify_dcel_reduced(D, 12, 100);
-      verify_exact_origins(D, 100);
-      if (D.nv != 12 || !D.is_delaunay()) n_fail++;
-    } catch (const std::exception& e) {
-      ADD_FAILURE() << "C100 #" << idx << ": exception: " << e.what();
-      n_fail++;
-    }
-    idx++;
-  }
-  BuckyGen::stop(Q);
-  EXPECT_EQ(n_fail, 0);
-  print_timing_stats("DCEL C100 exact origins", times_us);
 }
 
 TEST(DCEL, DISABLED_Plantri15_AllTriangulations) {

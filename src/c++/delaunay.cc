@@ -1,16 +1,10 @@
 #include "fullerenes/delaunay.hh"
-#include "fullerenes/eisenstein.hh"
 
 #include <stack>
-#include <queue>
 #include <cmath>
 #include <cassert>
 #include <algorithm>
-#include <numeric>
 #include <map>
-#include <array>
-#include <unordered_set>
-#include <unordered_map>
 
 // ============================================================================
 // Intrinsic geometry primitives
@@ -35,6 +29,15 @@ static double cot_opposite(double opp, double b, double c)
   double num = b*b + c*c - opp*opp;
   if (H <= 0) return (num >= 0) ? 1e15 : -1e15;
   return num / sqrt(H);
+}
+
+// Angle of the corner adjacent to sides `adj1`, `adj2` in a triangle
+// whose opposite side is `opp`.  Law of cosines, clamped for floating-point
+// safety at triangle-inequality boundaries.
+static double triangle_angle(double adj1, double adj2, double opp)
+{
+  double c = (adj1*adj1 + adj2*adj2 - opp*opp) / (2 * adj1 * adj2);
+  return acos(std::clamp(c, -1.0, 1.0));
 }
 
 // ============================================================================
@@ -77,304 +80,6 @@ double Diamond::flipped_length() const
 // Old FulleroidDelaunay + IDTAudit implementation moved to delaunay_old.cc.
 
 // ============================================================================
-// OriginTracker — exact Eisenstein face-origin tracking
-// ============================================================================
-//
-// Maintains a copy of the original equilateral triangulation so that during
-// flips and vertex removals, the repartitioning of original faces among iDT
-// faces can be done exactly using the Eisenstein integer turn predicate.
-//
-// The key operation is unfold_patch(): BFS-unfold a connected set of original
-// equilateral faces into the Z[omega] grid.  Since all original edges have
-// unit length, every vertex lands at an Eisenstein integer, and the turn()
-// predicate gives exact orientation tests with zero floating-point error.
-
-struct DelaunayTriangulation::OriginTracker {
-  int N;                                    // vertex count in original triangulation
-  vector<array<int,3>> face_verts;          // face_verts[fid] = {u, v, w} CCW
-  unordered_map<int64_t, int> arc_to_face;  // directed arc (u,v) → face ID
-
-  // Build from the sorted triangulation used by from_triangulation().
-  // num_faces must match the number of faces assigned during construction.
-  OriginTracker(const Triangulation& T, int num_faces);
-
-  // BFS-unfold original equilateral faces into Z[omega].
-  // Two-phase BFS: first through target faces only (to avoid wrapping on
-  // closed surfaces), then through all faces if required vertices are still
-  // unreached.  If anchor_vertex >= 0, starts from a target face containing
-  // that vertex (ensures the unfolding is centered on the fan).
-  // Returns a map from original vertex ID to Eisenstein grid position.
-  unordered_map<int, Eisenstein> unfold_patch(
-      const vector<int>& face_ids,
-      const vector<int>& required_vertices = {},
-      int anchor_vertex = -1) const;
-
-  // Classify original faces across the directed line vtx_A → vtx_B.
-  // Returns (left_of_line, right_of_line).  Faces whose centroid is exactly
-  // on the line are assigned to both sides.
-  pair<vector<int>, vector<int>>
-  classify_across_line(const vector<int>& face_ids,
-                       int vtx_A, int vtx_B) const;
-
-  // Classify original faces into a set of triangles (for ear-clipping).
-  // tri_verts[j] = {a, b, c} gives the CCW vertex IDs of triangle j.
-  // anchor_vertex: the removed flat vertex (ensures unfolding is fan-centered).
-  // Returns assignment[j] = list of original face IDs inside triangle j.
-  vector<vector<int>>
-  classify_into_triangles(const vector<int>& face_ids,
-                          const vector<array<int,3>>& tri_verts,
-                          int anchor_vertex = -1) const;
-};
-
-DelaunayTriangulation::OriginTracker::OriginTracker(
-    const Triangulation& T, int num_faces) : N(T.N)
-{
-  face_verts.resize(num_faces);
-  int fid = 0;
-  for (node_t u = 0; u < T.N; u++) {
-    auto row = T[u];
-    int deg = row.size();
-    for (int j = 0; j < deg; j++) {
-      node_t v = row[j], w = row[(j+1) % deg];
-      if (u < v && u < w) {
-        face_verts[fid] = {u, v, w};
-        arc_to_face[int64_t(u) * N + v] = fid;
-        arc_to_face[int64_t(v) * N + w] = fid;
-        arc_to_face[int64_t(w) * N + u] = fid;
-        fid++;
-      }
-    }
-  }
-  assert(fid == num_faces);
-}
-
-unordered_map<int, Eisenstein>
-DelaunayTriangulation::OriginTracker::unfold_patch(
-    const vector<int>& face_ids,
-    const vector<int>& required_vertices,
-    int anchor_vertex) const
-{
-  if (face_ids.empty()) return {};
-
-  // Two-phase BFS unfolding.
-  //
-  // On a closed surface, naive BFS can reach a vertex via a path that wraps
-  // around the surface, giving it coordinates inconsistent with the local
-  // geometry of the target patch.  To avoid this:
-  //
-  // Phase 1: expand only through TARGET faces.  This keeps the unfolding
-  //   within the patch (e.g., a fan polygon around a removed vertex).
-  //   All target face vertices get consistent local coordinates.
-  //
-  // Phase 2: if required vertices are still unreached, expand through
-  //   ALL adjacent faces to find them.  Positions set in phase 1 are
-  //   never overwritten.
-
-  unordered_set<int> target_faces(face_ids.begin(), face_ids.end());
-  unordered_set<int> target_verts(required_vertices.begin(),
-                                  required_vertices.end());
-  unordered_map<int, Eisenstein> pos;
-  unordered_set<int> placed;
-  queue<int> Q;
-
-  int faces_remaining = target_faces.size();
-  int verts_remaining = target_verts.size();
-
-  auto done = [&]() { return faces_remaining <= 0 && verts_remaining <= 0; };
-
-  auto place_vertex = [&](int vtx, Eisenstein p) {
-    if (!pos.count(vtx)) {
-      pos[vtx] = p;
-      if (target_verts.count(vtx)) verts_remaining--;
-    }
-  };
-
-  // Helper: expand from face f, placing the third vertex of each adjacent
-  // face.  If target_only, skip non-target adjacent faces.
-  auto expand = [&](int f, bool target_only) {
-    auto& v = face_verts[f];
-    for (int i = 0; i < 3; i++) {
-      int eu = v[i], ev = v[(i+1) % 3];
-      auto it = arc_to_face.find(int64_t(ev) * N + eu);
-      if (it == arc_to_face.end()) continue;
-      int adj = it->second;
-      if (placed.count(adj)) continue;
-      if (target_only && !target_faces.count(adj)) continue;
-
-      auto& av = face_verts[adj];
-      int third = av[0];
-      if (third == eu || third == ev) third = av[1];
-      if (third == eu || third == ev) third = av[2];
-
-      place_vertex(third, pos[ev] + (pos[eu] - pos[ev]).nextCCW());
-      placed.insert(adj);
-      if (target_faces.count(adj)) faces_remaining--;
-      Q.push(adj);
-    }
-  };
-
-  // Choose starting face: prefer one containing anchor_vertex (ensures the
-  // unfolding starts at the fan center for vertex removal).
-  int f0 = face_ids[0];
-  if (anchor_vertex >= 0) {
-    for (int fid : face_ids) {
-      auto& fv2 = face_verts[fid];
-      if (fv2[0] == anchor_vertex || fv2[1] == anchor_vertex || fv2[2] == anchor_vertex) {
-        f0 = fid;
-        break;
-      }
-    }
-  }
-  auto& fv = face_verts[f0];
-  place_vertex(fv[0], Eisenstein(0, 0));
-  place_vertex(fv[1], Eisenstein(1, 0));
-  place_vertex(fv[2], Eisenstein(0, 1));
-  placed.insert(f0);
-  faces_remaining--;
-  Q.push(f0);
-
-  // Phase 1: BFS through target faces only.
-  while (!Q.empty() && !done()) {
-    int f = Q.front(); Q.pop();
-    expand(f, /*target_only=*/true);
-  }
-
-  // If target faces are disconnected, seed each unvisited component.
-  if (faces_remaining > 0) {
-    for (int fid : face_ids) {
-      if (placed.count(fid)) continue;
-      // Try to find an adjacent placed face to seed from.
-      auto& fv2 = face_verts[fid];
-      bool seeded = false;
-      for (int i = 0; i < 3 && !seeded; i++) {
-        int eu = fv2[i], ev = fv2[(i+1) % 3];
-        // Check if the adjacent face across this edge is already placed.
-        auto it = arc_to_face.find(int64_t(ev) * N + eu);
-        if (it != arc_to_face.end() && placed.count(it->second)) {
-          // Place this face's third vertex.
-          int third = fv2[0];
-          if (third == eu || third == ev) third = fv2[1];
-          if (third == eu || third == ev) third = fv2[2];
-          place_vertex(third, pos[ev] + (pos[eu] - pos[ev]).nextCCW());
-          placed.insert(fid);
-          faces_remaining--;
-          Q.push(fid);
-          seeded = true;
-        }
-      }
-      if (!seeded) {
-        // Bridge: expand through non-target faces to reach this component.
-        // Re-enqueue all placed faces and expand without target restriction
-        // until we reach this unvisited target face.
-        queue<int> bridge_Q;
-        for (int p : placed) bridge_Q.push(p);
-        while (!bridge_Q.empty() && !placed.count(fid)) {
-          int f = bridge_Q.front(); bridge_Q.pop();
-          auto& v = face_verts[f];
-          for (int i = 0; i < 3; i++) {
-            int eu = v[i], ev = v[(i+1) % 3];
-            auto it = arc_to_face.find(int64_t(ev) * N + eu);
-            if (it == arc_to_face.end()) continue;
-            int adj = it->second;
-            if (placed.count(adj)) continue;
-            auto& av = face_verts[adj];
-            int third = av[0];
-            if (third == eu || third == ev) third = av[1];
-            if (third == eu || third == ev) third = av[2];
-            place_vertex(third, pos[ev] + (pos[eu] - pos[ev]).nextCCW());
-            placed.insert(adj);
-            if (target_faces.count(adj)) faces_remaining--;
-            bridge_Q.push(adj);
-          }
-        }
-      }
-      // Continue phase 1 BFS from any newly added faces.
-      while (!Q.empty() && !done()) {
-        int f = Q.front(); Q.pop();
-        expand(f, /*target_only=*/true);
-      }
-    }
-  }
-
-  // Phase 2: expand through all faces if required vertices still unreached.
-  if (verts_remaining > 0) {
-    // Re-seed from all placed faces.
-    queue<int>().swap(Q);  // clear
-    for (int f : placed) Q.push(f);
-    while (!Q.empty() && !done()) {
-      int f = Q.front(); Q.pop();
-      expand(f, /*target_only=*/false);
-    }
-  }
-
-  return pos;
-}
-
-pair<vector<int>, vector<int>>
-DelaunayTriangulation::OriginTracker::classify_across_line(
-    const vector<int>& face_ids, int vtx_A, int vtx_B) const
-{
-  if (face_ids.empty()) return {{}, {}};
-  auto pos = unfold_patch(face_ids, {vtx_A, vtx_B});
-
-  // Scale line endpoints by 3 so we can test the centroid (p+q+r)
-  // without dividing by 3.  sign(turn(3A, 3B, p+q+r)) = sign(turn(A, B, centroid)).
-  Eisenstein A3 = pos.at(vtx_A) * 3;
-  Eisenstein B3 = pos.at(vtx_B) * 3;
-
-  vector<int> left, right;
-  for (int fid : face_ids) {
-    auto& fv = face_verts[fid];
-    Eisenstein sum = pos.at(fv[0]) + pos.at(fv[1]) + pos.at(fv[2]);
-    int t = Eisenstein::turn(A3, B3, sum);
-    if (t >= 0) left.push_back(fid);     // on the line → left (by convention)
-    else right.push_back(fid);
-  }
-  return {left, right};
-}
-
-vector<vector<int>>
-DelaunayTriangulation::OriginTracker::classify_into_triangles(
-    const vector<int>& face_ids,
-    const vector<array<int,3>>& tri_verts,
-    int anchor_vertex) const
-{
-  // Collect all triangle corner vertices as required.
-  vector<int> req;
-  for (auto& tv : tri_verts)
-    for (int v : tv)
-      req.push_back(v);
-
-  auto pos = unfold_patch(face_ids, req, anchor_vertex);
-  int nt = tri_verts.size();
-  vector<vector<int>> assignment(nt);
-
-  // Precompute scaled triangle corners (3x to avoid centroid division).
-  vector<array<Eisenstein,3>> corners(nt);
-  for (int j = 0; j < nt; j++)
-    for (int k = 0; k < 3; k++)
-      corners[j][k] = pos.at(tri_verts[j][k]) * 3;
-
-  for (int fid : face_ids) {
-    auto& fv = face_verts[fid];
-    Eisenstein sum = pos.at(fv[0]) + pos.at(fv[1]) + pos.at(fv[2]);
-
-    for (int j = 0; j < nt; j++) {
-      auto& c = corners[j];
-      int t0 = Eisenstein::turn(c[0], c[1], sum);
-      int t1 = Eisenstein::turn(c[1], c[2], sum);
-      int t2 = Eisenstein::turn(c[2], c[0], sum);
-      if ((t0 >= 0 && t1 >= 0 && t2 >= 0) ||
-          (t0 <= 0 && t1 <= 0 && t2 <= 0)) {
-        assignment[j].push_back(fid);
-        break;
-      }
-    }
-  }
-  return assignment;
-}
-
-// ============================================================================
 // DelaunayTriangulation — DCEL-based iDT (delta-complex)
 // ============================================================================
 
@@ -409,10 +114,8 @@ int DelaunayTriangulation::alloc_face()
   } else {
     fid = nf++;
     f_he.push_back(-1);
-    f_origin.push_back({});
   }
   f_he[fid] = -1;
-  f_origin[fid].clear();
   return fid;
 }
 
@@ -433,8 +136,38 @@ void DelaunayTriangulation::dealloc_edge(int h)
 void DelaunayTriangulation::dealloc_face(int f)
 {
   f_he[f] = -1;
-  f_origin[f].clear();
   free_faces.push_back(f);
+}
+
+int DelaunayTriangulation::alloc_directed_edge(int u, int v, double L)
+{
+  int h = alloc_edge();
+  he_origin[h]     = u;
+  he_origin[h ^ 1] = v;
+  he_length[h] = he_length[h ^ 1] = L;
+  return h;
+}
+
+int DelaunayTriangulation::wire_triangle(int h0, int h1, int h2)
+{
+  int fid = alloc_face();
+  he_next[h0] = h1; he_next[h1] = h2; he_next[h2] = h0;
+  he_face[h0] = he_face[h1] = he_face[h2] = fid;
+  f_he[fid] = h0;
+  recompute_face_angles(fid);
+  return fid;
+}
+
+void DelaunayTriangulation::ensure_v_out(int v)
+{
+  int h = v_out[v];
+  if (h >= 0 && alive(h) && he_origin[h] == v) return;
+  // Scan all half-edges for a live outgoing one from v.  O(nh) fallback;
+  // only used to recover after structural edits that may have killed
+  // the previously-recorded outgoing pointer.
+  for (int hh = 0; hh < nh; hh++)
+    if (alive(hh) && he_origin[hh] == v) { v_out[v] = hh; return; }
+  v_out[v] = -1;
 }
 
 int DelaunayTriangulation::vertex_degree(int v) const
@@ -499,7 +232,6 @@ DelaunayTriangulation DelaunayTriangulation::from_triangulation(const Triangulat
         D.he_face[h_vw] = fid;
         D.he_face[h_wu] = fid;
         D.f_he.push_back(h_uv);
-        D.f_origin.push_back({fid});
       }
     }
     if (deg > 0) D.v_out[u] = arc_to_he.at({u, row[0]});
@@ -546,19 +278,13 @@ Diamond DelaunayTriangulation::diamond(int h) const
 void DelaunayTriangulation::recompute_face_angles(int f)
 {
   if (f_he[f] < 0) return;
-  int h0 = f_he[f];
-  int h1 = he_next[h0];
-  int h2 = he_next[h1];
-  double a = he_length[h0], b = he_length[h1], c = he_length[h2];
-  // Angle at origin of h0 = angle opposite side h1 (length b)... no.
-  // h0: u->v (length a), h1: v->w (length b), h2: w->u (length c).
-  // Angle at u (origin of h0) is opposite side b (the side v->w).
-  // Wait: the angle at u is between edges u->v (length a) and u->w (length c).
-  // The opposite side is v->w (length b).
-  // cos(angle_u) = (a^2 + c^2 - b^2) / (2*a*c)
-  he_angle[h0] = acos(std::clamp((a*a + c*c - b*b) / (2*a*c), -1.0, 1.0));
-  he_angle[h1] = acos(std::clamp((a*a + b*b - c*c) / (2*a*b), -1.0, 1.0));
-  he_angle[h2] = acos(std::clamp((b*b + c*c - a*a) / (2*b*c), -1.0, 1.0));
+  // h_i: u_i -> u_{i+1} with length L_i.  Angle at origin(h_i) is the
+  // corner between sides L_i (outgoing) and L_{i-1} (incoming), opposite
+  // to L_{i+1}.
+  int h[3] = { f_he[f], he_next[f_he[f]], he_next[he_next[f_he[f]]] };
+  double L[3] = { he_length[h[0]], he_length[h[1]], he_length[h[2]] };
+  for (int i = 0; i < 3; i++)
+    he_angle[h[i]] = triangle_angle(L[i], L[(i + 2) % 3], L[(i + 1) % 3]);
 }
 
 void DelaunayTriangulation::recompute_all_angles()
@@ -577,72 +303,42 @@ bool DelaunayTriangulation::is_delaunay_edge(int h) const
 bool DelaunayTriangulation::flip_edge(int h)
 {
   int t = h ^ 1;
-  int h1 = he_next[h], h2 = he_next[h1];   // face of h
-  int h4 = he_next[t], h5 = he_next[h4];    // face of twin
-
-  int u = he_origin[h], v = he_origin[t];
+  int h1 = he_next[h], h2 = he_next[h1];
+  int h4 = he_next[t], h5 = he_next[h4];
+  int u = he_origin[h],  v = he_origin[t];
   int B = he_origin[h2], D = he_origin[h5];
 
-  // Topological guard: B == D means the flip would create a self-loop.
+  // Guards: topological (no self-loop), geometric (convex diamond, finite
+  // positive new length).
   if (B == D) return false;
-
-  // Geometric guards.
   Diamond dm = diamond(h);
   if (!dm.is_convex()) return false;
   double f_len = dm.flipped_length();
   if (!std::isfinite(f_len) || f_len <= 0) return false;
 
-  // Execute flip.
-  // Before: face(h) = h -> h1 -> h2,  face(t) = t -> h4 -> h5
-  // After:  face(h) = h -> h5 -> h1,  face(t) = t -> h2 -> h4
-
+  // Rewire the diagonal: h becomes B->D, t becomes D->B.  Reuse the two
+  // face slots fh, ft by rewiring in place (avoids dealloc/realloc).
   int fh = he_face[h], ft = he_face[t];
-
-  // Origins: h becomes B->D, t becomes D->B.
   he_origin[h] = B;
   he_origin[t] = D;
+  he_length[h] = he_length[t] = f_len;
 
-  // Next pointers (all 6 change).
+  // Face left of h: (B, D, u) via half-edges h -> h5 -> h1.
   he_next[h]  = h5;  he_next[h5] = h1;  he_next[h1] = h;
-  he_next[t]  = h2;  he_next[h2] = h4;  he_next[h4] = t;
-
-  // Face assignments: h5 moves to face(h), h2 moves to face(t).
-  he_face[h5] = fh;
-  he_face[h2] = ft;
-  // h, h1 stay in fh; t, h4 stay in ft.
-
-  // Update face representatives.
+  he_face[h]  = he_face[h5] = he_face[h1] = fh;
   f_he[fh] = h;
+
+  // Face left of t: (D, B, v) via half-edges t -> h2 -> h4.
+  he_next[t]  = h2;  he_next[h2] = h4;  he_next[h4] = t;
+  he_face[t]  = he_face[h2] = he_face[h4] = ft;
   f_he[ft] = t;
 
-  // Edge length.
-  he_length[h] = f_len;
-  he_length[t] = f_len;
-
-  // Update v_out: u lost h (no longer leaves u), v lost t.
-  if (v_out[u] == h) v_out[u] = h4;
-  if (v_out[v] == t) v_out[v] = h1;
-
-  // Recompute angles for both affected faces.
   recompute_face_angles(fh);
   recompute_face_angles(ft);
 
-  // Repartition face origins across the new diagonal B→D.
-  if (origin_tracker) {
-    vector<int> all;
-    all.reserve(f_origin[fh].size() + f_origin[ft].size());
-    all.insert(all.end(), f_origin[fh].begin(), f_origin[fh].end());
-    all.insert(all.end(), f_origin[ft].begin(), f_origin[ft].end());
-    sort(all.begin(), all.end());
-    all.erase(unique(all.begin(), all.end()), all.end());
-
-    // Classify each original face by which side of B→D its centroid
-    // falls on, using Eisenstein turn() in the Z[omega] grid.
-    auto [left, right] = origin_tracker->classify_across_line(all, B, D);
-    f_origin[fh] = std::move(left);
-    f_origin[ft] = std::move(right);
-  }
-
+  // u and v lost their incident diagonal; find a new outgoing half-edge.
+  if (v_out[u] == h) v_out[u] = h4;
+  if (v_out[v] == t) v_out[v] = h1;
   return true;
 }
 
@@ -792,17 +488,65 @@ static FanPolygon extract_fan(const DelaunayTriangulation& D, int v) {
   }
 
   fan.cum.resize(fan.k + 1, 0);
-  for (int i = 0; i < fan.k; i++) {
-    double si = fan.spokes[i], sn = fan.spokes[(i+1)%fan.k], r = fan.rims[i];
-    double cos_a = std::clamp((si*si + sn*sn - r*r) / (2*si*sn), -1.0, 1.0);
-    fan.cum[i+1] = fan.cum[i] + acos(cos_a);
-  }
+  for (int i = 0; i < fan.k; i++)
+    fan.cum[i+1] = fan.cum[i]
+                 + triangle_angle(fan.spokes[i], fan.spokes[(i+1)%fan.k], fan.rims[i]);
 
   return fan;
 }
 
 // Ear-clip the fan polygon into triangles.
 // May mutate D via blocker-flips when no valid ear exists.
+// Find a half-edge from u to v in the current triangulation, or -1.
+static int find_edge(const DelaunayTriangulation& D, int u, int v) {
+  int h0 = D.v_out[u];
+  if (h0 < 0) return -1;
+  int h = h0;
+  do { if (D.dest(h) == v) return h; h = D.cw(h); } while (h != h0);
+  return -1;
+}
+
+// Ear acceptance test for a candidate ear (pp, pi, pn) in the fan polygon.
+// Returns the diagonal length if acceptable, else <= 0.
+static double ear_length_if_acceptable(
+    const DelaunayTriangulation& D, const FanPolygon& fan,
+    const vector<FanTriangulation::Diagonal>& already, int pp, int pi, int pn)
+{
+  int u = fan.nb[pp], w = fan.nb[pn];
+  // Distinct endpoints (no self-loop diagonal).
+  if (u == w) return 0;
+  // No duplicate of an existing edge.
+  if (find_edge(D, u, w) >= 0) return 0;
+  // No duplicate of a previously clipped diagonal in this fan.
+  for (auto& d : already) {
+    int du = fan.nb[d.from], dv = fan.nb[d.to];
+    if ((du == u && dv == w) || (du == w && dv == u)) return 0;
+  }
+  // Positive ear area; subtended fan angle strictly less than pi.
+  if (fan.ear_area(pp, pi, pn) <= 1e-10) return 0;
+  double sub = (pn > pp) ? fan.cum[pn] - fan.cum[pp]
+                         : (fan.cum[fan.k] - fan.cum[pp]) + fan.cum[pn];
+  if (sub > M_PI + 1e-10) return 0;
+  double len = fan.diag_length(pp, pn);
+  return (len > 1e-15) ? len : 0;
+}
+
+// Try to unblock the fan by flipping an edge that currently joins
+// non-adjacent (pp, pn) positions.  Returns true if any flip succeeded.
+static bool try_flip_blocker(DelaunayTriangulation& D, const FanPolygon& fan,
+                             const vector<int>& poly)
+{
+  int n = poly.size();
+  for (int j = 0; j < n; j++) {
+    int pp = poly[(j - 1 + n) % n], pn = poly[(j + 1) % n];
+    if (fan.nb[pp] == fan.nb[pn]) continue;
+    int h = find_edge(D, fan.nb[pp], fan.nb[pn]);
+    if (h < 0) continue;
+    if (D.flip_edge(h) || D.flip_edge(h ^ 1)) return true;
+  }
+  return false;
+}
+
 static FanTriangulation ear_clip_fan(DelaunayTriangulation& D,
                                       const FanPolygon& fan) {
   int k = fan.k;
@@ -813,216 +557,40 @@ static FanTriangulation ear_clip_fan(DelaunayTriangulation& D,
 
   while ((int)poly.size() > 3) {
     int n = poly.size();
-    bool found = false;
+    bool clipped = false;
 
+    // Scan for an acceptable ear.
     for (int j = 0; j < n; j++) {
-      int jm = (j - 1 + n) % n, jp = (j + 1) % n;
-      int pp = poly[jm], pi = poly[j], pn = poly[jp];
-
-      // Self-loop: diagonal endpoints must be distinct global vertices.
-      if (fan.nb[pp] == fan.nb[pn]) continue;
-
-      // Multi-edge: diagonal must not duplicate an existing edge.
-      bool blocked = false;
-      { int h0 = D.v_out[fan.nb[pp]], hc = h0;
-        if (h0 >= 0) do {
-          if (D.dest(hc) == fan.nb[pn]) { blocked = true; break; }
-          hc = D.cw(hc);
-        } while (hc != h0); }
-      for (auto& d : tri.diagonals)
-        if ((fan.nb[d.from] == fan.nb[pp] && fan.nb[d.to] == fan.nb[pn]) ||
-            (fan.nb[d.from] == fan.nb[pn] && fan.nb[d.to] == fan.nb[pp]))
-          { blocked = true; break; }
-      if (blocked) continue;
-
-      // Ear triangle must have positive area.
-      if (fan.ear_area(pp, pi, pn) <= 1e-10) continue;
-
-      // Subtended angle < pi (diagonal is interior to the polygon).
-      double sub_angle = (pn > pp) ? fan.cum[pn] - fan.cum[pp]
-                                    : (fan.cum[k] - fan.cum[pp]) + fan.cum[pn];
-      if (sub_angle > M_PI + 1e-10) continue;
-
-      // Diagonal must have positive length.
-      double len = fan.diag_length(pp, pn);
-      if (len <= 1e-15) continue;
-
+      int pp = poly[(j - 1 + n) % n], pi = poly[j], pn = poly[(j + 1) % n];
+      double len = ear_length_if_acceptable(D, fan, tri.diagonals, pp, pi, pn);
+      if (len <= 0) continue;
       tri.diagonals.push_back({pp, pi, pn, len});
       poly.erase(poly.begin() + j);
-      found = true;
+      clipped = true;
       break;
     }
 
-    if (!found) {
-      // --- Blocker-flip: try flipping blocking edges ---
-      // (Ugly imperative code — to be cleaned up separately.)
-      bool flipped = false;
-      int n2 = poly.size();
-      for (int j = 0; j < n2 && !flipped; j++) {
-        int jm = (j - 1 + n2) % n2, jp = (j + 1) % n2;
-        int pp = poly[jm], pn = poly[jp];
-        if (fan.nb[pp] == fan.nb[pn]) continue;
-        int h0 = D.v_out[fan.nb[pp]], hc = h0;
-        if (h0 >= 0) do {
-          if (D.dest(hc) == fan.nb[pn]) {
-            if (D.flip_edge(hc)) { flipped = true; break; }
-            if (D.flip_edge(hc ^ 1)) { flipped = true; break; }
-          }
-          hc = D.cw(hc);
-        } while (hc != h0);
-      }
-      if (!flipped) return tri;  // stuck — return incomplete
-    }
+    if (!clipped && !try_flip_blocker(D, fan, poly))
+      return tri;  // stuck: no ear, no blocker resolvable -> incomplete
   }
 
-  // Build triangle list from diagonals.
-  { vector<int> rpoly(k);
-    for (int i = 0; i < k; i++) rpoly[i] = i;
-    for (auto& ear : tri.diagonals) {
-      tri.triangles.push_back({ear.from, ear.ear, ear.to});
-      rpoly.erase(std::find(rpoly.begin(), rpoly.end(), ear.ear));
-    }
-    assert(rpoly.size() == 3);
-    tri.triangles.push_back({rpoly[0], rpoly[1], rpoly[2]});
+  // Compose diagonals into triangle list, appending the final base triangle.
+  vector<int> rpoly(k);
+  for (int i = 0; i < k; i++) rpoly[i] = i;
+  for (auto& ear : tri.diagonals) {
+    tri.triangles.push_back({ear.from, ear.ear, ear.to});
+    rpoly.erase(std::find(rpoly.begin(), rpoly.end(), ear.ear));
   }
+  assert(rpoly.size() == 3);
+  tri.triangles.push_back({rpoly[0], rpoly[1], rpoly[2]});
 
   tri.complete = true;
   return tri;
 }
 
-// Compute per-triangle origin assignments via per-sector Eisenstein unfolding.
-// Each sector (iDT fan face) is unfolded separately in Eisenstein coordinates,
-// then mapped to the fan's 2D coordinate system via barycentric interpolation.
-// Original face centroids are classified into ear triangles by point-in-triangle
-// tests in the fan's 2D space.
-static vector<vector<int>> compute_origin_assignment(
-    const DelaunayTriangulation& D, int v,
-    const FanPolygon& fan, const FanTriangulation& tri,
-    const vector<vector<int>>& sector_origins)
-{
-  int k = fan.k;
-  int nt = tri.triangles.size();
-
-  // Fan 2D positions of boundary vertices.
-  vector<double> fan_x(k), fan_y(k);
-  for (int i = 0; i < k; i++) {
-    fan_x[i] = fan.x(i);
-    fan_y[i] = fan.y(i);
-  }
-
-  // Ear triangle vertices in fan 2D.
-  vector<array<double,2>> ear_v0(nt), ear_v1(nt), ear_v2(nt);
-  for (int ti = 0; ti < nt; ti++) {
-    ear_v0[ti] = {fan_x[tri.triangles[ti].v0], fan_y[tri.triangles[ti].v0]};
-    ear_v1[ti] = {fan_x[tri.triangles[ti].v1], fan_y[tri.triangles[ti].v1]};
-    ear_v2[ti] = {fan_x[tri.triangles[ti].v2], fan_y[tri.triangles[ti].v2]};
-  }
-
-  auto cross2d_sign = [](double ax, double ay, double bx, double by,
-                          double px, double py) -> int {
-    double c = (bx - ax) * (py - ay) - (by - ay) * (px - ax);
-    return (c > 1e-12) ? 1 : (c < -1e-12) ? -1 : 0;
-  };
-
-  auto classify_point = [&](double px, double py) -> int {
-    for (int ti = 0; ti < nt; ti++) {
-      int t0 = cross2d_sign(ear_v0[ti][0], ear_v0[ti][1],
-                            ear_v1[ti][0], ear_v1[ti][1], px, py);
-      int t1 = cross2d_sign(ear_v1[ti][0], ear_v1[ti][1],
-                            ear_v2[ti][0], ear_v2[ti][1], px, py);
-      int t2 = cross2d_sign(ear_v2[ti][0], ear_v2[ti][1],
-                            ear_v0[ti][0], ear_v0[ti][1], px, py);
-      if (t0 >= 0 && t1 >= 0 && t2 >= 0) return ti;
-      if (t0 <= 0 && t1 <= 0 && t2 <= 0) return ti;
-    }
-    return -1;
-  };
-
-  auto sector_fallback = [&](int sec) -> int {
-    int sn = (sec + 1) % k;
-    for (int ti = 0; ti < nt; ti++) {
-      auto& t = tri.triangles[ti];
-      if ((t.v0 == sec || t.v1 == sec || t.v2 == sec) &&
-          (t.v0 == sn  || t.v1 == sn  || t.v2 == sn))
-        return ti;
-    }
-    return 0;
-  };
-
-  vector<vector<int>> assignment(nt);
-
-  for (int sec = 0; sec < k; sec++) {
-    auto& sec_origs = sector_origins[sec];
-    if (sec_origs.empty()) continue;
-
-    auto pos = D.origin_tracker->unfold_patch(
-        sec_origs, {v, fan.nb[sec], fan.nb[(sec+1)%k]}, v);
-
-    auto it_v = pos.find(v);
-    auto it_a = pos.find(fan.nb[sec]);
-    auto it_b = pos.find(fan.nb[(sec+1)%k]);
-
-    if (it_v == pos.end() || it_a == pos.end() || it_b == pos.end()) {
-      int fb = sector_fallback(sec);
-      for (int fid : sec_origs) assignment[fb].push_back(fid);
-      continue;
-    }
-
-    double eVx = it_v->second.first, eVy = it_v->second.second;
-    double eAx = it_a->second.first, eAy = it_a->second.second;
-    double eBx = it_b->second.first, eBy = it_b->second.second;
-    double fAx = fan_x[sec], fAy = fan_y[sec];
-    double fBx = fan_x[(sec+1)%k], fBy = fan_y[(sec+1)%k];
-    double det = (eAx - eVx) * (eBy - eVy) - (eBx - eVx) * (eAy - eVy);
-
-    for (int fid : sec_origs) {
-      auto& fverts = D.origin_tracker->face_verts[fid];
-      double cx = 0, cy = 0;
-      bool all_found = true;
-      for (int vi = 0; vi < 3; vi++) {
-        auto it = pos.find(fverts[vi]);
-        if (it == pos.end()) { all_found = false; break; }
-        cx += it->second.first;
-        cy += it->second.second;
-      }
-      if (!all_found || std::abs(det) < 1e-15) {
-        assignment[sector_fallback(sec)].push_back(fid);
-        continue;
-      }
-      cx /= 3.0; cy /= 3.0;
-      double ba = ((cx - eVx)*(eBy - eVy) - (cy - eVy)*(eBx - eVx)) / det;
-      double bb = ((cy - eVy)*(eAx - eVx) - (cx - eVx)*(eAy - eVy)) / det;
-      double fan_px = ba * fAx + bb * fBx;
-      double fan_py = ba * fAy + bb * fBy;
-      int ti = classify_point(fan_px, fan_py);
-      assignment[ti >= 0 ? ti : sector_fallback(sec)].push_back(fid);
-    }
-  }
-  return assignment;
-}
-
-// Replace the star of v with the fan triangulation (DCEL surgery).
-// Deallocates spokes and fan faces, allocates diagonal edges and ear faces,
-// wires the inner rim and diagonals into triangular face boundaries.
 static void splice_fan(DelaunayTriangulation& D, int v,
                         const FanPolygon& fan, const FanTriangulation& tri) {
   int k = fan.k;
-
-  // --- Collect face origins before deallocation ---
-  vector<vector<int>> sector_origins(k);
-  if (D.origin_tracker) {
-    int h0 = D.v_out[v], h = h0;
-    int sec = 0;
-    unordered_set<int> seen;
-    do {
-      int f = D.he_face[h];
-      for (int fid : D.f_origin[f])
-        if (seen.insert(fid).second)
-          sector_origins[sec].push_back(fid);
-      h = D.ccw(h);
-      sec++;
-    } while (h != h0);
-  }
 
   // --- Fix v_out for neighbors before deallocation ---
   for (int i = 0; i < k; i++) {
@@ -1038,62 +606,24 @@ static void splice_fan(DelaunayTriangulation& D, int v,
   }
   D.v_out[v] = -1;
 
-  // --- Build arc-to-halfedge map ---
+  // --- Build arc-to-halfedge map (inner rim + new diagonals) ---
   map<pair<int,int>, int> local_arc;
-
   for (int i = 0; i < k; i++)
     local_arc[{i, (i + 1) % k}] = fan.inner_rim[i];
-
   for (auto& d : tri.diagonals) {
-    int h_d = D.alloc_edge();
-    D.he_origin[h_d]     = fan.nb[d.from];
-    D.he_origin[h_d ^ 1] = fan.nb[d.to];
-    D.he_length[h_d]     = d.length;
-    D.he_length[h_d ^ 1] = d.length;
+    int h_d = D.alloc_directed_edge(fan.nb[d.from], fan.nb[d.to], d.length);
     local_arc[{d.from, d.to}] = h_d;
     local_arc[{d.to, d.from}] = h_d ^ 1;
   }
 
-  // --- Compute origin assignments ---
-  vector<vector<int>> origin_assignment;
-  if (D.origin_tracker)
-    origin_assignment = compute_origin_assignment(D, v, fan, tri, sector_origins);
+  // --- Wire each ear triangle ---
+  for (auto& t : tri.triangles)
+    D.wire_triangle(
+      local_arc.at({t.v0, t.v1}),
+      local_arc.at({t.v1, t.v2}),
+      local_arc.at({t.v2, t.v0}));
 
-  // --- Wire up each triangle ---
-  for (size_t ti = 0; ti < tri.triangles.size(); ti++) {
-    auto& t = tri.triangles[ti];
-    int fid = D.alloc_face();
-
-    int h_01 = local_arc.at({t.v0, t.v1});
-    int h_12 = local_arc.at({t.v1, t.v2});
-    int h_20 = local_arc.at({t.v2, t.v0});
-
-    D.he_next[h_01] = h_12;
-    D.he_next[h_12] = h_20;
-    D.he_next[h_20] = h_01;
-    D.he_face[h_01] = fid;
-    D.he_face[h_12] = fid;
-    D.he_face[h_20] = fid;
-    D.f_he[fid] = h_01;
-
-    if (D.origin_tracker)
-      D.f_origin[fid] = std::move(origin_assignment[ti]);
-  }
-
-  // --- Recompute angles for new faces ---
-  for (auto& t : tri.triangles) {
-    int h_01 = local_arc.at({t.v0, t.v1});
-    D.recompute_face_angles(D.he_face[h_01]);
-  }
-
-  // --- Safety: fix v_out if still broken ---
-  for (int i = 0; i < k; i++) {
-    int u = fan.nb[i];
-    if (D.v_out[u] < 0 || !D.alive(D.v_out[u]) || D.he_origin[D.v_out[u]] != u) {
-      for (auto& [arc, hid] : local_arc)
-        if (fan.nb[arc.first] == u && D.alive(hid)) { D.v_out[u] = hid; break; }
-    }
-  }
+  for (int i = 0; i < k; i++) D.ensure_v_out(fan.nb[i]);
 }
 
 // Reduce the star degree of vertex v by flipping incident edges.
@@ -1113,57 +643,21 @@ static void reduce_star_degree(DelaunayTriangulation& D, int v, int target) {
 // Remove a degree-3 vertex: three fan faces merge into one triangle.
 static void remove_degree3(DelaunayTriangulation& D, int v) {
   int h0 = D.v_out[v], h1 = D.ccw(h0), h2 = D.ccw(h1);
-
-  // Collect face origins.
-  vector<int> all_origins;
-  if (D.origin_tracker) {
-    for (int h : {h0, h1, h2}) {
-      int f = D.he_face[h];
-      all_origins.insert(all_origins.end(),
-                         D.f_origin[f].begin(), D.f_origin[f].end());
-    }
-    sort(all_origins.begin(), all_origins.end());
-    all_origins.erase(unique(all_origins.begin(), all_origins.end()),
-                      all_origins.end());
-  }
-
-  // Inner rim half-edges connect consecutive neighbors.
+  int f0 = D.he_face[h0], f1 = D.he_face[h1], f2 = D.he_face[h2];
   int inner0 = D.he_next[h0], inner1 = D.he_next[h1], inner2 = D.he_next[h2];
 
-  // Fix v_out for neighbors before deallocating.
-  for (int h : {h0, h1, h2}) {
-    int nbr = D.dest(h);
-    int spoke_twin = h ^ 1;
-    if (D.v_out[nbr] == spoke_twin) {
-      int h_s = D.cw(spoke_twin);
-      while (D.dest(h_s) == v && h_s != spoke_twin) h_s = D.cw(h_s);
-      D.v_out[nbr] = h_s;
-    }
-  }
+  // Snapshot the neighbour vertex ids BEFORE deallocation (dest reads he_origin
+  // of the twin half-edge, which dealloc_edge clears to -1).
+  int nb0 = D.dest(h0), nb1 = D.dest(h1), nb2 = D.dest(h2);
 
-  // Deallocate fan faces and spokes.
-  D.dealloc_face(D.he_face[h0]);
-  D.dealloc_face(D.he_face[h1]);
-  D.dealloc_face(D.he_face[h2]);
-  D.dealloc_edge(h0);
-  D.dealloc_edge(h1);
-  D.dealloc_edge(h2);
+  D.dealloc_face(f0); D.dealloc_face(f1); D.dealloc_face(f2);
+  D.dealloc_edge(h0); D.dealloc_edge(h1); D.dealloc_edge(h2);
   D.v_out[v] = -1;
 
-  // Wire the three inner rim half-edges into a single triangle face.
-  D.he_next[inner0] = inner1;
-  D.he_next[inner1] = inner2;
-  D.he_next[inner2] = inner0;
+  // Repair v_out for each neighbour whose outgoing pointer was a killed spoke.
+  for (int nbr : {nb0, nb1, nb2}) D.ensure_v_out(nbr);
 
-  int fid = D.alloc_face();
-  D.he_face[inner0] = fid;
-  D.he_face[inner1] = fid;
-  D.he_face[inner2] = fid;
-  D.f_he[fid] = inner0;
-  if (D.origin_tracker)
-    D.f_origin[fid] = all_origins;
-
-  D.recompute_face_angles(fid);
+  D.wire_triangle(inner0, inner1, inner2);
 }
 
 // ============================================================================
@@ -1255,14 +749,11 @@ void DelaunayTriangulation::remove_flat_vertices()
 
 // --- Full algorithm ---
 
-DelaunayTriangulation DelaunayTriangulation::compute(
-    const Triangulation& T, bool track_origins)
+DelaunayTriangulation DelaunayTriangulation::compute(const Triangulation& T)
 {
   // Sort flat vertices last, then build DCEL and run the algorithm.
   Triangulation sorted = T.sort_flat_last();
   DelaunayTriangulation D = from_triangulation(sorted);
-  if (track_origins)
-    D.origin_tracker = std::make_shared<OriginTracker>(sorted, D.nf);
   D.remove_flat_vertices();
   return D;
 }
@@ -1328,50 +819,25 @@ static int bisect_edge(DelaunayTriangulation& D, int h) {
   }
 
   // Delete original edge and its two faces.
-  int fu = D.he_face[h], ft = D.he_face[t];
-  D.dealloc_face(fu);
-  D.dealloc_face(ft);
+  D.dealloc_face(D.he_face[h]);
+  D.dealloc_face(D.he_face[t]);
   D.dealloc_edge(h);
 
-  // Allocate new edges: u-w, w-v, w-B, w-D.
-  int uw = D.alloc_edge();  // uw: u->w, uw^1: w->u
-  int wv = D.alloc_edge();  // wv: w->v, wv^1: v->w
-  int wB_he = D.alloc_edge();  // wB: w->B, wB^1: B->w
-  int wD_he = D.alloc_edge();  // wD: w->D, wD^1: D->w
-
-  D.he_origin[uw] = u;    D.he_origin[uw^1] = w;
-  D.he_origin[wv] = w;    D.he_origin[wv^1] = v;
-  D.he_origin[wB_he] = w; D.he_origin[wB_he^1] = B;
-  D.he_origin[wD_he] = w; D.he_origin[wD_he^1] = Dv;
-
-  D.he_length[uw] = D.he_length[uw^1] = half;
-  D.he_length[wv] = D.he_length[wv^1] = half;
-  D.he_length[wB_he] = D.he_length[wB_he^1] = wB;
-  D.he_length[wD_he] = D.he_length[wD_he^1] = wD;
+  // Allocate four new directed edges incident to w.
+  int uw    = D.alloc_directed_edge(u, w,  half);
+  int wv    = D.alloc_directed_edge(w, v,  half);
+  int wB_he = D.alloc_directed_edge(w, B,  wB);
+  int wD_he = D.alloc_directed_edge(w, Dv, wD);
 
   D.v_out[w] = uw ^ 1;  // w -> u
 
-  // Wire 4 new CCW faces: (u,w,B), (w,v,B), (v,w,D), (w,u,D).
-  auto safe_angle = [](double s1, double s2, double opp) {
-    return acos(std::clamp((s1*s1 + s2*s2 - opp*opp) / (2*s1*s2), -1.0, 1.0));
-  };
+  // Wire four new CCW faces around w.
+  D.wire_triangle(uw,     wB_he,   h_Bu);     // (u, w, B)
+  D.wire_triangle(wv,     h_vB,    wB_he^1);  // (w, v, B)
+  D.wire_triangle(wv^1,   wD_he,   h_Dv);     // (v, w, D)
+  D.wire_triangle(uw^1,   h_uD,    wD_he^1);  // (w, u, D)
 
-  auto make_face = [&](int e1, int e2, int e3, double L1, double L2, double L3) {
-    int fid = D.alloc_face();
-    D.he_next[e1] = e2; D.he_next[e2] = e3; D.he_next[e3] = e1;
-    D.he_face[e1] = D.he_face[e2] = D.he_face[e3] = fid;
-    D.f_he[fid] = e1;
-    D.he_angle[e1] = safe_angle(L3, L1, L2);
-    D.he_angle[e2] = safe_angle(L1, L2, L3);
-    D.he_angle[e3] = safe_angle(L2, L3, L1);
-  };
-
-  make_face(uw,    wB_he,   h_Bu,     half, wB, a);   // (u, w, B)
-  make_face(wv,    h_vB,    wB_he^1,  half, b,  wB);  // (w, v, B)
-  make_face(wv^1,  wD_he,   h_Dv,     half, wD, d);   // (v, w, D)
-  make_face(uw^1,  h_uD,    wD_he^1,  half, c,  wD);  // (w, u, D)
-
-  // Fix v_out for u and v if they pointed to the deleted edge.
+  // Fix v_out for u, v if they pointed at the deleted edge.
   if (D.v_out[u] == h) D.v_out[u] = uw;
   if (D.v_out[v] == t) D.v_out[v] = wv ^ 1;
 
