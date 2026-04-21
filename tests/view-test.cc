@@ -22,13 +22,13 @@ static_assert(batch::batchable_view<TriangulationView>);
 static_assert(batch::batchable_view<FullereneDualView>);
 static_assert(batch::batchable_view<PolyhedronView<double>>);
 static_assert(batch::batchable_view<PolyhedronView<float>>);
-static_assert(batch::batchable_view<DeltahedronView>);
+static_assert(batch::batchable_view<DeltahedronView<double>>);
 
 static_assert(GraphView::n_fields         == 3);
 static_assert(CubicGraphView::n_fields    == 3);
 static_assert(TriangulationView::n_fields == 3);
 static_assert(PolyhedronView<double>::n_fields == 4);
-static_assert(DeltahedronView::n_fields        == 4);
+static_assert(DeltahedronView<double>::n_fields == 4);
 
 // Graph-like views must share layout with each other.
 static_assert([]{
@@ -416,3 +416,184 @@ TEST(GraphView, EmptyView) {
     EXPECT_EQ(view.N, 0);
     EXPECT_FALSE(view.owns_memory());
 }
+
+// ---------------------------------------------------------------------------
+// Phase 4: Batch<V> / BatchView<V>
+// ---------------------------------------------------------------------------
+#include <fullerenes/batch/batch.hh>
+
+TEST(Batch, CubicGraphBatchPushBackAndIndex) {
+    Graph G20 = FullereneGraph::C20();
+    ASSERT_EQ(G20.N, 20);
+    CubicGraph CG(G20);
+
+    batch::Batch<CubicGraphView> B(CG.N, /*capacity=*/4, CG.dmax);
+    EXPECT_EQ(B.size(), 0);
+    EXPECT_EQ(B.capacity(), 4);
+    EXPECT_EQ(B.N(), 20);
+    EXPECT_EQ(B.dmax(), 3);
+
+    B.push_back(CG);
+    B.push_back(CG);
+    EXPECT_EQ(B.size(), 2);
+
+    auto v = B.view();
+    EXPECT_EQ(v.size(), 2);
+
+    for (std::size_t i = 0; i < 2u; ++i) {
+        CubicGraphView entry = v[i];
+        EXPECT_EQ(entry.N, 20);
+        EXPECT_EQ(entry.dmax, 3);
+        ASSERT_EQ(entry.neighbours.size(), (size_t)entry.N * entry.dmax);
+        // Same adjacency as the source.
+        for (int u = 0; u < entry.N; ++u) {
+            ASSERT_EQ(entry.deg[u], CG.deg[u]);
+            for (int j = 0; j < entry.deg[u]; ++j)
+                EXPECT_EQ(entry.neighbours[u * entry.dmax + j],
+                          CG.neighbours [u * CG.dmax     + j]);
+        }
+    }
+}
+
+TEST(Batch, PolyhedronBatchPreservesCoordinates) {
+    Polyhedron P = Polyhedron::C20();
+    ASSERT_EQ(P.N, 20);
+
+    batch::Batch<PolyhedronView<double>> B(P.N, 2, P.dmax);
+    B.push_back(P);
+    ASSERT_EQ(B.size(), 1);
+
+    PolyhedronView<double> entry = B[0];
+    ASSERT_EQ(entry.N, 20);
+    ASSERT_EQ(entry.points.size(), 20u);
+    for (int u = 0; u < entry.N; ++u)
+        for (int k = 0; k < 3; ++k)
+            EXPECT_DOUBLE_EQ(entry.points[u][k], P.points[u][k]);
+}
+
+TEST(Batch, BatchViewSliceAndIterate) {
+    Graph G20 = FullereneGraph::C20();
+    CubicGraph CG(G20);
+
+    batch::Batch<CubicGraphView> B(CG.N, 5, CG.dmax);
+    for (int i = 0; i < 5; ++i) B.push_back(CG);
+
+    auto all = B.view();
+    ASSERT_EQ(all.size(), 5);
+
+    auto mid = all.slice(1, 3);   // entries [1,4)
+    EXPECT_EQ(mid.size(), 3);
+    EXPECT_EQ(mid.N(),    CG.N);
+
+    int seen = 0;
+    for (auto v : mid) {
+        EXPECT_EQ(v.N, CG.N);
+        ++seen;
+    }
+    EXPECT_EQ(seen, 3);
+}
+
+// ---------------------------------------------------------------------------
+// Phase 5: BatchState and LayoutScratch<T>
+// ---------------------------------------------------------------------------
+#include <fullerenes/batch/batch_state.hh>
+#include <fullerenes/batch/layout_scratch.hh>
+
+TEST(BatchState, PushBackAndView) {
+    batch::BatchState S(4);
+    EXPECT_EQ(S.size(), 0);
+    EXPECT_EQ(S.capacity(), 4);
+
+    int i0 = S.push_back(/*id=*/1001, StatusFlag{StatusEnum::EMPTY}, /*iter=*/0, /*vi=*/0);
+    int i1 = S.push_back(/*id=*/1002, StatusFlag{StatusEnum::CUBIC_INITIALIZED}, /*iter=*/7, /*vi=*/1);
+    EXPECT_EQ(i0, 0);
+    EXPECT_EQ(i1, 1);
+    EXPECT_EQ(S.size(), 2);
+
+    auto v = S.view();
+    ASSERT_EQ(v.size(), 2);
+    EXPECT_EQ(v.id[0], 1001u);
+    EXPECT_EQ(v.id[1], 1002u);
+    EXPECT_EQ(v.iteration[1], 7);
+    EXPECT_EQ(v.valid_index[1], 1);
+}
+
+TEST(BatchState, SliceAndMutateThroughView) {
+    batch::BatchState S(5);
+    for (int i = 0; i < 5; ++i) S.push_back(uint64_t(100 + i), StatusFlag{}, i, i);
+
+    auto mid = S.slice(1, 3);
+    EXPECT_EQ(mid.size(), 3);
+    EXPECT_EQ(mid.id[0], 101u);
+    EXPECT_EQ(mid.id[2], 103u);
+
+    // Write-through: mid.iteration is a span into S's storage.
+    for (auto& it : mid.iteration) it = 99;
+    EXPECT_EQ(S.iteration()[0], 0);
+    EXPECT_EQ(S.iteration()[1], 99);
+    EXPECT_EQ(S.iteration()[3], 99);
+    EXPECT_EQ(S.iteration()[4], 4);
+}
+
+TEST(LayoutScratch, SizingAndPerEntryAccess) {
+    constexpr int Nf = 12;
+    batch::LayoutScratch<double> L(Nf, /*capacity=*/3);
+    L.resize(3);
+    EXPECT_EQ(L.size(), 3);
+    EXPECT_EQ(L.per_entry(), Nf);
+
+    // Write a sentinel into entry 1, verify entries 0/2 are untouched.
+    auto e1 = L[1];
+    ASSERT_EQ(int(e1.size()), Nf);
+    for (int k = 0; k < Nf; ++k) e1[k] = coord2<double>(double(k), double(-k));
+
+    auto e0 = L[0];
+    auto e2 = L[2];
+    for (int k = 0; k < Nf; ++k) {
+        EXPECT_EQ(L[1][k].first,  double(k));
+        EXPECT_EQ(L[1][k].second, double(-k));
+    }
+    // untouched entries default-initialized to (0,0) by BatchAlloc
+    EXPECT_EQ(e0[0].first,  0.0);
+    EXPECT_EQ(e2[Nf-1].first, 0.0);
+}
+
+TEST(LayoutScratch, SliceSharesStorage) {
+    constexpr int Nf = 5;
+    batch::LayoutScratch<float> L(Nf, 4);
+    L.resize(4);
+
+    auto v = L.view();
+    for (int i = 0; i < 4; ++i)
+        for (int k = 0; k < Nf; ++k)
+            v[i][k] = coord2<float>(float(i), float(k));
+
+    auto sub = L.slice(1, 2);          // entries [1,3)
+    EXPECT_EQ(sub.size(), 2);
+    EXPECT_EQ(sub[0][0].first, 1.0f);
+    EXPECT_EQ(sub[1][Nf-1].second, float(Nf - 1));
+}
+
+TEST(Batch, WritesThroughEntryViewUpdateStorage) {
+    Graph G20 = FullereneGraph::C20();
+    CubicGraph CG(G20);
+
+    batch::Batch<CubicGraphView> B(CG.N, 2, CG.dmax);
+    B.push_back(CG);
+    B.push_back(CG);
+
+    // Mutate entry 0 through the view, then re-read through the view.
+    {
+        auto v = B.view();
+        CubicGraphView e0 = v[0];
+        e0.neighbours[0] = 42;  // clobber one entry
+    }
+    {
+        auto v = B.view();
+        CubicGraphView e0 = v[0];
+        EXPECT_EQ(e0.neighbours[0], 42);
+        CubicGraphView e1 = v[1];
+        EXPECT_NE(e1.neighbours[0], 42);  // untouched
+    }
+}
+
