@@ -300,45 +300,58 @@ bool DelaunayTriangulation::is_delaunay_edge(int h) const
   return diamond(h).is_delaunay();
 }
 
-bool DelaunayTriangulation::flip_edge(int h)
+// Body of the flip: assumes caller has checked the desired topological
+// constraints (B != D for flip_edge, or just proceeds for the self-loop
+// variant).  Returns true on success.
+static bool do_flip(DelaunayTriangulation& D_, int h, bool allow_self_loop);
+
+bool DelaunayTriangulation::flip_edge(int h)              { return do_flip(*this, h, /*allow_self_loop=*/false); }
+bool DelaunayTriangulation::flip_edge_allow_self_loop(int h) { return do_flip(*this, h, /*allow_self_loop=*/true);  }
+
+static bool do_flip(DelaunayTriangulation& D_, int h, bool allow_self_loop)
 {
   int t = h ^ 1;
-  int h1 = he_next[h], h2 = he_next[h1];
-  int h4 = he_next[t], h5 = he_next[h4];
-  int u = he_origin[h],  v = he_origin[t];
-  int B = he_origin[h2], D = he_origin[h5];
+  int h1 = D_.he_next[h], h2 = D_.he_next[h1];
+  int h4 = D_.he_next[t], h5 = D_.he_next[h4];
+  int u = D_.he_origin[h],  v = D_.he_origin[t];
+  int B = D_.he_origin[h2], D = D_.he_origin[h5];
 
-  // Guards: topological (no self-loop), geometric (convex diamond, finite
-  // positive new length).
-  if (B == D) return false;
-  Diamond dm = diamond(h);
+  // Topological guard: the default flip_edge refuses flips that would
+  // create a self-loop (B == D).  The allow_self_loop variant accepts
+  // them and produces a self-loop edge at B.
+  if (!allow_self_loop && B == D) return false;
+  Diamond dm = D_.diamond(h);
   if (!dm.is_convex()) return false;
   double f_len = dm.flipped_length();
   if (!std::isfinite(f_len) || f_len <= 0) return false;
 
   // Rewire the diagonal: h becomes B->D, t becomes D->B.  Reuse the two
   // face slots fh, ft by rewiring in place (avoids dealloc/realloc).
-  int fh = he_face[h], ft = he_face[t];
-  he_origin[h] = B;
-  he_origin[t] = D;
-  he_length[h] = he_length[t] = f_len;
+  int fh = D_.he_face[h], ft = D_.he_face[t];
+  D_.he_origin[h] = B;
+  D_.he_origin[t] = D;
+  D_.he_length[h] = D_.he_length[t] = f_len;
 
   // Face left of h: (B, D, u) via half-edges h -> h5 -> h1.
-  he_next[h]  = h5;  he_next[h5] = h1;  he_next[h1] = h;
-  he_face[h]  = he_face[h5] = he_face[h1] = fh;
-  f_he[fh] = h;
+  D_.he_next[h]  = h5;  D_.he_next[h5] = h1;  D_.he_next[h1] = h;
+  D_.he_face[h]  = D_.he_face[h5] = D_.he_face[h1] = fh;
+  D_.f_he[fh] = h;
 
   // Face left of t: (D, B, v) via half-edges t -> h2 -> h4.
-  he_next[t]  = h2;  he_next[h2] = h4;  he_next[h4] = t;
-  he_face[t]  = he_face[h2] = he_face[h4] = ft;
-  f_he[ft] = t;
+  D_.he_next[t]  = h2;  D_.he_next[h2] = h4;  D_.he_next[h4] = t;
+  D_.he_face[t]  = D_.he_face[h2] = D_.he_face[h4] = ft;
+  D_.f_he[ft] = t;
 
-  recompute_face_angles(fh);
-  recompute_face_angles(ft);
+  D_.recompute_face_angles(fh);
+  D_.recompute_face_angles(ft);
 
   // u and v lost their incident diagonal; find a new outgoing half-edge.
-  if (v_out[u] == h) v_out[u] = h4;
-  if (v_out[v] == t) v_out[v] = h1;
+  if (D_.v_out[u] == h) D_.v_out[u] = h4;
+  if (D_.v_out[v] == t) D_.v_out[v] = h1;
+  // When allow_self_loop is used and B == D, h and t are now self-loops at B.
+  // Fix B's outgoing pointer to stay valid (the self-loop's half-edge is a
+  // legitimate outgoing half-edge from B).
+  if (B == D) D_.ensure_v_out(B);
   return true;
 }
 
@@ -744,10 +757,103 @@ void DelaunayTriangulation::remove_flat_vertices()
     if (!remove_any_flat()) break;
   }
 
+  // Final convergence: standard Lawson first, then escape any B == D
+  // non-Delaunay edges via self-loop flips (Hypothesis simplicial-final
+  // in the paper: empirically false for large fullerenes).  Each escape
+  // flip creates a self-loop at the shared vertex; subsequent Lawson
+  // passes either leave it alone (it is Delaunay) or flip it further.
   flip_to_delaunay();
+  for (int escape_iter = 0; escape_iter < 10 && !is_delaunay(); escape_iter++) {
+    bool did_any = false;
+    for (int h = 0; h < nh; h += 2) {
+      if (!alive(h) || is_delaunay_edge(h)) continue;
+      int B = he_origin[he_next[he_next[h]]];
+      int D = he_origin[he_next[he_next[h ^ 1]]];
+      if (B != D) continue;  // regular flip should handle it; it didn't, so skip
+      if (flip_edge_allow_self_loop(h)) { did_any = true; break; }
+    }
+    if (!did_any) break;  // no B==D non-Delaunay edge to escape — truly stuck
+    flip_to_delaunay();
+  }
 }
 
 // --- Full algorithm ---
+
+// If D has surviving flat vertices after remove_flat_vertices, try the
+// targeted escape: find a multi-edge between two surviving flat vertices,
+// an incident edge of a survivor, or a rim blocker edge (between
+// non-adjacent fan neighbours of a survivor).  Flip one and retry
+// removal.  Up to `max_rounds` rounds.
+static void escape_surviving_flats(DelaunayTriangulation& D, int max_rounds = 20) {
+  auto try_flip = [&](int h) {
+    return D.flip_edge(h) || D.flip_edge_allow_self_loop(h);
+  };
+
+  for (int round = 0; round < max_rounds; round++) {
+    std::vector<int> surv;
+    for (int v = 0; v < D.nv; v++)
+      if (D.v_out[v] >= 0 && D.v_orig_degree[v] == 6) surv.push_back(v);
+    if (surv.empty()) return;
+
+    bool did = false;
+
+    // Tier 1: multi-edge between two survivors.
+    for (size_t i = 0; i < surv.size() && !did; i++)
+      for (size_t j = i + 1; j < surv.size() && !did; j++) {
+        int u = surv[i], v = surv[j];
+        int h0 = D.v_out[u], h = h0;
+        if (h0 < 0) continue;
+        do {
+          if (D.dest(h) == v && try_flip(h)) { did = true; break; }
+          h = D.cw(h);
+        } while (h != h0);
+      }
+
+    // Tier 2: any edge incident to a survivor.
+    if (!did) {
+      for (int v : surv) {
+        int h0 = D.v_out[v], h = h0;
+        if (h0 < 0) continue;
+        do {
+          if (try_flip(h)) { did = true; break; }
+          h = D.cw(h);
+        } while (h != h0);
+        if (did) break;
+      }
+    }
+
+    // Tier 3: rim blocker — for each survivor, for each fan neighbour
+    // pair at gap >= 2, if an edge exists between them try to flip it.
+    // This mirrors ear_clip_fan's blocker-flip but runs at the
+    // compute() level with the stuck survivors known.
+    if (!did) {
+      for (int v : surv) {
+        int h0 = D.v_out[v];
+        if (h0 < 0) continue;
+        std::vector<int> nb;
+        int h = h0;
+        do { nb.push_back(D.dest(h)); h = D.cw(h); } while (h != h0);
+        int k = (int)nb.size();
+        for (int i = 0; i < k && !did; i++)
+          for (int g = 2; g <= k - 2 && !did; g++) {
+            int j = (i + g) % k;
+            if (nb[i] == nb[j]) continue;
+            // Find an edge between nb[i] and nb[j] and try to flip it.
+            int hu0 = D.v_out[nb[i]], hu = hu0;
+            if (hu0 < 0) continue;
+            do {
+              if (D.dest(hu) == nb[j] && try_flip(hu)) { did = true; break; }
+              hu = D.cw(hu);
+            } while (hu != hu0);
+          }
+        if (did) break;
+      }
+    }
+
+    if (!did) return;  // no flip possible — truly stuck
+    D.remove_flat_vertices();
+  }
+}
 
 DelaunayTriangulation DelaunayTriangulation::compute(const Triangulation& T)
 {
@@ -755,6 +861,9 @@ DelaunayTriangulation DelaunayTriangulation::compute(const Triangulation& T)
   Triangulation sorted = T.sort_flat_last();
   DelaunayTriangulation D = from_triangulation(sorted);
   D.remove_flat_vertices();
+  // If any flat vertices survived (rare topological corners), apply the
+  // surviving-flat escape to unblock removal.
+  escape_surviving_flats(D);
   return D;
 }
 
