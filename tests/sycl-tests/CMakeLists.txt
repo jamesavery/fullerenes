@@ -15,6 +15,8 @@ set(SYCL_EXECUTABLES
   sycl-vector-test
   sycl-smoke-test
   mdspan-test
+  dualize-view-test
+  pipeline-view-test
 )
 
 foreach(EXECUTABLE ${SYCL_EXECUTABLES})
@@ -36,3 +38,4 @@ add_test(NAME tutte-functor-test COMMAND tutte-functor-test)
 add_test(NAME eigen-functor-test COMMAND eigen-functor-test)
 add_test(NAME sycl-smoke-test COMMAND sycl-smoke-test)
 add_test(NAME mdspan-test COMMAND mdspan-test)
+add_test(NAME dualize-view-test COMMAND dualize-view-test)

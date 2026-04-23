@@ -1,0 +1,131 @@
+// Phase 7 pipeline test: verify the view-based functor overloads can be chained
+// as a full geometry pipeline:
+//   DualizeFunctor  → cubic adjacency in BatchView
+//   TutteFunctor    → 2D layout
+//   SphericalProjectionFunctor -> 3D coordinates
+//
+// This test intentionally stops after spherical projection. Forcefield
+// optimisation behaviour is validated separately.
+
+#include <gtest/gtest.h>
+#include <fullerenes/kernel-headers/all-kernels.hh>
+#include <fullerenes/buckygen-wrapper.hh>
+#include <fullerenes/graph.hh>
+#include <fullerenes/dense_graph.hh>
+#include <fullerenes/batch/batch.hh>
+#include <fullerenes/batch/batch_state.hh>
+#include <fullerenes/sycl-headers/sycl-vector.hh>
+
+#include <array>
+#include <cstdint>
+#include <cmath>
+#include <numeric>
+#include <iostream>
+
+namespace {
+
+TEST(PipelineViewTest, C60ViewPipelineToSphericalProjection) {
+    using T = float;
+    using K = uint16_t;
+
+    constexpr int N        = 60;
+    constexpr int Nf       = N/2 + 2;   // 32
+    constexpr int capacity = 5;
+
+    SyclQueue Q(Device::get_devices(DeviceType::GPU).at(0), true);
+
+    // -----------------------------------------------------------------
+    // Step 0: generate dual graphs from BuckyGen
+    // -----------------------------------------------------------------
+    using RSR = Spanify::RSRAdjacencyView<K>;
+    batch::Batch<RSR> src_dual(Nf, capacity, /*dmax*/6);
+    batch::Batch<RSR> dst_cubic(N, capacity, /*dmax*/3);
+    batch::BatchState st(capacity);
+    SyclVector<std::array<K,6>> faces_cubic_buf(capacity * Nf);
+    SyclVector<std::array<K,3>> faces_dual_buf (capacity * N);
+
+    {
+        // Use legacy path to generate dual graphs, then copy into src_dual.
+        FullereneBatch<T,K> tmp(N, capacity);
+        auto BQ = BuckyGen::start(N, false, false);
+        Graph G(Nf, GRAPH_DMAX);
+        for (int i = 0; i < capacity; ++i) {
+            ASSERT_TRUE(BuckyGen::next_fullerene(BQ, G));
+            tmp.push_back(G, uint64_t(i));
+        }
+        BuckyGen::stop(BQ);
+
+        auto src_spans = src_dual.view_capacity().spans();
+        auto& src_adj  = std::get<0>(src_spans);
+        auto& src_deg  = std::get<1>(src_spans);
+        for (int b = 0; b < capacity; ++b) {
+            for (int u = 0; u < Nf; ++u) {
+                const auto& nbrs = tmp.d_.A_dual_[b*Nf + u];
+                for (int k = 0; k < 6; ++k)
+                    src_adj[b*Nf*6 + u*6 + k] = K(nbrs[k]);
+                src_deg[b*Nf + u] = uint8_t(tmp.d_.deg_[b*Nf + u]);
+            }
+            st.push_back(uint64_t(b), StatusFlag(int(StatusEnum::DUAL_INITIALIZED)));
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // Step 1: DualizeFunctor — dual → cubic adjacency
+    // -----------------------------------------------------------------
+    DualizeFunctor<T,K> dualize;
+    dualize.compute(Q,
+        src_dual.view_capacity(), dst_cubic.view_capacity(), st.view(),
+        Span<std::array<K,6>>(faces_cubic_buf.data(), faces_cubic_buf.size()),
+        Span<std::array<K,3>>(faces_dual_buf.data(),  faces_dual_buf.size())
+    ).wait();
+
+    // -----------------------------------------------------------------
+    // Step 2: TutteFunctor — cubic adjacency → 2D layout
+    // -----------------------------------------------------------------
+    SyclVector<std::array<T,2>> layout2d(capacity * N);
+    TutteFunctor<T,K> tutte;
+    tutte.compute(Q,
+        dst_cubic.view_capacity(),
+        Span<std::array<T,2>>(layout2d.data(), layout2d.size()),
+        st.view()
+    ).wait();
+
+    // Verify 2D layout is non-zero for each isomer.
+    for (int b = 0; b < capacity; ++b) {
+        double sum = 0.0;
+        for (int u = 0; u < N; ++u) {
+            sum += std::abs(layout2d[b*N + u][0]);
+            sum += std::abs(layout2d[b*N + u][1]);
+        }
+        EXPECT_GT(sum, 0.0) << "Tutte layout all-zero for isomer " << b;
+    }
+
+    // -----------------------------------------------------------------
+    // Step 3: SphericalProjectionFunctor — 2D layout → 3D coords
+    // -----------------------------------------------------------------
+    SyclVector<std::array<T,3>> xyz(capacity * N);
+    SphericalProjectionFunctor<T,K> sph;
+    sph.compute(Q,
+        dst_cubic.view_capacity(),
+        Span<std::array<T,2>>(layout2d.data(), layout2d.size()),
+        Span<std::array<T,3>>(xyz.data(),      xyz.size()),
+        st.view()
+    ).wait();
+
+    // After spherical projection coords are scaled (not unit sphere) — just
+    // verify they are finite and non-zero.
+    for (int b = 0; b < capacity; ++b) {
+        double sum = 0.0;
+        for (int u = 0; u < N; ++u) {
+            const auto& p = xyz[b*N + u];
+            EXPECT_TRUE(std::isfinite(p[0]) && std::isfinite(p[1]) && std::isfinite(p[2]))
+                << "Non-finite coord after SphericalProjection: isomer " << b << " node " << u;
+            sum += std::abs(p[0]) + std::abs(p[1]) + std::abs(p[2]);
+        }
+        EXPECT_GT(sum, 0.0) << "All-zero xyz after SphericalProjection: isomer " << b;
+    }
+
+    // Pipeline coverage for Phase 7 ends at spherical projection.
+}
+
+} // namespace
