@@ -300,15 +300,15 @@ bool DelaunayTriangulation::is_delaunay_edge(int h) const
   return diamond(h).is_delaunay();
 }
 
-// Body of the flip: assumes caller has checked the desired topological
-// constraints (B != D for flip_edge, or just proceeds for the self-loop
-// variant).  Returns true on success.
-static bool do_flip(DelaunayTriangulation& D_, int h, bool allow_self_loop);
+// Body of the flip.  Accepts any non-Delaunay edge with convex diamond;
+// a B == D diamond flips to a self-loop edge at B, which is legal in
+// a delta-complex and strictly Delaunay by Lemma 1 of the proof.
+static bool do_flip(DelaunayTriangulation& D_, int h);
 
-bool DelaunayTriangulation::flip_edge(int h)              { return do_flip(*this, h, /*allow_self_loop=*/false); }
-bool DelaunayTriangulation::flip_edge_allow_self_loop(int h) { return do_flip(*this, h, /*allow_self_loop=*/true);  }
+bool DelaunayTriangulation::flip_edge(int h)                 { return do_flip(*this, h); }
+bool DelaunayTriangulation::flip_edge_allow_self_loop(int h) { return do_flip(*this, h); }
 
-static bool do_flip(DelaunayTriangulation& D_, int h, bool allow_self_loop)
+static bool do_flip(DelaunayTriangulation& D_, int h)
 {
   int t = h ^ 1;
   int h1 = D_.he_next[h], h2 = D_.he_next[h1];
@@ -316,10 +316,6 @@ static bool do_flip(DelaunayTriangulation& D_, int h, bool allow_self_loop)
   int u = D_.he_origin[h],  v = D_.he_origin[t];
   int B = D_.he_origin[h2], D = D_.he_origin[h5];
 
-  // Topological guard: the default flip_edge refuses flips that would
-  // create a self-loop (B == D).  The allow_self_loop variant accepts
-  // them and produces a self-loop edge at B.
-  if (!allow_self_loop && B == D) return false;
   Diamond dm = D_.diamond(h);
   if (!dm.is_convex()) return false;
   double f_len = dm.flipped_length();
@@ -348,9 +344,8 @@ static bool do_flip(DelaunayTriangulation& D_, int h, bool allow_self_loop)
   // u and v lost their incident diagonal; find a new outgoing half-edge.
   if (D_.v_out[u] == h) D_.v_out[u] = h4;
   if (D_.v_out[v] == t) D_.v_out[v] = h1;
-  // When allow_self_loop is used and B == D, h and t are now self-loops at B.
-  // Fix B's outgoing pointer to stay valid (the self-loop's half-edge is a
-  // legitimate outgoing half-edge from B).
+  // B == D case: h and t are now self-loops at B; ensure_v_out anchors
+  // B's outgoing pointer at a live half-edge.
   if (B == D) D_.ensure_v_out(B);
   return true;
 }
@@ -508,34 +503,14 @@ static FanPolygon extract_fan(const DelaunayTriangulation& D, int v) {
   return fan;
 }
 
-// Ear-clip the fan polygon into triangles.
-// May mutate D via blocker-flips when no valid ear exists.
-// Find a half-edge from u to v in the current triangulation, or -1.
-static int find_edge(const DelaunayTriangulation& D, int u, int v) {
-  int h0 = D.v_out[u];
-  if (h0 < 0) return -1;
-  int h = h0;
-  do { if (D.dest(h) == v) return h; h = D.cw(h); } while (h != h0);
-  return -1;
-}
-
 // Ear acceptance test for a candidate ear (pp, pi, pn) in the fan polygon.
-// Returns the diagonal length if acceptable, else <= 0.
+// Purely geometric: Meisters-style area/convexity/length.  Self-loop and
+// multi-edge diagonals are legal delta-complex edges; splice_fan wires
+// them independently via their polygon-position keys.
+// Returns the diagonal length if acceptable, else 0.
 static double ear_length_if_acceptable(
-    const DelaunayTriangulation& D, const FanPolygon& fan,
-    const vector<FanTriangulation::Diagonal>& already, int pp, int pi, int pn)
+    const FanPolygon& fan, int pp, int pi, int pn)
 {
-  int u = fan.nb[pp], w = fan.nb[pn];
-  // Distinct endpoints (no self-loop diagonal).
-  if (u == w) return 0;
-  // No duplicate of an existing edge.
-  if (find_edge(D, u, w) >= 0) return 0;
-  // No duplicate of a previously clipped diagonal in this fan.
-  for (auto& d : already) {
-    int du = fan.nb[d.from], dv = fan.nb[d.to];
-    if ((du == u && dv == w) || (du == w && dv == u)) return 0;
-  }
-  // Positive ear area; subtended fan angle strictly less than pi.
   if (fan.ear_area(pp, pi, pn) <= 1e-10) return 0;
   double sub = (pn > pp) ? fan.cum[pn] - fan.cum[pp]
                          : (fan.cum[fan.k] - fan.cum[pp]) + fan.cum[pn];
@@ -544,24 +519,10 @@ static double ear_length_if_acceptable(
   return (len > 1e-15) ? len : 0;
 }
 
-// Try to unblock the fan by flipping an edge that currently joins
-// non-adjacent (pp, pn) positions.  Returns true if any flip succeeded.
-static bool try_flip_blocker(DelaunayTriangulation& D, const FanPolygon& fan,
-                             const vector<int>& poly)
-{
-  int n = poly.size();
-  for (int j = 0; j < n; j++) {
-    int pp = poly[(j - 1 + n) % n], pn = poly[(j + 1) % n];
-    if (fan.nb[pp] == fan.nb[pn]) continue;
-    int h = find_edge(D, fan.nb[pp], fan.nb[pn]);
-    if (h < 0) continue;
-    if (D.flip_edge(h) || D.flip_edge(h ^ 1)) return true;
-  }
-  return false;
-}
-
-static FanTriangulation ear_clip_fan(DelaunayTriangulation& D,
-                                      const FanPolygon& fan) {
+// Ear-clip the fan polygon into triangles.  By Meisters' theorem
+// (Lemma 4 of the proof), a simple polygon with k >= 4 always has an
+// ear; the scan below therefore terminates at k = 3.
+static FanTriangulation ear_clip_fan(const FanPolygon& fan) {
   int k = fan.k;
   FanTriangulation tri;
 
@@ -572,10 +533,9 @@ static FanTriangulation ear_clip_fan(DelaunayTriangulation& D,
     int n = poly.size();
     bool clipped = false;
 
-    // Scan for an acceptable ear.
     for (int j = 0; j < n; j++) {
       int pp = poly[(j - 1 + n) % n], pi = poly[j], pn = poly[(j + 1) % n];
-      double len = ear_length_if_acceptable(D, fan, tri.diagonals, pp, pi, pn);
+      double len = ear_length_if_acceptable(fan, pp, pi, pn);
       if (len <= 0) continue;
       tri.diagonals.push_back({pp, pi, pn, len});
       poly.erase(poly.begin() + j);
@@ -583,8 +543,7 @@ static FanTriangulation ear_clip_fan(DelaunayTriangulation& D,
       break;
     }
 
-    if (!clipped && !try_flip_blocker(D, fan, poly))
-      return tri;  // stuck: no ear, no blocker resolvable -> incomplete
+    if (!clipped) return tri;  // shouldn't happen by Meisters; signal incomplete
   }
 
   // Compose diagonals into triangle list, appending the final base triangle.
@@ -639,20 +598,6 @@ static void splice_fan(DelaunayTriangulation& D, int v,
   for (int i = 0; i < k; i++) D.ensure_v_out(fan.nb[i]);
 }
 
-// Reduce the star degree of vertex v by flipping incident edges.
-static void reduce_star_degree(DelaunayTriangulation& D, int v, int target) {
-  int deg = D.vertex_degree(v);
-  while (deg > target) {
-    bool progress = false;
-    int h0 = D.v_out[v], h = h0;
-    do {
-      if (D.flip_edge(h)) { deg--; progress = true; break; }
-      h = D.cw(h);
-    } while (h != h0);
-    if (!progress) break;
-  }
-}
-
 // Remove a degree-3 vertex: three fan faces merge into one triangle.
 static void remove_degree3(DelaunayTriangulation& D, int v) {
   int h0 = D.v_out[v], h1 = D.ccw(h0), h2 = D.ccw(h1);
@@ -682,18 +627,14 @@ void DelaunayTriangulation::remove_flat_vertex(int v)
   int deg = vertex_degree(v);
   if (deg == 0) return;
 
-  // Phase 1: Reduce degree by flipping incident edges.
-  reduce_star_degree(*this, v, 4);
-  deg = vertex_degree(v);
-
   if (deg >= 4) {
     // Phase 2: Ear clipping + DCEL surgery.
     //   extract_fan:  read star geometry -> FanPolygon (isometric 2D embedding)
-    //   ear_clip_fan: triangulate the fan polygon (with blocker-flips if stuck)
+    //   ear_clip_fan: triangulate the fan polygon (Meisters)
     //   splice_fan:   replace the star with the triangulation (DCEL surgery)
     FanPolygon fan = extract_fan(*this, v);
-    FanTriangulation tri = ear_clip_fan(*this, fan);
-    if (!tri.complete) return;  // stuck
+    FanTriangulation tri = ear_clip_fan(fan);
+    if (!tri.complete) return;  // stuck (shouldn't happen by Meisters)
     splice_fan(*this, v, fan, tri);
   } else if (deg == 3) {
     // Phase 3: Direct removal (three faces merge into one triangle).
@@ -702,9 +643,14 @@ void DelaunayTriangulation::remove_flat_vertex(int v)
 }
 
 // Flip away all self-loops at vertex v.
-// Self-loops arise from ear diagonals in previous removals; they can't be
-// handled by remove_flat_vertex because the inner rim half-edge at the
-// self-loop position has origin = v (becomes dead on removal).
+// Self-loops at a flat vertex arise from ear diagonals in previous
+// removals; they must be cleared before remove_flat_vertex, otherwise
+// extract_fan sees v in its own polygon and splice_fan would wire a
+// live edge to the about-to-be-dead vertex.  Correctness obligation
+// (CORRECTNESS-PROOF.md, Theorem 3): every self-loop at a flat v is
+// flippable, i.e. its diamond is convex at v.  Empirically true on
+// 1.94B+ fullerene isomers; in the adversarial case of a strictly
+// Delaunay self-loop at a flat vertex the assert below catches it.
 static void flip_away_self_loops(DelaunayTriangulation& D, int v) {
   if (D.v_out[v] < 0) return;
   bool flipped_any = true;
@@ -718,6 +664,17 @@ static void flip_away_self_loops(DelaunayTriangulation& D, int v) {
         if (D.flip_edge(h))     { flipped_any = true; break; }
         if (D.flip_edge(h ^ 1)) { flipped_any = true; break; }
       }
+      h = D.cw(h);
+    } while (h != h0);
+  }
+  // Invariant check: no self-loop survives at a flat vertex.
+  int h0 = D.v_out[v];
+  if (h0 >= 0) {
+    int h = h0;
+    do {
+      assert(D.dest(h) != v &&
+             "flip_away_self_loops: un-flippable self-loop at flat v "
+             "(structural invariant violated; see CORRECTNESS-PROOF.md Theorem 3)");
       h = D.cw(h);
     } while (h != h0);
   }
@@ -757,103 +714,14 @@ void DelaunayTriangulation::remove_flat_vertices()
     if (!remove_any_flat()) break;
   }
 
-  // Final convergence: standard Lawson first, then escape any B == D
-  // non-Delaunay edges via self-loop flips (Hypothesis simplicial-final
-  // in the paper: empirically false for large fullerenes).  Each escape
-  // flip creates a self-loop at the shared vertex; subsequent Lawson
-  // passes either leave it alone (it is Delaunay) or flip it further.
+  // Final Lawson.  With guards dropped, this converges unconditionally by
+  // Theorem 1 (Bobenko-Springborn energy strictly decreases on every flip,
+  // including B == D self-loop-creating flips; the new self-loop is
+  // strictly Delaunay by Lemma 1).
   flip_to_delaunay();
-  for (int escape_iter = 0; escape_iter < 10 && !is_delaunay(); escape_iter++) {
-    bool did_any = false;
-    for (int h = 0; h < nh; h += 2) {
-      if (!alive(h) || is_delaunay_edge(h)) continue;
-      int B = he_origin[he_next[he_next[h]]];
-      int D = he_origin[he_next[he_next[h ^ 1]]];
-      if (B != D) continue;  // regular flip should handle it; it didn't, so skip
-      if (flip_edge_allow_self_loop(h)) { did_any = true; break; }
-    }
-    if (!did_any) break;  // no B==D non-Delaunay edge to escape — truly stuck
-    flip_to_delaunay();
-  }
 }
 
 // --- Full algorithm ---
-
-// If D has surviving flat vertices after remove_flat_vertices, try the
-// targeted escape: find a multi-edge between two surviving flat vertices,
-// an incident edge of a survivor, or a rim blocker edge (between
-// non-adjacent fan neighbours of a survivor).  Flip one and retry
-// removal.  Up to `max_rounds` rounds.
-static void escape_surviving_flats(DelaunayTriangulation& D, int max_rounds = 20) {
-  auto try_flip = [&](int h) {
-    return D.flip_edge(h) || D.flip_edge_allow_self_loop(h);
-  };
-
-  for (int round = 0; round < max_rounds; round++) {
-    std::vector<int> surv;
-    for (int v = 0; v < D.nv; v++)
-      if (D.v_out[v] >= 0 && D.v_orig_degree[v] == 6) surv.push_back(v);
-    if (surv.empty()) return;
-
-    bool did = false;
-
-    // Tier 1: multi-edge between two survivors.
-    for (size_t i = 0; i < surv.size() && !did; i++)
-      for (size_t j = i + 1; j < surv.size() && !did; j++) {
-        int u = surv[i], v = surv[j];
-        int h0 = D.v_out[u], h = h0;
-        if (h0 < 0) continue;
-        do {
-          if (D.dest(h) == v && try_flip(h)) { did = true; break; }
-          h = D.cw(h);
-        } while (h != h0);
-      }
-
-    // Tier 2: any edge incident to a survivor.
-    if (!did) {
-      for (int v : surv) {
-        int h0 = D.v_out[v], h = h0;
-        if (h0 < 0) continue;
-        do {
-          if (try_flip(h)) { did = true; break; }
-          h = D.cw(h);
-        } while (h != h0);
-        if (did) break;
-      }
-    }
-
-    // Tier 3: rim blocker — for each survivor, for each fan neighbour
-    // pair at gap >= 2, if an edge exists between them try to flip it.
-    // This mirrors ear_clip_fan's blocker-flip but runs at the
-    // compute() level with the stuck survivors known.
-    if (!did) {
-      for (int v : surv) {
-        int h0 = D.v_out[v];
-        if (h0 < 0) continue;
-        std::vector<int> nb;
-        int h = h0;
-        do { nb.push_back(D.dest(h)); h = D.cw(h); } while (h != h0);
-        int k = (int)nb.size();
-        for (int i = 0; i < k && !did; i++)
-          for (int g = 2; g <= k - 2 && !did; g++) {
-            int j = (i + g) % k;
-            if (nb[i] == nb[j]) continue;
-            // Find an edge between nb[i] and nb[j] and try to flip it.
-            int hu0 = D.v_out[nb[i]], hu = hu0;
-            if (hu0 < 0) continue;
-            do {
-              if (D.dest(hu) == nb[j] && try_flip(hu)) { did = true; break; }
-              hu = D.cw(hu);
-            } while (hu != hu0);
-          }
-        if (did) break;
-      }
-    }
-
-    if (!did) return;  // no flip possible — truly stuck
-    D.remove_flat_vertices();
-  }
-}
 
 DelaunayTriangulation DelaunayTriangulation::compute(const Triangulation& T)
 {
@@ -861,9 +729,16 @@ DelaunayTriangulation DelaunayTriangulation::compute(const Triangulation& T)
   Triangulation sorted = T.sort_flat_last();
   DelaunayTriangulation D = from_triangulation(sorted);
   D.remove_flat_vertices();
-  // If any flat vertices survived (rare topological corners), apply the
-  // surviving-flat escape to unblock removal.
-  escape_surviving_flats(D);
+
+  // Invariant check: every surviving (cone) vertex has degree >= 3.
+  // This is Hypothesis hyp:cone-deg in the paper — empirically true on
+  // 1.94B+ fullerene isomers, structurally expected by induction on
+  // buckygen expansions.  Fires only on degenerate input.
+  for (int v = 0; v < D.nv; v++) {
+    if (D.v_out[v] < 0) continue;
+    assert(D.vertex_degree(v) >= 3 &&
+           "compute: cone vertex reached degree < 3 (hyp:cone-deg violated)");
+  }
   return D;
 }
 
@@ -1012,6 +887,17 @@ bool DelaunayTriangulation::check_consistency() const
   // 8. Twin length consistency.
   for (int h = 0; h < nh; h += 2)
     if (alive(h) && he_length[h] != he_length[h ^ 1]) return false;
+
+  // 9. Triangle inequality on every live face.
+  for (int h = 0; h < nh; h++) {
+    if (!alive(h)) continue;
+    int h1 = he_next[h], h2 = he_next[h1];
+    double L0 = he_length[h], L1 = he_length[h1], L2 = he_length[h2];
+    double eps = 1e-9 * (L0 + L1 + L2);
+    if (L0 > L1 + L2 + eps) return false;
+    if (L1 > L0 + L2 + eps) return false;
+    if (L2 > L0 + L1 + eps) return false;
+  }
 
   return true;
 }
