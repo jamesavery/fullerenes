@@ -1883,6 +1883,95 @@ SyclEvent HessianFunctor<FFT,T,K>::compute(SyclQueue& Q, Fullerene<T,K> B, Span<
     throw std::logic_error("HessianFunctor::compute not implemented for single isomer");
 }
 
+// ---------------------------------------------------------------------------
+// View-based batch implementation (Phase 7)
+// ---------------------------------------------------------------------------
+template <ForcefieldType FFT, typename T, typename K>
+static SyclEvent compute_hessians_view(
+    SyclQueue& Q,
+    batch::BatchView<Spanify::RSRAdjacencyView<K>> graph,
+    Span<std::array<T,3>> xyz,
+    batch::BatchStateView state,
+    Span<T> hess, Span<K> cols)
+{
+    TEMPLATE_TYPEDEFS(T,K);
+    auto [adj_flat, deg_flat, twin_flat] = graph.spans();
+    (void)deg_flat; (void)twin_flat;
+
+    Span<std::array<K,3>> A_cubic(
+        reinterpret_cast<std::array<K,3>*>(adj_flat.data()),
+        adj_flat.size() / 3);
+
+    auto statuses   = state.status;
+    const int N        = graph.N();
+    const int capacity = graph.size();
+
+    if ((int)hess.size() < 90*N*capacity || (int)cols.size() < 90*N*capacity)
+        throw std::runtime_error("compute_hessians_view: hess and cols buffers must be >= 90*N*capacity");
+
+    SyclEventImpl hessians_finished = Q->submit([&](sycl::handler& h) {
+        sycl::local_accessor<coord3d, 1> X_smem(N, h);
+        sycl::local_accessor<real_t, 1>  sdata(3*N, h);
+
+        h.parallel_for(sycl::nd_range(sycl::range{(size_t)N*capacity}, sycl::range{(size_t)N}),
+        [=](sycl::nd_item<1> nditem) {
+            auto cta = nditem.get_group();
+            auto tid = nditem.get_local_linear_id();
+            auto bid = nditem.get_group_linear_id();
+
+            if (statuses[bid].is_not_set(StatusEnum::FULLERENEGRAPH_PREPARED)) return;
+
+            const auto cubic_neighbours_acc = A_cubic.subspan(bid * N, N);
+            const auto X_acc = xyz.subspan(bid * N, N).template as_span<coord3d>();
+
+            Constants<T,K>    constants(cubic_neighbours_acc, K(tid));
+            NodeNeighbours<K> nodeG(cubic_neighbours_acc, K(tid));
+            X_smem[tid] = X_acc[tid];
+            ForceField<FFT,T,K> FF(nodeG, constants, cta, sdata.get_pointer());
+            auto hessian = FF.hessian(Span<coord3d>(X_smem.get_pointer(), N));
+            int n_cols = 10*3;
+            int n_rows = N*3;
+            int hess_stride = n_cols*n_rows;
+            int toff = bid*hess_stride + tid*n_cols*3;
+            Span<T> hess_span = hess.subspan(toff, n_cols*3);
+            Span<K> cols_span = cols.subspan(toff, n_cols*3);
+            for (size_t i = 0; i < 3; i++)
+            for (size_t j = 0; j < 10; j++) {
+                for (size_t k = 0; k < 3; k++) {
+                    cols_span[i*n_cols + j*3 + k] = hessian.indices[j]*3 + k;
+                    hess_span[i*n_cols + j*3 + k] = hessian.A[j][i][k];
+                }
+            }
+            sycl::group_barrier(cta);
+            hess_span = hess.subspan(bid*hess_stride, n_cols*n_rows);
+            cols_span = cols.subspan(bid*hess_stride, n_cols*n_rows);
+            for (int ii = tid; ii < n_cols*n_rows; ii += N) {
+                int i  = ii / n_cols;
+                int jj = ii % n_cols;
+                int j  = cols_span[i*n_cols + jj];
+                int ix = 0;
+                if (i < j) {
+                    while (ix < n_cols && cols_span[j*n_cols + ix] != i) { ix++; }
+                    T val = T(0.5)*(hess_span[i*n_cols + jj] + hess_span[j*n_cols + ix]);
+                    hess_span[i*n_cols + jj] = val;
+                    hess_span[j*n_cols + ix] = val;
+                }
+            }
+        });
+    });
+    return SyclEvent(std::move(hessians_finished));
+}
+
+template <ForcefieldType FFT, typename T, typename K>
+SyclEvent HessianFunctor<FFT,T,K>::compute(
+    SyclQueue& Q,
+    batch::BatchView<Spanify::RSRAdjacencyView<K>> graph,
+    Span<std::array<T,3>> xyz,
+    batch::BatchStateView state,
+    Span<T> out_hessian, Span<K> out_cols) {
+    return compute_hessians_view<FFT,T,K>(Q, graph, xyz, state, out_hessian, out_cols);
+}
+
 template struct HessianFunctor<PEDERSEN, float, uint16_t>;
 template struct HessianFunctor<PEDERSEN, double, uint16_t>;
 //template struct HessianFunctor<PEDERSEN, double, uint16_t>;

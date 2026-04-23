@@ -1,5 +1,8 @@
 #pragma once
 #include <fullerenes/kernel-headers/base-functor.hh>
+#include <fullerenes/batch/batch.hh>
+#include <fullerenes/batch/batch_state.hh>
+#include <fullerenes/dense_graph.hh>
 
 template<EigensolveMode mode, typename T, typename K>
 struct EigenFunctor : public KernelFunctor<EigenFunctor<mode, T, K>> {
@@ -18,6 +21,17 @@ struct EigenFunctor : public KernelFunctor<EigenFunctor<mode, T, K>> {
 
     SyclEvent compute(SyclQueue& Q, Fullerene<T, K> fullerene, Span<T> hessian, Span<K> cols, size_t n_lanczos, Span<T> eigenvalues, Span<T> eigenvectors,
                         Span<K> indices, Span<T> off_diagonal, Span<T> qmat, Span<T> lanczos, Span<T> diag, Span<K> ends_idx);
+
+    // View-based batch overload (Phase 7).
+    // xyz:         capacity*N 3D coordinates (read-only, for deflation against rigid-body modes).
+    // All Span<> scratch params have identical semantics to the FullereneBatchView overload.
+    SyclEvent compute(SyclQueue& Q,
+                      Span<std::array<T,3>> xyz,
+                      int N, int capacity,
+                      Span<T> hessian, Span<K> cols, size_t n_lanczos,
+                      Span<T> eigenvalues, Span<T> eigenvectors,
+                      Span<T> off_diagonal, Span<T> qmat,
+                      Span<T> lanczos, Span<T> diag, Span<K> ends_idx);
 
 
     mutable FunctorArrays<K> indices_;

@@ -1,10 +1,24 @@
 #pragma once
 #include <fullerenes/kernel-headers/base-functor.hh>
+#include <fullerenes/batch/batch.hh>
+#include <fullerenes/batch/batch_state.hh>
+#include <fullerenes/dense_graph.hh>
 
 template <ForcefieldType FFT, typename T, typename K>
 struct ForcefieldOptimizeFunctor: public KernelFunctor<ForcefieldOptimizeFunctor<FFT,T,K>> {
     SyclEvent compute(SyclQueue& Q, Fullerene<T,K> fullerene, size_t iterations, size_t max_iterations, Span<K> indices, Span<std::array<T,3>> X1, Span<std::array<T,3>> X2, Span<std::array<T,3>> g0, Span<std::array<T,3>> g1, Span<std::array<T,3>> s);
     SyclEvent compute(SyclQueue& Q, FullereneBatchView<T,K> batch, size_t iterations, size_t max_iterations);
+
+    // View-based batch overload (Phase 7).
+    // graph:       cubic-graph batch (dmax==3, N nodes per isomer). Reads adjacency.
+    // xyz:         capacity*N 3D coordinates, updated in-place.
+    // state:       per-entry status; honours NOT_CONVERGED, updates CONVERGED_3D/FAILED_3D.
+    //              state.iteration[i] is incremented by batch_iters each call.
+    SyclEvent compute(SyclQueue& Q,
+                      batch::BatchView<Spanify::RSRAdjacencyView<K>> graph,
+                      Span<std::array<T,3>>                          xyz,
+                      batch::BatchStateView                          state,
+                      size_t batch_iters, size_t max_iters);
 
 
     mutable FunctorArrays<K> indices_;

@@ -258,7 +258,9 @@ struct EigenBuffers{
     * [rotx_0, roty_0, rotz_0, transx_0, transy_0, transz_0, min_0, max_0, rotx_1, roty_1, rotz_1, transx_1, transy_1, transz_1, min_1, max_1, ...]
  */
 template <EigensolveMode mode, typename T, typename K>
-SyclEvent eigensolve(SyclQueue& Q, FullereneBatchView<T,K> B, 
+SyclEvent eigensolve_impl(SyclQueue& Q,
+                            Span<std::array<T,3>> X_acc,
+                            size_t Natoms, size_t batch_size,
                             Span<T> hessians, 
                             Span<K> cols, 
                             size_t _nLanczos, 
@@ -271,12 +273,11 @@ SyclEvent eigensolve(SyclQueue& Q, FullereneBatchView<T,K> B,
                             Span<K> ends_idx){
     TEMPLATE_TYPEDEFS(T,K);
     //If mode is ENDS or ENDS_VECTORS, we can make do with fewer lanczos iterations, default is 50.
-    size_t nLanczos = (mode == EigensolveMode::ENDS || mode == EigensolveMode::ENDS_VECTORS) ? _nLanczos : B.N_*3 - 6; //-6 for 6 degrees of freedom
-    if (nLanczos  > B.N_*3) {
+    size_t nLanczos = (mode == EigensolveMode::ENDS || mode == EigensolveMode::ENDS_VECTORS) ? _nLanczos : Natoms*3 - 6; //-6 for 6 degrees of freedom
+    if (nLanczos  > Natoms*3) {
         throw std::runtime_error("Number of lanczos iterations ("+ std::to_string(nLanczos) +") exceeds the number of rank of the hessian matrix");
     }
-    size_t Natoms = B.N_, batch_size = B.size();
- 
+
     //Buffers required: buffer<T>& D_, buffer<T>& L_, buffer<T>& U_, buffer<T>& Q_, 
 
     //Lanczos
@@ -294,7 +295,6 @@ SyclEvent eigensolve(SyclQueue& Q, FullereneBatchView<T,K> B,
     auto U_acc = off_diagonal;
     auto H_acc = hessians;
     auto cols_acc = cols;
-    auto X_acc = B.d_.X_cubic_;
     if (lanczos.size() < Natoms*3*nLanczos*batch_size) throw std::runtime_error("Lanczos buffer (of size " + std::to_string(lanczos.size()) + ") is too small for the batch size " + std::to_string(batch_size) + " and number of lanczos iterations " + std::to_string(nLanczos) + " and number of atoms " + std::to_string(Natoms));
     Q -> submit([&](sycl::handler& h){
         //accessor V_acc(buffers.lanczosBuffers[index], h, write_only);
@@ -574,6 +574,17 @@ SyclEvent eigensolve(SyclQueue& Q, FullereneBatchView<T,K> B,
 }
 
 template <EigensolveMode mode, typename T, typename K>
+SyclEvent eigensolve(SyclQueue& Q, FullereneBatchView<T,K> B,
+                            Span<T> hessians,
+                            Span<K> cols,
+                            size_t _nLanczos,
+                            Span<T> eigenvalues,
+                            Span<T> eigenvectors,
+                            Span<T> off_diagonal, Span<T> qmat, Span<T> lanczos, Span<T> diag, Span<K> ends_idx) {
+    return eigensolve_impl<mode,T,K>(Q, B.d_.X_cubic_, B.N_, B.size(), hessians, cols, _nLanczos, eigenvalues, eigenvectors, off_diagonal, qmat, lanczos, diag, ends_idx);
+}
+
+template <EigensolveMode mode, typename T, typename K>
 SyclEvent EigenFunctor<mode, T, K>::compute(SyclQueue& Q, FullereneBatchView<T,K> B, 
                             Span<T> hessians,
                             Span<K> cols,
@@ -595,6 +606,45 @@ SyclEvent EigenFunctor<mode, T, K>::compute(SyclQueue& Q, Fullerene<T,K> B,
     throw std::logic_error("Not implemented");
 }
     
+// ---------------------------------------------------------------------------
+// View-based batch implementation (Phase 7)
+// ---------------------------------------------------------------------------
+// This overload passes xyz coordinates and explicit N/capacity instead of
+// a FullereneBatchView.  The Lanczos kernel uses xyz only for the initial
+// deflation of rigid-body eigenvectors; all other data comes from the
+// hessian/cols spans, so we can forward directly to the eigensolve function
+// after constructing a minimal proxy that exposes the required interface.
+template <EigensolveMode mode, typename T, typename K>
+SyclEvent EigenFunctor<mode, T, K>::compute(
+    SyclQueue& Q,
+    Span<std::array<T,3>> xyz,
+    int N, int capacity,
+    Span<T> hessians, Span<K> cols, size_t n_lanczos,
+    Span<T> eigenvalues, Span<T> eigenvectors,
+    Span<T> off_diagonal, Span<T> qmat,
+    Span<T> lanczos, Span<T> diag, Span<K> ends_idx)
+{
+    // eigensolve<mode> only accesses B.d_.X_cubic_, B.N_, and B.size().
+    // Build a thin proxy that satisfies those.
+    struct XyzProxy {
+        Span<std::array<T,3>> d_X;
+        size_t N_;
+        int    size_;
+        // The struct is accessed as B.d_.X_cubic_, B.N_, B.size() in eigensolve.
+        struct D { Span<std::array<T,3>> X_cubic_; } d_;
+        int size() const { return size_; }
+        // Provide the same interface as FullereneBatchView for eigensolve.
+        XyzProxy(Span<std::array<T,3>> xyz, int N, int cap)
+            : d_X(xyz), N_(N), size_(cap) { d_.X_cubic_ = xyz; }
+    };
+    return eigensolve_impl<mode,T,K>(Q,
+        xyz.template as_span<std::array<T,3>>(),
+        (size_t)N, (size_t)capacity,
+        hessians, cols, n_lanczos,
+        eigenvalues, eigenvectors,
+        off_diagonal, qmat, lanczos, diag, ends_idx);
+}
+
 template struct EigenFunctor<EigensolveMode::FULL_SPECTRUM, float, uint16_t>;
 template struct EigenFunctor<EigensolveMode::ENDS, float, uint16_t>;
 template struct EigenFunctor<EigensolveMode::ENDS_VECTORS, float, uint16_t>;

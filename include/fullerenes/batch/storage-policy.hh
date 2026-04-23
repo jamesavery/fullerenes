@@ -15,6 +15,14 @@
 // Keep all higher-level code backend-agnostic by going through this alias.
 
 #ifdef SYCL_LANGUAGE_VERSION
+#  define BATCH_STORAGE_USE_SYCL 1
+#elif defined(__ACPP__) || defined(__ADAPTIVECPP__) || defined(__HIPSYCL__) || defined(__OPENSYCL__) || defined(SYCL_IMPLEMENTATION_ONEAPI)
+#  define BATCH_STORAGE_USE_SYCL 1
+#else
+#  define BATCH_STORAGE_USE_SYCL 0
+#endif
+
+#if BATCH_STORAGE_USE_SYCL
 #  include <fullerenes/sycl-headers/sycl-vector.hh>
    template<typename T>
    using BatchAlloc = SyclVector<T>;

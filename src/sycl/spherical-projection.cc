@@ -348,6 +348,106 @@ SyclEvent SphericalProjectionFunctor<T,K>::compute(SyclQueue& Q, FullereneBatchV
     return spherical_projection<T,K>(Q, batch);
 }
 
+// ---------------------------------------------------------------------------
+// View-based batch implementation (Phase 7)
+// ---------------------------------------------------------------------------
+template <typename T, typename K>
+static SyclEvent spherical_projection_view_batch_impl(
+    SyclQueue& Q,
+    batch::BatchView<Spanify::RSRAdjacencyView<K>> graph,
+    Span<std::array<T,2>> layout_2d,
+    Span<std::array<T,3>> xyz_3d,
+    batch::BatchStateView state)
+{
+    TEMPLATE_TYPEDEFS(T,K);
+    constexpr real_t scalerad = 4.0;
+
+    auto [adj_flat, deg_flat, twin_flat] = graph.spans();
+    (void)deg_flat; (void)twin_flat;
+
+    Span<std::array<K,3>> A_cubic(
+        reinterpret_cast<std::array<K,3>*>(adj_flat.data()),
+        adj_flat.size() / 3);
+    Span<coord2d> layout_cd(
+        reinterpret_cast<coord2d*>(layout_2d.data()),
+        layout_2d.size());
+
+    auto statuses   = state.status;
+    const int N        = graph.N();
+    const int capacity = graph.size();
+
+    SyclEventImpl projection_done = Q->submit([&](handler& h) {
+        local_accessor<node_t, 1>  work_queue_memory(N*2, h);
+        local_accessor<int, 1>     smem(N, h);
+        local_accessor<coord2d, 1> atomic_coordinate_memory(N, h);
+        local_accessor<coord3d, 1> xyz_smem(N, h);
+
+        h.parallel_for(sycl::nd_range(sycl::range(N*capacity), sycl::range(N)),
+        [=](nd_item<1> nditem) {
+            auto cta        = nditem.get_group();
+            auto tid        = nditem.get_local_linear_id();
+            auto isomer_idx = nditem.get_group_linear_id();
+
+            if (!statuses[isomer_idx].is_set(StatusEnum::FULLERENEGRAPH_PREPARED)) return;
+
+            const auto cubic_neighbours = A_cubic.subspan(isomer_idx * N, N);
+            const auto xys_acc = layout_cd.subspan(isomer_idx * N, N);
+            auto xyz_acc = xyz_3d.subspan(isomer_idx * N, N);
+
+            atomic_coordinate_memory[tid] = {T(0), T(0)};
+            NodeNeighbours node_graph(cubic_neighbours, (K)tid);
+            node3 neighbours = node_graph.cubic_neighbours;
+            node_t distance = multiple_source_shortest_paths(cta, cubic_neighbours, smem, work_queue_memory);
+            node_t d_max = reduce_over_group(cta, distance, maximum<node_t>{});
+            smem[tid] = 0;
+            sycl::group_barrier(cta);
+            sycl::atomic_ref<int, sycl::memory_order::seq_cst, sycl::memory_scope::work_group> atomic_same_dist(smem[distance]);
+            atomic_same_dist.fetch_add(1);
+            sycl::group_barrier(cta);
+            node_t num_same_dist = smem[distance];
+            sycl::group_barrier(cta);
+            coord2d xys = xys_acc[tid];
+            sycl::atomic_ref<real_t, sycl::memory_order::seq_cst, sycl::memory_scope::work_group> atomic_coord_x(atomic_coordinate_memory[distance][0]);
+            sycl::atomic_ref<real_t, sycl::memory_order::seq_cst, sycl::memory_scope::work_group> atomic_coord_y(atomic_coordinate_memory[distance][1]);
+            atomic_coord_x.fetch_add(xys[0]);
+            atomic_coord_y.fetch_add(xys[1]);
+            sycl::group_barrier(cta);
+            coord2d centroid = atomic_coordinate_memory[distance]/real_t(num_same_dist);
+            coord2d xy = xys - centroid;
+            real_t dtheta = real_t(M_PI)/real_t(d_max+1);
+            real_t phi = dtheta*(distance+0.5);
+            real_t theta = sycl::atan2(xy[0],xy[1]);
+            coord3d xyz = {sycl::cos(theta)*sycl::sin(phi), sycl::sin(theta)*sycl::sin(phi), sycl::cos(phi)};
+            real_t xsum = sycl::reduce_over_group(cta, xyz[0], sycl::plus<real_t>{});
+            real_t ysum = sycl::reduce_over_group(cta, xyz[1], sycl::plus<real_t>{});
+            real_t zsum = sycl::reduce_over_group(cta, xyz[2], sycl::plus<real_t>{});
+            coord3d cm = {xsum/real_t(N), ysum/real_t(N), zsum/real_t(N)};
+
+            xyz -= cm;
+            real_t Ravg = real_t(0);
+            xyz_smem[tid] = xyz;
+            sycl::group_barrier(cta);
+            real_t local_Ravg = real_t(0);
+            for (size_t i = 0; i < 3; i++) { local_Ravg += norm(xyz_smem[tid] - xyz_smem[neighbours[i]]); }
+            Ravg = sycl::reduce_over_group(cta, local_Ravg, sycl::plus<real_t>{})/real_t(3*N);
+            xyz *= scalerad*real_t(1.5)/Ravg;
+            xyz_acc[tid] = xyz;
+            if (tid == 0) statuses[isomer_idx] |= StatusEnum::NOT_CONVERGED;
+        });
+    });
+    return SyclEvent(std::move(projection_done));
+}
+
+template <typename T, typename K>
+SyclEvent SphericalProjectionFunctor<T,K>::compute(
+    SyclQueue& Q,
+    batch::BatchView<Spanify::RSRAdjacencyView<K>> graph,
+    Span<std::array<T,2>> layout_2d,
+    Span<std::array<T,3>> xyz_3d,
+    batch::BatchStateView state) {
+    return spherical_projection_view_batch_impl<T,K>(Q, graph, layout_2d, xyz_3d, state);
+}
+
 template struct SphericalProjectionFunctor<float,uint16_t>;
 template struct SphericalProjectionFunctor<float,uint32_t>;
 template struct SphericalProjectionFunctor<double,uint16_t>;
