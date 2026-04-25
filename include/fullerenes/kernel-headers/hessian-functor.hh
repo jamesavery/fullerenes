@@ -14,19 +14,19 @@ struct HessianFunctor : public KernelFunctor<HessianFunctor<FFT, T, K>> {
     // out_cols:    column index arrays,     must be >= 90*N*capacity.
     SyclEvent compute(SyclQueue& Q,
                       batch::BatchView<Spanify::RSRAdjacencyView<K>> graph,
-                      Span<std::array<T,3>>                          xyz,
+                      std::span<std::array<T,3>>                          xyz,
                       batch::BatchStateView                          state,
-                      Span<T> out_hessian, Span<K> out_cols);
+                      std::span<T> out_hessian, std::span<K> out_cols);
 
     mutable FunctorArrays<K> indices_;
 
-    inline constexpr auto to_tuple(size_t N, Span<T> out_hessian, Span<K> out_cols) const {
+    inline constexpr auto to_tuple(size_t N, std::span<T> out_hessian, std::span<K> out_cols) const {
         return  std::make_tuple(
                 std::make_pair(std::ref(indices_), N)
                 );
     }
 
-    inline constexpr auto to_tuple_batch(size_t N, Span<T> out_hessian, Span<K> out_cols) const {
+    inline constexpr auto to_tuple_batch(size_t N, std::span<T> out_hessian, std::span<K> out_cols) const {
         return std::make_tuple();
     }
 };

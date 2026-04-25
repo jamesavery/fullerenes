@@ -6,27 +6,27 @@
 template<typename T, typename K>
 struct EccentricityFunctor : public KernelFunctor<EccentricityFunctor<T, K>> {
     // View-based overload (Phase 7). xyz: capacity*N 3D coords.
-    SyclEvent compute(SyclQueue& Q, Span<std::array<T,3>> xyz, int N, int capacity,
-                      batch::BatchStateView state, Span<T> out_ellipticity);
+    SyclEvent compute(SyclQueue& Q, std::span<std::array<T,3>> xyz, int N, int capacity,
+                      batch::BatchStateView state, std::span<T> out_ellipticity);
 
-    inline constexpr auto to_tuple(size_t N, Span<T> out_ellipticity) const {       return std::make_tuple();}
-    inline constexpr auto to_tuple_batch(size_t N, Span<T> out_ellipticity) const { return std::make_tuple();}
+    inline constexpr auto to_tuple(size_t N, std::span<T> out_ellipticity) const {       return std::make_tuple();}
+    inline constexpr auto to_tuple_batch(size_t N, std::span<T> out_ellipticity) const { return std::make_tuple();}
 };
 
 template<typename T, typename K>
 struct InertiaFunctor : public KernelFunctor<InertiaFunctor<T, K>> {
     // View-based overload (Phase 7). xyz: capacity*N 3D coords.
-    SyclEvent compute(SyclQueue& Q, Span<std::array<T,3>> xyz, int N, int capacity,
-                      batch::BatchStateView state, Span<std::array<T,3>> out_inertia);
+    SyclEvent compute(SyclQueue& Q, std::span<std::array<T,3>> xyz, int N, int capacity,
+                      batch::BatchStateView state, std::span<std::array<T,3>> out_inertia);
 
-    inline constexpr auto to_tuple(size_t N, Span<std::array<T,3>> out_inertia) const {       return std::make_tuple();}
-    inline constexpr auto to_tuple_batch(size_t N, Span<std::array<T,3>> out_inertia) const { return std::make_tuple();}
+    inline constexpr auto to_tuple(size_t N, std::span<std::array<T,3>> out_inertia) const {       return std::make_tuple();}
+    inline constexpr auto to_tuple_batch(size_t N, std::span<std::array<T,3>> out_inertia) const { return std::make_tuple();}
 };
 
 template<typename T, typename K>
 struct TransformCoordinatesFunctor : public KernelFunctor<TransformCoordinatesFunctor<T, K>> {
     // View-based overload (Phase 7). xyz: capacity*N 3D coords, updated in-place.
-    SyclEvent compute(SyclQueue& Q, Span<std::array<T,3>> xyz, int N, int capacity,
+    SyclEvent compute(SyclQueue& Q, std::span<std::array<T,3>> xyz, int N, int capacity,
                       batch::BatchStateView state);
 
     inline constexpr auto to_tuple(size_t N ) const {       return std::make_tuple();}
@@ -38,29 +38,29 @@ struct SurfaceAreaFunctor : public KernelFunctor<SurfaceAreaFunctor<T, K>> {
     // View-based overload (Phase 7).
     // xyz: capacity*N 3D coords; faces: capacity*Nf arrays of up to 6 node indices;
     // deg: capacity*Nf face degree (5 or 6).
-    SyclEvent compute(SyclQueue& Q, Span<std::array<T,3>> xyz, int N, int capacity,
-                      Span<std::array<K,6>> faces, Span<uint8_t> deg,
-                      batch::BatchStateView state, Span<T> out_surface_area);
+    SyclEvent compute(SyclQueue& Q, std::span<std::array<T,3>> xyz, int N, int capacity,
+                      std::span<std::array<K,6>> faces, std::span<uint8_t> deg,
+                      batch::BatchStateView state, std::span<T> out_surface_area);
 
     mutable FunctorArrays<K> indices_;
 
-    inline constexpr auto to_tuple(size_t N, Span<T> out_surface_area) const {
+    inline constexpr auto to_tuple(size_t N, std::span<T> out_surface_area) const {
         auto Nf = N/2 + 2;       
         return std::make_tuple(std::make_pair(std::ref(indices_), Nf));}
-    inline constexpr auto to_tuple_batch(size_t N, Span<T> out_surface_area) const { return std::make_tuple();}
+    inline constexpr auto to_tuple_batch(size_t N, std::span<T> out_surface_area) const { return std::make_tuple();}
 };
 
 template<typename T, typename K>
 struct VolumeFunctor : public KernelFunctor<VolumeFunctor<T, K>> {
     // View-based overload (Phase 7). Same parameters as SurfaceAreaFunctor view overload.
-    SyclEvent compute(SyclQueue& Q, Span<std::array<T,3>> xyz, int N, int capacity,
-                      Span<std::array<K,6>> faces, Span<uint8_t> deg,
-                      batch::BatchStateView state, Span<T> out_volume);
+    SyclEvent compute(SyclQueue& Q, std::span<std::array<T,3>> xyz, int N, int capacity,
+                      std::span<std::array<K,6>> faces, std::span<uint8_t> deg,
+                      batch::BatchStateView state, std::span<T> out_volume);
 
     mutable FunctorArrays<K> indices_;
 
-    inline constexpr auto to_tuple(size_t N, Span<T> out_volume) const {
+    inline constexpr auto to_tuple(size_t N, std::span<T> out_volume) const {
         auto Nf = N/2 + 2;
         return std::make_tuple(std::make_pair(std::ref(indices_), Nf));}
-    inline constexpr auto to_tuple_batch(size_t N, Span<T> out_volume) const { return std::make_tuple();}
+    inline constexpr auto to_tuple_batch(size_t N, std::span<T> out_volume) const { return std::make_tuple();}
 };

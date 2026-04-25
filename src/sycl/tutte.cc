@@ -25,7 +25,7 @@ template <typename T, typename K>
 static SyclEvent tutte_view_batch_impl(
     SyclQueue& Q,
     batch::BatchView<Spanify::RSRAdjacencyView<K>> graph,
-    Span<std::array<T,2>> layout,
+    std::span<std::array<T,2>> layout,
     batch::BatchStateView state)
 {
     TEMPLATE_TYPEDEFS(T,K);
@@ -33,11 +33,11 @@ static SyclEvent tutte_view_batch_impl(
     (void)deg_flat; (void)twin_flat;
 
     // Reinterpret flat K* as array<K,3>* (dmax==3 for cubic)
-    Span<std::array<K,3>> A_cubic(
+    std::span<std::array<K,3>> A_cubic(
         reinterpret_cast<std::array<K,3>*>(adj_flat.data()),
         adj_flat.size() / 3);
     // coord2d == std::array<T,2> (see FLOAT_TYPEDEFS macro)
-    Span<coord2d> layout_cd(
+    std::span<coord2d> layout_cd(
         reinterpret_cast<coord2d*>(layout.data()),
         layout.size());
 
@@ -115,7 +115,7 @@ static SyclEvent tutte_view_batch_impl(
 template <typename T, typename K>
 SyclEvent TutteFunctor<T,K>::compute(SyclQueue& Q,
                                      batch::BatchView<Spanify::RSRAdjacencyView<K>> graph,
-                                     Span<std::array<T,2>> layout,
+                                     std::span<std::array<T,2>> layout,
                                      batch::BatchStateView state) {
     return tutte_view_batch_impl<T,K>(Q, graph, layout, state);
 }

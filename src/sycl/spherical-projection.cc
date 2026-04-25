@@ -123,7 +123,7 @@ CuDeque(const local_accessor<T,1> memory, const int capacity): array(memory), fr
 };
 
 template <typename K>
-K multiple_source_shortest_paths(const sycl::group<1>& cta, const Span<std::array<K,3>> cubic_neighbours,const local_accessor<int,1>& distances, const local_accessor<K,1>& smem){
+K multiple_source_shortest_paths(const sycl::group<1>& cta, const std::span<std::array<K,3>> cubic_neighbours,const local_accessor<int,1>& distances, const local_accessor<K,1>& smem){
     INT_TYPEDEFS(K);
     auto N = cta.get_local_linear_range();
     auto tid = cta.get_local_linear_id();
@@ -162,8 +162,8 @@ template <typename T, typename K>
 static SyclEvent spherical_projection_view_batch_impl(
     SyclQueue& Q,
     batch::BatchView<Spanify::RSRAdjacencyView<K>> graph,
-    Span<std::array<T,2>> layout_2d,
-    Span<std::array<T,3>> xyz_3d,
+    std::span<std::array<T,2>> layout_2d,
+    std::span<std::array<T,3>> xyz_3d,
     batch::BatchStateView state)
 {
     TEMPLATE_TYPEDEFS(T,K);
@@ -172,10 +172,10 @@ static SyclEvent spherical_projection_view_batch_impl(
     auto [adj_flat, deg_flat, twin_flat] = graph.spans();
     (void)deg_flat; (void)twin_flat;
 
-    Span<std::array<K,3>> A_cubic(
+    std::span<std::array<K,3>> A_cubic(
         reinterpret_cast<std::array<K,3>*>(adj_flat.data()),
         adj_flat.size() / 3);
-    Span<coord2d> layout_cd(
+    std::span<coord2d> layout_cd(
         reinterpret_cast<coord2d*>(layout_2d.data()),
         layout_2d.size());
 
@@ -249,8 +249,8 @@ template <typename T, typename K>
 SyclEvent SphericalProjectionFunctor<T,K>::compute(
     SyclQueue& Q,
     batch::BatchView<Spanify::RSRAdjacencyView<K>> graph,
-    Span<std::array<T,2>> layout_2d,
-    Span<std::array<T,3>> xyz_3d,
+    std::span<std::array<T,2>> layout_2d,
+    std::span<std::array<T,3>> xyz_3d,
     batch::BatchStateView state) {
     return spherical_projection_view_batch_impl<T,K>(Q, graph, layout_2d, xyz_3d, state);
 }

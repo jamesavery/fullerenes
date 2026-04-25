@@ -97,10 +97,10 @@ int main(int argc, char** argv) {
     SphericalProjectionFunctor<real_t, node_t>           spherical_projection;
     ForcefieldOptimizeFunctor<PEDERSEN, real_t, node_t>  forcefield_optimize;
 
-    Span<std::array<real_t,3>> xyz_span(xyz.data(), xyz.size());
-    Span<std::array<real_t,2>> layout_span(layout2d.data(), layout2d.size());
-    Span<std::array<node_t,6>> faces_cubic_span(faces_cubic_buf.data(), faces_cubic_buf.size());
-    Span<std::array<node_t,3>> faces_dual_span (faces_dual_buf .data(), faces_dual_buf .size());
+    std::span<std::array<real_t,3>> xyz_span(xyz.data(), xyz.size());
+    std::span<std::array<real_t,2>> layout_span(layout2d.data(), layout2d.size());
+    std::span<std::array<node_t,6>> faces_cubic_span(faces_cubic_buf.data(), faces_cubic_buf.size());
+    std::span<std::array<node_t,3>> faces_dual_span (faces_dual_buf .data(), faces_dual_buf .size());
 
     auto generate_and_fill = [&]() {
         auto spans = src_dual.view_capacity().spans();

@@ -53,8 +53,8 @@ int main(int argc, char** argv) {
 
     SyclVector<std::array<node_t,6>> faces_cubic_buf(BatchSize * Nf);
     SyclVector<std::array<node_t,3>> faces_dual_buf (BatchSize * N);
-    Span<std::array<node_t,6>> faces_cubic_span(faces_cubic_buf.data(), faces_cubic_buf.size());
-    Span<std::array<node_t,3>> faces_dual_span (faces_dual_buf.data(),  faces_dual_buf.size());
+    std::span<std::array<node_t,6>> faces_cubic_span(faces_cubic_buf.data(), faces_cubic_buf.size());
+    std::span<std::array<node_t,3>> faces_dual_span (faces_dual_buf.data(),  faces_dual_buf.size());
 
     Graph G(N);
     auto fill = [&]() {

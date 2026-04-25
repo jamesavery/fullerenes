@@ -14,8 +14,8 @@ struct SphericalProjectionFunctor : public KernelFunctor<SphericalProjectionFunc
     // state:      per-entry status; honours FULLERENEGRAPH_PREPARED, sets NOT_CONVERGED.
     SyclEvent compute(SyclQueue& Q,
                       batch::BatchView<Spanify::RSRAdjacencyView<K>> graph,
-                      Span<std::array<T,2>>                          layout_2d,
-                      Span<std::array<T,3>>                          xyz_3d,
+                      std::span<std::array<T,2>>                          layout_2d,
+                      std::span<std::array<T,3>>                          xyz_3d,
                       batch::BatchStateView                          state);
 
     mutable FunctorArrays<K> topological_distances_;

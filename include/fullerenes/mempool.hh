@@ -9,7 +9,7 @@ struct BumpAllocator {
     BumpAllocator(T* data, size_t byte_size): data(data), byte_size(byte_size){}
 
     template <typename T>
-    BumpAllocator(Span<T> span): data(span.data()), byte_size(span.size()*sizeof(T)){}
+    BumpAllocator(std::span<T> span): data(span.data()), byte_size(span.size()*sizeof(T)){}
 
     template<typename T>
     constexpr inline static auto alignment(const Device& device){
@@ -27,7 +27,7 @@ struct BumpAllocator {
     constexpr inline static size_t allocation_size(SyclQueue& ctx, size_t size)   {return allocation_size<T>(ctx.device(), size);}
 
     template<typename T>
-    constexpr inline Span<T> allocate(const Device& device, size_t size){
+    constexpr inline std::span<T> allocate(const Device& device, size_t size){
         size_t alloc_size = allocation_size<T>(device,size);
         if (alloc_size > byte_size){
             throw std::runtime_error("Out of memory");
@@ -40,11 +40,11 @@ struct BumpAllocator {
         data = reinterpret_cast<void*>(ptr + size);
         byte_size -= (reinterpret_cast<char*>(data) - reinterpret_cast<char*>(ptr));
 
-        return Span(ptr, size);
+        return std::span(ptr, size);
     }
 
     template<typename T>
-    constexpr inline Span<T> allocate(SyclQueue& ctx, size_t size) {return allocate<T>(ctx.device(), size);}
+    constexpr inline std::span<T> allocate(SyclQueue& ctx, size_t size) {return allocate<T>(ctx.device(), size);}
     
     private:
 

@@ -219,9 +219,9 @@ void T_QTQ(const int n, MDSpan<real_t,1> Din, MDSpan<real_t,1> Lin, MDSpan<real_
     }
   }
 
-  std::cout << "D = " << Span(D.data(),n) << ";\n";
-  std::cout << "L = " << Span(L.data(),n) << ";\n";
-  std::cout << "U = " << Span(U.data(),2*(n+1)) << ";\n";
+  std::cout << "D = " << std::span(D.data(),n) << ";\n";
+  std::cout << "L = " << std::span(L.data(),n) << ";\n";
+  std::cout << "U = " << std::span(U.data(),2*(n+1)) << ";\n";
 
   for(int k=0;k<n-1;k++)
     if(fabs(L[k]) > numerical_zero)  // Only process if subdiagonal element is not already zero.

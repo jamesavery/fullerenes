@@ -9,12 +9,12 @@ struct EigenFunctor : public KernelFunctor<EigenFunctor<mode, T, K>> {
     // View-based batch overload (Phase 7).
     // xyz:         capacity*N 3D coordinates (read-only, for deflation against rigid-body modes).
     SyclEvent compute(SyclQueue& Q,
-                      Span<std::array<T,3>> xyz,
+                      std::span<std::array<T,3>> xyz,
                       int N, int capacity,
-                      Span<T> hessian, Span<K> cols, size_t n_lanczos,
-                      Span<T> eigenvalues, Span<T> eigenvectors,
-                      Span<T> off_diagonal, Span<T> qmat,
-                      Span<T> lanczos, Span<T> diag, Span<K> ends_idx);
+                      std::span<T> hessian, std::span<K> cols, size_t n_lanczos,
+                      std::span<T> eigenvalues, std::span<T> eigenvectors,
+                      std::span<T> off_diagonal, std::span<T> qmat,
+                      std::span<T> lanczos, std::span<T> diag, std::span<K> ends_idx);
 
 
     mutable FunctorArrays<K> indices_;
@@ -25,7 +25,7 @@ struct EigenFunctor : public KernelFunctor<EigenFunctor<mode, T, K>> {
     mutable FunctorArrays<K> ends_idx_;
 
     template <typename... Args>
-    inline constexpr auto to_tuple(size_t N, Span<T> hessian, Span<K> cols, size_t n_lanczos, Args&&... args) const {
+    inline constexpr auto to_tuple(size_t N, std::span<T> hessian, std::span<K> cols, size_t n_lanczos, Args&&... args) const {
         return  std::make_tuple(
                 std::make_pair(std::ref(indices_), N),
                 std::make_pair(std::ref(off_diagonal_), n_lanczos),
@@ -37,7 +37,7 @@ struct EigenFunctor : public KernelFunctor<EigenFunctor<mode, T, K>> {
     }
 
     template <typename... Args>
-    inline constexpr auto to_tuple_batch(size_t N, Span<T> hessian, Span<K> cols, size_t n_lanczos, Args&&... args) const {
+    inline constexpr auto to_tuple_batch(size_t N, std::span<T> hessian, std::span<K> cols, size_t n_lanczos, Args&&... args) const {
         return std::make_tuple(
                 std::make_pair(std::ref(off_diagonal_), n_lanczos),
                 std::make_pair(std::ref(qmat_), n_lanczos*n_lanczos),

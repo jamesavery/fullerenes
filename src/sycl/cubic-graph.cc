@@ -6,13 +6,13 @@ struct DeviceCubicGraph{
     static_assert(std::is_integral<K>::value, "K must be integral");
     //const accessor<K, 1, access::mode::read> cubic_neighbours;
     //const size_t offset;
-    const Span<std::array<K,3>> cubic_neighbours;
+    const std::span<std::array<K,3>> cubic_neighbours;
 
     inline std::array<K,3> operator[](const K i) const{
         return cubic_neighbours[i];
     }
 
-    DeviceCubicGraph(const Span<std::array<K,3>> cubic_neighbours) : cubic_neighbours(cubic_neighbours) {}
+    DeviceCubicGraph(const std::span<std::array<K,3>> cubic_neighbours) : cubic_neighbours(cubic_neighbours) {}
 
     /** @brief Find the index of the neighbour v in the list of neighbours of u
     // @param u: source node in the arc (u,v)

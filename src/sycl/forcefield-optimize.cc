@@ -62,7 +62,7 @@ struct ForceField
         node_t node_id;
         sycl::group<1> cta;
         // 84 + 107 FLOPS
-        FaceData(const sycl::group<1> &cta, const Span<coord3d> X, const NodeNeighbours<K> &G) : cta(cta)
+        FaceData(const sycl::group<1> &cta, const std::span<coord3d> X, const NodeNeighbours<K> &G) : cta(cta)
         {
             node_id = cta.get_local_linear_id();
             N = cta.get_local_linear_range();
@@ -187,7 +187,7 @@ struct ForceField
          * @param G The neighbour information for the threadIdx^th node.
          * @return A new ArcData object.
          */
-        ArcData(node_t a, const int j, const Span<coord3d> X, const NodeNeighbours<K> &G)
+        ArcData(node_t a, const int j, const std::span<coord3d> X, const NodeNeighbours<K> &G)
         {
             __builtin_assume(j < 3);
             this->j = j;
@@ -1584,7 +1584,7 @@ struct ForceField
      * @param c The constants for the threadIdx^th node.
      * @return The gradient of the bond, flatness, bending and dihedral terms w.r.t. the coordinates of the threadIdx^th node.
      */
-    coord3d gradient(const Span<coord3d> X) const
+    coord3d gradient(const std::span<coord3d> X) const
     {
         sycl::group_barrier(cta);
         coord3d grad = {0.0, 0.0, 0.0};
@@ -1611,7 +1611,7 @@ struct ForceField
          }
     }
 
-    hessian_t<T, K> hessian(const Span<coord3d> X) const
+    hessian_t<T, K> hessian(const std::span<coord3d> X) const
     {
         sycl::group_barrier(cta);
         hessian_t<T, K> hess(node_graph);
@@ -1629,7 +1629,7 @@ struct ForceField
     }
 
     // Uses finite difference to compute the hessian
-    hessian_t<T, K> fd_hessian(const Span<coord3d> X, const float reldelta = 1e-7) const
+    hessian_t<T, K> fd_hessian(const std::span<coord3d> X, const float reldelta = 1e-7) const
     {
         hessian_t<T, K> hess_fd(node_graph);
         for (uint16_t i = 0; i < N; i++)
@@ -1671,7 +1671,7 @@ struct ForceField
      * @param c The constants for the threadIdx^th node.
      * @return Total energy.
      */
-    real_t energy(const Span<coord3d> X) const
+    real_t energy(const std::span<coord3d> X) const
     {
         sycl::group_barrier(cta);
         real_t arc_energy = (real_t)0.0;
@@ -1708,7 +1708,7 @@ struct ForceField
      * @param X2 memory for storing temporary coordinates at x2.
      * @return The step-size alpha
      */
-    real_t GSS(const Span<coord3d> X, const coord3d &r0, const Span<coord3d> X1, const Span<coord3d> X2) const
+    real_t GSS(const std::span<coord3d> X, const coord3d &r0, const std::span<coord3d> X1, const std::span<coord3d> X2) const
     {
         const real_t tau = (real_t)0.6180339887;
         // Line search x - values;
@@ -1762,7 +1762,7 @@ struct ForceField
      * @param X2 memory for storing temporary coordinates.
      * @param MaxIter The maximum number of iterations.
      */
-    void CG(const Span<coord3d> X, const Span<coord3d> X1, const Span<coord3d> X2, const size_t MaxIter)
+    void CG(const std::span<coord3d> X, const std::span<coord3d> X1, const std::span<coord3d> X2, const size_t MaxIter)
     {
         real_t alpha, beta, g0_norm2, s_norm;
         coord3d g0, g1, s;
@@ -1859,7 +1859,7 @@ template <ForcefieldType FFT, typename T = float, typename K = uint16_t>
 static SyclEvent forcefield_optimize_view_batch_impl(
     SyclQueue& Q,
     batch::BatchView<Spanify::RSRAdjacencyView<K>> graph,
-    Span<std::array<T,3>> xyz,
+    std::span<std::array<T,3>> xyz,
     batch::BatchStateView state,
     size_t iterations, size_t max_iterations)
 {
@@ -1867,7 +1867,7 @@ static SyclEvent forcefield_optimize_view_batch_impl(
     auto [adj_flat, deg_flat, twin_flat] = graph.spans();
     (void)deg_flat; (void)twin_flat;
 
-    Span<std::array<K,3>> A_cubic(
+    std::span<std::array<K,3>> A_cubic(
         reinterpret_cast<std::array<K,3>*>(adj_flat.data()),
         adj_flat.size() / 3);
 
@@ -1896,7 +1896,7 @@ static SyclEvent forcefield_optimize_view_batch_impl(
                 if (statuses[bid].is_set(StatusEnum::FAILED_3D) || statuses[bid].is_set(StatusEnum::CONVERGED_3D)) return;
 
                 const auto cubic_neighbours_acc = A_cubic.subspan(bid * N, N);
-                auto X_acc = xyz.subspan(bid * N, N).template as_span<coord3d>();
+                auto X_acc = as_span<coord3d>(xyz.subspan(bid * N, N));
 
                 Constants<T,K>    constants(cubic_neighbours_acc, tid);
                 NodeNeighbours<K> nodeG(cubic_neighbours_acc, tid);
@@ -1910,7 +1910,7 @@ static SyclEvent forcefield_optimize_view_batch_impl(
                 auto convergence_check = [&]() {
                     coord3d rel_bond_err, rel_angle_err, rel_dihedral_err;
                     for (int j = 0; j < 3; j++) {
-                        auto arc = typename ForceField<FFT,T,K>::ArcData(tid, j, Span<coord3d>(X.get_pointer(), N), nodeG);
+                        auto arc = typename ForceField<FFT,T,K>::ArcData(tid, j, std::span<coord3d>(static_cast<coord3d*>(X.get_pointer()), N), nodeG);
                         rel_bond_err[j]     = std::abs(arc.bond()     - constants.r0[j])         / constants.r0[j];
                         rel_angle_err[j]    = std::abs(arc.angle()    - constants.angle0[j])     / constants.angle0[j];
                         rel_dihedral_err[j] = std::abs(arc.dihedral() - constants.inner_dih0[j]) / constants.inner_dih0[j];
@@ -1926,10 +1926,10 @@ static SyclEvent forcefield_optimize_view_batch_impl(
                     }
                 };
 
-                FF.CG(Span<coord3d>(X.get_pointer(), N), Span<coord3d>(X1.get_pointer(), N), Span<coord3d>(X2.get_pointer(), N), std::max(iterations - 1, size_t(0)));
-                auto E1 = FF.energy(Span<coord3d>(X.get_pointer(), N));
-                FF.CG(Span<coord3d>(X.get_pointer(), N), Span<coord3d>(X1.get_pointer(), N), Span<coord3d>(X2.get_pointer(), N), std::min(size_t(1), iterations));
-                auto E2 = FF.energy(Span<coord3d>(X.get_pointer(), N));
+                FF.CG(std::span<coord3d>(static_cast<coord3d*>(X.get_pointer()), N), std::span<coord3d>(static_cast<coord3d*>(X1.get_pointer()), N), std::span<coord3d>(static_cast<coord3d*>(X2.get_pointer()), N), std::max(iterations - 1, size_t(0)));
+                auto E1 = FF.energy(std::span<coord3d>(static_cast<coord3d*>(X.get_pointer()), N));
+                FF.CG(std::span<coord3d>(static_cast<coord3d*>(X.get_pointer()), N), std::span<coord3d>(static_cast<coord3d*>(X1.get_pointer()), N), std::span<coord3d>(static_cast<coord3d*>(X2.get_pointer()), N), std::min(size_t(1), iterations));
+                auto E2 = FF.energy(std::span<coord3d>(static_cast<coord3d*>(X.get_pointer()), N));
                 if ((std::abs(E1 - E2)/N < std::numeric_limits<T>::epsilon()*1e2) || ((size_t)iters[bid] >= max_iterations))
                     check_convergence = true;
                 if (check_convergence) convergence_check();
@@ -1944,7 +1944,7 @@ template <ForcefieldType FFT, typename T, typename K>
 SyclEvent ForcefieldOptimizeFunctor<FFT,T,K>::compute(
     SyclQueue& Q,
     batch::BatchView<Spanify::RSRAdjacencyView<K>> graph,
-    Span<std::array<T,3>> xyz,
+    std::span<std::array<T,3>> xyz,
     batch::BatchStateView state,
     size_t batch_iters, size_t max_iters) {
     return forcefield_optimize_view_batch_impl<FFT,T,K>(Q, graph, xyz, state, batch_iters, max_iters);

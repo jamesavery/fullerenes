@@ -12,7 +12,7 @@ struct TutteFunctor : public KernelFunctor<TutteFunctor<T,K>> {
     // state: per-entry status; honours FULLERENEGRAPH_PREPARED, sets CONVERGED_2D.
     SyclEvent compute(SyclQueue& Q,
                       batch::BatchView<Spanify::RSRAdjacencyView<K>> graph,
-                      Span<std::array<T,2>>                          layout,
+                      std::span<std::array<T,2>>                          layout,
                       batch::BatchStateView                          state);
 
     mutable FunctorArrays<std::array<T,2>> newxys_;

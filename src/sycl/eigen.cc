@@ -259,18 +259,18 @@ struct EigenBuffers{
  */
 template <EigensolveMode mode, typename T, typename K>
 SyclEvent eigensolve_impl(SyclQueue& Q,
-                            Span<std::array<T,3>> X_acc,
+                            std::span<std::array<T,3>> X_acc,
                             size_t Natoms, size_t batch_size,
-                            Span<T> hessians, 
-                            Span<K> cols, 
+                            std::span<T> hessians, 
+                            std::span<K> cols, 
                             size_t _nLanczos, 
-                            Span<T> eigenvalues, 
-                            Span<T> eigenvectors,
-                            Span<T> off_diagonal,
-                            Span<T> qmat,
-                            Span<T> lanczos,
-                            Span<T> diag,
-                            Span<K> ends_idx){
+                            std::span<T> eigenvalues, 
+                            std::span<T> eigenvectors,
+                            std::span<T> off_diagonal,
+                            std::span<T> qmat,
+                            std::span<T> lanczos,
+                            std::span<T> diag,
+                            std::span<K> ends_idx){
     TEMPLATE_TYPEDEFS(T,K);
     //If mode is ENDS or ENDS_VECTORS, we can make do with fewer lanczos iterations, default is 50.
     size_t nLanczos = (mode == EigensolveMode::ENDS || mode == EigensolveMode::ENDS_VECTORS) ? _nLanczos : Natoms*3 - 6; //-6 for 6 degrees of freedom
@@ -524,7 +524,7 @@ SyclEvent eigensolve_impl(SyclQueue& Q,
             for(int i = 0; i < 3; i++){
                 e[i*n + tid] = real_t(tid%3 == i)/sqrt(Natoms); 
             }
-            coord3d* X_ptr = X_acc.template as_span<coord3d>().data() + Natoms*bid;
+            coord3d* X_ptr = as_span<coord3d>(X_acc).data() + Natoms*bid;
             if (tid%3 == 0) {
                 e[3*n + tid] = real_t(0.);
                 e[4*n + tid] = -X_ptr[atom_idx][2];
@@ -585,28 +585,28 @@ SyclEvent eigensolve_impl(SyclQueue& Q,
 template <EigensolveMode mode, typename T, typename K>
 SyclEvent EigenFunctor<mode, T, K>::compute(
     SyclQueue& Q,
-    Span<std::array<T,3>> xyz,
+    std::span<std::array<T,3>> xyz,
     int N, int capacity,
-    Span<T> hessians, Span<K> cols, size_t n_lanczos,
-    Span<T> eigenvalues, Span<T> eigenvectors,
-    Span<T> off_diagonal, Span<T> qmat,
-    Span<T> lanczos, Span<T> diag, Span<K> ends_idx)
+    std::span<T> hessians, std::span<K> cols, size_t n_lanczos,
+    std::span<T> eigenvalues, std::span<T> eigenvectors,
+    std::span<T> off_diagonal, std::span<T> qmat,
+    std::span<T> lanczos, std::span<T> diag, std::span<K> ends_idx)
 {
     // eigensolve<mode> only accesses B.d_.X_cubic_, B.N_, and B.size().
     // Build a thin proxy that satisfies those.
     struct XyzProxy {
-        Span<std::array<T,3>> d_X;
+        std::span<std::array<T,3>> d_X;
         size_t N_;
         int    size_;
         // The struct is accessed as B.d_.X_cubic_, B.N_, B.size() in eigensolve.
-        struct D { Span<std::array<T,3>> X_cubic_; } d_;
+        struct D { std::span<std::array<T,3>> X_cubic_; } d_;
         int size() const { return size_; }
         // Provide the same interface as FullereneBatchView for eigensolve.
-        XyzProxy(Span<std::array<T,3>> xyz, int N, int cap)
+        XyzProxy(std::span<std::array<T,3>> xyz, int N, int cap)
             : d_X(xyz), N_(N), size_(cap) { d_.X_cubic_ = xyz; }
     };
     return eigensolve_impl<mode,T,K>(Q,
-        xyz.template as_span<std::array<T,3>>(),
+        as_span<std::array<T,3>>(xyz),
         (size_t)N, (size_t)capacity,
         hessians, cols, n_lanczos,
         eigenvalues, eigenvectors,
