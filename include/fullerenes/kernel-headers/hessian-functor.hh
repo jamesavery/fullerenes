@@ -6,9 +6,6 @@
 
 template<ForcefieldType FFT, typename T, typename K>
 struct HessianFunctor : public KernelFunctor<HessianFunctor<FFT, T, K>> {
-    SyclEvent compute(SyclQueue& Q, FullereneBatchView<T, K> batch, Span<T> out_hessian, Span<K> out_cols);
-    SyclEvent compute(SyclQueue& Q, Fullerene<T, K> batch, Span<T> out_hessian, Span<K> out_cols, Span<K> indices);
-
     // View-based batch overload (Phase 7).
     // graph:       cubic-graph batch (dmax==3, N nodes per isomer). Reads adjacency.
     // xyz:         capacity*N 3D coordinates (read-only).

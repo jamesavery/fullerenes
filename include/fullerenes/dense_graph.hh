@@ -14,6 +14,7 @@
 #include <utility>
 
 #include "planar_csr.hh"
+#include "fullerenes/batch/batch.hh"
 
 namespace Spanify {
 
@@ -36,6 +37,8 @@ struct RSRAdjacencyView {
     using node_type = K;
     using arc_t   = std::pair<K, K>;       // {source, target}
     using arcix_t = std::pair<K, uint8_t>; // {source, position_in_row}
+
+    static constexpr uint8_t default_dmax = 3;  // cubic
 
     K N = 0;
     int dmax = 0;
@@ -248,6 +251,80 @@ static_assert(std::is_trivially_copyable_v<RSRAdjacencyView<int32_t>>,
     "RSRAdjacencyView<int32_t> must be trivially copyable");
 static_assert(std::is_trivially_copyable_v<RSRAdjacencyView<uint16_t>>,
     "RSRAdjacencyView<uint16_t> must be trivially copyable");
+
+// ---------------------------------------------------------------------------
+// RSRPolyhedronView<T,K>: RSR adjacency extended with per-vertex 3D coordinates.
+//
+// Carries the same three adjacency fields (neighbours, deg, twin) as
+// RSRAdjacencyView plus a points span of std::array<T,3> (xyz).  This makes
+// (graph + geometry) atomically transferable through Batch<V>/BatchQueue<V>.
+//
+// Canonical tuple order: {neighbours, deg, twin, points}.  The first three
+// fields' size_factors match RSRAdjacencyView, so a BatchView<RSRPolyhedronView>
+// can be sliced into a BatchView<RSRAdjacencyView> via as_adjacency_view().
+// ---------------------------------------------------------------------------
+template<typename T, typename K = int32_t>
+struct RSRPolyhedronView : RSRAdjacencyView<K> {
+    using typename RSRAdjacencyView<K>::node_type;
+
+    static constexpr uint8_t default_dmax = 3;  // cubic
+
+    std::span<std::array<T,3>> points;          // [N] -- per-vertex xyz
+
+    RSRPolyhedronView() = default;
+
+    RSRPolyhedronView(K N, int dmax,
+                      std::span<K> neighbours, std::span<uint8_t> deg,
+                      std::span<std::array<T,3>> pts,
+                      std::span<uint8_t> twin = {})
+        : RSRAdjacencyView<K>(N, dmax, neighbours, deg, twin), points(pts) {}
+
+    // Construct from an existing adjacency view + points span.
+    RSRPolyhedronView(const RSRAdjacencyView<K>& g,
+                      std::span<std::array<T,3>> pts)
+        : RSRAdjacencyView<K>(g), points(pts) {}
+
+    // -- Batchability contract (extends adjacency with `points`) ------------
+    static constexpr std::size_t n_fields = 4;
+
+    auto to_tuple() {
+        return std::forward_as_tuple(this->neighbours, this->deg, this->twin, points);
+    }
+    auto to_tuple() const {
+        return std::forward_as_tuple(this->neighbours, this->deg, this->twin, points);
+    }
+
+    static constexpr std::array<std::size_t, n_fields>
+    get_size_factors(int /*N*/, int dmax) {
+        return { (std::size_t)dmax, (std::size_t)1, (std::size_t)dmax, (std::size_t)1 };
+    }
+};
+
+static_assert(std::is_trivially_copyable_v<RSRPolyhedronView<float,  uint16_t>>,
+    "RSRPolyhedronView<float,uint16_t> must be trivially copyable");
+static_assert(std::is_trivially_copyable_v<RSRPolyhedronView<double, uint16_t>>,
+    "RSRPolyhedronView<double,uint16_t> must be trivially copyable");
+
+// ---------------------------------------------------------------------------
+// Graph-prefix slicing: view a BatchView<RSRPolyhedronView<T,K>> as a
+// BatchView<RSRAdjacencyView<K>> over the shared adjacency fields.
+// The points span is available via points_span().
+// ---------------------------------------------------------------------------
+template<typename T, typename K>
+batch::BatchView<RSRAdjacencyView<K>>
+as_adjacency_view(batch::BatchView<RSRPolyhedronView<T,K>> pv) {
+    const auto& s = pv.spans();
+    typename batch::detail::span_tuple_t<RSRAdjacencyView<K>> adj_spans{
+        std::get<0>(s), std::get<1>(s), std::get<2>(s)
+    };
+    return batch::BatchView<RSRAdjacencyView<K>>(pv.N(), pv.dmax(), pv.size(), adj_spans);
+}
+
+template<typename T, typename K>
+std::span<std::array<T,3>>
+points_span(batch::BatchView<RSRPolyhedronView<T,K>> pv) {
+    return std::get<3>(pv.spans());
+}
 
 // ---------------------------------------------------------------------------
 // OwnedDenseGraph: owning version with vector storage.

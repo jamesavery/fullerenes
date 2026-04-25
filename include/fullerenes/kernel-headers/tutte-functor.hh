@@ -6,9 +6,6 @@
 
 template <typename T, typename K>
 struct TutteFunctor : public KernelFunctor<TutteFunctor<T,K>> {
-    SyclEvent compute(SyclQueue& Q, Fullerene<T,K> fullerene, Span<std::array<T,2>> newxys, Span<bool> fixed, Span<T> max_change);
-    SyclEvent compute(SyclQueue& Q, FullereneBatchView<T,K> batch);
-
     // View-based batch overload (Phase 7).
     // graph: cubic-graph batch (dmax==3, N nodes per isomer). Reads adjacency.
     // layout: capacity*N 2D coords, updated in-place with Tutte layout.

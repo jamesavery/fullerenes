@@ -6,9 +6,6 @@
 
 template <typename T, typename K>
 struct DualizeFunctor : public KernelFunctor<DualizeFunctor<T,K>> {
-    SyclEvent compute(SyclQueue& Q, Fullerene<T,K> fullerene, Span<K> cannon_ixs, Span<K> rep_count, Span<K> scan_array, Span<K> triangle_numbers, Span<K> arc_list);
-    SyclEvent compute(SyclQueue& Q, FullereneBatchView<T,K> batch);
-
     // View-based batch overload (Phase 7).
     // Uses Spanify::RSRAdjacencyView<K> directly so the index width matches
     // the functor's K. (The named graph views in graphview.hh are fixed to

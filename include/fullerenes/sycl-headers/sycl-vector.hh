@@ -57,7 +57,7 @@ struct SyclVector
     inline constexpr const T &at(size_t index) const { assert(index < size_); return data_[index]; }
 
     inline constexpr bool operator==(const SyclVector<T> &other) const {
-        return Span<T>(*this) == Span<T>(other);
+        return span_fuzzy_equal(Span<T>(*this), Span<T>(other));
     }
 
     inline constexpr void push_back(const T &value) { 

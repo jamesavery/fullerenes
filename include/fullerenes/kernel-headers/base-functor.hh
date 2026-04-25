@@ -1,6 +1,5 @@
 #pragma once
 #include <fullerenes/sycl-headers/sycl-device-queue.hh>
-#include <fullerenes/sycl-headers/sycl-fullerene-structs.hh>
 #include <fullerenes/sycl-headers/sycl-vector.hh>
 #include <fullerenes/sycl-headers/sycl-span.hh>
 #include <fullerenes/sycl-headers/misc-enums.hh>
@@ -304,65 +303,4 @@ struct KernelFunctor{
         }, pair_tuple);
     }
 
-    template <typename T, typename K, typename... Args>
-    auto operator() (SyclQueue& Q, FullereneBatchView<T,K> batch, LaunchPolicy policy, Args&&... args) {
-        if (policy == LaunchPolicy::SYNC) Q.wait();
-        auto max_concurrent_launches = static_cast<KernelImpl*>(this)->get_max_concurrent_launches(Q, batch.N_, std::forward<Args>(args)...);
-        mutexes_[Q].resize(std::min((size_t)batch.size(), max_concurrent_launches));
-        futures_[Q].resize(std::min((size_t)batch.size(), max_concurrent_launches));
-
-        if (batch.size() == 0) {return;}
-        if (batch.N_ > Q.device().get_property(DeviceProperty::MAX_WORK_GROUP_SIZE)){
-            SyclQueue out_of_order_queue(Q.device(), false);
-            auto full_ix = 0;
-            std::for_each(batch.begin(), batch.end(), [&](auto isomer) {
-                auto circular_ix = (this->dispatch_counters_[out_of_order_queue]++) % std::min((size_t)batch.size(), max_concurrent_launches);
-                //Mutex ensures that no two try to resize the same vector at the same time, nor use the same memory for different isomers
-                //mutexes_[{out_of_order_queue, circular_ix}].lock_and_wait();
-                //if (threads_[{out_of_order_queue, circular_ix}].joinable()) threads_[{out_of_order_queue, circular_ix}].join();
-                /* threads_[{out_of_order_queue, circular_ix}] = std::thread([=](SyclQueue& lambda_queue, KernelFunctor& kernel){
-                    auto data_tuple = kernel.allocate_and_return_tuple(lambda_queue, circular_ix, isomer.N_);
-                    isomer_function(out_of_order_queue, isomer, data_tuple);
-                }, std::ref(out_of_order_queue), std::ref(this)); */
-                
-                auto data_tuple = allocate_and_return_tuple<false>(out_of_order_queue, circular_ix, isomer.N_, 1, std::forward<Args>(args)...);
-                auto prepared_args = prepare_execution_arguments(full_ix, batch.size(), std::forward<Args>(args)...);
-                std::apply([&](auto&&... args) {
-                    static_cast<KernelImpl*>(this)->compute(out_of_order_queue, isomer, std::forward<decltype(args)>(args)...);
-                }, std::tuple_cat(prepared_args, data_tuple));
-                //isomer_function(out_of_order_queue, isomer, std::tuple_cat(data_tuple, prepared_args));
-                //auto data_tuple = allocate_and_return_tuple(out_of_order_queue, circular_ix, batch.N_);
-                //mutexes_[{out_of_order_queue, circular_ix}] = isomer_function(out_of_order_queue, isomer, data_tuple);
-                //mutexes_[{out_of_order_queue, circular_ix}].unlock();
-                full_ix++;
-            });
-            //Enqueue all the events in the input queue, this way asynchronicity is preserved
-            //When the caller waits for the input queue, it will wait for all the out_of_order_queue events
-            /* std::for_each(futures_[Q].begin(), futures_[Q].end(), [&](auto& fut) {
-                fut.wait();
-            }); */
-        }else{
-            auto batch_data = allocate_and_return_tuple<true>(Q, 0, batch.N_, batch.size(), std::forward<Args>(args)...);
-            //batch_function(Q, batch, batch_data);
-            std::apply([&](auto&&... data) {
-                static_cast<KernelImpl*>(this)->compute(Q, batch, std::forward<Args>(args)..., std::forward<decltype(data)>(data)...);
-            }, batch_data);
-        }
-        if (policy == LaunchPolicy::SYNC) Q.wait();
-    }
-
-    template <typename T, typename K, typename... Args>
-    auto operator() (SyclQueue& Q, FullereneBatch<T,K>& batch, LaunchPolicy policy, Args&&... args) {
-        this->operator()(Q, (FullereneBatchView<T,K>)batch, policy, std::forward<Args>(args)...);
-    }
-
-    template <typename T, typename K, typename... Args>
-    auto operator() (SyclQueue& Q, Fullerene<T,K> isomer, LaunchPolicy policy, Args&&... args) {
-        if (policy == LaunchPolicy::SYNC) Q.wait();
-        auto ret_val = std::apply([&](auto&&... data) {
-            return static_cast<KernelImpl*>(this)->compute(Q, isomer, std::forward<Args>(args)..., data...);
-        }, allocate_and_return_tuple<false>(Q, 0, isomer.N_, 1, std::forward<Args>(args)...));
-        if (policy == LaunchPolicy::SYNC) Q.wait();
-        return ret_val;
-    }
 };

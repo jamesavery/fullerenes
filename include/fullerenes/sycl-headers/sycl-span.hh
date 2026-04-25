@@ -1,66 +1,91 @@
 #pragma once
-#include <cassert>
-#include <iterator>
-#include <array>
+// Phase 9: Span<T> is a thin wrapper around std::span<T> that keeps the
+// extra `as_span<U>()` reinterpret helper used pervasively by the SYCL
+// kernels. All other behaviour is inherited from std::span.
+
+#include <span>
+#include <ostream>
+#include <algorithm>
+#include <limits>
+#include <cmath>
+#include <type_traits>
+#include <cstddef>
 
 template <typename T>
-struct is_std_array : std::false_type {};
+struct Span : public std::span<T> {
+    using base = std::span<T>;
+    using base::base;                          // inherit std::span constructors
+    using typename base::element_type;
+    using typename base::value_type;
+    using typename base::size_type;
 
-template <typename T, std::size_t N>
-struct is_std_array<std::array<T, N>> : std::true_type {};
+    constexpr Span() noexcept = default;
+    constexpr Span(const Span&) noexcept = default;
+    constexpr Span& operator=(const Span&) noexcept = default;
+    constexpr Span(base b) noexcept : base(b) {}
 
-template <typename T>
-struct Span
-{   
-    using value_type = T;
-    using pointer = T*;
-    using size_t = std::size_t;
-    inline constexpr Span() : data_(nullptr), size_(0) {}
-    inline constexpr Span(T *data, size_t size) : data_(data), size_(size) {}
-    inline constexpr Span(T *begin, T *end) : data_(begin), size_(std::distance(begin, end)) {}
-    inline constexpr Span(const Span<T> &other) = default;
-    inline constexpr Span(Span<T> &&other) = default;
-    inline constexpr Span(const Span<T>& other, size_t offset) : data_(other.data_ + offset), size_(other.size_ - offset) {}
-    inline constexpr Span(Span<T>&& other, size_t offset) : data_(other.data_ + offset), size_(other.size_ - offset) {}
-    inline constexpr Span(T& value) : data_(&value), size_(1) {}
-    
+    // Convert any pointer-like object (e.g. sycl::multi_ptr) to T* and wrap
+    // it as a span of `sz` elements. Needed because std::span's (It, size)
+    // constructor requires `It` to satisfy std::contiguous_iterator, which
+    // SYCL's multi_ptr does not. Excluded for raw pointers to avoid
+    // ambiguity with the inherited std::span(T*, size_type) ctor.
+    template <typename Ptr,
+              typename = std::enable_if_t<!std::is_pointer_v<std::decay_t<Ptr>>>,
+              typename = decltype(static_cast<T*>(std::declval<Ptr&>()))>
+    constexpr Span(Ptr&& p, std::size_t sz)
+        : base(static_cast<T*>(p), sz) {}
+
+    // Reinterpret-cast view of the underlying storage as a span of U.
     template <typename U>
-    inline constexpr Span<U> as_span() const {
-        return Span<U>(reinterpret_cast<U*>(data_), (sizeof(T) * size_ / sizeof(U)) );
+    constexpr Span<U> as_span() const {
+        return Span<U>(reinterpret_cast<U*>(this->data()),
+                       (this->size() * sizeof(T)) / sizeof(U));
     }
 
-    inline constexpr Span<T> subspan(size_t offset) const { assert(size_ - offset >= 0); return Span<T>(data_ + offset, size_ - offset); }
-    inline constexpr Span<T> subspan(size_t offset, size_t count) const { assert(offset + count <= size_);  return Span<T>(data_ + offset, count); }
-    inline constexpr Span<T>& operator= (const Span<T> &other) { data_ = other.data_; size_ = other.size_; return *this; }
-    inline constexpr Span<T>& operator= (Span<T> &&other) { return *this = other; }
-    inline bool operator==(const Span<T> other) const;
-    inline constexpr T &operator[](size_t index) const {assert(index < size_); assert(data_); return data_[index];}
-    inline constexpr T &at(size_t index) const{assert(index < size_); assert(data_); return data_[index];}
-    inline constexpr T *data() const { return data_; }
-    inline constexpr size_t size() const { return size_; }
-    inline constexpr bool empty() const { return size_ == 0; }
-    inline constexpr size_t size_bytes() const { return size_ * sizeof(T); }
-    inline constexpr T *begin() const { return data_; }
-    inline constexpr T *end() const { return data_ + size_; }
-    inline constexpr T &front() const { return data_[0]; }
-    inline constexpr T &back() const { return data_[size_ - 1]; }
-    template <typename U>
-    friend std::ostream &operator<<(std::ostream &os, const Span<U> &vec);
-    
-private:
-    T *data_;
-    size_t size_;
+    // Override subspan so it returns a Span<T>, preserving as_span<U>()
+    // chaining in existing call sites.
+    constexpr Span<T> subspan(size_type offset) const {
+        return Span<T>(this->data() + offset, this->size() - offset);
+    }
+    constexpr Span<T> subspan(size_type offset, size_type count) const {
+        return Span<T>(this->data() + offset, count);
+    }
 };
 
-template <typename T>
-Span(T*, typename Span<T>::size_t) -> Span<T>;
+// Deduction guides – cover raw pointers, iterator pairs, and iterator+size.
+template <typename T> Span(T*, std::size_t) -> Span<T>;
+template <typename It> Span(It, It) -> Span<typename std::iterator_traits<It>::value_type>;
 
 template <typename T>
-Span(T*, std::size_t) -> Span<T>;
+inline std::ostream& operator<<(std::ostream& os, std::span<T> v) {
+    os << "[";
+    for (std::size_t i = 0; i < v.size(); ++i) {
+        os << v[i];
+        if (i + 1 < v.size()) os << ", ";
+    }
+    os << "]";
+    return os;
+}
 
 template <typename T>
-Span(T*, T*) -> Span<T>;
+inline bool span_fuzzy_equal(std::span<T> a, std::span<T> b) {
+    if (a.size() != b.size()) return false;
+    if (a.data() == b.data()) return true;
+    if constexpr (std::is_floating_point_v<std::decay_t<T>>) {
+        return std::equal(a.begin(), a.end(), b.begin(), [](const auto& x, const auto& y) {
+            T eps = std::numeric_limits<T>::epsilon() * 20;
+            T max_v = std::max(std::abs(x), std::abs(y));
+            return std::abs(x - y) / (max_v > eps ? max_v : 1) < eps;
+        });
+    } else {
+        return std::equal(a.begin(), a.end(), b.begin());
+    }
+}
 
+// std::span does not define operator==; provide a fuzzy-element comparison
+// so legacy code that compared SyclVector/FullereneData members through
+// spans keeps working.
 template <typename T>
-Span(T&) -> Span<T>;
-
+inline bool operator==(std::span<T> a, std::span<T> b) {
+    return span_fuzzy_equal(a, b);
+}

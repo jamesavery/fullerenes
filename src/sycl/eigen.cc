@@ -573,38 +573,6 @@ SyclEvent eigensolve_impl(SyclQueue& Q,
     return final_compute;
 }
 
-template <EigensolveMode mode, typename T, typename K>
-SyclEvent eigensolve(SyclQueue& Q, FullereneBatchView<T,K> B,
-                            Span<T> hessians,
-                            Span<K> cols,
-                            size_t _nLanczos,
-                            Span<T> eigenvalues,
-                            Span<T> eigenvectors,
-                            Span<T> off_diagonal, Span<T> qmat, Span<T> lanczos, Span<T> diag, Span<K> ends_idx) {
-    return eigensolve_impl<mode,T,K>(Q, B.d_.X_cubic_, B.N_, B.size(), hessians, cols, _nLanczos, eigenvalues, eigenvectors, off_diagonal, qmat, lanczos, diag, ends_idx);
-}
-
-template <EigensolveMode mode, typename T, typename K>
-SyclEvent EigenFunctor<mode, T, K>::compute(SyclQueue& Q, FullereneBatchView<T,K> B, 
-                            Span<T> hessians,
-                            Span<K> cols,
-                            size_t _nLanczos,
-                            Span<T> eigenvalues,
-                            Span<T> eigenvectors,
-                            Span<T> off_diagonal, Span<T> qmat, Span<T> lanczos, Span<T> diag, Span<K> ends_idx){
-    return eigensolve<mode>(Q, B, hessians, cols, _nLanczos, eigenvalues, eigenvectors, off_diagonal, qmat, lanczos, diag, ends_idx);
-}
-
-template <EigensolveMode mode, typename T, typename K>
-SyclEvent EigenFunctor<mode, T, K>::compute(SyclQueue& Q, Fullerene<T,K> B, 
-                            Span<T> hessians,
-                            Span<K> cols,
-                            size_t _nLanczos,
-                            Span<T> eigenvalues,
-                            Span<T> eigenvectors,
-                            Span<K> indices, Span<T> off_diagonal, Span<T> qmat, Span<T> lanczos, Span<T> diag, Span<K> ends_idx){
-    throw std::logic_error("Not implemented");
-}
     
 // ---------------------------------------------------------------------------
 // View-based batch implementation (Phase 7)

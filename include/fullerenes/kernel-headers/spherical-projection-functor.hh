@@ -7,9 +7,6 @@
 template <typename T, typename K>
 struct SphericalProjectionFunctor : public KernelFunctor<SphericalProjectionFunctor<T,K>> {
     
-    SyclEvent compute(SyclQueue& Q, Fullerene<T,K> fullerene, Span<K> topological_distances_, Span<K> reduce_in_, Span<K> reduce_out_, Span<K> output_keys_, Span<std::array<T,2>> sorted_xys_);
-    SyclEvent compute(SyclQueue& Q, FullereneBatchView<T,K> batch);
-
     // View-based batch overload (Phase 7).
     // graph:      cubic-graph batch (dmax==3, N nodes per isomer). Reads adjacency.
     // layout_2d:  capacity*N 2D input coordinates (Tutte layout).
