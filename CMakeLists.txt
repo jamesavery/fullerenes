@@ -76,6 +76,10 @@ if(ENABLE_SYCL)
   if(NOT SYCL_COMPILER)
     message(FATAL_ERROR "ENABLE_SYCL=ON requires AdaptiveCpp compiler (acpp or syclcc)")
   endif()
+  # Force batch::Batch storage to use SyclVector (USM) even in translation
+  # units compiled by the host C++ compiler (programs/, benchmarks/), so
+  # host-populated batch buffers are accessible to SYCL kernels.
+  add_compile_definitions(FULLERENES_ENABLE_SYCL=1)
 
   if(CMAKE_CUDA_COMPILER)
     set(SYCL_DEFAULT_TARGET "NVIDIA")
