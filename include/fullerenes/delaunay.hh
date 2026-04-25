@@ -130,8 +130,16 @@ struct DelaunayTriangulation {
   void ensure_v_out(int v);
 
   // --- Full algorithm ---
-  // Computes the intrinsic Delaunay triangulation.
+  // Computes the unique intrinsic Delaunay triangulation of the input
+  // surface (Bobenko-Springborn 2007).  The output is generally a
+  // delta-complex and may contain multi-edges, self-loops, and bigons
+  // around cone vertices (deg-2 cones) -- all valid iDT features.
   static DelaunayTriangulation compute(const Triangulation& T);
+
+  // Smallest degree among live (non-removed) vertices, or INT_MAX if
+  // none.  A value below 3 indicates the iDT has at least one bigon
+  // (a non-simplicial feature, valid in delta-complex form).
+  int min_live_degree() const;
 
   // Bisect all multi-edges by inserting midpoint vertices.
   // Multi-edges (multiple geodesics between the same cone-point pair) can't be

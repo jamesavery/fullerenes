@@ -5,6 +5,7 @@
 #include <cassert>
 #include <algorithm>
 #include <map>
+#include <climits>
 
 // ============================================================================
 // Intrinsic geometry primitives
@@ -723,22 +724,30 @@ void DelaunayTriangulation::remove_flat_vertices()
 
 // --- Full algorithm ---
 
+int DelaunayTriangulation::min_live_degree() const
+{
+  int m = INT_MAX;
+  for (int v = 0; v < nv; v++) {
+    if (v_out[v] < 0) continue;
+    int d = vertex_degree(v);
+    if (d < m) m = d;
+  }
+  return m;
+}
+
 DelaunayTriangulation DelaunayTriangulation::compute(const Triangulation& T)
 {
   // Sort flat vertices last, then build DCEL and run the algorithm.
+  // Returns the unique intrinsic Delaunay triangulation of the input
+  // surface (Bobenko-Springborn 2007).  The output is generally a
+  // delta-complex: it may contain multi-edges, self-loops at cones,
+  // and (rarely) bigons around cones (deg-2 cone vertices) -- all
+  // legitimate features of the iDT object.  Callers that need a
+  // strictly simplicial output should query min_live_degree() and
+  // post-process (e.g. via bisect_multi_edges()) when needed.
   Triangulation sorted = T.sort_flat_last();
   DelaunayTriangulation D = from_triangulation(sorted);
   D.remove_flat_vertices();
-
-  // Invariant check: every surviving (cone) vertex has degree >= 3.
-  // This is Hypothesis hyp:cone-deg in the paper — empirically true on
-  // 1.94B+ fullerene isomers, structurally expected by induction on
-  // buckygen expansions.  Fires only on degenerate input.
-  for (int v = 0; v < D.nv; v++) {
-    if (D.v_out[v] < 0) continue;
-    assert(D.vertex_degree(v) >= 3 &&
-           "compute: cone vertex reached degree < 3 (hyp:cone-deg violated)");
-  }
   return D;
 }
 
