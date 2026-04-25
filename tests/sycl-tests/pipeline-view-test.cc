@@ -45,28 +45,25 @@ TEST(PipelineViewTest, C60ViewPipelineToSphericalProjection) {
     SyclVector<std::array<K,3>> faces_dual_buf (capacity * N);
 
     {
-        // Use legacy path to generate dual graphs, then copy into src_dual.
-        FullereneBatch<T,K> tmp(N, capacity);
+        // Generate dual graphs directly into src_dual.
         auto BQ = BuckyGen::start(N, false, false);
         Graph G(Nf, GRAPH_DMAX);
-        for (int i = 0; i < capacity; ++i) {
-            ASSERT_TRUE(BuckyGen::next_fullerene(BQ, G));
-            tmp.push_back(G, uint64_t(i));
-        }
-        BuckyGen::stop(BQ);
-
         auto src_spans = src_dual.view_capacity().spans();
         auto& src_adj  = std::get<0>(src_spans);
         auto& src_deg  = std::get<1>(src_spans);
         for (int b = 0; b < capacity; ++b) {
+            ASSERT_TRUE(BuckyGen::next_fullerene(BQ, G));
             for (int u = 0; u < Nf; ++u) {
-                const auto& nbrs = tmp.d_.A_dual_[b*Nf + u];
+                int du = G.deg[u];
                 for (int k = 0; k < 6; ++k)
-                    src_adj[b*Nf*6 + u*6 + k] = K(nbrs[k]);
-                src_deg[b*Nf + u] = uint8_t(tmp.d_.deg_[b*Nf + u]);
+                    src_adj[b*Nf*6 + u*6 + k] =
+                        K(k < du ? G.neighbours[u*G.dmax + k]
+                                 : std::numeric_limits<K>::max());
+                src_deg[b*Nf + u] = uint8_t(du);
             }
             st.push_back(uint64_t(b), StatusFlag(int(StatusEnum::DUAL_INITIALIZED)));
         }
+        BuckyGen::stop(BQ);
     }
 
     // -----------------------------------------------------------------
@@ -75,8 +72,8 @@ TEST(PipelineViewTest, C60ViewPipelineToSphericalProjection) {
     DualizeFunctor<T,K> dualize;
     dualize.compute(Q,
         src_dual.view_capacity(), dst_cubic.view_capacity(), st.view(),
-        Span<std::array<K,6>>(faces_cubic_buf.data(), faces_cubic_buf.size()),
-        Span<std::array<K,3>>(faces_dual_buf.data(),  faces_dual_buf.size())
+        std::span<std::array<K,6>>(faces_cubic_buf.data(), faces_cubic_buf.size()),
+        std::span<std::array<K,3>>(faces_dual_buf.data(),  faces_dual_buf.size())
     ).wait();
 
     // -----------------------------------------------------------------
@@ -86,7 +83,7 @@ TEST(PipelineViewTest, C60ViewPipelineToSphericalProjection) {
     TutteFunctor<T,K> tutte;
     tutte.compute(Q,
         dst_cubic.view_capacity(),
-        Span<std::array<T,2>>(layout2d.data(), layout2d.size()),
+        std::span<std::array<T,2>>(layout2d.data(), layout2d.size()),
         st.view()
     ).wait();
 
@@ -107,8 +104,8 @@ TEST(PipelineViewTest, C60ViewPipelineToSphericalProjection) {
     SphericalProjectionFunctor<T,K> sph;
     sph.compute(Q,
         dst_cubic.view_capacity(),
-        Span<std::array<T,2>>(layout2d.data(), layout2d.size()),
-        Span<std::array<T,3>>(xyz.data(),      xyz.size()),
+        std::span<std::array<T,2>>(layout2d.data(), layout2d.size()),
+        std::span<std::array<T,3>>(xyz.data(),      xyz.size()),
         st.view()
     ).wait();
 
