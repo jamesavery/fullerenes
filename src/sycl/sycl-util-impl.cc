@@ -134,7 +134,7 @@ SyclVector<T>& SyclVector<T>::operator=(const SyclVector<T>& other) {
 
 template <typename U>
 std::ostream& operator<<(std::ostream& os, const SyclVector<U>& vec) {
-    os << (Span<U>)vec;
+    os << (std::span<U>)vec;
     return os;
 }
 

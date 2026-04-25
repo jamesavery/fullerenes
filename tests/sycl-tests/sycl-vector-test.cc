@@ -147,7 +147,7 @@ TEST(SyclVector, InequalityOperator)
 TEST(SyclVector, SpanConstructor)
 {
     SyclVector<int> vec(10, 5);
-    Span<int> span(vec);
+    std::span<int> span(vec);
     EXPECT_EQ(span.size(), 10);
     for (int i = 0; i < 10; i++)
     {

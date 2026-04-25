@@ -12,15 +12,22 @@ struct is_specialization_of : std::false_type {};
 template <template <typename...> class Template, typename... Args>
 struct is_specialization_of<Template, Template<Args...>> : std::true_type {};
 
+// std::span takes a non-type second parameter (Extent), so is_specialization_of
+// cannot match it. Use a dedicated trait instead.
+template <typename T>
+struct is_std_span : std::false_type {};
+template <typename T, std::size_t N>
+struct is_std_span<std::span<T, N>> : std::true_type {};
+
 template <typename T>
 auto partition_vector(size_t ix, size_t batch_size, const T& value) {
-    if constexpr (is_specialization_of<SyclVector, T>::value || is_specialization_of<Span, T>::value) {
+    if constexpr (is_specialization_of<SyclVector, T>::value || is_std_span<T>::value) {
         auto size = value.size();
         if (size % batch_size != 0) {
             throw std::runtime_error("The size of the SyclVector is not divisible by the batch size");
         }
         auto size_per_isomer = size / batch_size;
-        auto modified = Span(value.begin() + ix*size_per_isomer, value.begin() + (ix+1)*size_per_isomer);
+        auto modified = std::span(value.begin() + ix*size_per_isomer, value.begin() + (ix+1)*size_per_isomer);
         return modified;
     } else {
         return value;  // Leave other types unchanged
@@ -74,10 +81,10 @@ struct FunctorArrays : public ArrayOfSyclVectors<T> {
         return this->at((size_t)device_type);
     }
 
-    Span<T> operator[](const std::pair<Device, size_t> ix_tuple) {
+    std::span<T> operator[](const std::pair<Device, size_t> ix_tuple) {
         return this->at((size_t)ix_tuple.first.type).at(ix_tuple.first.idx).at(ix_tuple.second);
     }
-    Span<T> operator[](const std::pair<SyclQueue&, size_t> ix_tuple) {
+    std::span<T> operator[](const std::pair<SyclQueue&, size_t> ix_tuple) {
         auto& [Q, ix] = ix_tuple;
         return (*this)[std::pair<Device,size_t>{Q.device(), ix}];
     }

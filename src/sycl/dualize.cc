@@ -17,10 +17,10 @@ struct DeviceDualGraph{
     //Check that K is integral
     INT_TYPEDEFS(K);
     
-    const Span<std::array<K,MaxDegree>> dual_neighbours;                          //(Nf x MaxDegree)
-    const Span<DegT> face_degrees;                            //(Nf x 1)
+    const std::span<std::array<K,MaxDegree>> dual_neighbours;                          //(Nf x MaxDegree)
+    const std::span<DegT> face_degrees;                            //(Nf x 1)
     
-    DeviceDualGraph(const Span<std::array<K,MaxDegree>> dual_neighbours, const Span<DegT> face_degrees) : dual_neighbours(dual_neighbours), face_degrees(face_degrees) {}
+    DeviceDualGraph(const std::span<std::array<K,MaxDegree>> dual_neighbours, const std::span<DegT> face_degrees) : dual_neighbours(dual_neighbours), face_degrees(face_degrees) {}
 
     K arc_ix(const K u, const K v) const{
         for (uint8_t j = 0; j < face_degrees[u]; j++){
@@ -81,15 +81,15 @@ int roundUp(int numToRound, int multiple)
 
 template<typename T, typename K, int MaxDegIn, int MaxDegOut>
 SyclEvent dualize_general_impl(  SyclQueue& Q, 
-                            Span<K> G_in, 
-                            Span<K> Deg_in, 
-                            Span<K> G_out, 
-                            Span<K> Deg_out,
-                            Span<K> cannon_ixs_acc,
-                            Span<K> rep_count_acc,
-                            Span<K> scan_array_acc,
-                            Span<K> triangle_numbers_acc,
-                            Span<K> arc_list_acc, 
+                            std::span<K> G_in, 
+                            std::span<K> Deg_in, 
+                            std::span<K> G_out, 
+                            std::span<K> Deg_out,
+                            std::span<K> cannon_ixs_acc,
+                            std::span<K> rep_count_acc,
+                            std::span<K> scan_array_acc,
+                            std::span<K> triangle_numbers_acc,
+                            std::span<K> arc_list_acc, 
                             int Nin, 
                             int Nout){
     INT_TYPEDEFS(K);
@@ -180,8 +180,8 @@ static SyclEvent dualize_view_batch_impl(SyclQueue& Q,
                                          batch::BatchView<Spanify::RSRAdjacencyView<K>> src,
                                          batch::BatchView<Spanify::RSRAdjacencyView<K>> dst,
                                          batch::BatchStateView                          state,
-                                         Span<std::array<K,6>> faces_cubic_scratch,
-                                         Span<std::array<K,3>> faces_dual_scratch)
+                                         std::span<std::array<K,6>> faces_cubic_scratch,
+                                         std::span<std::array<K,3>> faces_dual_scratch)
 {
     INT_TYPEDEFS(K);
     constexpr int     MaxDegree  = 6;
@@ -200,16 +200,16 @@ static SyclEvent dualize_view_batch_impl(SyclQueue& Q,
 
     // Wrap as project Spans (pointer,size) with the typed-row shapes the
     // kernel wants.
-    Span<std::array<K,MaxDegree>> A_dual(
+    std::span<std::array<K,MaxDegree>> A_dual(
         reinterpret_cast<std::array<K,MaxDegree>*>(src_adj_std.data()),
         src_adj_std.size() / MaxDegree);
-    Span<uint8_t> deg(src_deg_std.data(), src_deg_std.size());
-    Span<std::array<K,3>> A_cubic(
+    std::span<uint8_t> deg(src_deg_std.data(), src_deg_std.size());
+    std::span<std::array<K,3>> A_cubic(
         reinterpret_cast<std::array<K,3>*>(dst_adj_std.data()),
         dst_adj_std.size() / 3);
-    Span<std::array<K,MaxDegree>> faces_cubic = faces_cubic_scratch;
-    Span<std::array<K,3>>         faces_dual  = faces_dual_scratch;
-    Span<StatusFlag> statuses(state.status.data(), state.status.size());
+    std::span<std::array<K,MaxDegree>> faces_cubic = faces_cubic_scratch;
+    std::span<std::array<K,3>>         faces_dual  = faces_dual_scratch;
+    std::span<StatusFlag> statuses(state.status.data(), state.status.size());
 
     SyclEventImpl cubic_graph_event = Q->submit([&](handler &h) {
         local_accessor<std::array<K,MaxDegree>, 1> triangle_numbers(Nf, h);
@@ -231,8 +231,8 @@ static SyclEvent dualize_view_batch_impl(SyclQueue& Q,
             }
 
             DeviceDualGraph<MaxDegree, node_t, node_t> FD(
-                Span<std::array<K,MaxDegree>>(cached_neighbours.get_pointer(), Nf),
-                Span<node_t>(cached_degrees.get_pointer(), Nf));
+                std::span<std::array<K,MaxDegree>>(static_cast<std::array<K,MaxDegree>*>(cached_neighbours.get_pointer()), Nf),
+                std::span<node_t>(static_cast<node_t*>(cached_degrees.get_pointer()), Nf));
 
             node_t canon_arcs[MaxDegree];
             for (size_t i = 0; i < MaxDegree; i++) canon_arcs[i] = EMPTY_NODE;
@@ -302,8 +302,8 @@ SyclEvent DualizeFunctor<T,K>::compute(SyclQueue& Q,
                                        batch::BatchView<Spanify::RSRAdjacencyView<K>> src,
                                        batch::BatchView<Spanify::RSRAdjacencyView<K>> dst,
                                        batch::BatchStateView                          state,
-                                       Span<std::array<K,6>>                          faces_cubic,
-                                       Span<std::array<K,3>>                          faces_dual)
+                                       std::span<std::array<K,6>>                          faces_cubic,
+                                       std::span<std::array<K,3>>                          faces_dual)
 {
     return dualize_view_batch_impl<T,K>(Q, src, dst, state, faces_cubic, faces_dual);
 }

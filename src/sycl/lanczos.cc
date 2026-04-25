@@ -156,7 +156,7 @@ std::array<T,2> eigvalsh2x2(const std::array<T,4> &A){
 }
 //Assumes A is symmetric
 template <typename T, int N> 
-void lanczos(sycl::group<1>& cta, Span<T> A, Span<T> X, Span<T> alphas, Span<T> betas, Span<T> Vspan){
+void lanczos(sycl::group<1>& cta, std::span<T> A, std::span<T> X, std::span<T> alphas, std::span<T> betas, std::span<T> Vspan){
     auto tid = cta.get_local_linear_id();
     T* V = Vspan.data() + tid;
 

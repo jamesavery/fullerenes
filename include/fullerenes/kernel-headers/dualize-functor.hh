@@ -22,8 +22,8 @@ struct DualizeFunctor : public KernelFunctor<DualizeFunctor<T,K>> {
                       batch::BatchView<Spanify::RSRAdjacencyView<K>> src,
                       batch::BatchView<Spanify::RSRAdjacencyView<K>> dst,
                       batch::BatchStateView                          state,
-                      Span<std::array<K,6>>                          faces_cubic,
-                      Span<std::array<K,3>>                          faces_dual);
+                      std::span<std::array<K,6>>                          faces_cubic,
+                      std::span<std::array<K,3>>                          faces_dual);
 
     mutable FunctorArrays<K> cannon_ixs_;
     mutable FunctorArrays<K> rep_count_;

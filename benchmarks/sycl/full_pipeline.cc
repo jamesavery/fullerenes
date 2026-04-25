@@ -125,10 +125,10 @@ int main(int argc, char** argv) {
         BuckyGen::stop(BQ);
     }
 
-    Span<std::array<real_t,3>> xyz_span(xyz.data(), xyz.size());
-    Span<std::array<real_t,2>> layout_span(layout2d.data(), layout2d.size());
-    Span<std::array<node_t,6>> faces_cubic_span(faces_cubic_buf.data(), faces_cubic_buf.size());
-    Span<std::array<node_t,3>> faces_dual_span (faces_dual_buf .data(), faces_dual_buf .size());
+    std::span<std::array<real_t,3>> xyz_span(xyz.data(), xyz.size());
+    std::span<std::array<real_t,2>> layout_span(layout2d.data(), layout2d.size());
+    std::span<std::array<node_t,6>> faces_cubic_span(faces_cubic_buf.data(), faces_cubic_buf.size());
+    std::span<std::array<node_t,3>> faces_dual_span (faces_dual_buf .data(), faces_dual_buf .size());
 
     auto src_view = src_dual .view_capacity();
     auto dst_view = dst_cubic.view_capacity();
@@ -152,12 +152,12 @@ int main(int argc, char** argv) {
         auto T8 = std::chrono::steady_clock::now(); times_hessian += std::chrono::duration<double, std::nano>(T8 - T7).count();
         eigensolve_ends.compute(Q, xyz_span, (int)N, BatchSize,
             hessian_buffer, cols_buffer, n_lanczos,
-            spectral_ends_buffer, /*eigenvectors*/Span<real_t>(),
+            spectral_ends_buffer, /*eigenvectors*/std::span<real_t>(),
             off_diagonal, qmat, lanczos_buf, diag_buf, ends_idx).wait();
         auto T9 = std::chrono::steady_clock::now(); times_spectral_ends += std::chrono::duration<double, std::nano>(T9 - T8).count();
         eigensolve_full.compute(Q, xyz_span, (int)N, BatchSize,
             hessian_buffer, cols_buffer, n_lanczos,
-            spectral_buffer, /*eigenvectors*/Span<real_t>(),
+            spectral_buffer, /*eigenvectors*/std::span<real_t>(),
             off_diagonal, qmat, lanczos_buf, diag_buf, ends_idx).wait();
         auto T10 = std::chrono::steady_clock::now(); times_spectral += std::chrono::duration<double, std::nano>(T10 - T9).count();
         auto T11 = std::chrono::steady_clock::now(); times_spectral_vectors += std::chrono::duration<double, std::nano>(T11 - T10).count();

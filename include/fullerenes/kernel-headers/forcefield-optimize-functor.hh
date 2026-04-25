@@ -13,7 +13,7 @@ struct ForcefieldOptimizeFunctor: public KernelFunctor<ForcefieldOptimizeFunctor
     //              state.iteration[i] is incremented by batch_iters each call.
     SyclEvent compute(SyclQueue& Q,
                       batch::BatchView<Spanify::RSRAdjacencyView<K>> graph,
-                      Span<std::array<T,3>>                          xyz,
+                      std::span<std::array<T,3>>                          xyz,
                       batch::BatchStateView                          state,
                       size_t batch_iters, size_t max_iters);
 

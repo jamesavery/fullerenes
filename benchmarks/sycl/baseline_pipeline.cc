@@ -50,8 +50,8 @@ int main(int argc, char** argv) {
     SyclVector<std::array<real_t,2>> layout2d(BatchSize * N);
     SyclVector<std::array<real_t,3>> xyz     (BatchSize * N);
 
-    Span<std::array<real_t,2>> layout_span(layout2d.data(), layout2d.size());
-    Span<std::array<real_t,3>> xyz_span   (xyz.data(), xyz.size());
+    std::span<std::array<real_t,2>> layout_span(layout2d.data(), layout2d.size());
+    std::span<std::array<real_t,3>> xyz_span   (xyz.data(), xyz.size());
 
     Graph G(Nf, true);
 

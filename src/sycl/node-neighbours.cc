@@ -12,7 +12,7 @@ struct NodeNeighbours{
     
 
 
-    /* NodeNeighbours(sycl::group<1> cta, const Span<std::array<K,3>> cubic_neighbours_acc, K* sdata){
+    /* NodeNeighbours(sycl::group<1> cta, const std::span<std::array<K,3>> cubic_neighbours_acc, K* sdata){
         INT_TYPEDEFS(K);
         face_nodes.fill(UINT16_MAX);
         face_neighbours.fill(UINT16_MAX);
@@ -63,7 +63,7 @@ struct NodeNeighbours{
      * @return NodeNeighbours object.
      */
 
-    NodeNeighbours(const Span<std::array<K,3>> cubic_neighbours_acc, K tid){
+    NodeNeighbours(const std::span<std::array<K,3>> cubic_neighbours_acc, K tid){
         const DeviceCubicGraph FG(cubic_neighbours_acc);
         this->cubic_neighbours   = {FG[tid][0], FG[tid][1], FG[tid][2]};
         this->next_on_face = {FG.next_on_face(tid, FG[tid][0]), FG.next_on_face(tid, FG[tid][1]), FG.next_on_face(tid ,FG[tid][2])};
