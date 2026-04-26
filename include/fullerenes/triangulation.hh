@@ -108,7 +108,12 @@ public:
   vector<vector<node_t>> quads_of_the_line(node_t u0, int i, int a, int b) const;  
 
   Triangulation sort_nodes() const;
-  Triangulation sort_flat_last() const;
+
+  // Return the permutation that sorts cone vertices (degree != 6) before
+  // flat (degree == 6) vertices, preserving original order within each
+  // group.  pi[u_old] = u_new.  *this is unchanged; apply via
+  // `apply_permutation(pi)` on a copy to materialise the sorted graph.
+  Permutation sort_flat_last() const;
 };
 
 

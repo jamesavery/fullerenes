@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <map>
 #include <climits>
+#include <stdexcept>
+#include <string>
 
 // ============================================================================
 // Intrinsic geometry primitives
@@ -668,14 +670,22 @@ static void flip_away_self_loops(DelaunayTriangulation& D, int v) {
       h = D.cw(h);
     } while (h != h0);
   }
-  // Invariant check: no self-loop survives at a flat vertex.
+  // Invariant check (runtime, not assert: asserts compile out with -DNDEBUG):
+  // no self-loop survives at a flat vertex.  If one does, splice_fan would
+  // double-deallocate the self-loop edge and corrupt the DCEL silently.
+  // Theorem in CORRECTNESS-PROOF.md proves this never fires on
+  // non-Delaunay or freshly-created self-loops; the residual is the
+  // rim-flip-evolution case, which is empirically clean across all
+  // tested inputs.
   int h0 = D.v_out[v];
   if (h0 >= 0) {
     int h = h0;
     do {
-      assert(D.dest(h) != v &&
-             "flip_away_self_loops: un-flippable self-loop at flat v "
-             "(structural invariant violated; see CORRECTNESS-PROOF.md Theorem 3)");
+      if (D.dest(h) == v)
+        throw std::runtime_error(
+            "flip_away_self_loops: un-flippable self-loop at flat v=" +
+            std::to_string(v) + " (Obligation 1 violated; "
+            "see CORRECTNESS-PROOF.md)");
       h = D.cw(h);
     } while (h != h0);
   }
@@ -745,7 +755,8 @@ DelaunayTriangulation DelaunayTriangulation::compute(const Triangulation& T)
   // legitimate features of the iDT object.  Callers that need a
   // strictly simplicial output should query min_live_degree() and
   // post-process (e.g. via bisect_multi_edges()) when needed.
-  Triangulation sorted = T.sort_flat_last();
+  Triangulation sorted = T;
+  sorted.apply_permutation(T.sort_flat_last());
   DelaunayTriangulation D = from_triangulation(sorted);
   D.remove_flat_vertices();
   return D;

@@ -15,8 +15,15 @@
 // Constructor
 // ============================================================================
 
+static Triangulation sort_flat_last_copy(const Triangulation& T)
+{
+  Triangulation T_sorted = T;
+  T_sorted.apply_permutation(T.sort_flat_last());
+  return T_sorted;
+}
+
 FulleroidDelaunay::FulleroidDelaunay(const Triangulation& T)
-  : Triangulation(T.sort_flat_last()), edge_lengths(N, N, 0)
+  : Triangulation(sort_flat_last_copy(T)), edge_lengths(N, N, 0)
 {
   // Edge flips during vertex removal can temporarily push vertex degrees
   // well above 6 (the max for fullerene duals). Restride to give headroom.

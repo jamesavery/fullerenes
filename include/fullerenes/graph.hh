@@ -17,6 +17,7 @@ using namespace std;
 #include "geometry.hh"
 #include "auxiliary.hh"
 #include "matrix.hh"
+#include "permutation.hh"
 
 struct Graph : Spanify::DenseGraph<node_t> {
   using base_t = Spanify::DenseGraph<node_t>;
@@ -227,6 +228,26 @@ struct Graph : Spanify::DenseGraph<node_t> {
   vector<arc_t> directed_edges()   const;
 
   size_t count_edges() const;
+
+  // Sort the vertex indices {0, ..., N-1} by `less` (a stable sort) and
+  // return the resulting permutation pi with pi[u_old] = u_new (i.e.
+  // pi maps old labels to new labels).  *this is unchanged.  `less` is
+  // any callable invocable as `bool less(node_t a, node_t b)`; lambdas
+  // typically capture `this` to access vertex data such as degrees.
+  template<typename Less>
+  Permutation argsort(Less less) const {
+    std::vector<int> idx(N);
+    for (int i = 0; i < N; ++i) idx[i] = i;
+    std::stable_sort(idx.begin(), idx.end(), less);  // idx[u_new] = u_old
+    Permutation pi(N);
+    for (int u_new = 0; u_new < N; ++u_new) pi[idx[u_new]] = u_new;
+    return pi;
+  }
+
+  // Relabel vertices according to pi (pi[u_old] = u_new): vertex u_old's
+  // adjacency row moves to slot u_new, and every arc target t is
+  // relabelled to pi[t].  Requires owned memory.
+  void apply_permutation(const Permutation& pi);
 
   friend ostream& operator<<(ostream& s, const Graph& g);
 };

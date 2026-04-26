@@ -6,6 +6,7 @@
 #include "fullerenes/spiral.hh"
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/geometry.hh"
+#include "fullerenes/permutation.hh"
 
 class PointGroup {
 public:
@@ -34,30 +35,6 @@ public:
     return sym_type == G.sym_type && n == G.n && sym_reflection == G.sym_reflection;
   }
 };
-
-
-struct Permutation : public vector<int> {
-  Permutation(const vector<int>& p) : vector<int>(p){}
-  Permutation(int N=0) : vector<int>(N){}
-
-  static Permutation identity(int N);
-
-  Permutation inverse() const;
-  int order() const;
-
-  // Permutation composition
-  Permutation operator*(const Permutation& q) const;
-  //  bool operator==(const Permutation& q) const;
-
-};
-
-namespace std {
-  template<> struct hash<Permutation> {
-    size_t operator()(const Permutation &v) const {
-      return std::hash<vector<int>>()(v);
-    }
-  };
-}
 
 
 // 3D representation of a point group: one orthogonal matrix per group element.

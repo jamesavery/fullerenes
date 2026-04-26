@@ -96,6 +96,25 @@ int  Graph::arc_ix(node_t u, node_t v) const
   return find(u, v);
 }
 
+void Graph::apply_permutation(const Permutation& pi)
+{
+  assert(owns_memory());
+  assert((int)pi.size() == N);
+  std::vector<node_t> new_values(N * dmax, node_t(-1));
+  std::vector<uint8_t> new_deg(N, 0);
+  for (int u_old = 0; u_old < N; ++u_old) {
+    const int u_new = pi[u_old];
+    new_deg[u_new] = owned_deg[u_old];
+    for (int i = 0; i < owned_deg[u_old]; ++i) {
+      const int t_old = owned_values[u_old * dmax + i];
+      new_values[u_new * dmax + i] = pi[t_old];
+    }
+  }
+  owned_values = std::move(new_values);
+  owned_deg    = std::move(new_deg);
+  repoint();
+}
+
 // Successor to v in oriented neigbhours of u
 node_t Graph::next(node_t u, node_t v) const
 {

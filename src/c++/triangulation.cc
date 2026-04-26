@@ -1179,27 +1179,17 @@ Triangulation Triangulation::sort_nodes() const
   return Triangulation(new_neighbours);
 }
 
-Triangulation Triangulation::sort_flat_last() const
+Permutation Triangulation::sort_flat_last() const
 {
   // Sort vertices so cone points (degree != 6) come first in original order,
   // then flat (degree-6) vertices in original order.  This is the correct
   // ordering for iDT vertex removal, which removes from the back.
-  vector< pair<int,int> > keys(N);
-  for(int u=0;u<N;u++) keys[u] = make_pair((degree(u) == 6) ? 1 : 0, u);
-  sort(keys.begin(), keys.end());
-
-  vector<int> newname(N), oldname(N);
-  for(node_t u_new=0;u_new<N;u_new++){
-    newname[keys[u_new].second] = u_new;
-    oldname[u_new] = keys[u_new].second;
-  }
-
-  Graph new_graph(N, dmax);
-  for(int u=0;u<N;u++)
-    for(int i=0;i<degree(u);i++)
-      new_graph.push_back(newname[u], newname[(*this)[u][i]]);
-
-  return Triangulation(Graph(new_graph));
+  return argsort([this](node_t a, node_t b){
+    const int ka = (degree(a) == 6) ? 1 : 0;
+    const int kb = (degree(b) == 6) ? 1 : 0;
+    if (ka != kb) return ka < kb;
+    return a < b;
+  });
 }
 
 spiral_nomenclature FullereneDual::name(bool rarest_start) const
