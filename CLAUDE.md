@@ -78,6 +78,35 @@ struct coord3d;                                // 3D with cross product, polar a
 
 Fullerene topology is compactly encoded as spiral indices and jump sequences. The `general_spiral` and `spiral_nomenclature` types are first-class representations used throughout for isomer identification and generation.
 
+#### Canonical fullerene names from a dual triangulation
+
+To produce the canonical, vendor-neutral name of a fullerene given its dual `Triangulation T` (e.g. as returned by `BuckyGen::next_fullerene`):
+
+```cpp
+#include "fullerenes/spiral.hh"
+
+spiral_nomenclature sn(T,
+                       spiral_nomenclature::FULLERENE,        // naming_scheme
+                       spiral_nomenclature::TRIANGULATION,    // construction_scheme
+                       /*rarest_special_start=*/true);        // -> CANONICAL_GENERALIZED_SPIRAL
+std::string name = sn.to_string();   // e.g. "[GS:1,2,4,9,15,17,20,22,24,28,29,31]-fullerene"
+```
+
+For tooling output, **prefix the carbon count** so the size is visible at a glance:
+```cpp
+std::string tagged = "C" + std::to_string(N_carbon) + "-" + sn.to_string();
+// -> "C60-[GS:1,2,4,9,15,17,20,22,24,28,29,31]-fullerene"
+```
+
+Notes:
+- Pass the **dual triangulation** (the deg-5/6 graph) directly. `construction_scheme=TRIANGULATION` returns it unchanged inside the constructor. If you only have the cubic fullerene graph, use `construction_scheme=CUBIC` instead.
+- `rarest_special_start=true` selects `CANONICAL_GENERALIZED_SPIRAL` (`GS`); `false` selects `COMPATIBILITY_CANONICAL_SPIRAL` (`CS`).
+- The name encodes the 12 pentagon positions in the canonical spiral (plus jumps if the graph requires them).
+- The spiral is canonical: the same isomer always names the same way regardless of vertex labelling, so two runs that disagree on the buckygen index can still be cross-referenced.
+- To reconstruct a `FullereneGraph` from a name string, parse it via `spiral_nomenclature(const string&)` and feed the `general_spiral` to the existing fullerene constructors. (The `C<N>-` prefix is for human readability; strip it before parsing.)
+- Build deps: link `libfullerenes.so` and (if you're enumerating) `libbuckygen.a`.
+- Thread safety: each `spiral_nomenclature` object is independent, but compute names *outside* the OpenMP parallel region — name construction is not cheap, and a single-threaded post-pass keeps the hot loop tight.
+
 ### GPU/SYCL Subsystem
 
 Two header directories support GPU computation:
@@ -140,6 +169,7 @@ Fullerenes exist for all even N >= 20 except N=22.
 
 - **No git commits**: Never commit to git yourself. Stage the changed files with git add and propose a commit message. The user always reviews and commits manually.
 - **No backticks in commit messages**: Commit messages get pasted into an editor where backticks cause problems. Use plain text instead.
+- **No "Co-Authored-By: Claude" trailer in commits**: Do not append the `Co-Authored-By: Claude Opus 4.7 ... <noreply@anthropic.com>` trailer to commit messages, in either this repo or in `claude-projects/`. The byline is redundant clutter (the user reads diffs and PR descriptions, not commit trailers); claude-projects/ is by definition the Claude projects repo so the attribution adds nothing; in fullerenes the user finds it equally noisy. End commit messages with the last paragraph of substantive content. Applies to commits, amends, and fixups.
 - **Never stage claude-projects/**: The `claude-projects/` directory has its own separate git repo. Never add, stage, or commit files under `claude-projects/` to the fullerene repository. It is listed in `.gitignore`.
 - **NEVER kill background processes without EXPLICIT user approval**: Long-running computations (benchmarks, enumerations) may represent hours of irreplaceable work. ALWAYS ask "Can I stop task X? It has been running for Y time and has Z partial results" and WAIT for the user to confirm. Even if you discover a bug and want to relaunch, do NOT stop running processes — modify code, rebuild separately, and ask the user whether to stop the old run. This applies to TaskStop, Ctrl-C, `kill`, and any other means of termination. NO EXCEPTIONS.
 - **NEVER do a git reset without EXPLICIT user approval**: This may throw away days of work. Always ask the user.
