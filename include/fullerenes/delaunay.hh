@@ -25,6 +25,58 @@ struct Diamond {
   bool   is_delaunay()    const;  // cot(angle_B) + cot(angle_D) >= 0
   bool   is_convex()      const;  // angle sum < pi at both u and v
   double flipped_length() const;  // length of BD (the other diagonal)
+
+  // Cocircular ("tight") test: cot(angle_B) + cot(angle_D) == 0 exactly,
+  // i.e. the four points u, v, B, D are concyclic on the surface.  In this
+  // case both triangulations of the diamond are equally-valid Delaunay
+  // refinements of the same cell.  Uses exact integer arithmetic on
+  // length-squared (valid when all five lengths square to non-negative
+  // integers, e.g. equilateral triangulations and their flips).
+  // See CANONICAL-TESSELATION.md for the derivation.
+  bool is_cocircular() const;
+};
+
+// ============================================================================
+// Canonical Delaunay tesselation
+//
+// On a piecewise-flat surface, the iDT triangulation is not unique: when
+// k >= 4 cone points are concyclic, the cocircular k-gon admits multiple
+// equally-valid Delaunay triangulations, and which one the algorithm emits
+// depends on the input vertex labelling.  The Bobenko-Springborn (2007)
+// theorem guarantees that the underlying TESSELATION (cell decomposition
+// where every cocircular polygon is left intact) IS unique.
+//
+// CanonicalTesselation is exactly that invariant: a sorted multi-set of
+// CCW-oriented polygons, each in user-supplied vertex labels with
+// integer length-squared annotation per edge.  Two iDT outputs that
+// differ only by trivial flips inside cocircular cells (and/or by a
+// label-equivariant relabelling, once mapped through the same external
+// label-map) compare equal here, even though their raw triangulations
+// differ.
+// ============================================================================
+
+struct CanonicalTesselation {
+  // Polygon = CCW boundary of one Delaunay cell.  Each entry is
+  // (vertex_label, length²-of-outgoing-edge-to-next-vertex).  Polygons
+  // are normalized to lex-min cyclic rotation.
+  using Polygon = std::vector<std::pair<int, long long>>;
+
+  // Sorted multi-set of cells (a deterministic linear order is enough for
+  // equality / ordering).
+  std::vector<Polygon> cells;
+
+  bool operator==(const CanonicalTesselation& o) const { return cells == o.cells; }
+  bool operator!=(const CanonicalTesselation& o) const { return cells != o.cells; }
+  bool operator< (const CanonicalTesselation& o) const { return cells <  o.cells; }
+
+  // Counts (for quick queries; empty iDT yields zeros).
+  int n_cells() const { return (int)cells.size(); }
+
+  // Stable 64-bit fingerprint for hash maps and at-a-glance comparison.
+  size_t fingerprint() const;
+
+  // Compact human-readable form; one cell per line.
+  std::string to_string() const;
 };
 
 // ============================================================================
@@ -146,6 +198,46 @@ struct DelaunayTriangulation {
   // realized as distinct straight edges in R³.  Bisecting each with a midpoint
   // makes them geometrically distinct.  Returns the number of vertices added.
   int bisect_multi_edges();
+
+  // --- Tesselation invariant ---
+  // True iff edge h is cocircular ("tight"): the diamond's four cone points
+  // share a common circumcircle, so flipping h yields an equally-valid
+  // Delaunay triangulation.  Both half-edges of an edge return the same value.
+  bool is_cocircular_edge(int h) const;
+
+  // Per-half-edge cocircular mask: tight[h] == tight[h^1]; dead half-edges
+  // are false.  O(num_edges) integer-arithmetic predicates.
+  std::vector<bool> cocircular_edges() const;
+
+  // Canonical Delaunay tesselation in `vertex_labels` coordinates.
+  // `vertex_labels[k]` is the external label assigned to D's live vertex k;
+  // typically the vertex's position in the original Triangulation it came
+  // from (as recovered through `Triangulation::sort_flat_last()`).
+  // Cocircular interior edges are merged so each cell becomes one polygon;
+  // polygons are normalized (lex-min rotation), the multi-set is sorted.
+  CanonicalTesselation canonical_tesselation(
+      const std::vector<int>& vertex_labels) const;
+
+  // General tesselation extraction with a caller-supplied "interior" mask.
+  // `tight[h]` true ⇒ edge h is interior to a cell (it is collapsed away);
+  // `tight[h]` false ⇒ edge h is on a cell boundary.  Both half-edges of an
+  // edge must agree (`tight[h] == tight[h^1]`).
+  //
+  // The cell-walk is identical to canonical_tesselation; only the source of
+  // the interior-edge mask changes.  This lets the Alexandrov solver pass
+  // a Bobenko-Izmestiev "inessential" mask (edges with θ_e = π in the
+  // weighted-Delaunay tesselation at κ=0) to obtain the polytope's
+  // 2-skeleton T̄ (the polygonal flat 2-faces of the convex polytope),
+  // distinct from but compatible with the cocircular tesselation.
+  //
+  // Both notions agree exactly on flat-2-face diagonals whose four cone
+  // points are also cocircular in the surface metric; they may differ
+  // when the flat 2-face is non-cyclic, or when 4 surface-cocircular
+  // points are spread across multiple polytope faces.  Cross-validation
+  // between the two is a useful sanity check on the GCP geometry at κ=0.
+  CanonicalTesselation canonical_tesselation(
+      const std::vector<int>& vertex_labels,
+      const std::vector<bool>& tight) const;
 
   // --- Validation ---
   bool check_consistency() const;

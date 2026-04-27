@@ -8,6 +8,7 @@
 #include <climits>
 #include <stdexcept>
 #include <string>
+#include <sstream>
 
 // ============================================================================
 // Intrinsic geometry primitives
@@ -78,6 +79,30 @@ double Diamond::flipped_length() const
   double sqrtHH = (Ha > 0 && Hd > 0) ? sqrt(Ha * Hd) : 0;
   double f2 = a2 + c2 - (P * Q - sqrtHH) / (2 * e2);
   return (f2 > 0) ? sqrt(f2) : 0;
+}
+
+bool Diamond::is_cocircular() const
+{
+  // Tight Delaunay: cot(angle_B) + cot(angle_D) == 0 exactly.  Equivalent
+  // to s1 * area_2 + s2 * area_1 = 0 where s1 = a^2+b^2-e^2, s2 = c^2+d^2-e^2.
+  // Squaring after sign-check: tight iff sign(s1) != sign(s2) and
+  // s1^2 * H2 == s2^2 * H1 (with H = 16*area^2).  Or: both s1, s2 == 0.
+  // Done in integer length-squared arithmetic so the predicate is exact for
+  // equilateral triangulations and any sequence of flips.
+  long long Le = (long long)std::llround(e * e);
+  long long La = (long long)std::llround(a * a);
+  long long Lb = (long long)std::llround(b * b);
+  long long Lc = (long long)std::llround(c * c);
+  long long Ld = (long long)std::llround(d * d);
+  long long s1 = La + Lb - Le;
+  long long s2 = Lc + Ld - Le;
+  if (s1 == 0 && s2 == 0) return true;
+  if (s1 == 0 || s2 == 0) return false;
+  if ((s1 > 0) == (s2 > 0)) return false;          // same sign: not tight
+  auto H = [](long long x, long long y, long long z) {
+    return 2*(x*y + y*z + x*z) - (x*x + y*y + z*z); // 16 * area^2
+  };
+  return s1 * s1 * H(Le, Lc, Ld) == s2 * s2 * H(Le, La, Lb);
 }
 
 // Old FulleroidDelaunay + IDTAudit implementation moved to delaunay_old.cc.
@@ -760,6 +785,119 @@ DelaunayTriangulation DelaunayTriangulation::compute(const Triangulation& T)
   DelaunayTriangulation D = from_triangulation(sorted);
   D.remove_flat_vertices();
   return D;
+}
+
+// ============================================================================
+// Canonical Delaunay tesselation
+// See CANONICAL-TESSELATION.md for the algorithm derivation and the
+// Bobenko-Springborn uniqueness rationale.
+// ============================================================================
+
+bool DelaunayTriangulation::is_cocircular_edge(int h) const
+{
+  if (!alive(h)) return false;
+  return diamond(h).is_cocircular();
+}
+
+vector<bool> DelaunayTriangulation::cocircular_edges() const
+{
+  vector<bool> tight(nh, false);
+  for (int h = 0; h < nh; h += 2) {
+    if (!alive(h)) continue;
+    bool t = diamond(h).is_cocircular();
+    tight[h]     = t;
+    tight[h ^ 1] = t;
+  }
+  return tight;
+}
+
+// Lex-min cyclic rotation of a polygon boundary (oriented surface, no reverse).
+static CanonicalTesselation::Polygon
+min_rotation(const CanonicalTesselation::Polygon& p)
+{
+  int d = (int)p.size();
+  if (d <= 1) return p;
+  CanonicalTesselation::Polygon best = p;
+  CanonicalTesselation::Polygon rot(d);
+  for (int r = 1; r < d; r++) {
+    for (int i = 0; i < d; i++) rot[i] = p[(r + i) % d];
+    if (rot < best) best = rot;
+  }
+  return best;
+}
+
+CanonicalTesselation
+DelaunayTriangulation::canonical_tesselation(const vector<int>& vertex_labels) const
+{
+  return canonical_tesselation(vertex_labels, cocircular_edges());
+}
+
+CanonicalTesselation
+DelaunayTriangulation::canonical_tesselation(const vector<int>& vertex_labels,
+                                             const vector<bool>& tight) const
+{
+  // Walk cell boundaries.  Each non-tight half-edge h sits on exactly one
+  // cell (the one to its left in the DCEL CCW orientation).  Within a cell,
+  // tight edges are interior; we step across them with `next(twin(.))`.
+  vector<bool> visited(nh, false);
+  CanonicalTesselation T;
+  for (int h_start = 0; h_start < nh; h_start++) {
+    if (!alive(h_start) || visited[h_start] || tight[h_start]) continue;
+    CanonicalTesselation::Polygon poly;
+    int h = h_start;
+    do {
+      visited[h] = true;
+      int u = he_origin[h];
+      long long L = (long long)std::llround(he_length[h] * he_length[h]);
+      poly.push_back({(u >= 0 && u < (int)vertex_labels.size()) ? vertex_labels[u] : u, L});
+      // Advance: walk the cell boundary CCW.  Within the cell, tight edges
+      // are interior, so step into the adjacent triangle until the next
+      // boundary edge.
+      int h_next = he_next[h];
+      int safety = 0;
+      while (tight[h_next]) {
+        h_next = he_next[h_next ^ 1];
+        if (++safety > nh) {
+          // Topology gone wrong -- bail out with an empty cell so the
+          // caller can detect and report the problem.
+          T.cells.clear();
+          return T;
+        }
+      }
+      h = h_next;
+    } while (h != h_start);
+    T.cells.push_back(min_rotation(poly));
+  }
+  std::sort(T.cells.begin(), T.cells.end());
+  return T;
+}
+
+size_t CanonicalTesselation::fingerprint() const
+{
+  size_t acc = 0xcbf29ce484222325ULL;          // FNV-1a basis, used as seed
+  std::hash<long long> hh;
+  auto mix = [&](long long x){
+    acc ^= hh(x) + 0x9e3779b97f4a7c15ULL + (acc << 6) + (acc >> 2);
+  };
+  for (auto& cell : cells) {
+    mix((long long)cell.size());
+    for (auto& [v, L] : cell) { mix((long long)v); mix(L); }
+    mix(0x5bd1e9955LL);                        // cell separator
+  }
+  return acc;
+}
+
+string CanonicalTesselation::to_string() const
+{
+  ostringstream os;
+  os << "CanonicalTesselation{n_cells=" << cells.size() << ", cells=[\n";
+  for (size_t i = 0; i < cells.size(); i++) {
+    os << "  [n=" << cells[i].size() << "]";
+    for (auto& [v, L] : cells[i]) os << " (" << v << "," << L << ")";
+    os << "\n";
+  }
+  os << "]}";
+  return os.str();
 }
 
 // Bisect a multi-edge by inserting a midpoint vertex.

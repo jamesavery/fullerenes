@@ -38,6 +38,21 @@ if(OpenMP_CXX_FOUND)
   target_link_libraries(bench_alexandrov OpenMP::OpenMP_CXX)
 endif()
 
+add_executable(diag_selfloop diag_selfloop.cc)
+target_link_libraries(diag_selfloop fullerenes)
+
+add_executable(scan_topo scan_topo.cc)
+target_link_libraries(scan_topo fullerenes)
+
+add_executable(diag_mol2 diag_mol2.cc)
+target_link_libraries(diag_mol2 fullerenes)
+
+add_executable(scan_nonsimp scan_nonsimp.cc)
+target_link_libraries(scan_nonsimp fullerenes)
+
+add_executable(probe_multi probe_multi.cc)
+target_link_libraries(probe_multi fullerenes)
+
 add_executable(replay_perstep replay_perstep.cc)
 target_link_libraries(replay_perstep fullerenes)
 

@@ -25,6 +25,8 @@
 #include "fullerenes/matrix.hh"
 #include <cstdio>
 #include <cmath>
+#include <map>
+#include <set>
 #include <vector>
 #include <algorithm>
 #include <expected>
@@ -195,6 +197,37 @@ double feasibility_max_step(const DelaunayTriangulation& T,
     if (feasible(T, rs)) lo = mid; else hi = mid;
   }
   return lo;
+}
+
+// Safety factor for landing strictly inside F(T) when a step would otherwise
+// reach the feasibility boundary.  Matches B-I numerical practice.
+constexpr double FEAS_SAFETY = 0.95;
+
+// Clip step δ so r_from + δ ∈ F(T).  Returns the (possibly scaled) step δ'.
+//   - if r_from + δ ∈ F(T):  δ' = δ                 (no clip)
+//   - else:                  δ' = (FEAS_SAFETY · s_max) · δ
+// where s_max ∈ [0,1] is the largest feasible step (feasibility_max_step).
+//
+// Pre: r_from ∈ F(T).
+// Post: r_from + result ∈ F(T) strictly.
+//
+// Single source of truth for the F(T)-feasible step rule.  Used by:
+//   - solve() endgame extrapolation
+//   - Newton::polish trust-region step
+// `clipped` (if non-null) is set true iff a scale was applied.
+vector<double> feasible_step(const DelaunayTriangulation& T,
+                              const vector<double>& r_from,
+                              const vector<double>& delta,
+                              bool* clipped = nullptr) {
+  vector<double> r_to(r_from.size());
+  for (size_t i = 0; i < r_from.size(); i++) r_to[i] = r_from[i] + delta[i];
+  double s_max = feasibility_max_step(T, r_from, r_to);
+  bool clip = (s_max < 1.0);
+  double s = clip ? FEAS_SAFETY * s_max : 1.0;
+  if (clipped) *clipped = clip;
+  vector<double> out(delta.size());
+  for (size_t i = 0; i < delta.size(); i++) out[i] = s * delta[i];
+  return out;
 }
 
 // Per-oriented-edge Jacobian contribution.
@@ -437,12 +470,55 @@ pair<bool, double> update(double actual, double predicted, double dnorm,
 
 namespace Topology {
 
-// Find first edge with θ > π that can be flipped (skip B==D multi-edges).
+// B-I 2008 §3.4 (lines 614–640) define an edge h as "bad" iff the function
+// q̃_T fails Q-concavity across h.  They give two cases:
+//
+//   (ConcQuadr) — h has two distinct adjacent triangles forming a strictly-
+//     convex quadrilateral, with angle at the opposite vertex ≥ π.  The bad
+//     condition is θ_h > π (the GCP dihedral exceeds π).
+//
+//   (CloGeod)   — h is the i–j edge of an "iji" bigon-face (a face with both
+//     half-edges of h, two i-corners, and one j-corner; B-I lines 562–563).
+//     The bad condition is q_j < q_i − ℓ²_ij, i.e. r_j² < r_i² − ℓ²_ij.
+//
+// Our previous needs_flip implemented only (ConcQuadr).  The (CloGeod) clause
+// is needed because we start the homotopy from a Δ-complex iDT — bigon
+// faces may be present and need flipping during the path to maintain
+// Q-concavity.
 int needs_flip(const DelaunayTriangulation& T, const vector<double>& r) {
+  // (ConcQuadr): edge with two distinct adjacent triangles, θ > π.
+  // For a bigon edge (he_face[h] == he_face[h^1]), GCP::theta is not
+  // meaningful; skip and let the (CloGeod) pass below handle it.
+  // NaN θ — returned by alpha() when the abstract pyramid is degenerate
+  // (h_sq < 0, i.e. Cayley-Menger fails) — also counts as bad: the
+  // configuration is outside P(M) and a flip is required.  IEEE
+  // comparisons with NaN are false, so we test isnan() explicitly.
   for (int h = 0; h < T.nh; h += 2) {
     if (!T.alive(h)) continue;
-    if (T.he_origin[T.prev(h)] == T.he_origin[T.prev(h ^ 1)]) continue;
-    if (GCP::theta(T, r, h) > M_PI + 1e-10) return h;
+    if (T.he_face[h] == T.he_face[h ^ 1]) continue;       // bigon — handled below
+    double theta = GCP::theta(T, r, h);
+    if (std::isnan(theta) || theta > M_PI + 1e-10) return h;
+  }
+  // (CloGeod): bigon i–j edge of an iji-face, q_j < q_i − ℓ²_ij.
+  for (int h = 0; h < T.nh; h += 2) {
+    if (!T.alive(h)) continue;
+    if (T.he_face[h] != T.he_face[h ^ 1]) continue;       // not a bigon
+    int u = T.he_origin[h], v = T.dest(h);
+    if (u == v) continue;                                  // pure self-loop, not i–j edge
+    // Identify i (the doubled vertex) and j (the single vertex) from the
+    // bigon face's third half-edge: it must be a self-loop with origin = i.
+    int f = T.he_face[h];
+    int hh = T.f_he[f], h_self = -1;
+    for (int s = 0; s < 3; s++, hh = T.he_next[hh]) {
+      if (T.he_origin[hh] == T.dest(hh)) { h_self = hh; break; }
+    }
+    if (h_self < 0) continue;                              // no self-loop in this face — not iji-shape
+    int i = T.he_origin[h_self];
+    int j = (i == u) ? v : u;
+    if (i != u && i != v) continue;                        // i must be one of h's endpoints
+    double q_i = r[i] * r[i], q_j = r[j] * r[j];
+    double ell_ij_sq = T.he_length[h] * T.he_length[h];
+    if (q_j < q_i - ell_ij_sq - 1e-10) return h;
   }
   return -1;
 }
@@ -666,15 +742,23 @@ pair<bool, double> polish(DelaunayTriangulation& T, V& r,
     if (max_abs(kappa) < tol) return {true, max_abs(kappa)};
     if (rejects > 20) break;
 
-    double E    = energy(kappa);
-    auto   J    = GCP::jacobian(T, r);
-    auto   delta = TrustRegion::solve(J, kappa, Delta);
-    double pred = TrustRegion::predicted_reduction(J, kappa, delta);
-    V      r_trial = r + delta;
-    double E_trial = energy(GCP::kappa(T, r_trial));
+    double E         = energy(kappa);
+    auto   J         = GCP::jacobian(T, r);
+    auto   delta_raw = TrustRegion::solve(J, kappa, Delta);
+    // Clip step to F(T): keep r_trial inside the feasibility region so
+    // pyramids stay non-degenerate and κ(r_trial) is finite (no NaN θ on
+    // multi-edges, no false |κ|=0 convergence outside F).  Same helper
+    // used by the endgame extrapolation — single source of truth.
+    bool   clipped;
+    auto   delta     = GCP::feasible_step(T, r, delta_raw, &clipped);
+    double pred      = TrustRegion::predicted_reduction(J, kappa, delta);
+    V      r_trial   = r + delta;
+    double E_trial   = energy(GCP::kappa(T, r_trial));
 
     auto [ok, D2] = TrustRegion::update(E - E_trial, pred, norm(delta), Delta, Delta_max);
-    Delta = D2;
+    // If we clipped, cap Δ at the step we actually took so the next
+    // subproblem doesn't keep proposing the same infeasible direction.
+    Delta = clipped ? min(D2, norm(delta)) : D2;
     if (out_trace)
       out_trace->push_back(make_trace('N', iter, 0.0, Delta, ok ? 1 : 0, kappa, J));
     if (ok) { r = r_trial; Topology::flip_to_delaunay(T, r); rejects = 0; }
@@ -825,11 +909,7 @@ vector<coord3d> AlexandrovSolver::solve() {
   r_before_extrap = r;
   if (!track.history.empty()) {
     auto r_ext = PALC::extrapolate(track.history);
-    if (!r_ext.empty()) {
-      double s_max = GCP::feasibility_max_step(D, r, r_ext);
-      double s = (s_max < 1.0) ? 0.95 * s_max : 1.0;
-      for (size_t i = 0; i < r.size(); i++) r[i] += s * (r_ext[i] - r[i]);
-    }
+    if (!r_ext.empty()) r = r + GCP::feasible_step(D, r, r_ext - r);
     stats_extrap_kappa = LinAlg::max_abs(GCP::kappa(D, r));
   }
 
@@ -843,13 +923,78 @@ vector<coord3d> AlexandrovSolver::solve() {
 
   if (mk > 0.01) return {};
 
-  // 5. Reconstruct 3D positions
+  // 5. Verify post-convergence invariants (CLAUDE.md refined I-1, I-2).
+  //    Per refined I-1: T(0) may carry redundant multi-edges that
+  //    converged to a single polytope edge under the homotopy (both
+  //    copies at θ = π); these are not failures, the inessential mask
+  //    collapses them in T̄(0).  The actual requirements are:
+  //      (a) T̄(0) is a simple polygonal tesselation (no multi-edge
+  //          survives the inessential collapse)
+  //      (b) the polytope is non-degenerate: F ≥ 3 for V = 12 (V−E+F = 2
+  //          plus F = 2 forces all 12 vertices coplanar — a flat
+  //          drum-cap, zero volume)
+  //
+  //    `is_simplicial(T(0))` is *not* a failure criterion: a T(0) with
+  //    multi-edges all at θ = π is consistent with refined I-1 and
+  //    yields a correct polytope via T̄(0).  Computed for diagnostics
+  //    only.
+  //
+  //    inessential_eps stays at the strict default (1e-7).  Loosening it
+  //    risks falsely collapsing borderline simple edges with |θ − π|
+  //    slightly above 1e-7 but well below "almost flat", which can fold
+  //    a non-degenerate polytope into a drum-cap.  Multi-edges that
+  //    legitimately collapsed to one polytope edge typically reach
+  //    |θ − π| ≲ 1e-7 once Newton converges; if PALC stalls before that
+  //    (κ residual > tol), the F ≥ 3 check below catches the resulting
+  //    degeneracy.
+  stats_t0_simplicial = is_simplicial(D);   // diagnostic only
+  vector<int> labels(D.nv);
+  for (int v = 0; v < D.nv; v++) labels[v] = v;
+  auto tbar = polytope_tesselation(D, r, labels);
+  stats_tbar_n_cells = tbar.n_cells();
+  stats_tbar_simple_polygonal = is_simple_polygonal(tbar);
+
+  bool nondegenerate = (stats_tbar_n_cells >= 3);
+  if (!stats_tbar_simple_polygonal || !nondegenerate) {
+    if (verbose)
+      printf("  POST-CONVERGENCE INVARIANT VIOLATION: T̄(0) simple polygonal=%d, "
+             "n_cells=%d (F≥3 required for non-degenerate polytope), "
+             "T(0) simplicial=%d (diagnostic). "
+             "Per CLAUDE.md refined I-1, this indicates PALC misconvergence "
+             "on a non-degenerate metric. Returning empty.\n",
+             stats_tbar_simple_polygonal, stats_tbar_n_cells,
+             stats_t0_simplicial);
+    return {};
+  }
+
+  // 6. Reconstruct 3D positions via T-level Gram-BFS.  Correct under
+  //    refined I-1: every iDT edge in T(0) is either a polytope edge or
+  //    a flat-face diagonal (θ = π), so ℓ = 3D chord in both cases —
+  //    the Gram identity pos[u]·pos[v] = (r_u² + r_v² − ℓ²)/2 holds.
+  //    Multi-edge copies at θ = π are bookkeeping duplicates of one
+  //    polytope edge and Gram-BFS picks either copy with the same
+  //    result.
   return Reconstruct::from_radii(D, r);
 }
 
 vector<coord3d> AlexandrovSolver::reconstruct(const DelaunayTriangulation& T,
                                               const vector<double>& r) {
   return Reconstruct::from_radii(T, r);
+}
+
+AlexandrovSolver::AlexandrovPolytope
+AlexandrovSolver::solve_polytope(const vector<int>& vertex_labels) {
+  AlexandrovPolytope out;
+  out.positions = solve();
+  if (out.positions.empty()) return out;
+  // T(0) is now in D; r in this->r.  Build labels (identity if not given).
+  vector<int> labels = vertex_labels;
+  if (labels.empty()) {
+    labels.resize(D.nv);
+    for (int v = 0; v < D.nv; v++) labels[v] = v;
+  }
+  out.tesselation = polytope_tesselation(D, r, labels);
+  return out;
 }
 
 vector<double> AlexandrovSolver::kappa(const DelaunayTriangulation& T,
@@ -878,4 +1023,74 @@ int AlexandrovSolver::jacobian_det_sign(const DelaunayTriangulation& T,
 bool AlexandrovSolver::feasible(const DelaunayTriangulation& T,
                                  const vector<double>& r) {
   return GCP::feasible(T, r);
+}
+
+double AlexandrovSolver::theta(const DelaunayTriangulation& T,
+                                const vector<double>& r, int h) {
+  return GCP::theta(T, r, h);
+}
+
+vector<bool> AlexandrovSolver::inessential_edges(const DelaunayTriangulation& T,
+                                                  const vector<double>& r,
+                                                  double eps) {
+  // B-I §3.4 (line 798): an edge h is inessential iff q̃_T is Q on a
+  // neighborhood of any interior point of h.  At κ=0 this equates to
+  // θ_h = π exactly — the two adjacent pyramids over h are coplanar in
+  // 3D, so h is interior to a flat 2-face of P.  We implement the
+  // numerical version with a tolerance.
+  vector<bool> tight(T.nh, false);
+  for (int h = 0; h < T.nh; h += 2) {
+    if (!T.alive(h)) continue;
+    // For bigon edges (he_face[h] == he_face[h^1]), GCP::theta is not
+    // meaningful and the edge is by definition not a flat-face diagonal
+    // of any 2-face of P (it's part of a degenerate iji-bigon face).
+    // Mark non-inessential.
+    if (T.he_face[h] == T.he_face[h ^ 1]) continue;
+    double theta = GCP::theta(T, r, h);
+    if (std::isfinite(theta) && std::fabs(theta - M_PI) < eps) {
+      tight[h]     = true;
+      tight[h ^ 1] = true;
+    }
+  }
+  return tight;
+}
+
+CanonicalTesselation AlexandrovSolver::polytope_tesselation(
+    const DelaunayTriangulation& T,
+    const vector<double>& r,
+    const vector<int>& vertex_labels,
+    double inessential_eps) {
+  return T.canonical_tesselation(vertex_labels,
+                                  inessential_edges(T, r, inessential_eps));
+}
+
+bool AlexandrovSolver::is_simplicial(const DelaunayTriangulation& T) {
+  // Per invariant I-1 (CLAUDE.md): any non-simple feature in T contradicts
+  // an isometric R³ embedding for a non-degenerate polytope.
+  // Self-loops: any half-edge with origin == dest.
+  // Multi-edges: two distinct edges with the same vertex pair.
+  // Bigons: a face whose boundary has only 2 distinct edges (he_face[h] ==
+  //   he_face[h^1] for some pair).
+  std::map<std::pair<int,int>, int> pair_count;
+  for (int h = 0; h < T.nh; h += 2) {
+    if (!T.alive(h)) continue;
+    int u = T.he_origin[h], v = T.dest(h);
+    if (u == v) return false;                                 // self-loop
+    if (T.he_face[h] == T.he_face[h ^ 1]) return false;       // bigon
+    auto key = std::make_pair(std::min(u, v), std::max(u, v));
+    if (++pair_count[key] > 1) return false;                  // multi-edge
+  }
+  return true;
+}
+
+bool AlexandrovSolver::is_simple_polygonal(const CanonicalTesselation& tess) {
+  // Each polygon: ≥ 3 entries, all distinct labels.
+  for (const auto& poly : tess.cells) {
+    if (poly.size() < 3) return false;
+    std::set<int> seen;
+    for (const auto& [label, L] : poly) {
+      if (!seen.insert(label).second) return false;            // repeated label
+    }
+  }
+  return true;
 }
