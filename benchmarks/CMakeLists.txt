@@ -65,6 +65,9 @@ endif()
 add_executable(spiral_mol2 spiral_mol2.cc)
 target_link_libraries(spiral_mol2 fullerenes)
 
+add_executable(iso_mol2 iso_mol2.cc)
+target_link_libraries(iso_mol2 fullerenes buckygen)
+
 add_executable(replay_perstep replay_perstep.cc)
 target_link_libraries(replay_perstep fullerenes)
 

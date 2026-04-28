@@ -1416,12 +1416,26 @@ bool tri_tri_intersect(const coord3d& a0, const coord3d& b0, const coord3d& c0,
   coord3d n1 = (b1 - a1).cross(c1 - a1);
   coord3d L  = n0.cross(n1);
   double L2 = L.dot(L);
-  if (L2 < 1e-30) {
-    // Coplanar: rare; conservatively report intersection if any vertex
-    // of either triangle lies inside the other (2D point-in-triangle on
-    // the shared plane).  For our use, coplanar non-adjacent triangles
-    // are themselves a sign of trouble — return true.
-    return true;
+  // |L|² = |n0|²·|n1|² · sin²(angle).  Treat as coplanar when
+  // sin² < 1e-12 (≈ 1 micro-radian misalignment).  Healthy polytopes
+  // cannot have two distinct flat 2-faces in the same plane (that
+  // would be drum-cap, caught by the volume gate), so coplanar pairs
+  // are sub-triangulations of the same T̄(0) face and never represent
+  // real surface self-intersection.
+  double n0_2 = n0.dot(n0), n1_2 = n1.dot(n1);
+  if (L2 < 1e-12 * n0_2 * n1_2) {
+    // Coplanar non-adjacent triangles.  On a valid convex polytope this
+    // happens for sub-triangulations of the same flat 2-face: the iDT
+    // triangulates a flat polygonal face into multiple coplanar
+    // triangles, which then "share coplanar interior" without that
+    // being a true 3D self-intersection of the polytope's surface.
+    // The other case — two distinct coplanar 2-faces in the same plane
+    // — only happens for degenerate drum-cap polytopes, which the
+    // upstream volume gate already rejects.  So coplanar pairs are
+    // either benign (same face) or already caught (drum-cap); reporting
+    // intersection here would only false-positive on legitimate
+    // multi-triangle flat faces (e.g. C24-D6d, C36-D6h hexagonal caps).
+    return false;
   }
   // For a triangle, project vertices to L (as scalar t = (p−origin)·L̂).
   // Compute t-interval where triangle crosses the other plane.
