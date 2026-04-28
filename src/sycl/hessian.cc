@@ -18,9 +18,9 @@
 #endif
 #endif
 
-#include <fullerenes/kernel-headers/hessian-functor.hh>
-#include "queue-impl.cc"
-#include "forcefield-includes.cc"
+#include <fullerenes/kernel-headers/hessian.hh>
+#include "queue-impl.hh"
+#include "forcefield-includes.hh"
 
 template <ForcefieldType FFT, typename T, typename K>
 struct ForceField
@@ -1886,17 +1886,20 @@ static SyclEvent compute_hessians_view(
 }
 
 template <ForcefieldType FFT, typename T, typename K>
-SyclEvent HessianFunctor<FFT,T,K>::compute(
-    SyclQueue& Q,
-    batch::BatchView<Spanify::RSRAdjacencyView<K>> graph,
-    std::span<std::array<T,3>> xyz,
-    batch::BatchStateView state,
-    std::span<T> out_hessian, std::span<K> out_cols) {
+SyclEvent compute_hessian(SyclQueue& Q,
+                          batch::BatchView<Spanify::RSRAdjacencyView<K>> graph,
+                          std::span<std::array<T,3>> xyz,
+                          batch::BatchStateView state,
+                          std::span<T> out_hessian, std::span<K> out_cols,
+                          Workspace /*ws*/) {
     return compute_hessians_view<FFT,T,K>(Q, graph, xyz, state, out_hessian, out_cols);
 }
 
-template struct HessianFunctor<PEDERSEN, float, uint16_t>;
-template struct HessianFunctor<PEDERSEN, double, uint16_t>;
-//template struct HessianFunctor<PEDERSEN, double, uint16_t>;
-//template struct HessianFunctor<PEDERSEN, float, uint32_t>;
-//template struct HessianFunctor<PEDERSEN, double, uint32_t>;
+template SyclEvent compute_hessian<PEDERSEN, float, uint16_t>(SyclQueue&, batch::BatchView<Spanify::RSRAdjacencyView<uint16_t>>, std::span<std::array<float,3>>, batch::BatchStateView, std::span<float>, std::span<uint16_t>, Workspace);
+template SyclEvent compute_hessian<PEDERSEN, double,uint16_t>(SyclQueue&, batch::BatchView<Spanify::RSRAdjacencyView<uint16_t>>, std::span<std::array<double,3>>, batch::BatchStateView, std::span<double>, std::span<uint16_t>, Workspace);
+
+// Phase 2: see dualize_buffer_size — returns 0 (local_accessor for scratch).
+template <ForcefieldType FFT, typename T, typename K>
+size_t compute_hessian_buffer_size(const Device&, int, int) { return 0; }
+template size_t compute_hessian_buffer_size<PEDERSEN, float, uint16_t>(const Device&, int, int);
+template size_t compute_hessian_buffer_size<PEDERSEN, double,uint16_t>(const Device&, int, int);

@@ -1,9 +1,9 @@
-#include "queue-impl.cc"
+#include "queue-impl.hh"
 #include <fullerenes/sycl-headers/execution-compat.hh>
 #include <algorithm>
 #include <numeric>
-#include <fullerenes/kernel-headers/geometry-functors.hh>
-#include "forcefield-includes.cc"
+#include <fullerenes/kernel-headers/geometry.hh>
+#include "forcefield-includes.hh"
 
 template <typename T>
 symMat3<T> inertia_matrix(sycl::group<1>& cta, const std::span<std::array<T,3>> X){
@@ -65,8 +65,9 @@ template<typename T, typename K> struct SurfaceAreaFunctorView;
 template<typename T, typename K> struct VolumeFunctorView;
 
 template <typename T, typename K>
-SyclEvent EccentricityFunctor<T,K>::compute(SyclQueue& Q, std::span<std::array<T,3>> xyz, int N, int capacity,
-                                             batch::BatchStateView state, std::span<T> out_ellipticity) {
+SyclEvent eccentricity(SyclQueue& Q, std::span<std::array<T,3>> xyz, int N, int capacity,
+                       batch::BatchStateView state, std::span<T> out_ellipticity,
+                       Workspace /*ws*/) {
     auto statuses = state.status;
     SyclEventImpl ret_val = Q->submit([=](sycl::handler& cgh) {
         cgh.parallel_for<struct EccentricityFunctorView<T,K>>(
@@ -86,8 +87,9 @@ SyclEvent EccentricityFunctor<T,K>::compute(SyclQueue& Q, std::span<std::array<T
 }
 
 template <typename T, typename K>
-SyclEvent InertiaFunctor<T,K>::compute(SyclQueue& Q, std::span<std::array<T,3>> xyz, int N, int capacity,
-                                        batch::BatchStateView state, std::span<std::array<T,3>> out_inertia) {
+SyclEvent inertia(SyclQueue& Q, std::span<std::array<T,3>> xyz, int N, int capacity,
+                  batch::BatchStateView state, std::span<std::array<T,3>> out_inertia,
+                  Workspace /*ws*/) {
     auto statuses = state.status;
     SyclEventImpl ret_val = Q->submit([=](sycl::handler& cgh) {
         cgh.parallel_for<struct InertiaFunctorView<T,K>>(
@@ -106,8 +108,9 @@ SyclEvent InertiaFunctor<T,K>::compute(SyclQueue& Q, std::span<std::array<T,3>> 
 }
 
 template <typename T, typename K>
-SyclEvent TransformCoordinatesFunctor<T,K>::compute(SyclQueue& Q, std::span<std::array<T,3>> xyz, int N, int capacity,
-                                                     batch::BatchStateView state) {
+SyclEvent transform_to_principal_axes(SyclQueue& Q, std::span<std::array<T,3>> xyz, int N, int capacity,
+                                                     batch::BatchStateView state,
+                                                     Workspace /*ws*/) {
     auto statuses = state.status;
     SyclEventImpl ret_val = Q->submit([=](sycl::handler& cgh) {
         cgh.parallel_for<struct TransformCoordinatesFunctorView<T,K>>(
@@ -129,9 +132,10 @@ SyclEvent TransformCoordinatesFunctor<T,K>::compute(SyclQueue& Q, std::span<std:
 }
 
 template <typename T, typename K>
-SyclEvent SurfaceAreaFunctor<T,K>::compute(SyclQueue& Q, std::span<std::array<T,3>> xyz, int N, int capacity,
+SyclEvent surface_area(SyclQueue& Q, std::span<std::array<T,3>> xyz, int N, int capacity,
                                             std::span<std::array<K,6>> faces, std::span<uint8_t> deg,
-                                            batch::BatchStateView state, std::span<T> out_surface_area) {
+                                            batch::BatchStateView state, std::span<T> out_surface_area,
+                                            Workspace /*ws*/) {
     FLOAT_TYPEDEFS(T);
     auto statuses = state.status;
     const int Nf = N / 2 + 2;
@@ -168,9 +172,10 @@ SyclEvent SurfaceAreaFunctor<T,K>::compute(SyclQueue& Q, std::span<std::array<T,
 }
 
 template <typename T, typename K>
-SyclEvent VolumeFunctor<T,K>::compute(SyclQueue& Q, std::span<std::array<T,3>> xyz, int N, int capacity,
+SyclEvent volume(SyclQueue& Q, std::span<std::array<T,3>> xyz, int N, int capacity,
                                        std::span<std::array<K,6>> faces, std::span<uint8_t> deg,
-                                       batch::BatchStateView state, std::span<T> out_volume) {
+                                       batch::BatchStateView state, std::span<T> out_volume,
+                                       Workspace /*ws*/) {
     FLOAT_TYPEDEFS(T);
     auto statuses = state.status;
     const int Nf = N / 2 + 2;
@@ -206,8 +211,26 @@ SyclEvent VolumeFunctor<T,K>::compute(SyclQueue& Q, std::span<std::array<T,3>> x
     return ret_val;
 }
 
-template struct EccentricityFunctor<float, uint16_t>;
-template struct InertiaFunctor<float, uint16_t>;
-template struct TransformCoordinatesFunctor<float, uint16_t>;
-template struct SurfaceAreaFunctor<float, uint16_t>;
-template struct VolumeFunctor<float, uint16_t>;
+
+// Phase 2: see dualize_buffer_size — all return 0 (local_accessor for scratch).
+template <typename T, typename K>
+size_t eccentricity_buffer_size(const Device&, int, int) { return 0; }
+template <typename T, typename K>
+size_t inertia_buffer_size(const Device&, int, int) { return 0; }
+template <typename T, typename K>
+size_t transform_to_principal_axes_buffer_size(const Device&, int, int) { return 0; }
+template <typename T, typename K>
+size_t surface_area_buffer_size(const Device&, int, int) { return 0; }
+template <typename T, typename K>
+size_t volume_buffer_size(const Device&, int, int) { return 0; }
+template size_t eccentricity_buffer_size<float, uint16_t>(const Device&, int, int);
+template size_t inertia_buffer_size<float, uint16_t>(const Device&, int, int);
+template size_t transform_to_principal_axes_buffer_size<float, uint16_t>(const Device&, int, int);
+template size_t surface_area_buffer_size<float, uint16_t>(const Device&, int, int);
+template size_t volume_buffer_size<float, uint16_t>(const Device&, int, int);
+
+template SyclEvent eccentricity<float, uint16_t>(SyclQueue&, std::span<std::array<float,3>>, int, int, batch::BatchStateView, std::span<float>, Workspace);
+template SyclEvent inertia<float, uint16_t>(SyclQueue&, std::span<std::array<float,3>>, int, int, batch::BatchStateView, std::span<std::array<float,3>>, Workspace);
+template SyclEvent transform_to_principal_axes<float, uint16_t>(SyclQueue&, std::span<std::array<float,3>>, int, int, batch::BatchStateView, Workspace);
+template SyclEvent surface_area<float, uint16_t>(SyclQueue&, std::span<std::array<float,3>>, int, int, std::span<std::array<uint16_t,6>>, std::span<uint8_t>, batch::BatchStateView, std::span<float>, Workspace);
+template SyclEvent volume<float, uint16_t>(SyclQueue&, std::span<std::array<float,3>>, int, int, std::span<std::array<uint16_t,6>>, std::span<uint8_t>, batch::BatchStateView, std::span<float>, Workspace);

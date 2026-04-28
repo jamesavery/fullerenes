@@ -92,10 +92,6 @@ int main(int argc, char** argv) {
     std::vector<double> times_dual(Nruns), times_tutte(Nruns);
     std::vector<double> times_project(Nruns), times_opt(Nruns);
 
-    TutteFunctor<real_t, node_t>                        tutte_layout;
-    SphericalProjectionFunctor<real_t, node_t>          spherical_projection;
-    ForcefieldOptimizeFunctor<PEDERSEN, real_t, node_t> forcefield_optimize;
-
     for (int i = 0; i < (int)Nruns; ++i) {
         batch::Batch<RSR> dst_cubic(N, BatchSize, /*dmax*/3);
         batch::BatchState st(BatchSize);
@@ -105,11 +101,11 @@ int main(int argc, char** argv) {
 
         auto T0 = std::chrono::steady_clock::now();
         auto T1 = std::chrono::steady_clock::now(); times_memcpy[i] = std::chrono::duration<double, std::nano>(T1 - T0).count();
-        tutte_layout.compute(Q, dst_view, layout_span, st.view()).wait();
+        tutte_layout<real_t, node_t>(Q, dst_view, layout_span, st.view()).wait();
         auto T2 = std::chrono::steady_clock::now(); times_tutte[i] = std::chrono::duration<double, std::nano>(T2 - T1).count();
-        spherical_projection.compute(Q, dst_view, layout_span, xyz_span, st.view()).wait();
+        spherical_projection<real_t, node_t>(Q, dst_view, layout_span, xyz_span, st.view()).wait();
         auto T3 = std::chrono::steady_clock::now(); times_project[i] = std::chrono::duration<double, std::nano>(T3 - T2).count();
-        forcefield_optimize.compute(Q, dst_view, xyz_span, st.view(), 5*N, 5*N).wait();
+        forcefield_optimize<PEDERSEN, real_t, node_t>(Q, dst_view, xyz_span, st.view(), 5*N, 5*N).wait();
         auto T4 = std::chrono::steady_clock::now(); times_opt[i] = std::chrono::duration<double, std::nano>(T4 - T3).count();
     }
 

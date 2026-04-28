@@ -1,5 +1,5 @@
 #pragma once
-#include "queue-impl.cc"
+#include "queue-impl.hh"
 
 template <typename KernelName>
 struct LaunchConfig{

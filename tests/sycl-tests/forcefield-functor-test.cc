@@ -69,24 +69,19 @@ TEST_P(ForceFieldTest, DeterministicAcrossParallelQueues) {
     BuckyGen::stop(BQ);
     src_dual.resize(M);
 
-    DualizeFunctor<T,K>             dualize;
-    TutteFunctor<T,K>               tutte;
-    SphericalProjectionFunctor<T,K> sph;
-    ForcefieldOptimizeFunctor<PEDERSEN, T, K> ff;
-
     // Dualize into the adjacency prefix of seed_poly; points stay unused
     // until sph writes them.
     auto seed_adj = Spanify::as_adjacency_view(seed_poly.view_capacity());
-    dualize.compute(Q, src_dual.view(), seed_adj, st.view(),
+    dualize<T,K>(Q, src_dual.view(), seed_adj, st.view(),
                     std::span<std::array<K,6>>(faces_cubic.data(), faces_cubic.size()),
                     std::span<std::array<K,3>>(faces_dual.data(),  faces_dual.size())).wait();
     seed_poly.resize(M);
     auto seed_adj_sz = Spanify::as_adjacency_view(seed_poly.view());
     auto seed_xyz    = Spanify::points_span  (seed_poly.view());
-    tutte.compute(Q, seed_adj_sz,
+    tutte_layout<T,K>(Q, seed_adj_sz,
                   std::span<std::array<T,2>>(layout2d.data(), layout2d.size()),
                   st.view()).wait();
-    sph.compute(Q, seed_adj_sz,
+    spherical_projection<T,K>(Q, seed_adj_sz,
                 std::span<std::array<T,2>>(layout2d.data(), layout2d.size()),
                 seed_xyz,
                 st.view()).wait();
@@ -130,7 +125,7 @@ TEST_P(ForceFieldTest, DeterministicAcrossParallelQueues) {
             // Run FF on the adjacency prefix + xyz points of the batch.
             auto bv_adj = Spanify::as_adjacency_view(opt_b[j].view());
             auto bv_xyz = Spanify::points_span  (opt_b[j].view());
-            ff.compute(Q, bv_adj, bv_xyz, opt_s[j].view(), N, 10*N).wait();
+            forcefield_optimize<PEDERSEN,T,K>(Q, bv_adj, bv_xyz, opt_s[j].view(), N, 10*N).wait();
 
             // Batch -> Queue: atomic (graph + xyz) transfer back.
             batch::queue_push(out_q[j], opt_b[j], opt_s[j]);

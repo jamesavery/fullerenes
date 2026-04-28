@@ -19,6 +19,7 @@ struct SyclEventImpl {
     operator const sycl::event&() const { return event; }
 };
 
+#ifdef DEFINE_SYCL_QUEUE_METHODS
 SyclEvent::SyclEvent() : impl_(std::make_unique<SyclEventImpl>(sycl::event())) {}
 SyclEvent::SyclEvent(SyclEventImpl&& impl) : impl_(std::make_unique<SyclEventImpl>(std::move(impl))) {}
 SyclEvent& SyclEvent::operator=(SyclEvent&& other) {
@@ -40,7 +41,7 @@ void SyclEvent::wait() const {impl_->wait();}
 SyclEventImpl* SyclEvent::operator ->() const {return impl_.get();}
 SyclEventImpl& SyclEvent::operator *() const {return *impl_;}
 
-
+#endif // DEFINE_SYCL_QUEUE_METHODS
 
 struct SyclQueueImpl : public sycl::queue{
     using sycl::queue::queue;
@@ -58,6 +59,7 @@ struct SyclQueueImpl : public sycl::queue{
     const Device device_;
 };
 
+#ifdef DEFINE_SYCL_QUEUE_METHODS
 SyclQueue::SyclQueue() : device_({0, DeviceType::CPU}), in_order_(true) {
     impl_ = std::make_unique<SyclQueueImpl>(device_, in_order_);
 }
@@ -127,3 +129,4 @@ size_t Device::get_property(DeviceProperty property) const {
         default: std::cerr << "Unknown property" << std::endl; return 0;
     }
 }
+#endif // DEFINE_SYCL_QUEUE_METHODS

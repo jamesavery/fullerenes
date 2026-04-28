@@ -88,8 +88,6 @@ int main(int argc, char** argv) {
     std::vector<double> times_memcpy  (Nruns + Nwarmup);
     std::vector<double> times_dual    (Nruns);
 
-    DualizeFunctor<real_t, node_t> dualize;
-
     auto src_view = src_dual.view_capacity();
     auto dst_view = dst_cubic.view_capacity();
 
@@ -100,7 +98,7 @@ int main(int argc, char** argv) {
         times_generate[i] = std::chrono::duration<double, std::nano>(T0 - start).count();
         auto T1 = std::chrono::steady_clock::now();
         times_memcpy[i]   = std::chrono::duration<double, std::nano>(T1 - T0).count();
-        dualize.compute(Q, src_view, dst_view, st.view(), faces_cubic_span, faces_dual_span).wait();
+        dualize<real_t, node_t>(Q, src_view, dst_view, st.view(), faces_cubic_span, faces_dual_span).wait();
         if (i >= (int)Nwarmup) {
             auto T2 = std::chrono::steady_clock::now();
             times_dual[i - Nwarmup] = std::chrono::duration<double, std::nano>(T2 - T1).count();

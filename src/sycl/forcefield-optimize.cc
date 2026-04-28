@@ -21,9 +21,9 @@
 #endif
 #endif
 
-#include <fullerenes/kernel-headers/forcefield-optimize-functor.hh>
-#include "forcefield-includes.cc"
-#include "kernel.cc"
+#include <fullerenes/kernel-headers/forcefield-optimize.hh>
+#include "forcefield-includes.hh"
+#include "kernel.hh"
 
 template <ForcefieldType FFT, typename T, typename K>
 struct ForceField
@@ -1941,20 +1941,32 @@ static SyclEvent forcefield_optimize_view_batch_impl(
 }
 
 template <ForcefieldType FFT, typename T, typename K>
-SyclEvent ForcefieldOptimizeFunctor<FFT,T,K>::compute(
-    SyclQueue& Q,
-    batch::BatchView<Spanify::RSRAdjacencyView<K>> graph,
-    std::span<std::array<T,3>> xyz,
-    batch::BatchStateView state,
-    size_t batch_iters, size_t max_iters) {
+SyclEvent forcefield_optimize(SyclQueue& Q,
+                              batch::BatchView<Spanify::RSRAdjacencyView<K>> graph,
+                              std::span<std::array<T,3>> xyz,
+                              batch::BatchStateView state,
+                              size_t batch_iters, size_t max_iters,
+                              Workspace /*ws*/) {
     return forcefield_optimize_view_batch_impl<FFT,T,K>(Q, graph, xyz, state, batch_iters, max_iters);
 }
 
-template struct ForcefieldOptimizeFunctor<PEDERSEN, float, uint16_t>;
-template struct ForcefieldOptimizeFunctor<PEDERSEN, double, uint16_t>;
-template struct ForcefieldOptimizeFunctor<PEDERSEN, float, uint32_t>;   
-template struct ForcefieldOptimizeFunctor<PEDERSEN, double, uint32_t>;
-template struct ForcefieldOptimizeFunctor<FLATNESS_ENABLED, float, uint16_t>;
-template struct ForcefieldOptimizeFunctor<FLATNESS_ENABLED, double, uint16_t>;
-template struct ForcefieldOptimizeFunctor<FLATNESS_ENABLED, float, uint32_t>;   
-template struct ForcefieldOptimizeFunctor<FLATNESS_ENABLED, double, uint32_t>;
+template SyclEvent forcefield_optimize<PEDERSEN, float, uint16_t>(SyclQueue&, batch::BatchView<Spanify::RSRAdjacencyView<uint16_t>>, std::span<std::array<float,3>>, batch::BatchStateView, size_t, size_t, Workspace);
+template SyclEvent forcefield_optimize<PEDERSEN, float, uint32_t>(SyclQueue&, batch::BatchView<Spanify::RSRAdjacencyView<uint32_t>>, std::span<std::array<float,3>>, batch::BatchStateView, size_t, size_t, Workspace);
+template SyclEvent forcefield_optimize<PEDERSEN, double,uint16_t>(SyclQueue&, batch::BatchView<Spanify::RSRAdjacencyView<uint16_t>>, std::span<std::array<double,3>>, batch::BatchStateView, size_t, size_t, Workspace);
+template SyclEvent forcefield_optimize<PEDERSEN, double,uint32_t>(SyclQueue&, batch::BatchView<Spanify::RSRAdjacencyView<uint32_t>>, std::span<std::array<double,3>>, batch::BatchStateView, size_t, size_t, Workspace);
+template SyclEvent forcefield_optimize<FLATNESS_ENABLED, float, uint16_t>(SyclQueue&, batch::BatchView<Spanify::RSRAdjacencyView<uint16_t>>, std::span<std::array<float,3>>, batch::BatchStateView, size_t, size_t, Workspace);
+template SyclEvent forcefield_optimize<FLATNESS_ENABLED, float, uint32_t>(SyclQueue&, batch::BatchView<Spanify::RSRAdjacencyView<uint32_t>>, std::span<std::array<float,3>>, batch::BatchStateView, size_t, size_t, Workspace);
+template SyclEvent forcefield_optimize<FLATNESS_ENABLED, double,uint16_t>(SyclQueue&, batch::BatchView<Spanify::RSRAdjacencyView<uint16_t>>, std::span<std::array<double,3>>, batch::BatchStateView, size_t, size_t, Workspace);
+template SyclEvent forcefield_optimize<FLATNESS_ENABLED, double,uint32_t>(SyclQueue&, batch::BatchView<Spanify::RSRAdjacencyView<uint32_t>>, std::span<std::array<double,3>>, batch::BatchStateView, size_t, size_t, Workspace);
+
+// Phase 2: see dualize_buffer_size — returns 0 (local_accessor for scratch).
+template <ForcefieldType FFT, typename T, typename K>
+size_t forcefield_optimize_buffer_size(const Device&, int, int) { return 0; }
+template size_t forcefield_optimize_buffer_size<PEDERSEN, float, uint16_t>(const Device&, int, int);
+template size_t forcefield_optimize_buffer_size<PEDERSEN, float, uint32_t>(const Device&, int, int);
+template size_t forcefield_optimize_buffer_size<PEDERSEN, double,uint16_t>(const Device&, int, int);
+template size_t forcefield_optimize_buffer_size<PEDERSEN, double,uint32_t>(const Device&, int, int);
+template size_t forcefield_optimize_buffer_size<FLATNESS_ENABLED, float, uint16_t>(const Device&, int, int);
+template size_t forcefield_optimize_buffer_size<FLATNESS_ENABLED, float, uint32_t>(const Device&, int, int);
+template size_t forcefield_optimize_buffer_size<FLATNESS_ENABLED, double,uint16_t>(const Device&, int, int);
+template size_t forcefield_optimize_buffer_size<FLATNESS_ENABLED, double,uint32_t>(const Device&, int, int);

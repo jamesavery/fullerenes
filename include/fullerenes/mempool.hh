@@ -45,9 +45,15 @@ struct BumpAllocator {
 
     template<typename T>
     constexpr inline std::span<T> allocate(SyclQueue& ctx, size_t size) {return allocate<T>(ctx.device(), size);}
-    
+
+    // Bytes consumed since construction (for debug-asserting that
+    // *_buffer_size() queries match what the kernel actually allocates).
+    constexpr inline size_t bytes_used() const { return total_byte_size - byte_size; }
+    constexpr inline size_t bytes_remaining() const { return byte_size; }
+
     private:
 
-        void* data;
+        void*  data;
         size_t byte_size;
+        size_t total_byte_size = byte_size;
 };

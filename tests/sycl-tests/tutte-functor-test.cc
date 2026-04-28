@@ -71,14 +71,10 @@ TEST_P(FunctorTests, DualizeTutteSphThroughPolyView) {
     }
     BuckyGen::stop(BQ);
 
-    DualizeFunctor<T,K>             dualize;
-    TutteFunctor<T,K>               tutte;
-    SphericalProjectionFunctor<T,K> sph;
-
     // Dualize writes into the adjacency prefix of dst_poly.
     {
         auto dst_adj_cap = Spanify::as_adjacency_view(dst_poly.view_capacity());
-        dualize.compute(Q, src_dual.view_capacity(), dst_adj_cap, st.view(),
+        dualize<T,K>(Q, src_dual.view_capacity(), dst_adj_cap, st.view(),
                         std::span<std::array<K,6>>(faces_cubic.data(), faces_cubic.size()),
                         std::span<std::array<K,3>>(faces_dual.data(),  faces_dual.size())).wait();
     }
@@ -87,7 +83,7 @@ TEST_P(FunctorTests, DualizeTutteSphThroughPolyView) {
     auto dst_adj = Spanify::as_adjacency_view(dst_poly.view());
     auto dst_xyz = Spanify::points_span  (dst_poly.view());
 
-    tutte.compute(Q, dst_adj,
+    tutte_layout<T,K>(Q, dst_adj,
                   std::span<std::array<T,2>>(layout2d.data(), layout2d.size()),
                   st.view()).wait();
 
@@ -98,7 +94,7 @@ TEST_P(FunctorTests, DualizeTutteSphThroughPolyView) {
                 ASSERT_TRUE(std::isfinite(layout2d[b*N + u][c]))
                     << "non-finite tutte b=" << b << " u=" << u << " c=" << c;
 
-    sph.compute(Q, dst_adj,
+    spherical_projection<T,K>(Q, dst_adj,
                 std::span<std::array<T,2>>(layout2d.data(), layout2d.size()),
                 dst_xyz,
                 st.view()).wait();

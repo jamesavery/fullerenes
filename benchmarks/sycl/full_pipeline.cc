@@ -82,14 +82,7 @@ int main(int argc, char** argv) {
     SyclVector<real_t>    diag_buf    (BatchSize * n_lanczos);
     SyclVector<node_t>    ends_idx    (BatchSize * 2);
 
-    // ---- Kernel functors ------------------------------------------------
-    DualizeFunctor<real_t, node_t>                                      dualize_V1;
-    TutteFunctor<real_t, node_t>                                        tutte_layout;
-    SphericalProjectionFunctor<real_t, node_t>                          spherical_projection;
-    ForcefieldOptimizeFunctor<PEDERSEN, real_t, node_t>                 forcefield_optimize;
-    HessianFunctor<PEDERSEN, real_t, node_t>                            compute_hessians;
-    EigenFunctor<EigensolveMode::ENDS, real_t, node_t>                  eigensolve_ends;
-    EigenFunctor<EigensolveMode::FULL_SPECTRUM, real_t, node_t>         eigensolve_full;
+    // Kernels are invoked via free functions (Phase 5).
 
     // ---- Fill src_dual (and state) from BuckyGen -----------------------
     {
@@ -138,24 +131,24 @@ int main(int argc, char** argv) {
         auto T1 = std::chrono::steady_clock::now(); times_generate += std::chrono::duration<double, std::nano>(T1 - T1).count();
         auto T2 = std::chrono::steady_clock::now(); times_generate += std::chrono::duration<double, std::nano>(T2 - T1).count();
         auto T3 = std::chrono::steady_clock::now(); times_memcpy += std::chrono::duration<double, std::nano>(T3 - T2).count();
-        dualize_V1.compute(Q, src_view, dst_view, st.view(),
+        dualize<real_t, node_t>(Q, src_view, dst_view, st.view(),
                            faces_cubic_span, faces_dual_span).wait();
         auto T4 = std::chrono::steady_clock::now(); times_dual += std::chrono::duration<double, std::nano>(T4 - T3).count();
-        tutte_layout.compute(Q, dst_view, layout_span, st.view()).wait();
+        tutte_layout<real_t, node_t>(Q, dst_view, layout_span, st.view()).wait();
         auto T5 = std::chrono::steady_clock::now(); times_tutte += std::chrono::duration<double, std::nano>(T5 - T4).count();
-        spherical_projection.compute(Q, dst_view, layout_span, xyz_span, st.view()).wait();
+        spherical_projection<real_t, node_t>(Q, dst_view, layout_span, xyz_span, st.view()).wait();
         auto T6 = std::chrono::steady_clock::now(); times_project += std::chrono::duration<double, std::nano>(T6 - T5).count();
-        forcefield_optimize.compute(Q, dst_view, xyz_span, st.view(), 4*N, 4*N).wait();
+        forcefield_optimize<PEDERSEN, real_t, node_t>(Q, dst_view, xyz_span, st.view(), 4*N, 4*N).wait();
         auto T7 = std::chrono::steady_clock::now(); times_opt += std::chrono::duration<double, std::nano>(T7 - T6).count();
-        compute_hessians.compute(Q, dst_view, xyz_span, st.view(),
+        compute_hessian<PEDERSEN, real_t, node_t>(Q, dst_view, xyz_span, st.view(),
                                  hessian_buffer, cols_buffer).wait();
         auto T8 = std::chrono::steady_clock::now(); times_hessian += std::chrono::duration<double, std::nano>(T8 - T7).count();
-        eigensolve_ends.compute(Q, xyz_span, (int)N, BatchSize,
+        eigensolve<EigensolveMode::ENDS, real_t, node_t>(Q, xyz_span, (int)N, BatchSize,
             hessian_buffer, cols_buffer, n_lanczos,
             spectral_ends_buffer, /*eigenvectors*/std::span<real_t>(),
             off_diagonal, qmat, lanczos_buf, diag_buf, ends_idx).wait();
         auto T9 = std::chrono::steady_clock::now(); times_spectral_ends += std::chrono::duration<double, std::nano>(T9 - T8).count();
-        eigensolve_full.compute(Q, xyz_span, (int)N, BatchSize,
+        eigensolve<EigensolveMode::FULL_SPECTRUM, real_t, node_t>(Q, xyz_span, (int)N, BatchSize,
             hessian_buffer, cols_buffer, n_lanczos,
             spectral_buffer, /*eigenvectors*/std::span<real_t>(),
             off_diagonal, qmat, lanczos_buf, diag_buf, ends_idx).wait();

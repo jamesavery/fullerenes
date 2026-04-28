@@ -92,11 +92,6 @@ int main(int argc, char** argv) {
     SyclVector<std::array<real_t,2>> layout2d       (BatchSize * N);
     SyclVector<std::array<real_t,3>> xyz            (BatchSize * N);
 
-    DualizeFunctor<real_t, node_t>                       dualize_V1;
-    TutteFunctor<real_t, node_t>                         tutte_layout;
-    SphericalProjectionFunctor<real_t, node_t>           spherical_projection;
-    ForcefieldOptimizeFunctor<PEDERSEN, real_t, node_t>  forcefield_optimize;
-
     std::span<std::array<real_t,3>> xyz_span(xyz.data(), xyz.size());
     std::span<std::array<real_t,2>> layout_span(layout2d.data(), layout2d.size());
     std::span<std::array<node_t,6>> faces_cubic_span(faces_cubic_buf.data(), faces_cubic_buf.size());
@@ -137,13 +132,13 @@ int main(int argc, char** argv) {
         generate_and_fill();
         auto T2 = std::chrono::steady_clock::now(); times_generate = std::chrono::duration<double, std::nano>(T2 - T1).count();
         auto T3 = std::chrono::steady_clock::now(); times_memcpy   = std::chrono::duration<double, std::nano>(T3 - T2).count();
-        dualize_V1.compute(Q, src_view, dst_view, st.view(), faces_cubic_span, faces_dual_span).wait();
+        dualize<real_t, node_t>(Q, src_view, dst_view, st.view(), faces_cubic_span, faces_dual_span).wait();
         auto T4 = std::chrono::steady_clock::now(); times_dual     = std::chrono::duration<double, std::nano>(T4 - T3).count();
-        tutte_layout.compute(Q, dst_view, layout_span, st.view()).wait();
+        tutte_layout<real_t, node_t>(Q, dst_view, layout_span, st.view()).wait();
         auto T5 = std::chrono::steady_clock::now(); times_tutte    = std::chrono::duration<double, std::nano>(T5 - T4).count();
-        spherical_projection.compute(Q, dst_view, layout_span, xyz_span, st.view()).wait();
+        spherical_projection<real_t, node_t>(Q, dst_view, layout_span, xyz_span, st.view()).wait();
         auto T6 = std::chrono::steady_clock::now(); times_project  = std::chrono::duration<double, std::nano>(T6 - T5).count();
-        forcefield_optimize.compute(Q, dst_view, xyz_span, st.view(), 5*N, 5*N).wait();
+        forcefield_optimize<PEDERSEN, real_t, node_t>(Q, dst_view, xyz_span, st.view(), 5*N, 5*N).wait();
         auto T7 = std::chrono::steady_clock::now(); times_opt      = std::chrono::duration<double, std::nano>(T7 - T6).count();
     }
 

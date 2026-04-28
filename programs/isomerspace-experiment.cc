@@ -257,17 +257,7 @@ int main(int ac, char** argv)
     Q3s.emplace_back((int)N,  (int)(batch_size * 4), /*dmax*/3);
   }
 
-  DualizeFunctor<real_t, device_node_t>                       dualize;
-  TutteFunctor<real_t, device_node_t>                         tutte;
-  SphericalProjectionFunctor<real_t, device_node_t>           spherical_projection;
-  ForcefieldOptimizeFunctor<PEDERSEN, real_t, device_node_t>  forcefield_optimize;
-  HessianFunctor<PEDERSEN, real_t, device_node_t>             compute_hessian;
-  EigenFunctor<EigensolveMode::ENDS, real_t, device_node_t>   spectrum_ends;
-  EccentricityFunctor<real_t, device_node_t>                  eccentricity;
-  VolumeFunctor<real_t, device_node_t>                        volume;
-  SurfaceAreaFunctor<real_t, device_node_t>                   surface_area;
-  InertiaFunctor<real_t, device_node_t>                       inertia;
-  TransformCoordinatesFunctor<real_t, device_node_t>          transform_coordinates;
+  // Kernels are now invoked via free functions (Phase 4).
 
   vector<SyclQueue> gen_ctxs;
   std::generate_n(std::back_inserter(gen_ctxs), Nd, [&, i = 0]() mutable {
@@ -343,12 +333,12 @@ int main(int ac, char** argv)
         auto src_view = B.src_dual.view();
         auto dst_view = B.cubic_adj_view_capacity().slice(0, src_view.size());
         // Run the geometry pipeline.
-        dualize.compute(ctx, src_view, dst_view, B.st.view(),
+        dualize<real_t, device_node_t>(ctx, src_view, dst_view, B.st.view(),
                         B.faces_cubic_span(), B.faces_dual_span()).wait();
         // After dualize, dst_cubic is filled for the active range; mark size.
         B.dst_cubic.resize(src_view.size());
-        tutte.compute(ctx, B.cubic_adj_view(), B.layout_span(), B.st.view()).wait();
-        spherical_projection.compute(ctx, B.cubic_adj_view(),
+        tutte_layout<real_t, device_node_t>(ctx, B.cubic_adj_view(), B.layout_span(), B.st.view()).wait();
+        spherical_projection<real_t, device_node_t>(ctx, B.cubic_adj_view(),
                                      B.layout_span(), B.xyz_span(),
                                      B.st.view()).wait();
         // Push the cubic graph + xyz into Q1s for the optimization stage.
@@ -379,7 +369,7 @@ int main(int ac, char** argv)
                             StatusEnum(int(StatusEnum::CONVERGED_3D) |
                                        int(StatusEnum::FAILED_3D)    |
                                        int(StatusEnum::EMPTY))});
-      forcefield_optimize.compute(ctx, B.cubic_adj_view(), B.xyz_span(),
+      forcefield_optimize<PEDERSEN, real_t, device_node_t>(ctx, B.cubic_adj_view(), B.xyz_span(),
                                   B.st.view(), 3 * N, 20 * N).wait();
       batch::queue_push(Q2s[d], B.dst_cubic, B.st,
                         batch::StatusPredicate{StatusEnum(0),
@@ -405,23 +395,23 @@ int main(int ac, char** argv)
       B.dst_cubic.clear(); B.st.clear();
       batch::queue_push(B.dst_cubic, B.st, Q2s[d], batch::MatchAll{});
       auto bv  = B.cubic_adj_view();
-      transform_coordinates.compute(ctx, B.xyz_span(), (int)N, bv.size(), B.st.view()).wait();
-      compute_hessian.compute(ctx, bv, B.xyz_span(), B.st.view(),
+      transform_to_principal_axes<real_t, device_node_t>(ctx, B.xyz_span(), (int)N, bv.size(), B.st.view()).wait();
+      compute_hessian<PEDERSEN, real_t, device_node_t>(ctx, bv, B.xyz_span(), B.st.view(),
                               hessians[d], hessian_cols[d]).wait();
-      spectrum_ends.compute(ctx, B.xyz_span(), (int)N, bv.size(),
+      eigensolve<EigensolveMode::ENDS, real_t, device_node_t>(ctx, B.xyz_span(), (int)N, bv.size(),
                             hessians[d], hessian_cols[d], n_lanczos,
                             intermediate_spectrum_ends[d],
                             std::span<real_t>(),
                             ev_off_diag[d], ev_qmat[d], ev_lanczos[d],
                             ev_diag[d], ev_ends_idx[d]).wait();
       // Inertia in Å² → multiply by carbon_mass*aangstrom_length² for SI.
-      inertia.compute(ctx, B.xyz_span(), (int)N, bv.size(), B.st.view(),
+      inertia<real_t, device_node_t>(ctx, B.xyz_span(), (int)N, bv.size(), B.st.view(),
                       std::span<std::array<real_t,3>>(
                           reinterpret_cast<std::array<real_t,3>*>(results[INERTIA][d].data()),
                           results[INERTIA][d].size() / 3)).wait();
-      eccentricity.compute(ctx, B.xyz_span(), (int)N, bv.size(),
+      eccentricity<real_t, device_node_t>(ctx, B.xyz_span(), (int)N, bv.size(),
                            B.st.view(), results[ECCENTRICITY][d]).wait();
-      volume.compute(ctx, B.xyz_span(), (int)N, bv.size(),
+      volume<real_t, device_node_t>(ctx, B.xyz_span(), (int)N, bv.size(),
                      B.faces_cubic_span(),
                      std::span<uint8_t>(
                          reinterpret_cast<uint8_t*>(B.faces_dual.data()),
@@ -679,10 +669,9 @@ int main(int ac, char** argv)
       batch::queue_push(B.dst_cubic, B.st, Q3s[d],
                         batch::StatusPredicate{StatusEnum::CONVERGED_3D});
       auto bv = B.cubic_adj_view();
-      compute_hessian.compute(ctx, bv, B.xyz_span(), B.st.view(),
+      compute_hessian<PEDERSEN, real_t, device_node_t>(ctx, bv, B.xyz_span(), B.st.view(),
                               hessians[d], hessian_cols[d]).wait();
       if (STORE_EIGENSYSTEM) {
-        EigenFunctor<EigensolveMode::FULL_SPECTRUM_VECTORS, real_t, device_node_t> eigen;
         Q_eig[d] = SyclVector<real_t>(3 * N * 3 * N * final_batch_size, 0);
         lams[d]  = SyclVector<real_t>(3 * N * final_batch_size, 0);
         SyclVector<real_t>          fs_off_diag(n_lanczos * final_batch_size, 0);
@@ -690,7 +679,7 @@ int main(int ac, char** argv)
         SyclVector<real_t>          fs_lanczos(n_lanczos * N * 3 * final_batch_size, 0);
         SyclVector<real_t>          fs_diag   (n_lanczos * final_batch_size, 0);
         SyclVector<device_node_t>   fs_ends   (2 * final_batch_size, 0);
-        eigen.compute(ctx, B.xyz_span(), (int)N, bv.size(),
+        eigensolve<EigensolveMode::FULL_SPECTRUM_VECTORS, real_t, device_node_t>(ctx, B.xyz_span(), (int)N, bv.size(),
                       hessians[d], hessian_cols[d], N*3 - 6,
                       std::span<real_t>(lams[d].data(), lams[d].size()),
                       std::span<real_t>(Q_eig[d].data(), Q_eig[d].size()),
@@ -843,7 +832,7 @@ int main(int ac, char** argv)
   (void)Ttot; (void)Tupdate; (void)Tqueue; (void)Tdual; (void)Ttutte;
   (void)TX0; (void)Tcopy; (void)Tfile; (void)Toutq; (void)Tinq; (void)stdevs;
   (void)current_mean; (void)current_stddev; (void)aangstrom_length;
-  (void)surface_area; (void)result_reference; (void)progress_bar;
+  (void)surface_area<real_t, device_node_t>; (void)result_reference; (void)progress_bar;
   (void)stage_names;
 
   cout << "\n\n\n\n\n\n\n\n";

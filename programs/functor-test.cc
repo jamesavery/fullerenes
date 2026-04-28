@@ -18,10 +18,10 @@
 #include <fullerenes/batch/batch.hh>
 #include <fullerenes/batch/batch_state.hh>
 #include <fullerenes/batch/utilities.hh>
-#include <fullerenes/kernel-headers/dualize-functor.hh>
-#include <fullerenes/kernel-headers/forcefield-optimize-functor.hh>
-#include <fullerenes/kernel-headers/spherical-projection-functor.hh>
-#include <fullerenes/kernel-headers/tutte-functor.hh>
+#include <fullerenes/kernel-headers/dualize.hh>
+#include <fullerenes/kernel-headers/forcefield-optimize.hh>
+#include <fullerenes/kernel-headers/spherical-projection.hh>
+#include <fullerenes/kernel-headers/tutte.hh>
 #include <fullerenes/sycl-headers/sycl-device-queue.hh>
 #include <fullerenes/sycl-headers/sycl-vector.hh>
 
@@ -74,28 +74,23 @@ int main(int argc, char** argv)
         // ---- Pipeline --------------------------------------------------------
         SyclQueue Q(Device::default_device(), true);
 
-        DualizeFunctor<real_t, index_t>                                       dualize;
-        TutteFunctor<real_t, index_t>                                         tutte;
-        SphericalProjectionFunctor<real_t, index_t>                           sph;
-        ForcefieldOptimizeFunctor<ForcefieldType::PEDERSEN, real_t, index_t>  opt;
-
         auto src_view = src_dual .view_capacity();
         auto dst_view = dst_cubic.view_capacity();
 
-        dualize.compute(Q, src_view, dst_view, st.view(),
+        dualize<real_t, index_t>(Q, src_view, dst_view, st.view(),
             std::span<std::array<index_t,6>>(faces_cubic_buf.data(), faces_cubic_buf.size()),
             std::span<std::array<index_t,3>>(faces_dual_buf .data(), faces_dual_buf .size())
         ).wait();
-        tutte.compute(Q, dst_view,
+        tutte_layout<real_t, index_t>(Q, dst_view,
             std::span<std::array<real_t,2>>(layout2d.data(), layout2d.size()),
             st.view()
         ).wait();
-        sph.compute(Q, dst_view,
+        spherical_projection<real_t, index_t>(Q, dst_view,
             std::span<std::array<real_t,2>>(layout2d.data(), layout2d.size()),
             std::span<std::array<real_t,3>>(xyz     .data(), xyz     .size()),
             st.view()
         ).wait();
-        opt.compute(Q, dst_view,
+        forcefield_optimize<ForcefieldType::PEDERSEN, real_t, index_t>(Q, dst_view,
             std::span<std::array<real_t,3>>(xyz.data(), xyz.size()),
             st.view(), /*batch_iters=*/5*n, /*max_iters=*/5*n
         ).wait();

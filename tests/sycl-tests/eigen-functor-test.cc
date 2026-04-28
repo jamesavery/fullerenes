@@ -62,27 +62,19 @@ TEST_P(EigenTest, BatchSliceConsistency) {
     BuckyGen::stop(BQ);
     src_dual.resize(B);
 
-    DualizeFunctor<T,K>             dualize;
-    TutteFunctor<T,K>               tutte;
-    SphericalProjectionFunctor<T,K> sph;
-    ForcefieldOptimizeFunctor<PEDERSEN,T,K> ff;
-    HessianFunctor<PEDERSEN,T,K>    hessian;
-    EigenFunctor<EigensolveMode::ENDS,T,K>            ends;
-    EigenFunctor<EigensolveMode::FULL_SPECTRUM,T,K>   full;
-
-    dualize.compute(Q, src_dual.view(),
+    dualize<T,K>(Q, src_dual.view(),
                     dst_cubic.view_capacity(), st.view(),
                     std::span<std::array<K,6>>(faces_cubic.data(), faces_cubic.size()),
                     std::span<std::array<K,3>>(faces_dual.data(),  faces_dual.size())).wait();
     dst_cubic.resize(B);
-    tutte.compute(Q, dst_cubic.view(),
+    tutte_layout<T,K>(Q, dst_cubic.view(),
                   std::span<std::array<T,2>>(layout2d.data(), layout2d.size()),
                   st.view()).wait();
-    sph.compute(Q, dst_cubic.view(),
+    spherical_projection<T,K>(Q, dst_cubic.view(),
                 std::span<std::array<T,2>>(layout2d.data(), layout2d.size()),
                 std::span<std::array<T,3>>(xyz.data(), xyz.size()),
                 st.view()).wait();
-    ff.compute(Q, dst_cubic.view(),
+    forcefield_optimize<PEDERSEN,T,K>(Q, dst_cubic.view(),
                std::span<std::array<T,3>>(xyz.data(), xyz.size()),
                st.view(), 5*N, 5*N).wait();
 
@@ -100,12 +92,12 @@ TEST_P(EigenTest, BatchSliceConsistency) {
     SyclVector<T> diag_b(B * n_lanczos_max);
     SyclVector<K> ends_b(B * 2);
 
-    hessian.compute(Q, dst_cubic.view(),
+    compute_hessian<PEDERSEN,T,K>(Q, dst_cubic.view(),
                     std::span<std::array<T,3>>(xyz.data(), xyz.size()),
                     st.view(),
                     std::span<T>(hess_b.data(), hess_b.size()),
                     std::span<K>(cols_b.data(), cols_b.size())).wait();
-    ends.compute(Q, std::span<std::array<T,3>>(xyz.data(), xyz.size()),
+    eigensolve<EigensolveMode::ENDS,T,K>(Q, std::span<std::array<T,3>>(xyz.data(), xyz.size()),
                  N, B,
                  std::span<T>(hess_b.data(), hess_b.size()),
                  std::span<K>(cols_b.data(), cols_b.size()),
@@ -120,7 +112,7 @@ TEST_P(EigenTest, BatchSliceConsistency) {
 
     SyclVector<T> eigs_full_b(B * 3 * N);
     SyclVector<T> evec_full_b(B * 3 * N * 3 * N);
-    full.compute(Q, std::span<std::array<T,3>>(xyz.data(), xyz.size()),
+    eigensolve<EigensolveMode::FULL_SPECTRUM,T,K>(Q, std::span<std::array<T,3>>(xyz.data(), xyz.size()),
                  N, B,
                  std::span<T>(hess_b.data(), hess_b.size()),
                  std::span<K>(cols_b.data(), cols_b.size()),
@@ -153,10 +145,10 @@ TEST_P(EigenTest, BatchSliceConsistency) {
         auto bv1 = dst_cubic.view().slice(std::size_t(b), 1);
         auto st1 = st.slice(std::size_t(b), 1);
 
-        hessian.compute(Q, bv1, xyz1, st1,
+        compute_hessian<PEDERSEN,T,K>(Q, bv1, xyz1, st1,
                         std::span<T>(hess1.data(), hess1.size()),
                         std::span<K>(cols1.data(), cols1.size())).wait();
-        ends.compute(Q, xyz1, N, 1,
+        eigensolve<EigensolveMode::ENDS,T,K>(Q, xyz1, N, 1,
                      std::span<T>(hess1.data(), hess1.size()),
                      std::span<K>(cols1.data(), cols1.size()),
                      n_lanczos,
@@ -167,7 +159,7 @@ TEST_P(EigenTest, BatchSliceConsistency) {
                      std::span<T>(lan1.data(), lan1.size()),
                      std::span<T>(diag1.data(), diag1.size()),
                      std::span<K>(end1.data(), end1.size())).wait();
-        full.compute(Q, xyz1, N, 1,
+        eigensolve<EigensolveMode::FULL_SPECTRUM,T,K>(Q, xyz1, N, 1,
                      std::span<T>(hess1.data(), hess1.size()),
                      std::span<K>(cols1.data(), cols1.size()),
                      N*3 - 6,

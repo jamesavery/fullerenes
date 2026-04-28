@@ -7,10 +7,10 @@
 #include <algorithm>
 #include <fullerenes/sycl-headers/execution-compat.hh>
 #include <numeric>
-#include <fullerenes/kernel-headers/tutte-functor.hh>
-#include "kernel.cc"
-#include "queue-impl.cc"
-#include "forcefield-includes.cc"
+#include <fullerenes/kernel-headers/tutte.hh>
+#include "kernel.hh"
+#include "queue-impl.hh"
+#include "forcefield-includes.hh"
 
 //Global memory arrays needed for the general tutte layout kernel:
 //  - XY double buffer: The position of each vertex
@@ -113,14 +113,23 @@ static SyclEvent tutte_view_batch_impl(
 }
 
 template <typename T, typename K>
-SyclEvent TutteFunctor<T,K>::compute(SyclQueue& Q,
-                                     batch::BatchView<Spanify::RSRAdjacencyView<K>> graph,
-                                     std::span<std::array<T,2>> layout,
-                                     batch::BatchStateView state) {
+SyclEvent tutte_layout(SyclQueue& Q,
+                       batch::BatchView<Spanify::RSRAdjacencyView<K>> graph,
+                       std::span<std::array<T,2>> layout,
+                       batch::BatchStateView state,
+                       Workspace /*ws*/) {
     return tutte_view_batch_impl<T,K>(Q, graph, layout, state);
 }
 
-template struct TutteFunctor<float,uint16_t>;
-template struct TutteFunctor<float,uint32_t>;
-template struct TutteFunctor<double,uint16_t>;
-template struct TutteFunctor<double,uint32_t>;
+template SyclEvent tutte_layout<float, uint16_t>(SyclQueue&, batch::BatchView<Spanify::RSRAdjacencyView<uint16_t>>, std::span<std::array<float,2>>, batch::BatchStateView, Workspace);
+template SyclEvent tutte_layout<float, uint32_t>(SyclQueue&, batch::BatchView<Spanify::RSRAdjacencyView<uint32_t>>, std::span<std::array<float,2>>, batch::BatchStateView, Workspace);
+template SyclEvent tutte_layout<double,uint16_t>(SyclQueue&, batch::BatchView<Spanify::RSRAdjacencyView<uint16_t>>, std::span<std::array<double,2>>, batch::BatchStateView, Workspace);
+template SyclEvent tutte_layout<double,uint32_t>(SyclQueue&, batch::BatchView<Spanify::RSRAdjacencyView<uint32_t>>, std::span<std::array<double,2>>, batch::BatchStateView, Workspace);
+
+// Phase 2: see dualize_buffer_size — returns 0 (local_accessor for scratch).
+template <typename T, typename K>
+size_t tutte_layout_buffer_size(const Device&, int, int) { return 0; }
+template size_t tutte_layout_buffer_size<float, uint16_t>(const Device&, int, int);
+template size_t tutte_layout_buffer_size<float, uint32_t>(const Device&, int, int);
+template size_t tutte_layout_buffer_size<double,uint16_t>(const Device&, int, int);
+template size_t tutte_layout_buffer_size<double,uint32_t>(const Device&, int, int);

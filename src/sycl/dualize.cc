@@ -7,10 +7,10 @@
 #include <iterator>
 #include <type_traits>
 #include <fullerenes/sycl-headers/execution-compat.hh>
-#include <fullerenes/kernel-headers/dualize-functor.hh>
-#include "queue-impl.cc"
-#include "forcefield-includes.cc"
-#include "kernel.cc"
+#include <fullerenes/kernel-headers/dualize.hh>
+#include "queue-impl.hh"
+#include "forcefield-includes.hh"
+#include "kernel.hh"
 
 template<int MaxDegree, typename K, typename DegT = K>
 struct DeviceDualGraph{
@@ -76,94 +76,6 @@ int roundUp(int numToRound, int multiple)
 {
     assert(multiple);
     return ((numToRound + multiple - 1) / multiple) * multiple;
-}
-
-
-template<typename T, typename K, int MaxDegIn, int MaxDegOut>
-SyclEvent dualize_general_impl(  SyclQueue& Q, 
-                            std::span<K> G_in, 
-                            std::span<K> Deg_in, 
-                            std::span<K> G_out, 
-                            std::span<K> Deg_out,
-                            std::span<K> cannon_ixs_acc,
-                            std::span<K> rep_count_acc,
-                            std::span<K> scan_array_acc,
-                            std::span<K> triangle_numbers_acc,
-                            std::span<K> arc_list_acc, 
-                            int Nin, 
-                            int Nout){
-    INT_TYPEDEFS(K);
-    sycl::device d = Q->get_device();
-
-    //Find maximum workgroup size
-    auto max_workgroup_size = d.get_info<sycl::info::device::max_work_group_size>();
-
-    size_t workgroup_size1 = std::min((int)max_workgroup_size, Nin);
-    size_t workgroup_size2 = std::min((int)max_workgroup_size, Nout);
-    size_t grid_size1 = roundUp(Nin, workgroup_size1);
-    size_t grid_size2 = roundUp(Nout, workgroup_size2);
-    
-    auto work_distribution = Q->submit([&](handler &h) {
-        h.parallel_for(nd_range(range{grid_size1}, range{workgroup_size1}), [=](nd_item<1> nditem) {
-            auto thid = nditem.get_global_linear_id();
-            DeviceDualGraph<MaxDegIn, K> FD(G_in.data(), Deg_in.data());
-            K rep_count = 0;
-            if (thid < Nin){
-                for (int i = 0; i < FD.face_degrees[thid]; i++){
-                    auto canon_arc = FD.get_canonical_arc(thid, FD.dual_neighbours[thid*MaxDegIn + i]);
-                    if (canon_arc[0] == thid){
-                        cannon_ixs_acc[thid*MaxDegIn + rep_count] = i;
-                        ++rep_count;
-                    }
-                }
-                rep_count_acc[thid] = rep_count;
-            }
-        });
-    });
-    
-    work_distribution.wait();
-    Q.wait();
-    std::exclusive_scan(FULLERENE_PAR_UNSEQ rep_count_acc.begin(), rep_count_acc.end(), scan_array_acc.begin(), K(0), std::plus<K>{});
-
-    auto arc_list_event = Q->submit([&](handler &h) {
-        h.parallel_for(nd_range(range{grid_size1}, range{workgroup_size1}), [=](nd_item<1> nditem) {
-            auto idx = nditem.get_global_linear_id();
-            DeviceDualGraph<MaxDegIn, K> FD(G_in.data(), Deg_in.data());
-            if (idx < Nin){
-            K rep_count = rep_count_acc[idx];
-            K scan_result = scan_array_acc[idx];
-            for (int ii = 0; ii < rep_count; ii++){
-                K i = cannon_ixs_acc[idx*MaxDegIn + ii];
-                K triangle_id = scan_result + ii;
-                triangle_numbers_acc[idx*MaxDegIn + i] = triangle_id;
-                arc_list_acc[triangle_id*2 + 0] = idx;
-                arc_list_acc[triangle_id*2 + 1] = FD.dual_neighbours[idx*MaxDegIn + i];
-            }
-            }
-        });
-    });
-    
-    SyclEventImpl cubic_graph_event = Q->submit([&](handler &h) {
-        h.depends_on(arc_list_event);
-        h.parallel_for(nd_range(range{grid_size2}, range{workgroup_size2}), [=](nd_item<1> nditem) {
-            auto tidx = nditem.get_global_linear_id();
-            DeviceDualGraph<MaxDegIn, K> FD(G_in.data(), Deg_in.data());
-            if (tidx < Nout){
-            K u = arc_list_acc[tidx*2 + 0]; K v = arc_list_acc[tidx*2 + 1];
-            auto n_count = 0;
-            auto u0 = u;
-            node2 edge = FD.get_canonical_arc(v, u); G_out[tidx*MaxDegOut] = triangle_numbers_acc[edge[0]*MaxDegIn + FD.arc_ix(edge)];
-            while(v != u0 && n_count < MaxDegOut){
-                ++n_count;
-                auto w = FD.next_on_face(u,v);
-                u = v; v = w;
-                edge = FD.get_canonical_arc(v, u); G_out[tidx*MaxDegOut + n_count] = triangle_numbers_acc[edge[0]*MaxDegIn + FD.arc_ix(edge)];
-            }
-            if (Deg_out.data()) Deg_out[tidx] = n_count+1;
-            }
-        });
-    });
-    return SyclEvent(std::move(cubic_graph_event));
 }
 
 
@@ -298,17 +210,30 @@ static SyclEvent dualize_view_batch_impl(SyclQueue& Q,
 }
 
 template <typename T, typename K>
-SyclEvent DualizeFunctor<T,K>::compute(SyclQueue& Q,
-                                       batch::BatchView<Spanify::RSRAdjacencyView<K>> src,
-                                       batch::BatchView<Spanify::RSRAdjacencyView<K>> dst,
-                                       batch::BatchStateView                          state,
-                                       std::span<std::array<K,6>>                          faces_cubic,
-                                       std::span<std::array<K,3>>                          faces_dual)
+SyclEvent dualize(SyclQueue& Q,
+                  batch::BatchView<Spanify::RSRAdjacencyView<K>> src,
+                  batch::BatchView<Spanify::RSRAdjacencyView<K>> dst,
+                  batch::BatchStateView                          state,
+                  std::span<std::array<K,6>>                          faces_cubic,
+                  std::span<std::array<K,3>>                          faces_dual,
+                  Workspace                                      /*ws*/)
 {
     return dualize_view_batch_impl<T,K>(Q, src, dst, state, faces_cubic, faces_dual);
 }
 
-template struct DualizeFunctor<float,uint16_t>;
-template struct DualizeFunctor<float,uint32_t>;
-template struct DualizeFunctor<double,uint16_t>;
-template struct DualizeFunctor<double,uint32_t>;
+template SyclEvent dualize<float, uint16_t>(SyclQueue&, batch::BatchView<Spanify::RSRAdjacencyView<uint16_t>>, batch::BatchView<Spanify::RSRAdjacencyView<uint16_t>>, batch::BatchStateView, std::span<std::array<uint16_t,6>>, std::span<std::array<uint16_t,3>>, Workspace);
+template SyclEvent dualize<float, uint32_t>(SyclQueue&, batch::BatchView<Spanify::RSRAdjacencyView<uint32_t>>, batch::BatchView<Spanify::RSRAdjacencyView<uint32_t>>, batch::BatchStateView, std::span<std::array<uint32_t,6>>, std::span<std::array<uint32_t,3>>, Workspace);
+template SyclEvent dualize<double,uint16_t>(SyclQueue&, batch::BatchView<Spanify::RSRAdjacencyView<uint16_t>>, batch::BatchView<Spanify::RSRAdjacencyView<uint16_t>>, batch::BatchStateView, std::span<std::array<uint16_t,6>>, std::span<std::array<uint16_t,3>>, Workspace);
+template SyclEvent dualize<double,uint32_t>(SyclQueue&, batch::BatchView<Spanify::RSRAdjacencyView<uint32_t>>, batch::BatchView<Spanify::RSRAdjacencyView<uint32_t>>, batch::BatchStateView, std::span<std::array<uint32_t,6>>, std::span<std::array<uint32_t,3>>, Workspace);
+
+// Phase 2: scratch-size query. Current view-based path uses local_accessor
+// for everything so this returns 0; the API is in place so callers can size
+// a shared workspace via std::max() over every kernel.
+template <typename T, typename K>
+size_t dualize_buffer_size(const Device& /*device*/, int /*N*/, int /*capacity*/) {
+    return 0;
+}
+template size_t dualize_buffer_size<float, uint16_t>(const Device&, int, int);
+template size_t dualize_buffer_size<float, uint32_t>(const Device&, int, int);
+template size_t dualize_buffer_size<double,uint16_t>(const Device&, int, int);
+template size_t dualize_buffer_size<double,uint32_t>(const Device&, int, int);

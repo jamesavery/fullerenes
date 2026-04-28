@@ -16,7 +16,8 @@
 #ifndef DEVICE_CAST
     #define DEVICE_CAST(x,ix) (reinterpret_cast<const sycl::device*>(x)[ix])
 #endif
-#include "queue-impl.cc"
+#define DEFINE_SYCL_QUEUE_METHODS
+#include "queue-impl.hh"
 
 using namespace sycl;
 

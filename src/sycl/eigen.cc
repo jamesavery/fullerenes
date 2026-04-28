@@ -1,9 +1,9 @@
 #include "sycl/sycl.hpp"
-#include <fullerenes/kernel-headers/eigen-functor.hh>
-#include "forcefield-includes.cc"
+#include <fullerenes/kernel-headers/eigen.hh>
+#include "forcefield-includes.hh"
 #include <array>
 #include <cstdint>
-#include "queue-impl.cc"
+#include "queue-impl.hh"
 using namespace sycl;
 
 template <typename T>
@@ -583,28 +583,16 @@ SyclEvent eigensolve_impl(SyclQueue& Q,
 // hessian/cols spans, so we can forward directly to the eigensolve function
 // after constructing a minimal proxy that exposes the required interface.
 template <EigensolveMode mode, typename T, typename K>
-SyclEvent EigenFunctor<mode, T, K>::compute(
+SyclEvent eigensolve(
     SyclQueue& Q,
     std::span<std::array<T,3>> xyz,
     int N, int capacity,
     std::span<T> hessians, std::span<K> cols, size_t n_lanczos,
     std::span<T> eigenvalues, std::span<T> eigenvectors,
     std::span<T> off_diagonal, std::span<T> qmat,
-    std::span<T> lanczos, std::span<T> diag, std::span<K> ends_idx)
+    std::span<T> lanczos, std::span<T> diag, std::span<K> ends_idx,
+    Workspace /*ws*/)
 {
-    // eigensolve<mode> only accesses B.d_.X_cubic_, B.N_, and B.size().
-    // Build a thin proxy that satisfies those.
-    struct XyzProxy {
-        std::span<std::array<T,3>> d_X;
-        size_t N_;
-        int    size_;
-        // The struct is accessed as B.d_.X_cubic_, B.N_, B.size() in eigensolve.
-        struct D { std::span<std::array<T,3>> X_cubic_; } d_;
-        int size() const { return size_; }
-        // Provide the same interface as FullereneBatchView for eigensolve.
-        XyzProxy(std::span<std::array<T,3>> xyz, int N, int cap)
-            : d_X(xyz), N_(N), size_(cap) { d_.X_cubic_ = xyz; }
-    };
     return eigensolve_impl<mode,T,K>(Q,
         as_span<std::array<T,3>>(xyz),
         (size_t)N, (size_t)capacity,
@@ -613,12 +601,26 @@ SyclEvent EigenFunctor<mode, T, K>::compute(
         off_diagonal, qmat, lanczos, diag, ends_idx);
 }
 
-template struct EigenFunctor<EigensolveMode::FULL_SPECTRUM, float, uint16_t>;
-template struct EigenFunctor<EigensolveMode::ENDS, float, uint16_t>;
-template struct EigenFunctor<EigensolveMode::ENDS_VECTORS, float, uint16_t>;
-template struct EigenFunctor<EigensolveMode::FULL_SPECTRUM_VECTORS, float, uint16_t>;
+template SyclEvent eigensolve<EigensolveMode::FULL_SPECTRUM,         float,  uint16_t>(SyclQueue&, std::span<std::array<float,3>>,  int, int, std::span<float>,  std::span<uint16_t>, size_t, std::span<float>,  std::span<float>,  std::span<float>,  std::span<float>,  std::span<float>,  std::span<float>,  std::span<uint16_t>, Workspace);
+template SyclEvent eigensolve<EigensolveMode::ENDS,                  float,  uint16_t>(SyclQueue&, std::span<std::array<float,3>>,  int, int, std::span<float>,  std::span<uint16_t>, size_t, std::span<float>,  std::span<float>,  std::span<float>,  std::span<float>,  std::span<float>,  std::span<float>,  std::span<uint16_t>, Workspace);
+template SyclEvent eigensolve<EigensolveMode::ENDS_VECTORS,          float,  uint16_t>(SyclQueue&, std::span<std::array<float,3>>,  int, int, std::span<float>,  std::span<uint16_t>, size_t, std::span<float>,  std::span<float>,  std::span<float>,  std::span<float>,  std::span<float>,  std::span<float>,  std::span<uint16_t>, Workspace);
+template SyclEvent eigensolve<EigensolveMode::FULL_SPECTRUM_VECTORS, float,  uint16_t>(SyclQueue&, std::span<std::array<float,3>>,  int, int, std::span<float>,  std::span<uint16_t>, size_t, std::span<float>,  std::span<float>,  std::span<float>,  std::span<float>,  std::span<float>,  std::span<float>,  std::span<uint16_t>, Workspace);
+template SyclEvent eigensolve<EigensolveMode::FULL_SPECTRUM,         double, uint16_t>(SyclQueue&, std::span<std::array<double,3>>, int, int, std::span<double>, std::span<uint16_t>, size_t, std::span<double>, std::span<double>, std::span<double>, std::span<double>, std::span<double>, std::span<double>, std::span<uint16_t>, Workspace);
+template SyclEvent eigensolve<EigensolveMode::ENDS,                  double, uint16_t>(SyclQueue&, std::span<std::array<double,3>>, int, int, std::span<double>, std::span<uint16_t>, size_t, std::span<double>, std::span<double>, std::span<double>, std::span<double>, std::span<double>, std::span<double>, std::span<uint16_t>, Workspace);
+template SyclEvent eigensolve<EigensolveMode::ENDS_VECTORS,          double, uint16_t>(SyclQueue&, std::span<std::array<double,3>>, int, int, std::span<double>, std::span<uint16_t>, size_t, std::span<double>, std::span<double>, std::span<double>, std::span<double>, std::span<double>, std::span<double>, std::span<uint16_t>, Workspace);
+template SyclEvent eigensolve<EigensolveMode::FULL_SPECTRUM_VECTORS, double, uint16_t>(SyclQueue&, std::span<std::array<double,3>>, int, int, std::span<double>, std::span<uint16_t>, size_t, std::span<double>, std::span<double>, std::span<double>, std::span<double>, std::span<double>, std::span<double>, std::span<uint16_t>, Workspace);
 
-template struct EigenFunctor<EigensolveMode::FULL_SPECTRUM, double, uint16_t>;
-template struct EigenFunctor<EigensolveMode::ENDS, double, uint16_t>;
-template struct EigenFunctor<EigensolveMode::ENDS_VECTORS, double, uint16_t>;
-template struct EigenFunctor<EigensolveMode::FULL_SPECTRUM_VECTORS, double, uint16_t>;
+// Phase 2: see dualize_buffer_size — returns 0 (local_accessor for scratch).
+// The eigen kernel currently still takes its scratch (off_diagonal, qmat,
+// lanczos, diag, ends_idx) as external Spans; in Phase 3 those move to
+// Workspace, at which point this query becomes non-zero.
+template <EigensolveMode mode, typename T, typename K>
+size_t eigensolve_buffer_size(const Device&, int, int, size_t) { return 0; }
+template size_t eigensolve_buffer_size<EigensolveMode::FULL_SPECTRUM, float, uint16_t>(const Device&, int, int, size_t);
+template size_t eigensolve_buffer_size<EigensolveMode::ENDS, float, uint16_t>(const Device&, int, int, size_t);
+template size_t eigensolve_buffer_size<EigensolveMode::ENDS_VECTORS, float, uint16_t>(const Device&, int, int, size_t);
+template size_t eigensolve_buffer_size<EigensolveMode::FULL_SPECTRUM_VECTORS, float, uint16_t>(const Device&, int, int, size_t);
+template size_t eigensolve_buffer_size<EigensolveMode::FULL_SPECTRUM, double, uint16_t>(const Device&, int, int, size_t);
+template size_t eigensolve_buffer_size<EigensolveMode::ENDS, double, uint16_t>(const Device&, int, int, size_t);
+template size_t eigensolve_buffer_size<EigensolveMode::ENDS_VECTORS, double, uint16_t>(const Device&, int, int, size_t);
+template size_t eigensolve_buffer_size<EigensolveMode::FULL_SPECTRUM_VECTORS, double, uint16_t>(const Device&, int, int, size_t);

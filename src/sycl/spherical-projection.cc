@@ -7,10 +7,10 @@
 #include <algorithm>
 #include <fullerenes/sycl-headers/execution-compat.hh>
 #include <numeric>
-#include <fullerenes/kernel-headers/spherical-projection-functor.hh>
+#include <fullerenes/kernel-headers/spherical-projection.hh>
 #include <fullerenes/kernel-headers/sycl-parallel-primitives.hh>
-#include "kernel.cc"
-#include "forcefield-includes.cc"
+#include "kernel.hh"
+#include "forcefield-includes.hh"
 
 using namespace sycl;
 template <typename T>
@@ -246,16 +246,24 @@ static SyclEvent spherical_projection_view_batch_impl(
 }
 
 template <typename T, typename K>
-SyclEvent SphericalProjectionFunctor<T,K>::compute(
-    SyclQueue& Q,
-    batch::BatchView<Spanify::RSRAdjacencyView<K>> graph,
-    std::span<std::array<T,2>> layout_2d,
-    std::span<std::array<T,3>> xyz_3d,
-    batch::BatchStateView state) {
+SyclEvent spherical_projection(SyclQueue& Q,
+                               batch::BatchView<Spanify::RSRAdjacencyView<K>> graph,
+                               std::span<std::array<T,2>> layout_2d,
+                               std::span<std::array<T,3>> xyz_3d,
+                               batch::BatchStateView state,
+                               Workspace /*ws*/) {
     return spherical_projection_view_batch_impl<T,K>(Q, graph, layout_2d, xyz_3d, state);
 }
 
-template struct SphericalProjectionFunctor<float,uint16_t>;
-template struct SphericalProjectionFunctor<float,uint32_t>;
-template struct SphericalProjectionFunctor<double,uint16_t>;
-template struct SphericalProjectionFunctor<double,uint32_t>;
+template SyclEvent spherical_projection<float, uint16_t>(SyclQueue&, batch::BatchView<Spanify::RSRAdjacencyView<uint16_t>>, std::span<std::array<float,2>>, std::span<std::array<float,3>>, batch::BatchStateView, Workspace);
+template SyclEvent spherical_projection<float, uint32_t>(SyclQueue&, batch::BatchView<Spanify::RSRAdjacencyView<uint32_t>>, std::span<std::array<float,2>>, std::span<std::array<float,3>>, batch::BatchStateView, Workspace);
+template SyclEvent spherical_projection<double,uint16_t>(SyclQueue&, batch::BatchView<Spanify::RSRAdjacencyView<uint16_t>>, std::span<std::array<double,2>>, std::span<std::array<double,3>>, batch::BatchStateView, Workspace);
+template SyclEvent spherical_projection<double,uint32_t>(SyclQueue&, batch::BatchView<Spanify::RSRAdjacencyView<uint32_t>>, std::span<std::array<double,2>>, std::span<std::array<double,3>>, batch::BatchStateView, Workspace);
+
+// Phase 2: see dualize_buffer_size — returns 0 (local_accessor for scratch).
+template <typename T, typename K>
+size_t spherical_projection_buffer_size(const Device&, int, int) { return 0; }
+template size_t spherical_projection_buffer_size<float, uint16_t>(const Device&, int, int);
+template size_t spherical_projection_buffer_size<float, uint32_t>(const Device&, int, int);
+template size_t spherical_projection_buffer_size<double,uint16_t>(const Device&, int, int);
+template size_t spherical_projection_buffer_size<double,uint32_t>(const Device&, int, int);

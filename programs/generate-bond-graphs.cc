@@ -57,33 +57,28 @@ int main(int argc, char *argv[]) {
     std::cout << "Generated " << pushed << " dual graphs" << std::endl;
 
     // ---- Pipeline --------------------------------------------------------
-    DualizeFunctor<real_t, index_t>                                       dualize;
-    TutteFunctor<real_t, index_t>                                         tutte;
-    SphericalProjectionFunctor<real_t, index_t>                           sph;
-    ForcefieldOptimizeFunctor<ForcefieldType::PEDERSEN, real_t, index_t>  opt;
-
     SyclQueue ctx(Device::default_device(), true);
     auto src_view = src_dual .view_capacity();
     auto dst_view = dst_cubic.view_capacity();
 
     std::cout << "Dualizing.." << std::endl;
-    dualize.compute(ctx, src_view, dst_view, st.view(),
+    dualize<real_t, index_t>(ctx, src_view, dst_view, st.view(),
         std::span<std::array<index_t,6>>(faces_cubic_buf.data(), faces_cubic_buf.size()),
         std::span<std::array<index_t,3>>(faces_dual_buf .data(), faces_dual_buf .size())
     ).wait();
     std::cout << "Computing Tutte Embeddings.." << std::endl;
-    tutte.compute(ctx, dst_view,
+    tutte_layout<real_t, index_t>(ctx, dst_view,
         std::span<std::array<real_t,2>>(layout2d.data(), layout2d.size()),
         st.view()
     ).wait();
     std::cout << "Computing Projections.." << std::endl;
-    sph.compute(ctx, dst_view,
+    spherical_projection<real_t, index_t>(ctx, dst_view,
         std::span<std::array<real_t,2>>(layout2d.data(), layout2d.size()),
         std::span<std::array<real_t,3>>(xyz     .data(), xyz     .size()),
         st.view()
     ).wait();
     std::cout << "Optimizing Forcefield.." << std::endl;
-    opt.compute(ctx, dst_view,
+    forcefield_optimize<ForcefieldType::PEDERSEN, real_t, index_t>(ctx, dst_view,
         std::span<std::array<real_t,3>>(xyz.data(), xyz.size()),
         st.view(), /*batch_iters=*/5*N, /*max_iters=*/5*N
     ).wait();

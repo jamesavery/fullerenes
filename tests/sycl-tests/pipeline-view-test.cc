@@ -67,21 +67,19 @@ TEST(PipelineViewTest, C60ViewPipelineToSphericalProjection) {
     }
 
     // -----------------------------------------------------------------
-    // Step 1: DualizeFunctor — dual → cubic adjacency
+    // Step 1: dualize — dual → cubic adjacency
     // -----------------------------------------------------------------
-    DualizeFunctor<T,K> dualize;
-    dualize.compute(Q,
+    dualize<T,K>(Q,
         src_dual.view_capacity(), dst_cubic.view_capacity(), st.view(),
         std::span<std::array<K,6>>(faces_cubic_buf.data(), faces_cubic_buf.size()),
         std::span<std::array<K,3>>(faces_dual_buf.data(),  faces_dual_buf.size())
     ).wait();
 
     // -----------------------------------------------------------------
-    // Step 2: TutteFunctor — cubic adjacency → 2D layout
+    // Step 2: tutte_layout — cubic adjacency → 2D layout
     // -----------------------------------------------------------------
     SyclVector<std::array<T,2>> layout2d(capacity * N);
-    TutteFunctor<T,K> tutte;
-    tutte.compute(Q,
+    tutte_layout<T,K>(Q,
         dst_cubic.view_capacity(),
         std::span<std::array<T,2>>(layout2d.data(), layout2d.size()),
         st.view()
@@ -98,11 +96,10 @@ TEST(PipelineViewTest, C60ViewPipelineToSphericalProjection) {
     }
 
     // -----------------------------------------------------------------
-    // Step 3: SphericalProjectionFunctor — 2D layout → 3D coords
+    // Step 3: spherical_projection — 2D layout → 3D coords
     // -----------------------------------------------------------------
     SyclVector<std::array<T,3>> xyz(capacity * N);
-    SphericalProjectionFunctor<T,K> sph;
-    sph.compute(Q,
+    spherical_projection<T,K>(Q,
         dst_cubic.view_capacity(),
         std::span<std::array<T,2>>(layout2d.data(), layout2d.size()),
         std::span<std::array<T,3>>(xyz.data(),      xyz.size()),
