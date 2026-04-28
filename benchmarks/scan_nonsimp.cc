@@ -93,16 +93,23 @@ static Outcome run_one(const string& spiral_name) {
     o.n_flips = solver.stats_flips;
     o.n_steps = solver.stats_steps;
 
-    if (!coords.empty()) {
-      o.kind = Outcome::OK;
-    } else if (solver.stats_final_kappa > 0.01) {
-      o.kind = Outcome::FAIL_KAPPA;
-    } else if (!solver.stats_t0_simplicial) {
-      o.kind = Outcome::FAIL_T0_NONSIMPLICIAL;
-    } else if (!solver.stats_tbar_simple_polygonal) {
-      o.kind = Outcome::FAIL_TBAR_NONSIMPLE;
-    } else {
-      o.kind = Outcome::FAIL_KAPPA;  // shouldn't happen
+    // solve() now always returns positions when reconstruct succeeded;
+    // status enum is the source of truth.
+    using S = AlexandrovSolver::ValidationStatus;
+    switch (solver.stats_status) {
+      case S::OK:                       o.kind = Outcome::OK; break;
+      case S::FAIL_KAPPA_NOT_CONVERGED: o.kind = Outcome::FAIL_KAPPA; break;
+      case S::FAIL_NOT_SIMPLE:
+        o.kind = solver.stats_t0_simplicial ? Outcome::FAIL_TBAR_NONSIMPLE
+                                              : Outcome::FAIL_T0_NONSIMPLICIAL;
+        break;
+      case S::FAIL_RECONSTRUCT:
+      case S::FAIL_VOLUME_DEGENERATE:
+      case S::FAIL_SELF_INTERSECTING:
+      case S::FAIL_NOT_CONVEX:
+        o.kind = Outcome::FAIL_T0_NONSIMPLICIAL;  // legacy bucket; new finer
+                                                   // labels live in scan_diag_max
+        break;
     }
   } catch (...) {
     o.kind = Outcome::FAIL_BUILD;

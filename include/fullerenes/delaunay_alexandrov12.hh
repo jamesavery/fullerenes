@@ -19,6 +19,21 @@
 #include <vector>
 
 struct AlexandrovSolver {
+  // ValidationStatus: outcome of the post-convergence validator.  solve()
+  // always returns reconstructed positions (so failed cases can be
+  // inspected); callers must check stats_status == OK before using them
+  // as valid Alexandrov-polytope coordinates.
+  enum class ValidationStatus {
+    OK,                          // valid output: simple, well-formed, convex
+    FAIL_KAPPA_NOT_CONVERGED,    // |κ| > 0.01: PALC + Newton didn't reach κ = 0
+    FAIL_NOT_SIMPLE,             // T̄(0) has multi-edges in cells, or F < 3
+    FAIL_RECONSTRUCT,            // Gram-BFS yielded NaN (negative perp²)
+    FAIL_VOLUME_DEGENERATE,      // vol_norm < 0.01 (drum-cap or near-flat)
+    FAIL_SELF_INTERSECTING,      // two non-adjacent triangles cross in 3D
+    FAIL_NOT_CONVEX,             // some vertex on outside of a face plane
+  };
+  static const char* status_str(ValidationStatus s);
+
   DelaunayTriangulation D;
   std::vector<double> r;
   bool verbose = false;
@@ -27,6 +42,8 @@ struct AlexandrovSolver {
   double stats_final_kappa = 0;
   double stats_extrap_kappa = 0;   // max|kappa| right after endgame extrapolation
   std::vector<double> r_before_extrap;   // last PALC iterate (for diagnostics)
+  ValidationStatus stats_status = ValidationStatus::FAIL_KAPPA_NOT_CONVERGED;
+  bool valid() const { return stats_status == ValidationStatus::OK; }
 
   // Post-convergence verification (per CLAUDE.md invariants I-1, I-2).
   // Populated by solve() after PALC + Newton; meaningful iff stats_final_kappa
@@ -34,6 +51,11 @@ struct AlexandrovSolver {
   bool stats_t0_simplicial = false;       // D has no multi-edges/self-loops/bigons
   bool stats_tbar_simple_polygonal = false; // T̄(0) cells all have ≥3 distinct labels
   int  stats_tbar_n_cells = 0;            // number of polygonal cells in T̄(0)
+  double stats_volume_norm = 0;           // |V| / ⟨ℓ⟩³ on the reconstructed polytope
+                                           // (1.03M-scan median ≈ 1.0; degenerate ≤ 1e-6;
+                                           //  healthy lower-bound ≈ 0.12)
+  bool stats_polytope_convex = false;     // every non-face vertex on inside of every face plane
+  bool stats_polytope_no_self_intersect = false; // no two non-adjacent triangles intersect in 3D
 
   // One entry per PALC step (if trace_jacobian) or Newton step (phase='N').
   struct TraceEntry {
@@ -48,8 +70,50 @@ struct AlexandrovSolver {
   };
   std::vector<TraceEntry> trace;
 
-  // Returns the 3D coordinates of the n cone points, or an empty vector on
-  // failure.  The final triangulation after edge flips is left in D.
+  // Per-step trajectory diagnostic (Task #28 characterization run).  Filled
+  // when record_diag=true.  Captures the geometric proximity of (T,r) to
+  // ∂P(M) so we can compare drum-cap vs non-degenerate trajectories.
+  bool record_diag = false;
+  struct DiagEntry {
+    char   phase;                    // 'P' for PALC step, 'N' for Newton iter
+    int    step;
+    double t;                        // homotopy parameter
+    double ds;                       // arc-length step (PALC) / trust radius (Newton)
+    int    nit;                      // corrector iters (PALC) / 1 (Newton)
+    double kappa_max;                // max|κ|
+    // Distance to ∂P(M) on the (ConcQuadr) side: min over non-bigon edges
+    // of (π − θ_e).  Small values mean the iterate is close to the
+    // boundary; 0 means at the boundary; negative would mean past it.
+    double theta_min_dist_to_pi;
+    // Counts of edges with (π − θ_e) below thresholds {0.1, 0.01, 1e-3}.
+    // Tracks the *distribution* shape: drum-cap convergence has many
+    // edges piling up near π simultaneously; non-degenerate convergence
+    // has only the flat-face-diagonal edges approaching.
+    int    n_near_pi_01, n_near_pi_001, n_near_pi_0001;
+    // F(T) margin: smallest Cayley-Menger pyramid h_sq.
+    double min_h_sq;
+    // Radius spread: std(r) / mean(r).  Drum-cap collapses all radii
+    // together; non-degenerate keeps spread.
+    double r_cv;
+    // Hessian/Jacobian degeneracy: sign(det J).  In P(M) interior with
+    // Lorentzian Hessian (1, n−1), this should be a fixed sign.  Sign
+    // change indicates a fold / degeneracy.
+    int    det_J_sign;
+    // Cumulative flips at this step.
+    int    n_flips_cum;
+    // Number of alive non-bigon edges (denominator for n_near_pi_* ratios).
+    int    n_non_bigon_alive;
+  };
+  std::vector<DiagEntry> diag_trace;
+
+  // Returns the 3D coordinates of the n cone points.  ALWAYS returns
+  // positions when reconstruction is possible — even on failed
+  // validation — so that failure cases can be visualized and debugged.
+  // Callers must check `stats_status == OK` (or `valid()`) before
+  // treating the result as a valid Alexandrov polytope.  The final
+  // triangulation after edge flips is left in D.  Empty result only
+  // when the Gram-BFS reconstruction itself yields NaN, in which case
+  // stats_status == FAIL_RECONSTRUCT.
   std::vector<coord3d> solve();
 
   // Full polytope output: vertex positions + 1-/2-skeleton.  Bundles
@@ -60,9 +124,12 @@ struct AlexandrovSolver {
   // invariants violated; see stats_*).  `vertex_labels[k]` is the external
   // label for DCEL vertex k; defaults to identity (k → k).
   struct AlexandrovPolytope {
-    std::vector<coord3d> positions;       // V(P): 12 cone-point positions in R³
+    std::vector<coord3d> positions;       // V(P): 12 cone-point positions in R³.
+                                           // Always populated when reconstruction
+                                           // succeeded; check `status` for validity.
     CanonicalTesselation tesselation;     // T̄(0): polygonal 2-skeleton of P
-    bool ok() const { return !positions.empty(); }
+    ValidationStatus status = ValidationStatus::FAIL_KAPPA_NOT_CONVERGED;
+    bool ok() const { return status == ValidationStatus::OK; }
   };
   AlexandrovPolytope solve_polytope(const std::vector<int>& vertex_labels = {});
 
@@ -144,4 +211,39 @@ struct AlexandrovSolver {
   // repeated label on its boundary.  Combined with `is_simplicial(T)` this
   // certifies T̄ is a simple polygonal tesselation.
   static bool is_simple_polygonal(const CanonicalTesselation& tess);
+
+  // ------ Reconstructed-polytope geometric checks ------
+
+  // True iff `pos` describes a convex non-degenerate polytope.  Two checks:
+  //   (a) Defensive precondition: signed volume (in the CCW half-edge
+  //       convention) is strictly positive.  Rejects flat (drum-cap, vol=0)
+  //       and globally-inverted (vol<0) configurations — for either, the
+  //       outward-normal direction inferred from CCW order is wrong, and
+  //       the vertex test below would give a meaningless answer.
+  //   (b) Convexity test: every vertex v ∉ f has signed distance
+  //       ≤ `tol·mean_edge_length` from the plane of f, where the outward
+  //       normal is `(b−a) × (c−a)` for three consecutive vertices in
+  //       `he_next` order.  No spherical-approximation assumption — works
+  //       for nanotubes, oblate polytopes, irregular shapes.  For T̄(0)-
+  //       collapsed flat faces, all triangles within a face share a plane
+  //       so the per-triangle check is correct.
+  // O(V·F) + O(F) on V=12, F≤20.
+  static bool is_convex(const DelaunayTriangulation& T,
+                          const std::vector<coord3d>& pos,
+                          double tol = 1e-3);
+
+  // True iff some pair of non-adjacent triangles in T (sharing no vertex)
+  // intersect in 3D.  Möller's triangle-triangle test.  O(F²) face pairs;
+  // ≤ 400 pair-tests on V=12.
+  //
+  // A self-intersecting "polytope" is not embedded in R³ — it's not a
+  // valid polytope at all.  This check is a core definitional gate of
+  // validity, on equal footing with convexity and simplicity.  Convexity
+  // does imply non-self-intersection for closed 2-spheres, so the two
+  // checks are not independent on healthy outputs; but the gate must be
+  // enforced anyway so that any failure mode is reported under its
+  // correct label.
+  static bool has_self_intersection(const DelaunayTriangulation& T,
+                                      const std::vector<coord3d>& pos,
+                                      double tol = 1e-6);
 };

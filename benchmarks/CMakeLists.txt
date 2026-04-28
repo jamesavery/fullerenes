@@ -53,6 +53,18 @@ target_link_libraries(scan_nonsimp fullerenes)
 add_executable(probe_multi probe_multi.cc)
 target_link_libraries(probe_multi fullerenes)
 
+add_executable(trace_palc trace_palc.cc)
+target_link_libraries(trace_palc fullerenes)
+
+add_executable(scan_diag_max scan_diag_max.cc)
+target_link_libraries(scan_diag_max fullerenes)
+if(OpenMP_CXX_FOUND)
+  target_link_libraries(scan_diag_max OpenMP::OpenMP_CXX)
+endif()
+
+add_executable(spiral_mol2 spiral_mol2.cc)
+target_link_libraries(spiral_mol2 fullerenes)
+
 add_executable(replay_perstep replay_perstep.cc)
 target_link_libraries(replay_perstep fullerenes)
 
