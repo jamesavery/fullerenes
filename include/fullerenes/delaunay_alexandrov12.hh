@@ -36,6 +36,18 @@ struct AlexandrovSolver {
 
   DelaunayTriangulation D;
   std::vector<double> r;
+  // Optional override of the initial radii for PALC.  When non-empty
+  // and of size D.nv, solve() uses this in place of the default
+  // PALC::initial_radii(D) (= 2·R_max·1).  Used by the symmetry-
+  // breaking perturbation experiments and by warm-start callers.
+  std::vector<double> r_init_override;
+  // Coefficient for the strict-interior margin schedule applied during
+  // PALC: at homotopy parameter t ∈ (0, 1], iterates are kept in P(M)
+  // with safety distance c·t from ∂P(M) on the (ConcQuadr) and
+  // (CloGeod) sides.  At t = 0 (Newton polish), margin → 0 reproduces
+  // the closure check.  c = 0 disables margin enforcement (pre-#28
+  // behaviour).  Tunable for experimentation.
+  double palc_interior_margin = 0.0;
   bool verbose = false;
   bool trace_jacobian = false;       // record per-step spectrum of J
   int stats_steps = 0, stats_flips = 0, stats_newton_total = 0;

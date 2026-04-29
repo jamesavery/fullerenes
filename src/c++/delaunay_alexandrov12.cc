@@ -567,21 +567,33 @@ namespace Topology {
 // is needed because we start the homotopy from a Δ-complex iDT — bigon
 // faces may be present and need flipping during the path to maintain
 // Q-concavity.
-int needs_flip(const DelaunayTriangulation& T, const vector<double>& r) {
-  // (ConcQuadr): edge with two distinct adjacent triangles, θ > π.
+// `margin` parameterizes how strictly the iterate is held inside P(M):
+//   margin = -1e-10  closure with numerical noise buffer (existing behavior;
+//                    flip when θ > π + 1e-10 or q_j < q_i − ℓ²_ij − 1e-10)
+//   margin = 0       exact closure (boundary triggers a flip)
+//   margin = c > 0   strict-interior with safety distance c from ∂P(M):
+//                    flip when θ > π − c or q_j < q_i − ℓ²_ij + c
+// PALC uses a t-dependent schedule c·t so the margin shrinks to 0 as t → 0,
+// allowing legitimate flat-face diagonals (θ → π) at the polytope limit
+// while pushing the path strictly inside at intermediate t.  At t = 0
+// (Newton polish) the default margin = -1e-10 reproduces the closure check.
+int needs_flip(const DelaunayTriangulation& T, const vector<double>& r,
+                double margin = -1e-10) {
+  // (ConcQuadr): edge with two distinct adjacent triangles, θ > π − margin.
   // For a bigon edge (he_face[h] == he_face[h^1]), GCP::theta is not
   // meaningful; skip and let the (CloGeod) pass below handle it.
   // NaN θ — returned by alpha() when the abstract pyramid is degenerate
   // (h_sq < 0, i.e. Cayley-Menger fails) — also counts as bad: the
   // configuration is outside P(M) and a flip is required.  IEEE
   // comparisons with NaN are false, so we test isnan() explicitly.
+  double theta_threshold = M_PI - margin;
   for (int h = 0; h < T.nh; h += 2) {
     if (!T.alive(h)) continue;
     if (T.he_face[h] == T.he_face[h ^ 1]) continue;       // bigon — handled below
     double theta = GCP::theta(T, r, h);
-    if (std::isnan(theta) || theta > M_PI + 1e-10) return h;
+    if (std::isnan(theta) || theta > theta_threshold) return h;
   }
-  // (CloGeod): bigon i–j edge of an iji-face, q_j < q_i − ℓ²_ij.
+  // (CloGeod): bigon i–j edge of an iji-face, q_j < q_i − ℓ²_ij + margin.
   for (int h = 0; h < T.nh; h += 2) {
     if (!T.alive(h)) continue;
     if (T.he_face[h] != T.he_face[h ^ 1]) continue;       // not a bigon
@@ -600,16 +612,18 @@ int needs_flip(const DelaunayTriangulation& T, const vector<double>& r) {
     if (i != u && i != v) continue;                        // i must be one of h's endpoints
     double q_i = r[i] * r[i], q_j = r[j] * r[j];
     double ell_ij_sq = T.he_length[h] * T.he_length[h];
-    if (q_j < q_i - ell_ij_sq - 1e-10) return h;
+    if (q_j < q_i - ell_ij_sq + margin) return h;
   }
   return -1;
 }
 
-// Flip all edges where θ > π.  Returns number of flips performed.
-int flip_to_delaunay(DelaunayTriangulation& T, const vector<double>& r) {
+// Flip until needs_flip(T, r, margin) returns -1 (or 20 iter cap).
+// Returns number of flips performed.
+int flip_to_delaunay(DelaunayTriangulation& T, const vector<double>& r,
+                      double margin = -1e-10) {
   int total = 0;
   for (int iter = 0; iter < 20; iter++) {
-    int h = needs_flip(T, r);
+    int h = needs_flip(T, r, margin);
     if (h < 0) break;
     if (T.flip_edge(h)) total++;
     else break;
@@ -744,7 +758,8 @@ V initial_radii(const DelaunayTriangulation& T) {
 TrackResult palc_track(DelaunayTriangulation& T, V r, const V& kappa1,
                         double t_target, double ds_init,
                         vector<AlexandrovSolver::TraceEntry>* trace,
-                        vector<AlexandrovSolver::DiagEntry>* diag) {
+                        vector<AlexandrovSolver::DiagEntry>* diag,
+                        double interior_margin_coeff = 0.0) {
   double t = 1.0, ds = ds_init;
   vector<pair<double, V>> history;
   PALCStats stats;
@@ -755,7 +770,14 @@ TrackResult palc_track(DelaunayTriangulation& T, V r, const V& kappa1,
 
     if (result.accepted()) {
       t = result.t; r = std::move(result.r);
-      stats.flips += Topology::flip_to_delaunay(T, r);
+      // Strict-interior margin schedule: c·t at intermediate t shrinks to
+      // 0 at t = 0 (where flat-face diagonals legitimately have θ → π).
+      // c = 0 (default) reproduces pre-#28 behaviour (closure check via
+      // the negative -1e-10 numerical buffer in needs_flip).
+      double margin = (interior_margin_coeff > 0)
+                        ? interior_margin_coeff * t
+                        : -1e-10;
+      stats.flips += Topology::flip_to_delaunay(T, r, margin);
       if (!history.empty() && fabs(t - history.back().first) < 1e-14)
         history.back() = {t, r};
       else
@@ -1011,14 +1033,19 @@ vector<coord3d> AlexandrovSolver::solve() {
   diag_trace.clear();
   stats_status = ValidationStatus::FAIL_KAPPA_NOT_CONVERGED;
 
-  // 1. Initialize: uniform radii
-  r = PALC::initial_radii(D);
+  // 1. Initialize: uniform radii (or caller-provided override).
+  if ((int)r_init_override.size() == D.nv) {
+    r = r_init_override;
+  } else {
+    r = PALC::initial_radii(D);
+  }
   auto kappa1 = GCP::kappa(D, r);
 
   // 2. PALC: trace κ(r) = t·κ₁ from t=1 toward t_target
   auto track = PALC::palc_track(D, r, kappa1, /*t_target=*/0.1, /*ds_init=*/0.1,
                                  trace_jacobian ? &trace : nullptr,
-                                 record_diag ? &diag_trace : nullptr);
+                                 record_diag ? &diag_trace : nullptr,
+                                 palc_interior_margin);
   r = std::move(track.r_final);
   stats_steps        = track.stats.steps;
   stats_flips        = track.stats.flips;

@@ -68,6 +68,15 @@ target_link_libraries(spiral_mol2 fullerenes)
 add_executable(iso_mol2 iso_mol2.cc)
 target_link_libraries(iso_mol2 fullerenes buckygen)
 
+add_executable(idt_lengths idt_lengths.cc)
+target_link_libraries(idt_lengths fullerenes)
+
+add_executable(perturb_solve perturb_solve.cc)
+target_link_libraries(perturb_solve fullerenes)
+
+add_executable(margin_sweep margin_sweep.cc)
+target_link_libraries(margin_sweep fullerenes)
+
 add_executable(replay_perstep replay_perstep.cc)
 target_link_libraries(replay_perstep fullerenes)
 
