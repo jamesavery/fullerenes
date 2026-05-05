@@ -45,16 +45,13 @@ inline long wedge(Eisenstein u, Eisenstein v) {
     return (long)u.first * v.second - (long)u.second * v.first;
 }
 
-// True complex conjugate in Z[ω]:
+// i-reflection: complex conjugation in C, restricted to Z[ω]:
 //   complex_conj(a + b*ω) = a + b*ω̄ = (a + b) - b*ω
-// (Z[ω]'s only non-trivial field automorphism, z -> z̄.)
-//
-// NOTE: the legacy `Eisenstein::invertn()` method returns the same
-// value; this free function is a more discoverable name and is the
-// recommended form for new code.  A follow-up commit renames the
-// method to `Eisenstein::complex_conj()` to match.
+// Companion to Eisenstein::eis_conj() (the ω-reflection in Z[ω]'s
+// native (1, ω) basis).  Forwards to Eisenstein::complex_conj() so
+// callers can use either the free-function or method form.
 inline Eisenstein complex_conj(Eisenstein z) {
-    return Eisenstein(z.first + z.second, -z.second);
+    return z.complex_conj();
 }
 
 // Cartesian (x, y) of Eisenstein (a, b) in the (1, ω) basis.

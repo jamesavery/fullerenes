@@ -45,8 +45,10 @@ public:
   
   bool isUnit() const { return norm2() == 1;  }
 
-  // invertn(a,b) * (a,b) == norm2() (1,0)
-  Eisenstein invertn() const { return Eisenstein((first+second), -second); }
+  // i-reflection: complex conjugation in C, restricted to Z[w].
+  // Sends a + b*w -> a + b*wbar = (a+b) - b*w (where w = exp(i*pi/3),
+  // wbar = 1 - w).  Identity:  z * complex_conj(z) == norm2() * 1.
+  Eisenstein complex_conj() const { return Eisenstein((first+second), -second); }
   Eisenstein GCtransform(int k, int l) const {  return Eisenstein(k,l) * (*this);  }
   Eisenstein affine(const Eisenstein& x0, const Eisenstein w) const {
     Eisenstein x(*this);
@@ -61,7 +63,11 @@ public:
   Eisenstein nextCW()    const { return (*this) * Eisenstein(1,-1); }
   Eisenstein nextCCW()   const { return (*this) * Eisenstein(0,1);  }
   Eisenstein transpose() const { return Eisenstein(second,first);   }
-  Eisenstein conj()      const { return Eisenstein(first,-second);  }
+  // w-reflection: conjugation in Z[w] in its native (1, w) basis,
+  // sending a + b*w -> a + (-b)*w = a - b*w (i.e. (a, -b) in (1, w)
+  // coordinates).  Companion to complex_conj: complex_conj is the
+  // i-reflection in C, eis_conj is the w-reflection in Z[w].
+  Eisenstein eis_conj()  const { return Eisenstein(first,-second);  }
 
   int unit_angle() const {
     assert(norm2() == 1);
@@ -99,7 +105,7 @@ public:
 
   Eisenstein div(const Eisenstein& y) const {
     // Naive, possibly non-robust algorithm
-    Eisenstein z(*this * y.invertn());
+    Eisenstein z(*this * y.complex_conj());
 
     double re = z.first, im = z.second;
     re /= y.norm2(); im /= y.norm2();

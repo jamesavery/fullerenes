@@ -231,7 +231,7 @@ vector< pair<Eisenstein,node_t> > Unfolding::get_outline(const map<arc_t,Unfoldi
 void Unfolding::transform_line(const Unfolding::arccoord_t& l1, const Unfolding::arccoord_t& l2,
 			       Eisenstein& x0, Eisenstein& x0p, Eisenstein& w)
 {
-  Eisenstein Duv(l1.second-l1.first), Dvu(l2.first-l2.second), Tuvvu((Duv.invertn()*Dvu)/Dvu.norm2());
+  Eisenstein Duv(l1.second-l1.first), Dvu(l2.first-l2.second), Tuvvu((Duv.complex_conj()*Dvu)/Dvu.norm2());
 
   x0  = l1.first;
   x0p = l2.second;

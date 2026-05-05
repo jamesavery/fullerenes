@@ -34,7 +34,7 @@ void draw_nodes_polygon(const polygon &p, const Eisenstein w,
 			  matrix<int> &grid, node_t& last_node)
 {
   auto scan = (p*w).scanConvert(); // Coordinate-transformed polygon  
-  Eisenstein iw = w.invertn();	   // Inverse coordinate transformation
+  Eisenstein iw = w.complex_conj();	   // Inverse coordinate transformation
 
   int X,Y;			   // Un-transformed coordinates
   
@@ -130,7 +130,7 @@ vector<Eisenstein> cubic_inner_faces(polygon P, matrix<int> node_grid)
 
 void latex_scanconversion(const char *name, Eisenstein w, polygon p)
 {
-  Eisenstein iw = w.invertn();
+  Eisenstein iw = w.complex_conj();
   auto scan = (p*w).scanConvert();
 
   printf("\\newcommand{\\controlpoints%s}{",name);
