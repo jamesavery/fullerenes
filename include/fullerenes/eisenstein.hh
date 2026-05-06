@@ -12,7 +12,7 @@ using namespace std;
   Multiplication:
   (a,b) = a*1 + b*w -> (a,b)*(c,d) = (a*1+b*w)(c*1+d*w) = (ac*1 + (bc+ad)*w + b*d*(w-1) = (ac-bd)*1 + (bc+ad+bd)*w
   
-  Inverse: (a+b,-b)/(a^2+ab+b^2)
+  Inverse: (a+b,-b)/(a^2+ab+b^2) = complex_conj(a,b)/norm2(a,b)
   
 */
 class Eisenstein: public pair<int,int> {
@@ -45,9 +45,9 @@ public:
   
   bool isUnit() const { return norm2() == 1;  }
 
+  // w-reflection: conjugation in Z[w] in its native (1, w) basis,
+  Eisenstein eis_conj()  const { return Eisenstein(first,-second);  }
   // i-reflection: complex conjugation in C, restricted to Z[w].
-  // Sends a + b*w -> a + b*wbar = (a+b) - b*w (where w = exp(i*pi/3),
-  // wbar = 1 - w).  Identity:  z * complex_conj(z) == norm2() * 1.
   Eisenstein complex_conj() const { return Eisenstein((first+second), -second); }
   Eisenstein GCtransform(int k, int l) const {  return Eisenstein(k,l) * (*this);  }
   Eisenstein affine(const Eisenstein& x0, const Eisenstein w) const {
@@ -63,11 +63,6 @@ public:
   Eisenstein nextCW()    const { return (*this) * Eisenstein(1,-1); }
   Eisenstein nextCCW()   const { return (*this) * Eisenstein(0,1);  }
   Eisenstein transpose() const { return Eisenstein(second,first);   }
-  // w-reflection: conjugation in Z[w] in its native (1, w) basis,
-  // sending a + b*w -> a + (-b)*w = a - b*w (i.e. (a, -b) in (1, w)
-  // coordinates).  Companion to complex_conj: complex_conj is the
-  // i-reflection in C, eis_conj is the w-reflection in Z[w].
-  Eisenstein eis_conj()  const { return Eisenstein(first,-second);  }
 
   int unit_angle() const {
     assert(norm2() == 1);
@@ -155,10 +150,68 @@ namespace std {
   template<> struct hash<Eisenstein> { // Vectors of integers smaller than 32 bit
     size_t operator()(Eisenstein const &f) const {
       uint64_t combined_int = (uint64_t(f.first)<<32) + f.second;
-      return std::hash<uint64_t>()(combined_int);      
+      return std::hash<uint64_t>()(combined_int);
     }
   };
 }
+
+
+// =====================================================================
+// Free-function helpers on Z[w].
+//
+// Things that are about Z[w] but read more naturally as binary or
+// query operations than as methods on a single Eisenstein.
+// =====================================================================
+
+// d-th sixth-root of unity, with mod-6 wrap on d (handles d < 0 too).
+// Eisenstein::unit[i] is the same value when 0 <= i <= 6 (where i=6 is
+// a duplicate of i=0); use unit_direction when d may be out of range.
+inline Eisenstein unit_direction(int d) {
+  return Eisenstein::unit[((d % 6) + 6) % 6];
+}
+
+// Integer signed area in shear coords:  u.first*v.second - u.second*v.first.
+// Sign matches the Cartesian wedge (Cartesian-wedge = (sqrt(3)/2) * this),
+// so trigonometry-free orientation tests are exact.  Companion to
+// Eisenstein::turn(a, b, c), which returns the SIGN of wedge(b-a, c-a).
+inline long wedge(Eisenstein u, Eisenstein v) {
+  return (long)u.first * v.second - (long)u.second * v.first;
+}
+
+// Some Eisenstein integer (a, b) with a >= 0, b >= 0 and
+// a^2 + a*b + b^2 == N.  Returns the first sector-0 representative
+// found by scanning b = 0, 1, ...; aborts if no solution exists.
+// Precondition: N >= 0 is a valid Eisenstein norm.
+Eisenstein eisenstein_of_norm(int N);
+
+// Enumerate ALL sector-0 Eisenstein reps (a >= 0, b >= 0) of norm N.
+// Generic norms return 1 entry; split-prime norms return 2 entries in
+// distinct rotation orbits.
+std::vector<Eisenstein> sector0_reps_of_norm(int N);
+
+
+// =====================================================================
+// D6 action between norm-equal Eisensteins.
+// =====================================================================
+
+// A D6 affine transform of Z[w] onto itself:
+//   T(z) = unit * z                       (if reflect == false)
+//        = unit * z.complex_conj()        (if reflect == true)
+// `unit` is one of the 6 Eisenstein units.
+struct D6Affine {
+  Eisenstein unit;
+  bool       reflect;
+
+  Eisenstein apply(Eisenstein z) const {
+    return (reflect ? z.complex_conj() : z) * unit;
+  }
+};
+
+// Find the D6Affine T with T(z_from) == z_to.  Both inputs must have
+// the same norm.  Exactly one branch (rotation, reflection) gives a
+// unit by the D6 symmetry of Z[w]; align returns that branch.  Aborts
+// on norm mismatch or non-divisibility.
+D6Affine align(Eisenstein z_from, Eisenstein z_to);
 
 
 

@@ -10,13 +10,12 @@
 // scan_triangle(P0..P2) -- per-scanline a-range of the integer
 //                          lattice points in a CCW triangle.
 //
-// Both depend only on the Eisenstein primitives in eisenstein_ops.hh
+// Both depend only on the Eisenstein primitives in eisenstein.hh
 // and on Triangulation's CCW neighbour-list contract.  No Alexandrov,
 // no fillin-specific machinery.
 // =====================================================================
 
 #include "fullerenes/eisenstein.hh"
-#include "fullerenes/eisenstein_ops.hh"
 #include "fullerenes/triangulation.hh"
 
 #include <array>

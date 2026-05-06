@@ -1,6 +1,6 @@
 #include "fullerenes/delaunay_unfold.hh"
 #include "fullerenes/eisenstein_tikz.hh"
-#include "fullerenes/eisenstein_ops.hh"
+#include "fullerenes/eisenstein.hh"
 
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/delaunay.hh"
@@ -85,7 +85,7 @@ void dump_neighbour_unfolding_tikz(const CellPlacement& F,
         D6Affine T = align(z_src, z_dst);
         auto apply = [&](Eisenstein p) {
             Eisenstein q = p - Qa;
-            if (T.reflect) q = complex_conj(q);
+            if (T.reflect) q = q.complex_conj();
             q = q * T.unit;
             return q + Pa;
         };
@@ -237,7 +237,7 @@ LatticeUnfolding unfold_from_seed(const DelaunayTriangulation& D,
         g.parent_cell_id = parent_id;
         for (const auto& [p, v] : F.lattice_points) {
             Eisenstein q = p - anchor_local;
-            if (T.reflect) q = complex_conj(q);
+            if (T.reflect) q = q.complex_conj();
             q = q * T.unit + anchor_global;
             g.entries.push_back({q, v});
         }
@@ -301,7 +301,7 @@ LatticeUnfolding unfold_from_seed(const DelaunayTriangulation& D,
         D6Affine T = align(z_local, z_global);
         auto apply = [&](Eisenstein p) {
             Eisenstein q = p - Pu_l;
-            if (T.reflect) q = complex_conj(q);
+            if (T.reflect) q = q.complex_conj();
             return q * T.unit + Pu_g;
         };
         Eisenstein P0g = apply(F.P0), P1g = apply(F.P1), P2g = apply(F.P2);

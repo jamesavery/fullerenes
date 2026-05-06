@@ -9,7 +9,7 @@
 // having one source of truth.
 // =====================================================================
 
-#include "fullerenes/eisenstein_ops.hh"
+#include "fullerenes/eisenstein.hh"
 
 #include <algorithm>
 #include <cmath>

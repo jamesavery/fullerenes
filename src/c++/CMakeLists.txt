@@ -2,7 +2,7 @@ add_library(fullerenes SHARED
   graph.cc cubicgraph.cc planargraph.cc fullerenegraph.cc triangulation.cc polyhedron.cc
   spiralc.cc planargraph-io.cc polyhedron-io.cc debug.cc fold.cc  unfold.cc geometryc.cc
   delaunay.cc  delaunay_embed3d.cc  delaunay_old.cc  delaunay_alexandrov12.cc  graph_fortran.cc isomerdb.cc layout.cc layout2d.cc argparser.cc
-  polyhedron-optimize.cc symmetry.cc eisenstein.cc eisenstein_ops.cc eisenstein_raster.cc
+  polyhedron-optimize.cc symmetry.cc eisenstein.cc eisenstein_raster.cc barycentric.cc
   delaunay_strip.cc delaunay_unfold.cc deltahedron.cc buckinverse.cc ../contrib/mgmres.cc ${MORE_SOURCES}
 )
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "fullerenes/eisenstein_ops.hh"
+#include "fullerenes/eisenstein.hh"
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/delaunay.hh"
 
