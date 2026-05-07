@@ -770,6 +770,44 @@ int DelaunayTriangulation::min_live_degree() const
   return m;
 }
 
+bool DelaunayTriangulation::is_simplicial() const
+{
+  // Simplicial iff the arc map  h |-> (origin(h), dest(h))  is injective
+  // on live half-edges.  Self-loops fail because both twins encode (v,v);
+  // multi-edges fail because two non-twin half-edges encode the same
+  // arc (u,v).  Both pathologies show up as a duplicate insertion.
+  std::set<std::pair<int,int>> arcs;
+  for (int h = 0; h < nh; h++) {
+    if (!alive(h)) continue;
+    if (!arcs.insert({he_origin[h], dest(h)}).second) return false;
+  }
+  return true;
+}
+
+bool DelaunayTriangulation::is_well_formed() const
+{
+  // Every live half-edge belongs to exactly one face cycle (walked via
+  // he_next), and every such cycle has length 3.  DCEL counterpart of
+  // Graph::is_consistently_oriented: there an arc u->v is consistent
+  // if it appears in exactly one face walked via next(v, u); here a
+  // half-edge h is consistent if it appears in exactly one face
+  // walked via he_next.
+  std::vector<bool> visited(nh, false);
+  for (int h0 = 0; h0 < nh; h0++) {
+    if (!alive(h0) || visited[h0]) continue;
+    int h = h0;
+    for (int step = 0; step < 3; step++) {
+      if (!alive(h) || visited[h]) return false;
+      visited[h] = true;
+      h = he_next[h];
+    }
+    if (h != h0) return false;             // cycle longer than 3
+  }
+  for (int h = 0; h < nh; h++)
+    if (alive(h) && !visited[h]) return false;
+  return true;
+}
+
 DelaunayTriangulation DelaunayTriangulation::compute(const Triangulation& T)
 {
   // Sort flat vertices last, then build DCEL and run the algorithm.

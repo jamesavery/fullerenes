@@ -189,9 +189,28 @@ struct DelaunayTriangulation {
   static DelaunayTriangulation compute(const Triangulation& T);
 
   // Smallest degree among live (non-removed) vertices, or INT_MAX if
-  // none.  A value below 3 indicates the iDT has at least one bigon
-  // (a non-simplicial feature, valid in delta-complex form).
+  // none.  A value below 3 is one (but not the only) non-simplicial
+  // signature -- use is_simplicial() for a complete check.
   int min_live_degree() const;
+
+  // True iff the iDT's 1-skeleton is a simple graph: no self-loops,
+  // no multi-edges.  Equivalently: the map h |-> (origin(h), dest(h))
+  // is injective on live half-edges.  Self-loops fail because both
+  // twins encode the arc (v,v); multi-edges fail because two non-twin
+  // half-edges encode the same arc.
+  // Non-simplicial outputs are valid iDT delta-complexes (Bobenko-
+  // Springborn 2007), not algorithm failures.
+  // Cost: O(E log E).
+  bool is_simplicial() const;
+
+  // True iff the DCEL is structurally well-formed: every live half-edge
+  // belongs to exactly one face cycle traversed via he_next, and every
+  // such cycle has length 3.  This is the DCEL counterpart of
+  // Graph::is_consistently_oriented (which walks faces via next(v,u)).
+  // A well-formed iDT can still be non-simplicial (multi-edges, self-
+  // loops); a not-well-formed iDT signals a bug in the algorithm.
+  // Cost: O(E).
+  bool is_well_formed() const;
 
   // Bisect all multi-edges by inserting midpoint vertices.
   // Multi-edges (multiple geodesics between the same cone-point pair) can't be

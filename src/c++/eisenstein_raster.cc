@@ -183,7 +183,7 @@ NextFace find_next_face_at_hex(const Triangulation& T,
 
     // Lattice direction of the line at V.  line_dir is an Eisenstein
     // pointing in the line's direction (any positive-scale rep).
-    auto xy = to_cartesian(line_dir);
+    auto xy = line_dir.coord();
     double theta = std::atan2(xy.second, xy.first);
     if (theta < 0) theta += 2 * M_PI;
     int j_line = (int)std::floor(theta / (M_PI / 3.0));

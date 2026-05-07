@@ -1,6 +1,8 @@
 #include <utility>
 #include <vector>
 #include <string>
+#include <stdexcept>
+#include <sstream>
 
 
 #include "fullerenes/spiral.hh"
@@ -68,9 +70,10 @@ spiral_nomenclature::spiral_nomenclature(const string &str) : naming_scheme(CAGE
   //  cerr << "segments = " << segments[0] << "; " << segments[1] << "; " << segments[2] << "\n";
 
   if(segments.size() != 3){
-    cerr << "Error in spiral string \"" << str << "\": Number of \"[]\"-delimited segments is " << segments.size()
-	 << ", not 3.\n";
-    abort();
+    std::ostringstream m;
+    m << "spiral_nomenclature: malformed name \"" << str
+      << "\": " << segments.size() << " \"[]\"-delimited segments, expected 3";
+    throw std::invalid_argument(m.str());
   }
 
   string &prefix_string = segments[0], &spiral_spec = segments[1], &suffix_string = segments[2];
@@ -136,8 +139,10 @@ spiral_nomenclature::spiral_nomenclature(const string &str) : naming_scheme(CAGE
   }
 
   if(!(suffix == "fullerene" || suffix == "fulleroid")){
-    cerr << "Graph type is \""<<suffix<<"\", must be one of \"cage\", \"fullerene\", or \"fulleroid\".\n";
-    abort();
+    std::ostringstream m;
+    m << "spiral_nomenclature: graph type is \"" << suffix
+      << "\", must be one of \"cage\", \"fullerene\", or \"fulleroid\"";
+    throw std::invalid_argument(m.str());
   }
 
   if (suffix == "fullerene"){

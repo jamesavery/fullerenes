@@ -86,6 +86,12 @@ target_link_libraries(batch_multiflip_sweep fullerenes)
 add_executable(deflate_solve deflate_solve.cc)
 target_link_libraries(deflate_solve fullerenes)
 
+add_executable(scan_full_range scan_full_range.cc)
+target_link_libraries(scan_full_range fullerenes buckygen)
+if(OpenMP_CXX_FOUND)
+  target_link_libraries(scan_full_range OpenMP::OpenMP_CXX)
+endif()
+
 
 add_executable(replay_perstep replay_perstep.cc)
 target_link_libraries(replay_perstep fullerenes)
