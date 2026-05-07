@@ -77,6 +77,16 @@ target_link_libraries(perturb_solve fullerenes)
 add_executable(margin_sweep margin_sweep.cc)
 target_link_libraries(margin_sweep fullerenes)
 
+add_executable(stochastic_sweep stochastic_sweep.cc)
+target_link_libraries(stochastic_sweep fullerenes)
+
+add_executable(batch_multiflip_sweep batch_multiflip_sweep.cc)
+target_link_libraries(batch_multiflip_sweep fullerenes)
+
+add_executable(deflate_solve deflate_solve.cc)
+target_link_libraries(deflate_solve fullerenes)
+
+
 add_executable(replay_perstep replay_perstep.cc)
 target_link_libraries(replay_perstep fullerenes)
 

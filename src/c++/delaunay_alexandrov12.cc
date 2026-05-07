@@ -26,6 +26,7 @@
 #include <cstdio>
 #include <cmath>
 #include <map>
+#include <random>
 #include <set>
 #include <vector>
 #include <algorithm>
@@ -631,6 +632,33 @@ int flip_to_delaunay(DelaunayTriangulation& T, const vector<double>& r,
   return total;
 }
 
+// Synchronized batch multi-flip (Direction 2).  Identify all alive
+// non-bigon edges with θ > π − threshold, then flip them all in one
+// pass.  Single-edge flip cycles (which defeat sequential flip_to_-
+// delaunay on the symmetric drum-cap metrics) cannot occur here
+// because no θ re-evaluation happens between flips in the batch.
+// Returns number of flips actually performed (some may have been
+// skipped if they share vertices with an earlier flip in the batch
+// and are no longer alive by the time we reach them).
+int batch_multi_flip(DelaunayTriangulation& T, const vector<double>& r,
+                      double threshold) {
+  if (threshold <= 0) return 0;
+  vector<int> targets;
+  double cutoff = M_PI - threshold;
+  for (int h = 0; h < T.nh; h += 2) {
+    if (!T.alive(h)) continue;
+    if (T.he_face[h] == T.he_face[h ^ 1]) continue;       // bigon
+    double theta = GCP::theta(T, r, h);
+    if (std::isnan(theta) || theta > cutoff) targets.push_back(h);
+  }
+  int total = 0;
+  for (int h : targets) {
+    if (!T.alive(h)) continue;                             // killed by earlier flip
+    if (T.flip_edge(h)) total++;
+  }
+  return total;
+}
+
 } // namespace Topology
 
 // ============================================================================
@@ -643,10 +671,54 @@ int flip_to_delaunay(DelaunayTriangulation& T, const vector<double>& r,
 
 namespace PALC {
 
+// Deflation context for Direction 4: augments the homotopy residual by
+// a repulsive term centered at `target` with magnitude `strength`.
+//   F(r, t) → F(r, t) + (1 − t) · α · (r − r*) / ‖r − r*‖²
+// active() ⇒ apply.  inactive Deflation is the identity transformation
+// — F, J, and κ₁ are returned unchanged.
+struct Deflation {
+  vector<double> target;
+  double         strength = 0.0;
+
+  bool active(int n) const {
+    return strength > 0 && (int)target.size() == n;
+  }
+
+  // D(r) = α · (r − r*) / ‖r − r*‖²
+  vector<double> D(const vector<double>& r) const {
+    int n = (int)r.size();
+    vector<double> delta(n), out(n);
+    double dn2 = 0;
+    for (int i = 0; i < n; i++) { delta[i] = r[i] - target[i]; dn2 += delta[i]*delta[i]; }
+    if (dn2 < 1e-30) return out;   // singular at target — caller should avoid
+    double s = strength / dn2;
+    for (int i = 0; i < n; i++) out[i] = s * delta[i];
+    return out;
+  }
+
+  // ∂D_i/∂r_j = α/‖δ‖² · (δ_ij − 2·δ_i·δ_j/‖δ‖²)
+  matrix<double> dDdr(const vector<double>& r) const {
+    int n = (int)r.size();
+    matrix<double> dD(n, n, 0.0);
+    vector<double> delta(n);
+    double dn2 = 0;
+    for (int i = 0; i < n; i++) { delta[i] = r[i] - target[i]; dn2 += delta[i]*delta[i]; }
+    if (dn2 < 1e-30) return dD;
+    double s = strength / dn2;
+    double inv_dn2 = 1.0 / dn2;
+    for (int i = 0; i < n; i++)
+      for (int j = 0; j < n; j++)
+        dD(i, j) = s * ((i == j ? 1.0 : 0.0) - 2.0 * delta[i] * delta[j] * inv_dn2);
+    return dD;
+  }
+};
+
 struct Tangent { double t_dot; vector<double> r_dot; };
 
 // Tangent to the homotopy curve at (t, r).
 // From J·ṙ = κ₁·ṫ and ||(ṫ, ṙ)|| = 1, ṫ < 0.
+// With deflation:  J_def·ṙ = κ₁_eff·ṫ where J_def = J + (1−t)·∂D/∂r
+// and κ₁_eff = κ₁ + D(r).
 Tangent compute_tangent(const matrix<double>& J, const vector<double>& kappa1) {
   auto v = LinAlg::solve(J, kappa1);  // v = J⁻¹ κ₁
   if (!LinAlg::is_valid(v))
@@ -672,14 +744,30 @@ pair<double, V> predict(double t, const V& r, const Tangent& tau, double ds) {
 int correct(const DelaunayTriangulation& T, double& t, V& r,
             const V& kappa1, const Tangent& tau0,
             double t0, const V& r0, double ds,
-            int max_iter, double tol) {
+            int max_iter, double tol,
+            const Deflation* defl = nullptr) {
   using LinAlg::dot;
+  bool use_defl = defl && defl->active((int)r.size());
   for (int nit = 0; nit < max_iter; nit++) {
-    V F = GCP::kappa(T, r) - kappa1 * t;                  // residual
+    V F = GCP::kappa(T, r) - kappa1 * t;                  // base residual
+    auto J = GCP::jacobian(T, r);
+    V kappa1_eff = kappa1;
+    if (use_defl) {
+      // F_def = F + (1−t)·D(r);  J_def = J + (1−t)·∂D/∂r;
+      // Bordered's "kappa1" represents −∂F/∂t = κ₁ − (the t-derivative term).
+      // For F_def, ∂F_def/∂t = −κ₁ − D(r), so κ₁_eff = κ₁ + D(r).
+      auto Dvec = defl->D(r);
+      double w = 1.0 - t;
+      for (size_t i = 0; i < F.size(); i++) F[i] += w * Dvec[i];
+      auto dD = defl->dDdr(r);
+      for (int i = 0; i < J.m; i++)
+        for (int j = 0; j < J.n; j++) J(i, j) += w * dD(i, j);
+      kappa1_eff.resize(F.size());
+      for (size_t i = 0; i < F.size(); i++) kappa1_eff[i] = kappa1[i] + Dvec[i];
+    }
     if (LinAlg::max_abs(F) < tol) return nit;
 
-    auto J = GCP::jacobian(T, r);
-    LinAlg::Bordered B{J, kappa1, tau0.r_dot, tau0.t_dot};
+    LinAlg::Bordered B{J, kappa1_eff, tau0.r_dot, tau0.t_dot};
     double g = ds - dot(tau0.r_dot, r - r0) - tau0.t_dot * (t - t0);
     auto sol = B.solve(-F, g);
     if (!sol) return -1;
@@ -720,12 +808,26 @@ struct StepResult {
 //       distance ds from (t₀, r₀), to within CORRECTOR_TOL.
 StepResult palc_step(const DelaunayTriangulation& T,
                       double t0, const V& r0, const V& kappa1,
-                      const matrix<double>& J, double ds) {
-  auto tau = compute_tangent(J, kappa1);
+                      const matrix<double>& J, double ds,
+                      const Deflation* defl = nullptr) {
+  // Tangent on the deflated curve uses J_def and κ₁_eff.
+  matrix<double> J_eff = J;
+  V kappa1_eff = kappa1;
+  if (defl && defl->active((int)r0.size())) {
+    auto dD = defl->dDdr(r0);
+    auto Dvec = defl->D(r0);
+    double w = 1.0 - t0;
+    for (int i = 0; i < J_eff.m; i++)
+      for (int j = 0; j < J_eff.n; j++) J_eff(i, j) += w * dD(i, j);
+    kappa1_eff.resize(kappa1.size());
+    for (size_t i = 0; i < kappa1.size(); i++)
+      kappa1_eff[i] = kappa1[i] + Dvec[i];
+  }
+  auto tau = compute_tangent(J_eff, kappa1_eff);
   auto [tp, rp] = predict(t0, r0, tau, ds);
   double tc = tp; V rc = rp;
   int nit = correct(T, tc, rc, kappa1, tau, t0, r0, ds,
-                     CORRECTOR_MAX_ITER, CORRECTOR_TOL);
+                     CORRECTOR_MAX_ITER, CORRECTOR_TOL, defl);
   return {nit, tc, std::move(rc)};
 }
 
@@ -759,14 +861,20 @@ TrackResult palc_track(DelaunayTriangulation& T, V r, const V& kappa1,
                         double t_target, double ds_init,
                         vector<AlexandrovSolver::TraceEntry>* trace,
                         vector<AlexandrovSolver::DiagEntry>* diag,
-                        double interior_margin_coeff = 0.0) {
+                        double interior_margin_coeff = 0.0,
+                        double stochastic_eps = 0.0,
+                        uint32_t stochastic_seed = 1,
+                        double batch_multiflip_threshold = 0.0,
+                        const Deflation* deflation = nullptr) {
   double t = 1.0, ds = ds_init;
   vector<pair<double, V>> history;
   PALCStats stats;
+  std::mt19937 rng(stochastic_seed);
+  std::uniform_real_distribution<double> jitter(-1.0, 1.0);
 
   for (int step = 0; step < 500 && t > t_target; step++) {
     auto J = GCP::jacobian(T, r);
-    auto result = palc_step(T, t, r, kappa1, J, ds);
+    auto result = palc_step(T, t, r, kappa1, J, ds, deflation);
 
     if (result.accepted()) {
       t = result.t; r = std::move(result.r);
@@ -778,6 +886,31 @@ TrackResult palc_track(DelaunayTriangulation& T, V r, const V& kappa1,
                         ? interior_margin_coeff * t
                         : -1e-10;
       stats.flips += Topology::flip_to_delaunay(T, r, margin);
+
+      // Batch multi-flip (Direction 2): after the regular post-accept
+      // flip cleanup, do a single synchronized batch flip of any
+      // remaining near-π edges to escape sequential-flip cycles.
+      // Then a final flip_to_delaunay cleans up the post-batch state.
+      if (batch_multiflip_threshold > 0) {
+        int batch_flips = Topology::batch_multi_flip(T, r,
+                                                       batch_multiflip_threshold);
+        if (batch_flips > 0) {
+          stats.flips += batch_flips;
+          stats.flips += Topology::flip_to_delaunay(T, r, margin);
+        }
+      }
+
+      // Stochastic perturbation (Direction 1): r ← r·(1 + ε·u_v) per
+      // vertex, with u_v ~ uniform[−1,+1].  Applied after the post-
+      // accept flip phase so the corrector starts the next step from
+      // a perturbed but still in-F(T)-near r (small eps preserves
+      // F(T)).  Breaks symmetry continuously rather than only at
+      // t = 1.  ε = 0 disables.
+      if (stochastic_eps > 0) {
+        for (size_t i = 0; i < r.size(); i++) {
+          r[i] *= 1.0 + stochastic_eps * jitter(rng);
+        }
+      }
       if (!history.empty() && fabs(t - history.back().first) < 1e-14)
         history.back() = {t, r};
       else
@@ -1042,10 +1175,17 @@ vector<coord3d> AlexandrovSolver::solve() {
   auto kappa1 = GCP::kappa(D, r);
 
   // 2. PALC: trace κ(r) = t·κ₁ from t=1 toward t_target
+  PALC::Deflation defl;
+  defl.target = r_deflate_target;
+  defl.strength = deflate_strength;
   auto track = PALC::palc_track(D, r, kappa1, /*t_target=*/0.1, /*ds_init=*/0.1,
                                  trace_jacobian ? &trace : nullptr,
                                  record_diag ? &diag_trace : nullptr,
-                                 palc_interior_margin);
+                                 palc_interior_margin,
+                                 stochastic_perturbation_eps,
+                                 stochastic_seed,
+                                 palc_batch_multiflip_threshold,
+                                 defl.active(D.nv) ? &defl : nullptr);
   r = std::move(track.r_final);
   stats_steps        = track.stats.steps;
   stats_flips        = track.stats.flips;

@@ -48,6 +48,32 @@ struct AlexandrovSolver {
   // the closure check.  c = 0 disables margin enforcement (pre-#28
   // behaviour).  Tunable for experimentation.
   double palc_interior_margin = 0.0;
+  // Stochastic-perturbation experiment (Direction 1): after each accepted
+  // PALC step, multiplicatively perturb r per-vertex by uniform random
+  // factor in [1−ε, 1+ε] before the next predictor.  Continuously breaks
+  // any symmetry the metric induces in the trajectory.  ε = 0 (default)
+  // disables the perturbation.  `stochastic_seed` makes runs reproducible.
+  double stochastic_perturbation_eps = 0.0;
+  uint32_t stochastic_seed = 1;
+  // Synchronized batch multi-flip experiment (Direction 2): after each
+  // accepted PALC step (post the standard flip_to_delaunay phase),
+  // perform a batch flip of all alive non-bigon edges with
+  // θ_e > π − batch_multiflip_threshold, all in one pass without
+  // re-evaluating θ between flips.  Then a final flip_to_delaunay
+  // cleans up.  Threshold = 0 disables.
+  double palc_batch_multiflip_threshold = 0.0;
+  // Deflated homotopy (Direction 4): if r_deflate_target.size() == D.nv
+  // and deflate_strength > 0, augment the PALC residual with a repulsive
+  // deflation term that diverges at r_deflate_target — the empirically-
+  // known drum-cap fixed point from a prior failed run.
+  //   F_def(r, t) = κ(r) − t·κ₁ + (1−t)·α·(r − r*) / ‖r − r*‖²
+  // r_deflate_target = r*, deflate_strength = α.  At t = 1 the deflation
+  // is off (factor (1−t) = 0); at t = 0 it dominates near r* and forces
+  // PALC away from drum-cap.  After the PALC track, an un-deflated
+  // Newton polish gives a clean κ = 0 solution.  Inactive when target
+  // is empty or strength = 0.
+  std::vector<double> r_deflate_target;
+  double deflate_strength = 0.0;
   bool verbose = false;
   bool trace_jacobian = false;       // record per-step spectrum of J
   int stats_steps = 0, stats_flips = 0, stats_newton_total = 0;
