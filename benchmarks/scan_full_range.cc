@@ -8,7 +8,10 @@
 //
 // Usage:
 //   scan_full_range <N_min> <N_max> --out failures.tsv --summary summary.txt
-//                   [--ipr]
+//                   [--ipr] [--gauge-snap] [--gauge-project] [--tsvd] [--rcond <r>]
+//
+// (Note: --tsvd uses the symmetric eigendecomposition of J in the bordering
+//  algorithm; this is the production form per tsvd-design.md.)
 //
 // Output (failures.tsv) — one row per non-OK isomer:
 //   N  status  vol_norm  kappa  flips  steps  buckygen_idx  spiral_name
@@ -68,11 +71,17 @@ int main(int argc, char** argv) {
   int N_max = atoi(argv[2]);
   string out_path, summary_path;
   bool ipr = false;
+  bool gauge_snap = false, gauge_project = false, tsvd = false;
+  double rcond = 5e-3;
   for (int i = 3; i < argc; i++) {
     string a = argv[i];
     if      (a == "--out"     && i+1 < argc) out_path     = argv[++i];
     else if (a == "--summary" && i+1 < argc) summary_path = argv[++i];
     else if (a == "--ipr")                   ipr          = true;
+    else if (a == "--gauge-snap")            gauge_snap   = true;
+    else if (a == "--gauge-project")         gauge_project = true;
+    else if (a == "--tsvd")                  tsvd          = true;
+    else if (a == "--rcond" && i+1 < argc)   rcond = std::stod(argv[++i]);
   }
   if (out_path.empty() || summary_path.empty()) {
     fprintf(stderr, "--out and --summary required\n");
@@ -115,6 +124,10 @@ int main(int argc, char** argv) {
     for (int i = 0; i < (int)all.size(); i++) {
       // Compute canonical name and run solver.
       AlexandrovSolver solver;
+      solver.palc_gauge_snap    = gauge_snap;
+      solver.palc_gauge_project = gauge_project;
+      solver.palc_tsvd          = tsvd;
+      solver.palc_tsvd_rcond    = rcond;
       string spiral_name;
       try {
         solver.D = DelaunayTriangulation::compute(all[i]);

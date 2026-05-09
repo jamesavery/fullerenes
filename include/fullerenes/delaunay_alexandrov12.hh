@@ -74,6 +74,42 @@ struct AlexandrovSolver {
   // is empty or strength = 0.
   std::vector<double> r_deflate_target;
   double deflate_strength = 0.0;
+  // Translation-gauge fixing (Direction 5).  Two forms, both opt-in.
+  //
+  // (a) palc_gauge_snap (state-snap):  After each accepted PALC step
+  //     and each accepted Newton-polish step, reconstruct cone-point
+  //     positions p_v via Gram-BFS, compute centroid c, and replace
+  //     r_v ← ‖p_v − c‖ (clipped via GCP::feasible_step to stay in
+  //     F(T)).  Fixes 4/5 of the known κ-stall cases at the cost of
+  //     significant regressions on the previously-OK population
+  //     (~3% at C100).  Use only on cases known to need it.
+  //
+  // (b) palc_gauge_project (step-projection):  Less invasive form.
+  //     At each PALC corrector iteration and each Newton-polish
+  //     trust-region iteration, build the 12×3 gauge basis Q from
+  //     p̂_v = p_v / r_v (current Gram-BFS positions, apex at
+  //     origin), QR-orthonormalize, and project Newton's update
+  //     Δr ← (I − QQᵀ)Δr before applying.  Removes the gauge
+  //     component of each step without modifying r in place.
+  //
+  // Both are gated to skip iterates with |κ|_max ≥ 0.5 since
+  // Gram-BFS reconstruction is geometrically meaningless at high κ
+  // (the iterate is a B-I generalized polytope, not a real polytope).
+  bool palc_gauge_snap = false;
+  bool palc_gauge_project = false;
+  // Truncated-pseudoinverse bordered Newton (Direction 6, production form).
+  // When palc_tsvd=true, replace the LU-bordered solve in the corrector
+  // and the Levenberg-Marquardt trust-region step in Newton::polish with
+  // a symmetric truncated pseudoinverse on J: J = Q diag(λ) Qᵀ, then
+  // J⁺ inverts only |λ| > rcond·max|λ|.  In the corrector this is
+  // composed via the bordering algorithm (one decomposition cached and
+  // applied twice).  Produces the unique minimum-‖Δr‖ step that is
+  // automatically orthogonal to ker(J) — the translation-gauge
+  // directions, which are the soft-kernel obstruction during PALC.
+  // See claude-projects/delaunay-geometry/tsvd-design.md for the full
+  // mathematical specification, validation plan, and empirical results.
+  bool   palc_tsvd       = false;
+  double palc_tsvd_rcond = 5e-3;
   bool verbose = false;
   bool trace_jacobian = false;       // record per-step spectrum of J
   int stats_steps = 0, stats_flips = 0, stats_newton_total = 0;
