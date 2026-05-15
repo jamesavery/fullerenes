@@ -68,3 +68,7 @@ target_compile_definitions(extract-graph PRIVATE FULLERENE_ROOT="${CMAKE_SOURCE_
 add_executable(alexandrov-icosahedral-test alexandrov-icosahedral-test.cc)
 target_link_libraries(alexandrov-icosahedral-test fullerenes GTest::GTest GTest::Main)
 add_test(NAME alexandrov-icosahedral-test COMMAND alexandrov-icosahedral-test)
+
+add_executable(planargraph-ascii-test planargraph-ascii-test.cc)
+target_link_libraries(planargraph-ascii-test fullerenes GTest::GTest GTest::Main)
+add_test(NAME planargraph-ascii-test COMMAND planargraph-ascii-test)
