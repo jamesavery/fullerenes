@@ -2,6 +2,10 @@ add_executable(gc-transform-test gc-transform-test.cc)
 target_link_libraries(gc-transform-test fullerenes GTest::GTest GTest::Main)
 add_test(NAME gc-transform-test COMMAND gc-transform-test)
 
+add_executable(surface-geodesics-test surface-geodesics-test.cc)
+target_link_libraries(surface-geodesics-test fullerenes buckygen GTest::GTest GTest::Main)
+add_test(NAME surface-geodesics-test COMMAND surface-geodesics-test)
+
 add_executable(spiral-roundtrip-test spiral-roundtrip-test.cc)
 target_link_libraries(spiral-roundtrip-test fullerenes GTest::GTest GTest::Main)
 add_test(NAME spiral-roundtrip-test COMMAND spiral-roundtrip-test)

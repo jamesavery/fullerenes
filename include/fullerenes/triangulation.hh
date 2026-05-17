@@ -82,27 +82,40 @@ public:
   vector<tri_t> triangles() const { return compute_faces_oriented(); }
   int n_triangles() const { return 2*N - 4; }
 
+  // A simple geodesic u -> v: the Eisenstein displacement (a, b) (with
+  // a, b >= 0) walked from u, starting along the `axis`-th out-arc at u
+  // (the a-axis). Reaches v = end_of_the_line(u, axis, a, b); squared
+  // length is g.norm2() = a^2 + a*b + b^2.
   struct simple_geodesic {
     Eisenstein g;
     int axis;
 
-    simple_geodesic(int a, int b=0, int axis=0) : g(a,b), axis(axis) {}
+    simple_geodesic(int a=0, int b=0, int axis=0) : g(a,b), axis(axis) {}
   };
 
+  // A general geodesic u -> v: a sequence of simple geodesics
+  // u -> K_1 -> K_2 -> ... -> v, broken at intermediate cones.
   struct geodesic {
-    vector<Eisenstein> g;
-    double d;
-    int axis;
+    vector<simple_geodesic> segments;
+    geodesic() = default;
+    geodesic(int) {}   // matrix<geodesic>(m, n) zero-init compatibility
   };
-  
+
   matrix<int>    pentagon_distance_mtx() const;
 
 
   matrix<int>              simple_square_surface_distances(vector<node_t> only_nodes = {},bool calculate_self_geodesics=false) const;
-  matrix<double>           surface_distances(vector<node_t> only_nodes = {},bool calculate_self_geodesics=false) const;
-  
-  matrix<geodesic>         surface_geodesics(vector<node_t> only_nodes = {},bool calculate_self_geodesics=false) const;    
+  matrix<double>           surface_distances(vector<node_t> only_nodes = {},bool calculate_self_geodesics=false,
+                                             matrix<geodesic>* geodesics_out=nullptr) const;
+
+  matrix<geodesic>         surface_geodesics(vector<node_t> only_nodes = {},bool calculate_self_geodesics=false) const;
   matrix<simple_geodesic>  simple_geodesics(vector<node_t> only_nodes = {},bool calculate_self_geodesics=false) const;
+
+  // Concatenate simple geodesics along a node-index path:
+  //   [U, K_1, ..., V] -> { simple(U, K_1), simple(K_1, K_2), ..., simple(K_n, V) }.
+  // Returns an empty geodesic for paths of length <= 1 (U == V or unreachable).
+  static geodesic compose_simple_geodesics(const vector<int>& path,
+                                            const matrix<simple_geodesic>& simple);
   
   node_t         end_of_the_line(node_t u0, int i, int a, int b) const;
   vector<vector<node_t>> quads_of_the_line(node_t u0, int i, int a, int b) const;  
