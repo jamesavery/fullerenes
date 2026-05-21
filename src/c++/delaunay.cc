@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include <string>
 #include <sstream>
+#include <cstdio>
 
 // ============================================================================
 // Intrinsic geometry primitives
@@ -208,7 +209,12 @@ int DelaunayTriangulation::vertex_degree(int v) const
 
 // --- Construction ---
 
-DelaunayTriangulation DelaunayTriangulation::from_triangulation(const Triangulation& T)
+// Build the metric-independent half-edge topology (connectivity + faces +
+// v_orig_degree) from a combinatorial triangulation. The metric arrays
+// (he_length, he_angle, v_cone_angle) are sized but left for the caller to
+// fill -- this is the shared core of from_triangulation (equilateral) and
+// from_intrinsic_metric (prescribed lengths).
+static DelaunayTriangulation build_topology(const Triangulation& T)
 {
   DelaunayTriangulation D;
   D.nv = T.N;
@@ -229,8 +235,8 @@ DelaunayTriangulation DelaunayTriangulation::from_triangulation(const Triangulat
   D.he_next.resize(D.nh);
   D.he_origin.resize(D.nh);
   D.he_face.resize(D.nh, -1);
-  D.he_length.assign(D.nh, 1.0);
-  D.he_angle.assign(D.nh, M_PI / 3.0);
+  D.he_length.resize(D.nh);   // metric: caller fills
+  D.he_angle.resize(D.nh);    // metric: caller fills (recompute_all_angles)
 
   // Phase 2: Set origins.
   for (auto& [arc, hid] : arc_to_he)
@@ -265,14 +271,42 @@ DelaunayTriangulation DelaunayTriangulation::from_triangulation(const Triangulat
     if (deg > 0) D.v_out[u] = arc_to_he.at({u, row[0]});
   }
 
-  // Phase 4: Vertex data.
-  D.v_cone_angle.resize(D.nv);
+  // Per-vertex original degree (topological; metric-independent).
   D.v_orig_degree.resize(D.nv);
-  for (node_t v = 0; v < T.N; v++) {
-    D.v_orig_degree[v] = T.degree(v);
-    D.v_cone_angle[v] = T.degree(v) * M_PI / 3.0;
-  }
+  D.v_cone_angle.resize(D.nv);  // caller fills
+  for (node_t v = 0; v < T.N; v++) D.v_orig_degree[v] = T.degree(v);
 
+  return D;
+}
+
+DelaunayTriangulation DelaunayTriangulation::from_triangulation(const Triangulation& T)
+{
+  // Equilateral metric: every edge length 1, every angle pi/3, cone angle
+  // deg*pi/3. (The special case length == 1 of from_intrinsic_metric, kept
+  // explicit because the constants are exact and this is the hot path.)
+  DelaunayTriangulation D = build_topology(T);
+  D.he_length.assign(D.nh, 1.0);
+  D.he_angle.assign(D.nh, M_PI / 3.0);
+  for (node_t v = 0; v < D.nv; v++)
+    D.v_cone_angle[v] = D.v_orig_degree[v] * M_PI / 3.0;
+  return D;
+}
+
+DelaunayTriangulation
+DelaunayTriangulation::from_intrinsic_metric(const Triangulation& T,
+                                             const EdgeLengthFn& length)
+{
+  // Prescribed intrinsic metric: edge lengths from `length`, angles and cone
+  // angles derived. The topology is identical to the equilateral case; only
+  // the metric differs.
+  DelaunayTriangulation D = build_topology(T);
+  for (int h = 0; h < D.nh; h += 2) {
+    double L = length(D.he_origin[h], D.he_origin[h ^ 1]);
+    D.he_length[h] = D.he_length[h ^ 1] = L;
+  }
+  D.recompute_all_angles();
+  for (node_t v = 0; v < D.nv; v++)
+    D.v_cone_angle[v] = D.vertex_angle_sum(v);
   return D;
 }
 
@@ -319,6 +353,28 @@ void DelaunayTriangulation::recompute_all_angles()
 {
   for (int f = 0; f < nf; f++)
     recompute_face_angles(f);
+}
+
+double DelaunayTriangulation::vertex_angle_sum(int v) const
+{
+  // Sum the corner angle at v over all incident faces. he_angle[h] is the
+  // angle at origin(h); cw() walks the outgoing half-edges (one per incident
+  // face) around v.
+  int h0 = v_out[v];
+  if (h0 < 0) return 0.0;
+  double sum = 0.0;
+  int h = h0;
+  do { sum += he_angle[h]; h = cw(h); } while (h != h0);
+  return sum;
+}
+
+bool DelaunayTriangulation::is_flat(int v, double flat_tol) const
+{
+  // Flat == zero cone curvature == cone angle 2*pi. flat_tol must separate the
+  // metric's noise floor from the smallest real cone curvature (pi/3 ~ 1.047);
+  // for the equilateral metric any tol in (0, pi/3) agrees exactly with the
+  // degree-6 test (deg-6 cone angle = 6*pi/3 = 2*pi).
+  return std::abs(v_cone_angle[v] - 2 * M_PI) < flat_tol;
 }
 
 // --- Delaunay operations ---
@@ -716,7 +772,7 @@ static void flip_away_self_loops(DelaunayTriangulation& D, int v) {
   }
 }
 
-void DelaunayTriangulation::remove_flat_vertices()
+void DelaunayTriangulation::remove_flat_vertices(double flat_tol)
 {
   // Scan all live flat vertices top-down; any single removable vertex keeps
   // the algorithm moving.  Repeat until a pass produces no removals, then
@@ -728,16 +784,36 @@ void DelaunayTriangulation::remove_flat_vertices()
   // are still removable — which strands labeling-dependent multi-edge
   // clusters and leaves the iDT with > 12 vertices.  A full-scan pass is
   // O(N) per iteration and has no worse asymptotic cost than the old loop.
+  // Progress reporting (when verbose_removal > 0). Counts live vertices and
+  // reports every `verbose_removal` removals. fprintf(stderr) is unbuffered;
+  // we fflush each line so it shows on a slow run (don't pipe — piping
+  // re-introduces block buffering).
+  auto count_live = [&]() {
+    int n = 0;
+    for (int v = 0; v < nv; v++) if (v_out[v] >= 0) n++;
+    return n;
+  };
+  long long removed = 0;
+  if (verbose_removal) {
+    std::fprintf(stderr, "[remove_flat] start: %d live vertices\n", count_live());
+    std::fflush(stderr);
+  }
+
   auto remove_any_flat = [&]() {
     bool progress = false;
     for (int v = nv - 1; v >= 0; v--) {
-      if (v_out[v] < 0 || v_orig_degree[v] != 6) continue;
+      if (v_out[v] < 0 || !is_flat(v, flat_tol)) continue;
       flip_away_self_loops(*this, v);
       remove_flat_vertex(v);
       if (v_out[v] < 0) {
         progress = true;
         while (nv > 0 && v_out[nv - 1] < 0) nv--;
         lawson_sweep();
+        if (verbose_removal && (++removed % verbose_removal == 0)) {
+          std::fprintf(stderr, "[remove_flat] removed %lld, %d live remain\n",
+                       removed, count_live());
+          std::fflush(stderr);
+        }
       }
     }
     return progress;
@@ -750,11 +826,46 @@ void DelaunayTriangulation::remove_flat_vertices()
     if (!remove_any_flat()) break;
   }
 
+  if (verbose_removal) {
+    std::fprintf(stderr, "[remove_flat] done: removed %lld, %d live remain\n",
+                 removed, count_live());
+    std::fflush(stderr);
+  }
+
   // Final Lawson.  With guards dropped, this converges unconditionally by
   // Theorem 1 (Bobenko-Springborn energy strictly decreases on every flip,
   // including B == D self-loop-creating flips; the new self-loop is
   // strictly Delaunay by Lemma 1).
   flip_to_delaunay();
+}
+
+std::vector<int> DelaunayTriangulation::compact_vertices()
+{
+  // Live vertices (v_out >= 0) get fresh contiguous indices in their current
+  // order; dead vertices are dropped. Half-edge origins and the per-vertex
+  // arrays are rewritten; nv shrinks to the live count.
+  std::vector<int> new_of_old(nv, -1), new_to_old;
+  for (int v = 0; v < nv; v++)
+    if (v_out[v] >= 0) { new_of_old[v] = (int)new_to_old.size(); new_to_old.push_back(v); }
+  int nlive = (int)new_to_old.size();
+
+  for (int h = 0; h < nh; h++)
+    if (he_origin[h] >= 0) he_origin[h] = new_of_old[he_origin[h]];
+
+  std::vector<int>    nout(nlive);
+  std::vector<double> ncone(nlive);
+  std::vector<int>    ndeg(nlive);
+  for (int w = 0; w < nlive; w++) {
+    int o = new_to_old[w];
+    nout[w]  = v_out[o];
+    ncone[w] = v_cone_angle[o];
+    ndeg[w]  = v_orig_degree[o];
+  }
+  v_out = std::move(nout);
+  v_cone_angle = std::move(ncone);
+  v_orig_degree = std::move(ndeg);
+  nv = nlive;
+  return new_to_old;
 }
 
 // --- Full algorithm ---
@@ -822,6 +933,22 @@ DelaunayTriangulation DelaunayTriangulation::compute(const Triangulation& T)
   sorted.apply_permutation(T.sort_flat_last());
   DelaunayTriangulation D = from_triangulation(sorted);
   D.remove_flat_vertices();
+  return D;
+}
+
+DelaunayTriangulation DelaunayTriangulation::compute(const Triangulation& T,
+                                                     const EdgeLengthFn& length,
+                                                     double flat_tol)
+{
+  // Prescribed-metric iDT. Unlike the equilateral compute(T), we do NOT
+  // sort_flat_last() (that classifies flatness by degree, which is wrong for
+  // a general metric, and would also permute the vertices the caller's
+  // `length` oracle is keyed on). remove_flat_vertices() identifies flat
+  // vertices by cone angle (is_flat) and its full-scan loop is order-robust,
+  // so no pre-sort is needed.
+  DelaunayTriangulation D = from_intrinsic_metric(T, length);
+  D.remove_flat_vertices(flat_tol);
+  D.compact_vertices();  // cones are scattered (no flat-last sort); compact to nv=cones
   return D;
 }
 
