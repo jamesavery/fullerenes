@@ -106,6 +106,18 @@ bool Diamond::is_cocircular() const
   return s1 * s1 * H(Le, Lc, Ld) == s2 * s2 * H(Le, La, Lb);
 }
 
+bool Diamond::is_cocircular(double tol) const
+{
+  // Float tight-Delaunay test for non-equilateral metrics: cot(angle_B) +
+  // cot(angle_D) == 0, where angle_B is opposite e in triangle (e,a,b) and
+  // angle_D opposite e in (e,c,d). cot_opposite returns +/-1e15 on a
+  // degenerate triangle, which never lands within a sane tol, so degenerate
+  // diamonds are correctly reported non-tight.
+  double cotB = cot_opposite(e, a, b);
+  double cotD = cot_opposite(e, c, d);
+  return std::abs(cotB + cotD) < tol;
+}
+
 // Old FulleroidDelaunay + IDTAudit implementation moved to delaunay_old.cc.
 
 // ============================================================================
@@ -970,6 +982,18 @@ vector<bool> DelaunayTriangulation::cocircular_edges() const
   for (int h = 0; h < nh; h += 2) {
     if (!alive(h)) continue;
     bool t = diamond(h).is_cocircular();
+    tight[h]     = t;
+    tight[h ^ 1] = t;
+  }
+  return tight;
+}
+
+vector<bool> DelaunayTriangulation::cocircular_edges(double tol) const
+{
+  vector<bool> tight(nh, false);
+  for (int h = 0; h < nh; h += 2) {
+    if (!alive(h)) continue;
+    bool t = diamond(h).is_cocircular(tol);
     tight[h]     = t;
     tight[h ^ 1] = t;
   }

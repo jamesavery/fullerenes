@@ -36,6 +36,12 @@ struct Diamond {
   // integers, e.g. equilateral triangulations and their flips).
   // See CANONICAL-TESSELATION.md for the derivation.
   bool is_cocircular() const;
+
+  // Floating-point cocircular test for general (non-equilateral) metrics,
+  // where length-squared is not integer so the exact predicate above does not
+  // apply: tight iff |cot(angle_B) + cot(angle_D)| < tol. Scale-invariant
+  // (cotangents are dimensionless), so tol is a pure angle threshold.
+  bool is_cocircular(double tol) const;
 };
 
 // ============================================================================
@@ -285,6 +291,11 @@ struct DelaunayTriangulation {
   // Per-half-edge cocircular mask: tight[h] == tight[h^1]; dead half-edges
   // are false.  O(num_edges) integer-arithmetic predicates.
   std::vector<bool> cocircular_edges() const;
+
+  // Float cocircular mask for general metrics (Diamond::is_cocircular(tol)).
+  // Use as the `tight` argument to canonical_tesselation when the metric is
+  // not equilateral (the integer predicate above is then invalid).
+  std::vector<bool> cocircular_edges(double tol) const;
 
   // Canonical Delaunay tesselation in `vertex_labels` coordinates.
   // `vertex_labels[k]` is the external label assigned to D's live vertex k;
