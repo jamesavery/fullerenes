@@ -143,12 +143,11 @@ struct DelaunayTriangulation {
 
   // --- Delaunay operations ---
   bool is_delaunay_edge(int h) const;
+  // Flip the diagonal of the diamond around edge h.  Accepts any
+  // non-Delaunay edge with a convex diamond, including the B == D case
+  // (which produces a self-loop edge at B; see Lemma 1 of
+  // claude-projects/delaunay/CORRECTNESS-PROOF.md).
   bool flip_edge(int h);
-  // Like flip_edge, but does not reject the B == D case.  A successful
-  // flip with B == D produces a self-loop edge at B.  The result is a
-  // well-formed delta-complex triangulation; the caller takes
-  // responsibility for handling the self-loop.
-  bool flip_edge_allow_self_loop(int h);
   int  lawson_sweep();
   int  count_non_delaunay() const;
   int  flip_to_delaunay();
