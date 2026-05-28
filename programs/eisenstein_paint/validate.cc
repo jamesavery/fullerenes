@@ -20,8 +20,9 @@
 #include "fullerenes/eisenstein_paint.hh"
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/buckygen-wrapper.hh"
-
+#if defined(_OPENMP)
 #include <omp.h>
+#endif
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
@@ -233,7 +234,9 @@ int main(int argc, char** argv) {
         std::fprintf(fpn, "max_us      %.3f\n", max_us);
         std::fprintf(fpn, "mean_us     %.3f\n", mean_us);
         std::fprintf(fpn, "wall_s      %.3f\n", wall_s);
+        #if defined(_OPENMP)
         std::fprintf(fpn, "threads     %d\n",   omp_get_max_threads());
+        #endif
         std::fclose(fpn);
 
         if (!fails.empty()) {

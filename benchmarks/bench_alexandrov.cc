@@ -19,7 +19,9 @@
 #include <set>
 #include <sstream>
 #include <algorithm>
+#if defined(_OPENMP)
 #include <omp.h>
+#endif
 
 using namespace std;
 
@@ -95,9 +97,11 @@ static void scan(int N) {
     int nb = batch.size();
     vector<double> chunk_times(nb, 0.0);
 
+    #if defined(_OPENMP)
     #pragma omp parallel for schedule(dynamic) \
       reduction(+:n_ok,n_fail,n_cross,n_badori,total_steps,total_newton,total_flips) \
       reduction(max:worst_edge,worst_curv)
+    #endif
     for (int b = 0; b < nb; b++) {
       auto D = DelaunayTriangulation::compute(batch[b]);
 
@@ -192,8 +196,13 @@ static void scan(int N) {
   printf("SUMMARY C%d: %d isomers, %d pass, %d conv_fail, %d cross, %d badori\n",
          N, total, n_ok, n_fail, n_cross, n_badori);
   printf("  worst_edge=%.4f%% worst_curv=%.6f rad\n", worst_edge*100, worst_curv);
+  #if defined(_OPENMP)
   printf("  wall: %.1fs (%d threads, %.1f isomers/s)\n",
          wall_s, omp_get_max_threads(), total / wall_s);
+  #else
+  printf("  wall: %.1fs (1 thread, %.1f isomers/s)\n",
+         wall_s, total / wall_s);
+  #endif
   printf("  per-isomer cpu: total=%.1fs  mean=%.2fms  median=%.2fms  p99=%.2fms  max=%.2fms\n",
          total_ms/1000, total_ms/total,
          nt > 0 ? times_ms[nt/2] : 0,

@@ -4,6 +4,8 @@
 #include "triangulation.hh"
 #include "geometry.hh"
 
+#include <functional>
+
 
 // Diamond: the local geometry around an edge in a metrized triangulation.
 //
@@ -34,6 +36,12 @@ struct Diamond {
   // integers, e.g. equilateral triangulations and their flips).
   // See CANONICAL-TESSELATION.md for the derivation.
   bool is_cocircular() const;
+
+  // Floating-point cocircular test for general (non-equilateral) metrics,
+  // where length-squared is not integer so the exact predicate above does not
+  // apply: tight iff |cot(angle_B) + cot(angle_D)| < tol. Scale-invariant
+  // (cotangents are dimensionless), so tol is a pure angle threshold.
+  bool is_cocircular(double tol) const;
 };
 
 // ============================================================================
@@ -108,8 +116,14 @@ struct DelaunayTriangulation {
 
   // --- Per-vertex (indexed 0..nv-1) ---
   vector<int>    v_out;          // one outgoing half-edge (-1 = dead vertex)
-  vector<double> v_cone_angle;   // original_degree * pi/3
-  vector<int>    v_orig_degree;  // degree in original equilateral triangulation
+  vector<double> v_cone_angle;   // cone angle = total vertex angle (deg*pi/3 when equilateral)
+  vector<int>    v_orig_degree;  // degree in original triangulation
+
+  // --- Diagnostics ---
+  // If > 0, remove_flat_vertices prints live-vertex progress to stderr every
+  // this-many removed vertices (and a header/footer). 0 = silent. Output is
+  // flushed each line so it is visible even on a slow run.
+  int verbose_removal = 0;
 
   // --- Per-face (indexed 0..nf-1) ---
   vector<int> f_he;        // one boundary half-edge (-1 = dead face)
@@ -134,12 +148,41 @@ struct DelaunayTriangulation {
   int vertex_degree(int v) const;  // count outgoing half-edges from v
 
   // --- Construction ---
+
+  // A metric on the edges: length of the undirected edge {u,v}.
+  using EdgeLengthFn = std::function<double(node_t u, node_t v)>;
+
+  // Build the iDT topology from the combinatorial triangulation T with the
+  // EQUILATERAL metric (all edge lengths 1, all angles pi/3, cone angle
+  // deg*pi/3). This is the special case from_intrinsic_metric(T, 1).
   static DelaunayTriangulation from_triangulation(const Triangulation& T);
+
+  // Build the iDT topology from T with a PRESCRIBED intrinsic metric: edge
+  // lengths come from `length(u,v)`, angles and cone angles are then derived
+  // from those lengths (recompute_all_angles + vertex_angle_sum). Generalises
+  // from_triangulation to non-equilateral surfaces.
+  static DelaunayTriangulation from_intrinsic_metric(const Triangulation& T,
+                                                     const EdgeLengthFn& length);
 
   // --- Geometry ---
   Diamond diamond(int h) const;
   void recompute_face_angles(int f);
   void recompute_all_angles();
+
+  // Total angle at vertex v = sum of incident corner angles. The Gaussian
+  // curvature / angle defect is 2*pi - vertex_angle_sum(v); a flat vertex
+  // has angle sum 2*pi. Requires angles current (call recompute_all_angles
+  // after changing any length).
+  double vertex_angle_sum(int v) const;
+
+  // A vertex is flat (zero cone curvature, hence removable) iff its cone
+  // angle is 2*pi to within flat_tol. Metric-based replacement for the
+  // equilateral-only "degree == 6" test. flat_tol must lie above the input
+  // metric's curvature noise floor and below the smallest real cone curvature:
+  // 1e-6 suits exact (equilateral) metrics; a numerically solved metric (e.g.
+  // a CEPS conformal solve, whose layout-cut seams leave ~5e-4 spurious
+  // curvature at genuinely flat vertices) needs ~1e-2.
+  bool is_flat(int v, double flat_tol = 1e-6) const;
 
   // --- Delaunay operations ---
   bool is_delaunay_edge(int h) const;
@@ -155,7 +198,17 @@ struct DelaunayTriangulation {
 
   // --- Vertex removal ---
   void remove_flat_vertex(int v);
-  void remove_flat_vertices();
+  // Remove every flat vertex (is_flat(v, flat_tol)), leaving the cones. See
+  // is_flat for choosing flat_tol (1e-6 exact, ~1e-2 for a CEPS metric).
+  void remove_flat_vertices(double flat_tol = 1e-6);
+
+  // Renumber the live vertices to 0..n_live-1 (dropping removed ones) and
+  // shrink nv, rewriting he_origin and the per-vertex arrays. Needed after a
+  // removal that leaves live vertices scattered (the metric-based path, which
+  // unlike compute(T) does not sort flats last), because AlexandrovSolver
+  // sizes its system by nv and assumes every index 0..nv-1 is a live cone.
+  // Returns new_to_old: the original index of each surviving vertex.
+  std::vector<int> compact_vertices();
 
   // --- Edge/face allocation ---
   int  alloc_edge();         // returns half-edge id of first half-edge
@@ -186,6 +239,17 @@ struct DelaunayTriangulation {
   // delta-complex and may contain multi-edges, self-loops, and bigons
   // around cone vertices (deg-2 cones) -- all valid iDT features.
   static DelaunayTriangulation compute(const Triangulation& T);
+
+  // As compute(T), but for a PRESCRIBED intrinsic metric `length(u,v)`.
+  // Flat vertices are identified by cone angle (is_flat), not degree, so it
+  // works on any surface whose flat vertices need not be degree-6. Removes
+  // the flat vertices, leaving the cone vertices in a delta-complex iDT
+  // ready for AlexandrovSolver. Equivalent to compute(T) when length == 1.
+  // flat_tol sets the cone/flat threshold (see is_flat): 1e-6 for an exact
+  // metric, ~1e-2 for a numerically solved one.
+  static DelaunayTriangulation compute(const Triangulation& T,
+                                       const EdgeLengthFn& length,
+                                       double flat_tol = 1e-6);
 
   // Smallest degree among live (non-removed) vertices, or INT_MAX if
   // none.  A value below 3 is one (but not the only) non-simplicial
@@ -226,6 +290,11 @@ struct DelaunayTriangulation {
   // Per-half-edge cocircular mask: tight[h] == tight[h^1]; dead half-edges
   // are false.  O(num_edges) integer-arithmetic predicates.
   std::vector<bool> cocircular_edges() const;
+
+  // Float cocircular mask for general metrics (Diamond::is_cocircular(tol)).
+  // Use as the `tight` argument to canonical_tesselation when the metric is
+  // not equilateral (the integer predicate above is then invalid).
+  std::vector<bool> cocircular_edges(double tol) const;
 
   // Canonical Delaunay tesselation in `vertex_labels` coordinates.
   // `vertex_labels[k]` is the external label assigned to D's live vertex k;
