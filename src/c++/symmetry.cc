@@ -229,14 +229,14 @@ vector<int> Symmetry::site_symmetry_counts(const vector<Permutation>& pi) const
     int orbit_length = 1;
     for(int j=0;j<order;j++){
       int I = pi[j][i];
-      assert(I<M);
+      assert(I<M); // TODO: No asserts/aborts allowed. Eliminate failure modes instead, throw exception on should-never-happen-failures, incorporate remaining-failures-that-can-happen into return type or status param.
       assert(I>=0);
       if(seen[I]) continue;
       seen[I] = true;
       orbit_length++;
     }	
     int site_order = order/orbit_length; 
-    assert(site_order <= 12); // Only holds for fullerenes?
+    assert(site_order <= 12); // TODO: Only holds for fullerenes. Remove or make general.
     m[site_order-1]++;
   }
   return m;
