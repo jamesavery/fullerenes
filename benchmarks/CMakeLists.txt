@@ -95,6 +95,9 @@ endif()
 add_executable(probe_jacobian probe_jacobian.cc)
 target_link_libraries(probe_jacobian fullerenes)
 
+add_executable(drumcap_compare drumcap_compare.cc)
+target_link_libraries(drumcap_compare fullerenes)
+
 
 add_executable(replay_perstep replay_perstep.cc)
 target_link_libraries(replay_perstep fullerenes)
