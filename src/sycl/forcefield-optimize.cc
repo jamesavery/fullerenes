@@ -21,9 +21,9 @@
 #endif
 #endif
 
-#include <fullerenes/kernel-headers/forcefield-optimize-functor.hh>
-#include "forcefield-includes.cc"
-#include "kernel.cc"
+#include <fullerenes/kernel-headers/forcefield-optimize.hh>
+#include "forcefield-includes.hh"
+#include "kernel.hh"
 
 template <ForcefieldType FFT, typename T, typename K>
 struct ForceField
@@ -62,7 +62,7 @@ struct ForceField
         node_t node_id;
         sycl::group<1> cta;
         // 84 + 107 FLOPS
-        FaceData(const sycl::group<1> &cta, const Span<coord3d> X, const NodeNeighbours<K> &G) : cta(cta)
+        FaceData(const sycl::group<1> &cta, const std::span<coord3d> X, const NodeNeighbours<K> &G) : cta(cta)
         {
             node_id = cta.get_local_linear_id();
             N = cta.get_local_linear_range();
@@ -187,7 +187,7 @@ struct ForceField
          * @param G The neighbour information for the threadIdx^th node.
          * @return A new ArcData object.
          */
-        ArcData(node_t a, const int j, const Span<coord3d> X, const NodeNeighbours<K> &G)
+        ArcData(node_t a, const int j, const std::span<coord3d> X, const NodeNeighbours<K> &G)
         {
             __builtin_assume(j < 3);
             this->j = j;
@@ -1584,7 +1584,7 @@ struct ForceField
      * @param c The constants for the threadIdx^th node.
      * @return The gradient of the bond, flatness, bending and dihedral terms w.r.t. the coordinates of the threadIdx^th node.
      */
-    coord3d gradient(const Span<coord3d> X) const
+    coord3d gradient(const std::span<coord3d> X) const
     {
         sycl::group_barrier(cta);
         coord3d grad = {0.0, 0.0, 0.0};
@@ -1611,7 +1611,7 @@ struct ForceField
          }
     }
 
-    hessian_t<T, K> hessian(const Span<coord3d> X) const
+    hessian_t<T, K> hessian(const std::span<coord3d> X) const
     {
         sycl::group_barrier(cta);
         hessian_t<T, K> hess(node_graph);
@@ -1629,7 +1629,7 @@ struct ForceField
     }
 
     // Uses finite difference to compute the hessian
-    hessian_t<T, K> fd_hessian(const Span<coord3d> X, const float reldelta = 1e-7) const
+    hessian_t<T, K> fd_hessian(const std::span<coord3d> X, const float reldelta = 1e-7) const
     {
         hessian_t<T, K> hess_fd(node_graph);
         for (uint16_t i = 0; i < N; i++)
@@ -1671,7 +1671,7 @@ struct ForceField
      * @param c The constants for the threadIdx^th node.
      * @return Total energy.
      */
-    real_t energy(const Span<coord3d> X) const
+    real_t energy(const std::span<coord3d> X) const
     {
         sycl::group_barrier(cta);
         real_t arc_energy = (real_t)0.0;
@@ -1708,7 +1708,7 @@ struct ForceField
      * @param X2 memory for storing temporary coordinates at x2.
      * @return The step-size alpha
      */
-    real_t GSS(const Span<coord3d> X, const coord3d &r0, const Span<coord3d> X1, const Span<coord3d> X2) const
+    real_t GSS(const std::span<coord3d> X, const coord3d &r0, const std::span<coord3d> X1, const std::span<coord3d> X2) const
     {
         const real_t tau = (real_t)0.6180339887;
         // Line search x - values;
@@ -1762,7 +1762,7 @@ struct ForceField
      * @param X2 memory for storing temporary coordinates.
      * @param MaxIter The maximum number of iterations.
      */
-    void CG(const Span<coord3d> X, const Span<coord3d> X1, const Span<coord3d> X2, const size_t MaxIter)
+    void CG(const std::span<coord3d> X, const std::span<coord3d> X1, const std::span<coord3d> X2, const size_t MaxIter)
     {
         real_t alpha, beta, g0_norm2, s_norm;
         coord3d g0, g1, s;
@@ -1848,345 +1848,125 @@ struct ForceField
     }
 };
 
+
+// ---------------------------------------------------------------------------
+// View-based batch implementation (Phase 7)
+// ---------------------------------------------------------------------------
 template <ForcefieldType FFT, typename T, typename K>
-struct ForceFieldOptimizeBatchKernel {};
+struct ForceFieldOptimizeViewBatchKernel {};
 
 template <ForcefieldType FFT, typename T = float, typename K = uint16_t>
-SyclEvent forcefield_optimize_impl(SyclQueue &Q, FullereneBatchView<T, K> B, size_t iterations, size_t max_iterations)
-{   
+static SyclEvent forcefield_optimize_view_batch_impl(
+    SyclQueue& Q,
+    batch::BatchView<Spanify::RSRAdjacencyView<K>> graph,
+    std::span<std::array<T,3>> xyz,
+    batch::BatchStateView state,
+    size_t iterations, size_t max_iterations)
+{
     TEMPLATE_TYPEDEFS(T, K);
-    LaunchConfig<ForceFieldOptimizeBatchKernel<FFT, T, K>> launch_config(Q);
+    auto [adj_flat, deg_flat, twin_flat] = graph.spans();
+    (void)deg_flat; (void)twin_flat;
 
-    auto N = B.N_;
+    std::span<std::array<K,3>> A_cubic(
+        reinterpret_cast<std::array<K,3>*>(adj_flat.data()),
+        adj_flat.size() / 3);
+
+    auto statuses = state.status;
+    auto iters    = state.iteration;
+    const int N        = graph.N();
+    const int capacity = graph.size();
+
     auto local_mem_bytes_required = N * 3 * sizeof(coord3d) + N * 2 * sizeof(T);
-    assert(Q->get_device().get_info<sycl::info::device::local_mem_size>() >= local_mem_bytes_required);
-    SyclEventImpl ffopt_done = Q->submit([&](sycl::handler &h)
-             {
-        sycl::local_accessor<T,1> sdata(N*2, h);
-        sycl::local_accessor<coord3d,1> X(N,h);
-        sycl::local_accessor<coord3d,1> X1(N,h);
-        sycl::local_accessor<coord3d,1> X2(N,h);
-        h.parallel_for<ForceFieldOptimizeBatchKernel<FFT,T,K>>(sycl::nd_range(sycl::range{N*B.capacity()}, sycl::range{N}), [=](sycl::nd_item<1> nditem) {
-            auto cta = nditem.get_group();
-            auto tid = nditem.get_local_linear_id();
-            auto bid = nditem.get_group_linear_id();
-            if (B.m_.flags_[bid].is_not_set(StatusEnum::NOT_CONVERGED)) return;
-            if (B.m_.flags_[bid].is_set(StatusEnum::FAILED_3D) || B.m_.flags_[bid].is_set(StatusEnum::CONVERGED_3D)) return;
-            Fullerene<T,K> fullerene = B[bid];
-            auto X_acc = fullerene.d_.X_cubic_.template as_span<coord3d>();
-            auto cubic_neighbours_acc = fullerene.d_.A_cubic_;
+    assert(Q->get_device().get_info<sycl::info::device::local_mem_size>() >= (size_t)local_mem_bytes_required);
 
-//          Create an accessor to the neighbourlist offset by the block id.
-//
-            Constants<T,K>      constants(cubic_neighbours_acc, tid);
-            NodeNeighbours<K>   nodeG(cubic_neighbours_acc, tid);
-            bool check_convergence = false;
+    SyclEventImpl ffopt_done = Q->submit([&](sycl::handler& h) {
+        sycl::local_accessor<T,1>      sdata(N*2, h);
+        sycl::local_accessor<coord3d,1> X(N, h);
+        sycl::local_accessor<coord3d,1> X1(N, h);
+        sycl::local_accessor<coord3d,1> X2(N, h);
 
-            
-            X[tid] = X_acc[tid];
-            sycl::group_barrier(cta);
-            // DEBUG: check X before CG
-            if (tid == 0 && bid == 0) {
-                bool any_nan = false;
-                for (size_t i = 0; i < N; i++) {
-                    if (!std::isfinite(X[i][0]) || !std::isfinite(X[i][1]) || !std::isfinite(X[i][2])) { any_nan = true; break; }
-                }
-                printf("FF_BATCH: bid=%d N=%d X_nan_before_CG=%d X[0]=(%f,%f,%f)\n", (int)bid, (int)N, any_nan, X[0][0], X[0][1], X[0][2]);
-            }
-            sycl::group_barrier(cta);
-            ForceField FF = ForceField<FFT,T,K>(nodeG, constants, cta, get_raw_ptr(sdata));
-            auto convergence_check = [&]() {
-                coord3d rel_bond_err, rel_angle_err, rel_dihedral_err;
-                for(int j = 0; j < 3; j++){
-                    auto arc = typename ForceField<FFT,T,K>::ArcData(tid, j, Span<coord3d>(get_raw_ptr(X), N), nodeG);
-                    rel_bond_err[j] = std::abs(arc.bond() - constants.r0[j]) / constants.r0[j];
-                    rel_angle_err[j] = std::abs(arc.angle() - constants.angle0[j]) / constants.angle0[j];
-                    rel_dihedral_err[j] = std::abs(arc.dihedral() - constants.inner_dih0[j]) / constants.inner_dih0[j];
-                }
-                real_t max_rel_bond_err     = sycl::reduce_over_group(cta, max(rel_bond_err), sycl::maximum<real_t>{});
-                real_t max_rel_angle_err    = sycl::reduce_over_group(cta, max(rel_angle_err), sycl::maximum<real_t>{});
-                real_t max_rel_dihedral_err = sycl::reduce_over_group(cta, max(rel_dihedral_err), sycl::maximum<real_t>{});
-                if(tid == 0){
-                    size_t iterations_done = B.m_.iterations_[bid];
-                    bool converged = ((max_rel_angle_err < 0.26) && (max_rel_dihedral_err < 0.1) && (max_rel_bond_err < 0.1));
-                    bool failed = (!std::isfinite(max_rel_bond_err)) || (iterations_done >= max_iterations);
-                    B.m_.flags_[bid].set(converged ? StatusEnum::CONVERGED_3D : (failed ? StatusEnum::FAILED_3D : StatusEnum::NOT_CONVERGED));
-                }
-            };
-            FF.CG(Span<coord3d>(get_raw_ptr(X), N), Span<coord3d>(get_raw_ptr(X1),N), Span<coord3d>(get_raw_ptr(X2),N), std::max(iterations - 1,size_t(0)));
-            // DEBUG: check X after first CG
-            if (tid == 0 && bid == 0) {
-                bool any_nan = false;
-                for (size_t i = 0; i < N; i++) {
-                    if (!std::isfinite(X[i][0]) || !std::isfinite(X[i][1]) || !std::isfinite(X[i][2])) { any_nan = true; break; }
-                }
-                printf("FF_BATCH: bid=%d X_nan_after_CG1=%d X[0]=(%f,%f,%f) iters=%d\n", (int)bid, any_nan, X[0][0], X[0][1], X[0][2], (int)(iterations-1));
-            }
-            sycl::group_barrier(cta);
-            auto E1 = FF.energy(Span<coord3d>(get_raw_ptr(X), N));
-            FF.CG(Span<coord3d>(get_raw_ptr(X), N), Span<coord3d>(get_raw_ptr(X1),N), Span<coord3d>(get_raw_ptr(X2),N), std::min(size_t(1),iterations));
-            auto E2 = FF.energy(Span<coord3d>(get_raw_ptr(X), N));
-            if ( (std::abs(E1 - E2)/N < std::numeric_limits<T>::epsilon()*1e2)   || (B.m_.iterations_[bid] >= max_iterations)) /* ~1e-5 for float, ~2e-14 for double */ check_convergence = true;
-            //
-            if (check_convergence) convergence_check();
-            if (tid == 0) B.m_.iterations_[bid] += iterations;
-            X_acc[tid] = X[tid];
-        }); });
+        h.parallel_for<ForceFieldOptimizeViewBatchKernel<FFT,T,K>>(
+            sycl::nd_range(sycl::range{(size_t)N*capacity}, sycl::range{(size_t)N}),
+            [=](sycl::nd_item<1> nditem) {
+                auto cta = nditem.get_group();
+                auto tid = nditem.get_local_linear_id();
+                auto bid = nditem.get_group_linear_id();
+
+                if (statuses[bid].is_not_set(StatusEnum::NOT_CONVERGED)) return;
+                if (statuses[bid].is_set(StatusEnum::FAILED_3D) || statuses[bid].is_set(StatusEnum::CONVERGED_3D)) return;
+
+                const auto cubic_neighbours_acc = A_cubic.subspan(bid * N, N);
+                auto X_acc = as_span<coord3d>(xyz.subspan(bid * N, N));
+
+                Constants<T,K>    constants(cubic_neighbours_acc, tid);
+                NodeNeighbours<K> nodeG(cubic_neighbours_acc, tid);
+                bool check_convergence = false;
+
+                X[tid] = X_acc[tid];
+                sycl::group_barrier(cta);
+
+                ForceField<FFT,T,K> FF(nodeG, constants, cta, sdata.get_pointer());
+
+                auto convergence_check = [&]() {
+                    coord3d rel_bond_err, rel_angle_err, rel_dihedral_err;
+                    for (int j = 0; j < 3; j++) {
+                        auto arc = typename ForceField<FFT,T,K>::ArcData(tid, j, std::span<coord3d>(static_cast<coord3d*>(X.get_pointer()), N), nodeG);
+                        rel_bond_err[j]     = std::abs(arc.bond()     - constants.r0[j])         / constants.r0[j];
+                        rel_angle_err[j]    = std::abs(arc.angle()    - constants.angle0[j])     / constants.angle0[j];
+                        rel_dihedral_err[j] = std::abs(arc.dihedral() - constants.inner_dih0[j]) / constants.inner_dih0[j];
+                    }
+                    real_t max_rel_bond_err     = sycl::reduce_over_group(cta, max(rel_bond_err),     sycl::maximum<real_t>{});
+                    real_t max_rel_angle_err    = sycl::reduce_over_group(cta, max(rel_angle_err),    sycl::maximum<real_t>{});
+                    real_t max_rel_dihedral_err = sycl::reduce_over_group(cta, max(rel_dihedral_err), sycl::maximum<real_t>{});
+                    if (tid == 0) {
+                        size_t iterations_done = (size_t)iters[bid];
+                        bool converged = (max_rel_angle_err < 0.26) && (max_rel_dihedral_err < 0.1) && (max_rel_bond_err < 0.1);
+                        bool failed    = (!std::isfinite(max_rel_bond_err)) || (iterations_done >= max_iterations);
+                        statuses[bid].set(converged ? StatusEnum::CONVERGED_3D : (failed ? StatusEnum::FAILED_3D : StatusEnum::NOT_CONVERGED));
+                    }
+                };
+
+                FF.CG(std::span<coord3d>(static_cast<coord3d*>(X.get_pointer()), N), std::span<coord3d>(static_cast<coord3d*>(X1.get_pointer()), N), std::span<coord3d>(static_cast<coord3d*>(X2.get_pointer()), N), std::max(iterations - 1, size_t(0)));
+                auto E1 = FF.energy(std::span<coord3d>(static_cast<coord3d*>(X.get_pointer()), N));
+                FF.CG(std::span<coord3d>(static_cast<coord3d*>(X.get_pointer()), N), std::span<coord3d>(static_cast<coord3d*>(X1.get_pointer()), N), std::span<coord3d>(static_cast<coord3d*>(X2.get_pointer()), N), std::min(size_t(1), iterations));
+                auto E2 = FF.energy(std::span<coord3d>(static_cast<coord3d*>(X.get_pointer()), N));
+                if ((std::abs(E1 - E2)/N < std::numeric_limits<T>::epsilon()*1e2) || ((size_t)iters[bid] >= max_iterations))
+                    check_convergence = true;
+                if (check_convergence) convergence_check();
+                if (tid == 0) iters[bid] += (int32_t)iterations;
+                X_acc[tid] = X[tid];
+            });
+    });
     return SyclEvent(std::move(ffopt_done));
 }
 
 template <ForcefieldType FFT, typename T, typename K>
-struct ForceFieldGradientKernel {};
-
-template <ForcefieldType FFT, typename T, typename K>
-struct ForceFieldEnergyKernel {};
-
-template <ForcefieldType FFT, typename T, typename K>
-SyclEvent forcefield_optimize_impl(SyclQueue& Q, Fullerene<T,K> fullerene,
-                                            const Span<K> indices, 
-                                            const Span<std::array<T, 3>> X1,
-                                            const Span<std::array<T, 3>> X2,
-                                            const Span<std::array<T, 3>> g0,
-                                            const Span<std::array<T, 3>> g1,
-                                            const Span<std::array<T, 3>> s,
-                                            size_t iterations, size_t max_iterations){
-    TEMPLATE_TYPEDEFS(T, K);
-    if (fullerene.m_.flags_.get().is_not_set(StatusEnum::NOT_CONVERGED)) return SyclEvent();
-    if (fullerene.m_.flags_.get().is_set(StatusEnum::FAILED_3D) || fullerene.m_.flags_.get().is_set(StatusEnum::CONVERGED_3D)) return SyclEvent();
-
-    auto N = fullerene.N_;
-    auto X = fullerene.d_.X_cubic_;
-    auto A = fullerene.d_.A_cubic_;
-
-
-    //TODO: Make NodeNeighbours and Constants structures accessible to the client-code so we can compute them once and store in SyclVectors.
-    //SyclVector<NodeNeighbours<K>>   node_graphs_(N);
-    //SyclVector<Constants<T,K>>      constants_(N);
-    //Span<NodeNeighbours<K>>         node_graphs = node_graphs_;
-    //Span<Constants<T,K>>            constants = constants_;  
-
-    Q.wait();
-    std::iota(indices.begin(), indices.end(), K{0});
-
-    auto energy = [&] (Span<coord3d> X){
-        Q.wait();
-        T result = std::transform_reduce(FULLERENE_PAR_UNSEQ indices.begin(), indices.end(), T{0}, std::plus<T>{}, [=](K i) {
-            NodeNeighbours<K> node_graph(A, i);
-            Constants<T,K> constants(A, i);
-            T result = 0;
-            for (int j = 0; j < 3; j++)
-            {
-                typename ForceField<FFT,T,K>::ArcData arc(i, j, X, node_graph);
-                result += arc.energy(constants);
-            }
-            return result;
-        });
-        return result;
-    };
-
-    auto gradient = [&] (Span<coord3d> X, Span<coord3d> grad){
-        Q->submit([&](sycl::handler &h){
-            h.parallel_for<ForceFieldGradientKernel<FFT,T,K>>(sycl::range<1>(N), [=](sycl::id<1> i){
-                K idx = i;
-                NodeNeighbours<K> node_graphs(A, idx);
-                Constants<T,K> constants(A, idx);
-                coord3d result = {0,0,0};
-                for (int j = 0; j < 3; j++)
-                {
-                    typename ForceField<FFT,T,K>::ArcData arc(idx, j, X, node_graphs);
-                    result += arc.gradient(constants);
-                }
-                grad[i] = result;
-            });
-        });
-    };
-
-    auto GSS = [&] (const Span<coord3d> X, const Span<coord3d> r0, const Span<coord3d> X1, const Span<coord3d> X2){
-        const T tau = (T)0.6180339887;
-        T a = 0.0;
-        T b = (T)1.0;
-        T x1, x2;
-        x1 = (a + ((T)1. - tau) * (b - a));
-        x2 = (a + tau * (b - a));
-        Q.wait();
-        std::transform(FULLERENE_PAR_UNSEQ indices.begin(), indices.end(), X1.begin(), [=](K i){return X[i] + x1 * r0[i];});
-        std::transform(FULLERENE_PAR_UNSEQ indices.begin(), indices.end(), X2.begin(), [=](K i){return X[i] + x2 * r0[i];});
-        T f1 = energy(X1);
-        T f2 = energy(X2);
-        for (int i = 0; i < 20; i++)
-        {
-            if (f1 > f2)
-            {
-                a = x1;
-                x1 = x2;
-                f1 = f2;
-                x2 = a + tau * (b - a);
-                Q.wait();
-                std::transform(FULLERENE_PAR_UNSEQ indices.begin(), indices.end(), X2.begin(), [=](K i){return X[i] + x2 * r0[i];});
-                f2 = energy(X2);
-            }
-            else
-            {
-                b = x2;
-                x2 = x1;
-                f2 = f1;
-                x1 = a + ((T)1.0 - tau) * (b - a);
-                Q.wait();
-                std::transform(FULLERENE_PAR_UNSEQ indices.begin(), indices.end(), X1.begin(), [=](K i){return X[i] + x1 * r0[i];});
-                f1 = energy(X1);
-            }
-        }
-        if (f1 > energy(X))
-        {
-            return (T)0.0;
-        }
-        T alpha = (a + b) / (T)2.0;
-        return alpha;
-    };
-
-    auto CG = [&] (const Span<coord3d> X, const Span<coord3d> X1, const Span<coord3d> X2, const size_t MaxIter){
-        T alpha, beta, g0_norm2, s_norm;
-        gradient(X, g0);
-        Q.wait();
-        std::transform(FULLERENE_PAR_UNSEQ indices.begin(), indices.end(), s.begin(), [=](K i){return -g0[i];});
-        s_norm = sycl::sqrt(std::transform_reduce(FULLERENE_PAR_UNSEQ indices.begin(), indices.end(), T{0}, std::plus<T>{}, [=](K i){return dot(s[i], s[i]);}));
-        std::transform(FULLERENE_PAR_UNSEQ indices.begin(), indices.end(), s.begin(), [=](K i){return s[i] / s_norm;});
-
-        for (size_t i = 0; i < MaxIter; i++)
-        {
-            alpha = GSS(X, s, X1, X2);
-            if (alpha > (T)0.0)
-            {
-                Q.wait();
-                std::transform(FULLERENE_PAR_UNSEQ indices.begin(), indices.end(), X1.begin(), [=](K i){return X[i] + alpha * s[i];});
-            }
-            gradient(X1, g1);
-            Q.wait();
-            g0_norm2 = std::transform_reduce(FULLERENE_PAR_UNSEQ indices.begin(), indices.end(), T{0}, std::plus<T>{}, [=](K i){return dot(g0[i], g0[i]);});
-            beta = sycl::max(std::transform_reduce(FULLERENE_PAR_UNSEQ indices.begin(), indices.end(), T{0}, std::plus<T>{}, [=](K i){return dot(g1[i], (g1[i] - g0[i]));}) / g0_norm2, (T)0.0);
-            if (alpha > (T)0.0)
-            {
-                Q.wait();
-                std::transform(FULLERENE_PAR_UNSEQ indices.begin(), indices.end(), X.begin(), [=](K i){return X1[i];});
-            }
-            else
-            {
-                Q.wait();
-                std::copy(FULLERENE_PAR_UNSEQ g1.begin(), g1.end(), g0.begin());
-                beta = (T)0.0;
-            }
-            Q.wait();
-            std::transform(FULLERENE_PAR_UNSEQ indices.begin(), indices.end(), s.begin(), [=](K i){return -g1[i] + beta * s[i];});
-            std::copy(FULLERENE_PAR_UNSEQ g1.begin(), g1.end(), g0.begin());
-            s_norm = sycl::sqrt(std::transform_reduce(FULLERENE_PAR_UNSEQ indices.begin(), indices.end(), T{0}, std::plus<T>{}, [=](K i){return dot(s[i], s[i]);}));
-            std::transform(FULLERENE_PAR_UNSEQ indices.begin(), indices.end(), s.begin(), [=](K i){return s[i] / s_norm;});
-        }
-    };
-    bool check_convergence = false;
-
-    auto convergence_check = [&] () {
-        Q.wait();
-        T max_rel_bond_err = std::transform_reduce(FULLERENE_PAR_UNSEQ indices.begin(), indices.end(), T{0}, [](T a, T b){ return std::max(a, b); }, [=](K i){
-            Constants<T,K> constants(A, i);
-            NodeNeighbours<K> nodeG(A, i);
-            T rel_bond_err = 0;
-            for(int j = 0; j < 3; j++){
-                typename ForceField<FFT,T,K>::ArcData arc(i, j, X, nodeG);
-                rel_bond_err = sycl::max(rel_bond_err, std::abs(arc.bond() - constants.r0[j]) / constants.r0[j]);
-            }
-            return rel_bond_err;
-        });
-        T max_rel_angle_err = std::transform_reduce(FULLERENE_PAR_UNSEQ indices.begin(), indices.end(), T{0}, [](T a, T b){ return std::max(a, b); }, [=](K i){
-            Constants<T,K> constants(A, i);
-            NodeNeighbours<K> nodeG(A, i);
-            T rel_angle_err = 0;
-            for(int j = 0; j < 3; j++){
-                typename ForceField<FFT,T,K>::ArcData arc(i, j, X, nodeG);
-                rel_angle_err = sycl::max(rel_angle_err, std::abs(arc.angle() - constants.angle0[j]) / constants.angle0[j]);
-            }
-            return rel_angle_err;
-        });
-        T max_rel_dihedral_err = std::transform_reduce(FULLERENE_PAR_UNSEQ indices.begin(), indices.end(), T{0}, [](T a, T b){ return std::max(a, b); }, [=](K i){
-            Constants<T,K> constants(A, i);
-            NodeNeighbours<K> nodeG(A, i);
-            T rel_dihedral_err = 0;
-            for(int j = 0; j < 3; j++){
-                typename ForceField<FFT,T,K>::ArcData arc(i, j, X, nodeG);
-                rel_dihedral_err = sycl::max(rel_dihedral_err, std::abs(arc.dihedral() - constants.inner_dih0[j]) / constants.inner_dih0[j]);
-            }
-            return rel_dihedral_err;
-        });
-        size_t iterations_done = fullerene.m_.iterations_;
-        bool converged = ((max_rel_angle_err < 0.26) && (max_rel_dihedral_err < 0.1) && (max_rel_bond_err < 0.1));
-        bool failed = (!std::isfinite(max_rel_bond_err)) || (iterations_done >= max_iterations);
-        fullerene.m_.flags_.get().set(converged ? StatusEnum::CONVERGED_3D : (failed ? StatusEnum::FAILED_3D : StatusEnum::NOT_CONVERGED));
-    };
-    CG(X, X1, X2, std::max(iterations - 1,size_t(0)));
-    auto E1 = energy(X);
-    CG(X, X1, X2, std::min(size_t(1),iterations));
-    auto E2 = energy(X);
-    if (std::abs(E1 - E2)/N < std::numeric_limits<T>::epsilon()*1e2) check_convergence = true;
-    if (check_convergence) convergence_check();
-    fullerene.m_.iterations_ += iterations;
-
-    return Q.get_event();
+SyclEvent forcefield_optimize(SyclQueue& Q,
+                              batch::BatchView<Spanify::RSRAdjacencyView<K>> graph,
+                              std::span<std::array<T,3>> xyz,
+                              batch::BatchStateView state,
+                              size_t batch_iters, size_t max_iters,
+                              Workspace /*ws*/) {
+    return forcefield_optimize_view_batch_impl<FFT,T,K>(Q, graph, xyz, state, batch_iters, max_iters);
 }
 
-/* template <ForcefieldType FFT, typename T, typename K>
-void ForcefieldOptimizeFunctor<FFT, T, K>::operator() (SyclQueue& Q, Fullerene<T,K> fullerene, const int iterations, const int max_iterations, LaunchPolicy policy)
-{   
-    LaunchConfig<ForceFieldGradientKernel<FFT, T, K>> launch_config(Q);
-    std::cout << "ForceFieldGradientKernel: " << launch_config << std::endl;
-    std::cout << "Max Concurrent Kernels: " << launch_config.max_concurrent_launches(fullerene.N_) << std::endl;
-    auto max_launches = launch_config.max_concurrent_launches(fullerene.N_);
-    auto launch_ix = (this->dispatch_counters_[Q].fetch_add(1)) % max_launches;
-    execute_with_policy(Q, (Policy)policy, [&](){
-        forcefield_optimize_impl<FFT, T, K>(Q,  indices_[{Q,launch_ix}],
-                                                fullerene.d_.X_cubic_.template as_span<std::array<T,3>>(),
-                                                X1_[{Q,launch_ix}],
-                                                X2_[{Q,launch_ix}],
-                                                fullerene.d_.A_cubic_,
-                                                g0_[{Q,launch_ix}],
-                                                g1_[{Q,launch_ix}],
-                                                s_[{Q,launch_ix}],
-                                                iterations, max_iterations);    
-    });
-}
+template SyclEvent forcefield_optimize<PEDERSEN, float, uint16_t>(SyclQueue&, batch::BatchView<Spanify::RSRAdjacencyView<uint16_t>>, std::span<std::array<float,3>>, batch::BatchStateView, size_t, size_t, Workspace);
+template SyclEvent forcefield_optimize<PEDERSEN, float, uint32_t>(SyclQueue&, batch::BatchView<Spanify::RSRAdjacencyView<uint32_t>>, std::span<std::array<float,3>>, batch::BatchStateView, size_t, size_t, Workspace);
+template SyclEvent forcefield_optimize<PEDERSEN, double,uint16_t>(SyclQueue&, batch::BatchView<Spanify::RSRAdjacencyView<uint16_t>>, std::span<std::array<double,3>>, batch::BatchStateView, size_t, size_t, Workspace);
+template SyclEvent forcefield_optimize<PEDERSEN, double,uint32_t>(SyclQueue&, batch::BatchView<Spanify::RSRAdjacencyView<uint32_t>>, std::span<std::array<double,3>>, batch::BatchStateView, size_t, size_t, Workspace);
+template SyclEvent forcefield_optimize<FLATNESS_ENABLED, float, uint16_t>(SyclQueue&, batch::BatchView<Spanify::RSRAdjacencyView<uint16_t>>, std::span<std::array<float,3>>, batch::BatchStateView, size_t, size_t, Workspace);
+template SyclEvent forcefield_optimize<FLATNESS_ENABLED, float, uint32_t>(SyclQueue&, batch::BatchView<Spanify::RSRAdjacencyView<uint32_t>>, std::span<std::array<float,3>>, batch::BatchStateView, size_t, size_t, Workspace);
+template SyclEvent forcefield_optimize<FLATNESS_ENABLED, double,uint16_t>(SyclQueue&, batch::BatchView<Spanify::RSRAdjacencyView<uint16_t>>, std::span<std::array<double,3>>, batch::BatchStateView, size_t, size_t, Workspace);
+template SyclEvent forcefield_optimize<FLATNESS_ENABLED, double,uint32_t>(SyclQueue&, batch::BatchView<Spanify::RSRAdjacencyView<uint32_t>>, std::span<std::array<double,3>>, batch::BatchStateView, size_t, size_t, Workspace);
 
+// Phase 2: see dualize_buffer_size — returns 0 (local_accessor for scratch).
 template <ForcefieldType FFT, typename T, typename K>
-void ForcefieldOptimizeFunctor<FFT, T, K>::operator() (SyclQueue& Q, FullereneBatchView<T,K> B, const int iterations, const int max_iterations, LaunchPolicy policy)
-{      
-    execute_with_policy(Q, (Policy)policy, [&](){
-        forcefield_optimize_impl<FFT, T, K>(Q, B, iterations, max_iterations, policy);
-    });
-} */
-
-template <ForcefieldType FFT, typename T, typename K>
-SyclEvent ForcefieldOptimizeFunctor<FFT,T,K>::compute(SyclQueue& Q, Fullerene<T,K> fullerene, size_t iterations, size_t max_iterations,
-                                                    Span<K> indices, Span<std::array<T,3>> X1, Span<std::array<T,3>> X2, Span<std::array<T,3>> g0, Span<std::array<T,3>> g1, Span<std::array<T,3>> s){
-    return forcefield_optimize_impl<FFT,T,K>(Q, 
-                                        fullerene,
-                                        indices,
-                                        X1,
-                                        X2,
-                                        g0,
-                                        g1,
-                                        s,
-                                        iterations, max_iterations
-                                        );
-}
-
-template <ForcefieldType FFT, typename T, typename K>
-SyclEvent ForcefieldOptimizeFunctor<FFT,T,K>::compute(SyclQueue& Q, FullereneBatchView<T,K> batch, size_t iterations, size_t max_iterations){
-    return forcefield_optimize_impl<FFT,T,K>(Q,batch,iterations, max_iterations);
-}
-
-
-template struct ForcefieldOptimizeFunctor<PEDERSEN, float, uint16_t>;
-template struct ForcefieldOptimizeFunctor<PEDERSEN, double, uint16_t>;
-template struct ForcefieldOptimizeFunctor<PEDERSEN, float, uint32_t>;   
-template struct ForcefieldOptimizeFunctor<PEDERSEN, double, uint32_t>;
-template struct ForcefieldOptimizeFunctor<FLATNESS_ENABLED, float, uint16_t>;
-template struct ForcefieldOptimizeFunctor<FLATNESS_ENABLED, double, uint16_t>;
-template struct ForcefieldOptimizeFunctor<FLATNESS_ENABLED, float, uint32_t>;   
-template struct ForcefieldOptimizeFunctor<FLATNESS_ENABLED, double, uint32_t>;
+size_t forcefield_optimize_buffer_size(const Device&, int, int) { return 0; }
+template size_t forcefield_optimize_buffer_size<PEDERSEN, float, uint16_t>(const Device&, int, int);
+template size_t forcefield_optimize_buffer_size<PEDERSEN, float, uint32_t>(const Device&, int, int);
+template size_t forcefield_optimize_buffer_size<PEDERSEN, double,uint16_t>(const Device&, int, int);
+template size_t forcefield_optimize_buffer_size<PEDERSEN, double,uint32_t>(const Device&, int, int);
+template size_t forcefield_optimize_buffer_size<FLATNESS_ENABLED, float, uint16_t>(const Device&, int, int);
+template size_t forcefield_optimize_buffer_size<FLATNESS_ENABLED, float, uint32_t>(const Device&, int, int);
+template size_t forcefield_optimize_buffer_size<FLATNESS_ENABLED, double,uint16_t>(const Device&, int, int);
+template size_t forcefield_optimize_buffer_size<FLATNESS_ENABLED, double,uint32_t>(const Device&, int, int);

@@ -33,8 +33,8 @@ TEST(MDSPan, StridedAccess)
             }
     std::cout << "data = " << data << "\n";
 
-    std::cout << "span.stride = "  << Span( span.stride().data(),3) << "\n";
-    std::cout << "spanT.stride = " << Span(spanT.stride().data(),3) << "\n";
+    std::cout << "span.stride = "  << std::span( span.stride().data(),3) << "\n";
+    std::cout << "spanT.stride = " << std::span(spanT.stride().data(),3) << "\n";
 
     
     std::cout << "span = ";
@@ -67,10 +67,10 @@ TEST(SpanMatrix, CoalesceTest)
     
     for(int i=0;i<4;i++){
         SpanMatrix Ai = A({i,0,0}, 3,3);
-        std::cout << "A.shape = " << Span(Ai.shape().data(),2) << "\n";
+        std::cout << "A.shape = " << std::span(Ai.shape().data(),2) << "\n";
         std::cout << "A"<<i << " = \n" << Ai << "\n";
     }
-    std::cout << "A.data()" << Span(A.data(),m*n*p) << "\n";
+    std::cout << "A.data()" << std::span(A.data(),m*n*p) << "\n";
 }
 
 TEST(SpanMatrix, QHQ_test)
@@ -235,7 +235,7 @@ TEST(SyclVector, InequalityOperator)
 TEST(SyclVector, SpanConstructor)
 {
     SyclVector<int> vec(10, 5);
-    Span<int> span(vec);
+    std::span<int> span(vec);
     EXPECT_EQ(span.size(), 10);
     for (int i = 0; i < 10; i++)
     {

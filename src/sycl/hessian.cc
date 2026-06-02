@@ -18,9 +18,9 @@
 #endif
 #endif
 
-#include <fullerenes/kernel-headers/hessian-functor.hh>
-#include "queue-impl.cc"
-#include "forcefield-includes.cc"
+#include <fullerenes/kernel-headers/hessian.hh>
+#include "queue-impl.hh"
+#include "forcefield-includes.hh"
 
 template <ForcefieldType FFT, typename T, typename K>
 struct ForceField
@@ -59,7 +59,7 @@ struct ForceField
         node_t node_id;
         sycl::group<1> cta;
         // 84 + 107 FLOPS
-        FaceData(const sycl::group<1> &cta, const Span<coord3d> X, const NodeNeighbours<K> &G) : cta(cta)
+        FaceData(const sycl::group<1> &cta, const std::span<coord3d> X, const NodeNeighbours<K> &G) : cta(cta)
         {
             node_id = cta.get_local_linear_id();
             N = cta.get_local_linear_range();
@@ -184,7 +184,7 @@ struct ForceField
          * @param G The neighbour information for the threadIdx^th node.
          * @return A new ArcData object.
          */
-        ArcData(node_t a, const int j, const Span<coord3d> X, const NodeNeighbours<K> &G)
+        ArcData(node_t a, const int j, const std::span<coord3d> X, const NodeNeighbours<K> &G)
         {
             __builtin_assume(j < 3);
             this->j = j;
@@ -1575,7 +1575,7 @@ struct ForceField
      * @param c The constants for the threadIdx^th node.
      * @return The gradient of the bond, flatness, bending and dihedral terms w.r.t. the coordinates of the threadIdx^th node.
      */
-    coord3d gradient(const Span<coord3d> X) const
+    coord3d gradient(const std::span<coord3d> X) const
     {
         sycl::group_barrier(cta);
         coord3d grad = {0.0, 0.0, 0.0};
@@ -1602,7 +1602,7 @@ struct ForceField
          }
     }
 
-    hessian_t<T, K> hessian(const Span<coord3d> X) const
+    hessian_t<T, K> hessian(const std::span<coord3d> X) const
     {
         sycl::group_barrier(cta);
         hessian_t<T, K> hess(node_graph, node_id);
@@ -1620,7 +1620,7 @@ struct ForceField
     }
 
     // Uses finite difference to compute the hessian
-    hessian_t<T, K> fd_hessian(const Span<coord3d> X, const float reldelta = 1e-7) const
+    hessian_t<T, K> fd_hessian(const std::span<coord3d> X, const float reldelta = 1e-7) const
     {
         hessian_t<T, K> hess_fd(node_graph, node_id);
         for (uint16_t i = 0; i < N; i++)
@@ -1662,7 +1662,7 @@ struct ForceField
      * @param c The constants for the threadIdx^th node.
      * @return Total energy.
      */
-    real_t energy(const Span<coord3d> X) const
+    real_t energy(const std::span<coord3d> X) const
     {
         sycl::group_barrier(cta);
         real_t arc_energy = (real_t)0.0;
@@ -1699,7 +1699,7 @@ struct ForceField
      * @param X2 memory for storing temporary coordinates at x2.
      * @return The step-size alpha
      */
-    real_t GSS(const Span<coord3d> X, const coord3d &r0, const Span<coord3d> X1, const Span<coord3d> X2) const
+    real_t GSS(const std::span<coord3d> X, const coord3d &r0, const std::span<coord3d> X1, const std::span<coord3d> X2) const
     {
         const real_t tau = (real_t)0.6180339887;
         // Line search x - values;
@@ -1753,7 +1753,7 @@ struct ForceField
      * @param X2 memory for storing temporary coordinates.
      * @param MaxIter The maximum number of iterations.
      */
-    void CG(const Span<coord3d> X, const Span<coord3d> X1, const Span<coord3d> X2, const size_t MaxIter)
+    void CG(const std::span<coord3d> X, const std::span<coord3d> X1, const std::span<coord3d> X2, const size_t MaxIter)
     {
         real_t alpha, beta, g0_norm2, s_norm;
         coord3d g0, g1, s;
@@ -1806,85 +1806,100 @@ struct ForceField
     }
 };
 
+// ---------------------------------------------------------------------------
+// View-based batch implementation (Phase 7)
+// ---------------------------------------------------------------------------
 template <ForcefieldType FFT, typename T, typename K>
-SyclEvent compute_hessians(SyclQueue& Q, FullereneBatchView<T,K> B, Span<T> hess, Span<K> cols){
+static SyclEvent compute_hessians_view(
+    SyclQueue& Q,
+    batch::BatchView<Spanify::RSRAdjacencyView<K>> graph,
+    std::span<std::array<T,3>> xyz,
+    batch::BatchStateView state,
+    std::span<T> hess, std::span<K> cols)
+{
     TEMPLATE_TYPEDEFS(T,K);
-    if (hess.size() < 90*B.N_*B.size() || cols.size() < 90*B.N_*B.size()) throw std::runtime_error("compute_hessians: hess and cols buffers must be of size >= 90*N*size");
-    SyclEventImpl hessians_finished = Q->submit([&](sycl::handler& h){
-        auto X_acc = B.d_.X_cubic_;
+    auto [adj_flat, deg_flat, twin_flat] = graph.spans();
+    (void)deg_flat; (void)twin_flat;
 
-        sycl::local_accessor<coord3d, 1> X(B.N_,h);
-        sycl::local_accessor<real_t, 1> sdata(3*B.N_,h);
+    std::span<std::array<K,3>> A_cubic(
+        reinterpret_cast<std::array<K,3>*>(adj_flat.data()),
+        adj_flat.size() / 3);
 
-        auto N = B.N_;
-        auto size = B.size();
-        h.parallel_for(sycl::nd_range(sycl::range{size*N}, sycl::range{N}), [=](sycl::nd_item<1> nditem){
+    auto statuses   = state.status;
+    const int N        = graph.N();
+    const int capacity = graph.size();
+
+    if ((int)hess.size() < 90*N*capacity || (int)cols.size() < 90*N*capacity)
+        throw std::runtime_error("compute_hessians_view: hess and cols buffers must be >= 90*N*capacity");
+
+    SyclEventImpl hessians_finished = Q->submit([&](sycl::handler& h) {
+        sycl::local_accessor<coord3d, 1> X_smem(N, h);
+        sycl::local_accessor<real_t, 1>  sdata(3*N, h);
+
+        h.parallel_for(sycl::nd_range(sycl::range{(size_t)N*capacity}, sycl::range{(size_t)N}),
+        [=](sycl::nd_item<1> nditem) {
             auto cta = nditem.get_group();
             auto tid = nditem.get_local_linear_id();
             auto bid = nditem.get_group_linear_id();
-            auto& flag = B.m_.flags_[bid];
-            if (flag.is_not_set(StatusEnum::FULLERENEGRAPH_PREPARED)) return; //Skip if cubic graph is not initialized
-            auto cubic_neighbours_acc = B[bid].d_.A_cubic_;
 
-            Constants<T,K> constants (cubic_neighbours_acc, K(tid));
-            NodeNeighbours nodeG(cubic_neighbours_acc, K(tid));
-            X[tid] = X_acc[bid*N + tid];
-            ForceField FF = ForceField<FFT,T,K>(nodeG, constants, cta, get_raw_ptr(sdata));
-            auto hessian = FF.hessian(Span<coord3d>(get_raw_ptr(X), N));
+            if (statuses[bid].is_not_set(StatusEnum::FULLERENEGRAPH_PREPARED)) return;
+
+            const auto cubic_neighbours_acc = A_cubic.subspan(bid * N, N);
+            const auto X_acc = as_span<coord3d>(xyz.subspan(bid * N, N));
+
+            Constants<T,K>    constants(cubic_neighbours_acc, K(tid));
+            NodeNeighbours<K> nodeG(cubic_neighbours_acc, K(tid));
+            X_smem[tid] = X_acc[tid];
+            ForceField<FFT,T,K> FF(nodeG, constants, cta, sdata.get_pointer());
+            auto hessian = FF.hessian(std::span<coord3d>(static_cast<coord3d*>(X_smem.get_pointer()), N));
             int n_cols = 10*3;
             int n_rows = N*3;
             int hess_stride = n_cols*n_rows;
             int toff = bid*hess_stride + tid*n_cols*3;
-            Span<T> hess_span = hess.subspan(toff, n_cols*3);
-            Span<K> cols_span = cols.subspan(toff, n_cols*3);
-            for (size_t i = 0; i < 3; i++) //rows
-            for (size_t j = 0; j < 10; j++) //cols / 3
-            {   
-                for (size_t k = 0; k < 3; k++)
-                {   
+            std::span<T> hess_span = hess.subspan(toff, n_cols*3);
+            std::span<K> cols_span = cols.subspan(toff, n_cols*3);
+            for (size_t i = 0; i < 3; i++)
+            for (size_t j = 0; j < 10; j++) {
+                for (size_t k = 0; k < 3; k++) {
                     cols_span[i*n_cols + j*3 + k] = hessian.indices[j]*3 + k;
                     hess_span[i*n_cols + j*3 + k] = hessian.A[j][i][k];
-                }    
+                }
             }
             sycl::group_barrier(cta);
-            //Enforce symmetry
-
             hess_span = hess.subspan(bid*hess_stride, n_cols*n_rows);
             cols_span = cols.subspan(bid*hess_stride, n_cols*n_rows);
-
-            for(int ii = tid; ii < n_cols*n_rows; ii += N){
-                int i = ii / n_cols;
+            for (int ii = tid; ii < n_cols*n_rows; ii += N) {
+                int i  = ii / n_cols;
                 int jj = ii % n_cols;
-                int j = cols_span[i*n_cols + jj];
+                int j  = cols_span[i*n_cols + jj];
                 int ix = 0;
-                
-                if(i < j){
-                    while (ix < n_cols && cols_span[j*n_cols + ix] != i) {ix++;}
-
-                    T val = 0.5*(hess_span[i*n_cols + jj] + hess_span[j*n_cols + ix]);
+                if (i < j) {
+                    while (ix < n_cols && cols_span[j*n_cols + ix] != i) { ix++; }
+                    T val = T(0.5)*(hess_span[i*n_cols + jj] + hess_span[j*n_cols + ix]);
                     hess_span[i*n_cols + jj] = val;
                     hess_span[j*n_cols + ix] = val;
                 }
             }
-
         });
     });
     return SyclEvent(std::move(hessians_finished));
 }
 
 template <ForcefieldType FFT, typename T, typename K>
-SyclEvent HessianFunctor<FFT,T,K>::compute(SyclQueue& Q, FullereneBatchView<T,K> B, Span<T> hess, Span<K> cols){
-    return compute_hessians<FFT, T, K>(Q, B, hess, cols);
+SyclEvent compute_hessian(SyclQueue& Q,
+                          batch::BatchView<Spanify::RSRAdjacencyView<K>> graph,
+                          std::span<std::array<T,3>> xyz,
+                          batch::BatchStateView state,
+                          std::span<T> out_hessian, std::span<K> out_cols,
+                          Workspace /*ws*/) {
+    return compute_hessians_view<FFT,T,K>(Q, graph, xyz, state, out_hessian, out_cols);
 }
 
+template SyclEvent compute_hessian<PEDERSEN, float, uint16_t>(SyclQueue&, batch::BatchView<Spanify::RSRAdjacencyView<uint16_t>>, std::span<std::array<float,3>>, batch::BatchStateView, std::span<float>, std::span<uint16_t>, Workspace);
+template SyclEvent compute_hessian<PEDERSEN, double,uint16_t>(SyclQueue&, batch::BatchView<Spanify::RSRAdjacencyView<uint16_t>>, std::span<std::array<double,3>>, batch::BatchStateView, std::span<double>, std::span<uint16_t>, Workspace);
+
+// Phase 2: see dualize_buffer_size — returns 0 (local_accessor for scratch).
 template <ForcefieldType FFT, typename T, typename K>
-SyclEvent HessianFunctor<FFT,T,K>::compute(SyclQueue& Q, Fullerene<T,K> B, Span<T> hess, Span<K> cols, Span<K> indices){
-    //TODO: Implement compute for single isomer
-    throw std::logic_error("HessianFunctor::compute not implemented for single isomer");
-}
-
-template struct HessianFunctor<PEDERSEN, float, uint16_t>;
-template struct HessianFunctor<PEDERSEN, double, uint16_t>;
-//template struct HessianFunctor<PEDERSEN, double, uint16_t>;
-//template struct HessianFunctor<PEDERSEN, float, uint32_t>;
-//template struct HessianFunctor<PEDERSEN, double, uint32_t>;
+size_t compute_hessian_buffer_size(const Device&, int, int) { return 0; }
+template size_t compute_hessian_buffer_size<PEDERSEN, float, uint16_t>(const Device&, int, int);
+template size_t compute_hessian_buffer_size<PEDERSEN, double,uint16_t>(const Device&, int, int);

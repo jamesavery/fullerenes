@@ -1,42 +1,10 @@
 #include "sycl/sycl.hpp"
-#include <fullerenes/kernel-headers/eigen-functor.hh>
-#include "forcefield-includes.cc"
+#include <fullerenes/kernel-headers/eigen.hh>
+#include "forcefield-includes.hh"
 #include <array>
 #include <cstdint>
-#include "queue-impl.cc"
+#include "queue-impl.hh"
 using namespace sycl;
-
-template <int M, typename T, typename K>
-inline T lanczos_mat_vec(const sycl::group<1>& cta, const sycl::local_accessor<T,1>& smem,
-                         const size_t tid, const T x, const T* row_values, const K* row_cols) {
-    T result = T(0);
-    smem[tid] = x;
-    sycl::group_barrier(cta);
-    #pragma unroll
-    for (int j = 0; j < M; j++) {
-        result += row_values[j] * smem[row_cols[j]];
-    }
-    sycl::group_barrier(cta);
-    return result;
-}
-
-template <typename T>
-inline T lanczos_mgs(const sycl::group<1>& cta, const int index, const int N, T* V, const T* Z) {
-    sycl::group_barrier(cta);
-    T result = V[index * N];
-    #pragma unroll
-    for (int j = 0; j < 6; j++) {
-        auto proj = reduce_over_group(cta, result * Z[j], sycl::plus<T>{}) * Z[j];
-        result -= proj;
-    }
-    #pragma unroll
-    for (int j = 0; j < index; j++) {
-        auto proj = reduce_over_group(cta, result * V[j * N], sycl::plus<T>{}) * V[j * N];
-        result -= proj;
-    }
-    result /= sycl::sqrt(reduce_over_group(cta, result * result, sycl::plus<T>{}));
-    return result;
-}
 
 template <typename T>
 inline T deterministic_unit_random(uint32_t seed, uint32_t lane) {
@@ -290,25 +258,26 @@ struct EigenBuffers{
     * [rotx_0, roty_0, rotz_0, transx_0, transy_0, transz_0, min_0, max_0, rotx_1, roty_1, rotz_1, transx_1, transy_1, transz_1, min_1, max_1, ...]
  */
 template <EigensolveMode mode, typename T, typename K>
-SyclEvent eigensolve(SyclQueue& Q, FullereneBatchView<T,K> B, 
-                            Span<T> hessians, 
-                            Span<K> cols, 
+SyclEvent eigensolve_impl(SyclQueue& Q,
+                            std::span<std::array<T,3>> X_acc,
+                            size_t Natoms, size_t batch_size,
+                            std::span<T> hessians, 
+                            std::span<K> cols, 
                             size_t _nLanczos, 
-                            Span<T> eigenvalues, 
-                            Span<T> eigenvectors,
-                            Span<T> off_diagonal,
-                            Span<T> qmat,
-                            Span<T> lanczos,
-                            Span<T> diag,
-                            Span<K> ends_idx){
+                            std::span<T> eigenvalues, 
+                            std::span<T> eigenvectors,
+                            std::span<T> off_diagonal,
+                            std::span<T> qmat,
+                            std::span<T> lanczos,
+                            std::span<T> diag,
+                            std::span<K> ends_idx){
     TEMPLATE_TYPEDEFS(T,K);
     //If mode is ENDS or ENDS_VECTORS, we can make do with fewer lanczos iterations, default is 50.
-    size_t nLanczos = (mode == EigensolveMode::ENDS || mode == EigensolveMode::ENDS_VECTORS) ? _nLanczos : B.N_*3 - 6; //-6 for 6 degrees of freedom
-    if (nLanczos  > B.N_*3) {
+    size_t nLanczos = (mode == EigensolveMode::ENDS || mode == EigensolveMode::ENDS_VECTORS) ? _nLanczos : Natoms*3 - 6; //-6 for 6 degrees of freedom
+    if (nLanczos  > Natoms*3) {
         throw std::runtime_error("Number of lanczos iterations ("+ std::to_string(nLanczos) +") exceeds the number of rank of the hessian matrix");
     }
-    size_t Natoms = B.N_, batch_size = B.size();
- 
+
     //Buffers required: buffer<T>& D_, buffer<T>& L_, buffer<T>& U_, buffer<T>& Q_, 
 
     //Lanczos
@@ -326,7 +295,6 @@ SyclEvent eigensolve(SyclQueue& Q, FullereneBatchView<T,K> B,
     auto U_acc = off_diagonal;
     auto H_acc = hessians;
     auto cols_acc = cols;
-    auto X_acc = B.d_.X_cubic_;
     if (lanczos.size() < Natoms*3*nLanczos*batch_size) throw std::runtime_error("Lanczos buffer (of size " + std::to_string(lanczos.size()) + ") is too small for the batch size " + std::to_string(batch_size) + " and number of lanczos iterations " + std::to_string(nLanczos) + " and number of atoms " + std::to_string(Natoms));
     Q -> submit([&](sycl::handler& h){
         //accessor V_acc(buffers.lanczosBuffers[index], h, write_only);
@@ -350,6 +318,19 @@ SyclEvent eigensolve(SyclQueue& Q, FullereneBatchView<T,K> B,
             real_t* V = V_acc.data() + bid * nLanczos * N + tid;
             coord3d* X_ptr = X_acc.data()  + Natoms*bid; 
 
+            auto mat_vect = [&](const real_t x){
+                real_t result = real_t(0);
+                smem[tid] = x;
+                sycl::group_barrier(cta);
+                #pragma unroll
+                for (int j = 0; j < M; j++){
+                    int col = C[j];
+                    result += A[j] * smem[col];
+                }
+                sycl::group_barrier(cta);
+                return result;
+            };
+
             real_t Z[6]; //Eigenvectors spanning the kernel of the hessian (Rotations, Translations)
             Z[0] = real_t(tid%3 == 0)/sycl::sqrt(T(Natoms)); Z[1] = real_t(tid%3 == 1)/sycl::sqrt(T(Natoms)); Z[2] = real_t(tid%3 == 2)/sycl::sqrt(T(Natoms)); // Translation eigenvectors
             if(tid%3 == 0){
@@ -370,6 +351,27 @@ SyclEvent eigensolve(SyclQueue& Q, FullereneBatchView<T,K> B,
             Z[3] /= sycl::sqrt(reduce_over_group(cta, Z[3]*Z[3], sycl::plus<real_t>{}));
             Z[4] /= sycl::sqrt(reduce_over_group(cta, Z[4]*Z[4], sycl::plus<real_t>{}));
             Z[5] /= sycl::sqrt(reduce_over_group(cta, Z[5]*Z[5], sycl::plus<real_t>{}));
+
+
+            //Modified Gram-Schmidt, Also orthogonalizes against the deflation space
+            auto MGS = [&](int index){
+                sycl::group_barrier(cta);
+                real_t result = V[index*N];
+                #pragma unroll
+                for (int j = 0; j < 6; j++){
+                    auto proj = reduce_over_group(cta, result * Z[j], sycl::plus<real_t>{}) * Z[j];
+                    result -= proj; //Remove the component along Z[j] from result
+                }
+
+                #pragma unroll
+                for (int j = 0; j < index; j++){
+                    auto proj = reduce_over_group(cta, result * V[j*N], sycl::plus<real_t>{}) * V[j*N];
+                    result -= proj; //Remove the component along V[j*N] from result
+                }
+                result /= sycl::sqrt(reduce_over_group(cta, result * result, sycl::plus<real_t>{}));
+                return result;
+            };
+
             sycl::group_barrier(cta);
 
             for(int j = 0; j < M; j++){
@@ -381,12 +383,12 @@ SyclEvent eigensolve(SyclQueue& Q, FullereneBatchView<T,K> B,
             // Generate deterministic pseudo-random starting vector from lane id.
             V[0*N] = deterministic_unit_random<T>(42u, static_cast<uint32_t>(tid));
             V[0*N] /= sycl::sqrt(reduce_over_group(cta, V[0*N] * V[0*N], sycl::plus<real_t>{}));
-            V[0*N] = lanczos_mgs(cta, 0, N, V, Z);
+            V[0*N] = MGS(0);
             for (int i = 0; i < nLanczos; i++){
                 if (i > 1){
-                    V[i*N] = lanczos_mgs(cta, i, N, V, Z);
+                    V[i*N] = MGS(i);
                 }
-                real_t v = lanczos_mat_vec<M>(cta, smem, tid, V[i*N], A, C);
+                real_t v = mat_vect(V[i*N]);
                 real_t alpha = reduce_over_group(cta, v * V[i*N],sycl::plus<real_t>{});
                 if (tid == i) alphas[i] = alpha;
                 if (i == 0){
@@ -520,9 +522,9 @@ SyclEvent eigensolve(SyclQueue& Q, FullereneBatchView<T,K> B,
             real_t* q = Q_acc.data() + bid * m * m;
 
             for(int i = 0; i < 3; i++){
-                e[i*n + tid] = real_t(tid%3 == i)/sqrt(Natoms); 
+                e[i*n + tid] = real_t(tid%3 == i)/sycl::sqrt(real_t(Natoms));
             }
-            coord3d* X_ptr = X_acc.template as_span<coord3d>().data() + Natoms*bid;
+            coord3d* X_ptr = as_span<coord3d>(X_acc).data() + Natoms*bid;
             if (tid%3 == 0) {
                 e[3*n + tid] = real_t(0.);
                 e[4*n + tid] = -X_ptr[atom_idx][2];
@@ -571,34 +573,54 @@ SyclEvent eigensolve(SyclQueue& Q, FullereneBatchView<T,K> B,
     return final_compute;
 }
 
-template <EigensolveMode mode, typename T, typename K>
-SyclEvent EigenFunctor<mode, T, K>::compute(SyclQueue& Q, FullereneBatchView<T,K> B, 
-                            Span<T> hessians,
-                            Span<K> cols,
-                            size_t _nLanczos,
-                            Span<T> eigenvalues,
-                            Span<T> eigenvectors,
-                            Span<T> off_diagonal, Span<T> qmat, Span<T> lanczos, Span<T> diag, Span<K> ends_idx){
-    return eigensolve<mode>(Q, B, hessians, cols, _nLanczos, eigenvalues, eigenvectors, off_diagonal, qmat, lanczos, diag, ends_idx);
-}
-
-template <EigensolveMode mode, typename T, typename K>
-SyclEvent EigenFunctor<mode, T, K>::compute(SyclQueue& Q, Fullerene<T,K> B, 
-                            Span<T> hessians,
-                            Span<K> cols,
-                            size_t _nLanczos,
-                            Span<T> eigenvalues,
-                            Span<T> eigenvectors,
-                            Span<K> indices, Span<T> off_diagonal, Span<T> qmat, Span<T> lanczos, Span<T> diag, Span<K> ends_idx){
-    throw std::logic_error("Not implemented");
-}
     
-template struct EigenFunctor<EigensolveMode::FULL_SPECTRUM, float, uint16_t>;
-template struct EigenFunctor<EigensolveMode::ENDS, float, uint16_t>;
-template struct EigenFunctor<EigensolveMode::ENDS_VECTORS, float, uint16_t>;
-template struct EigenFunctor<EigensolveMode::FULL_SPECTRUM_VECTORS, float, uint16_t>;
+// ---------------------------------------------------------------------------
+// View-based batch implementation (Phase 7)
+// ---------------------------------------------------------------------------
+// This overload passes xyz coordinates and explicit N/capacity instead of
+// a FullereneBatchView.  The Lanczos kernel uses xyz only for the initial
+// deflation of rigid-body eigenvectors; all other data comes from the
+// hessian/cols spans, so we can forward directly to the eigensolve function
+// after constructing a minimal proxy that exposes the required interface.
+template <EigensolveMode mode, typename T, typename K>
+SyclEvent eigensolve(
+    SyclQueue& Q,
+    std::span<std::array<T,3>> xyz,
+    int N, int capacity,
+    std::span<T> hessians, std::span<K> cols, size_t n_lanczos,
+    std::span<T> eigenvalues, std::span<T> eigenvectors,
+    std::span<T> off_diagonal, std::span<T> qmat,
+    std::span<T> lanczos, std::span<T> diag, std::span<K> ends_idx,
+    Workspace /*ws*/)
+{
+    return eigensolve_impl<mode,T,K>(Q,
+        as_span<std::array<T,3>>(xyz),
+        (size_t)N, (size_t)capacity,
+        hessians, cols, n_lanczos,
+        eigenvalues, eigenvectors,
+        off_diagonal, qmat, lanczos, diag, ends_idx);
+}
 
-template struct EigenFunctor<EigensolveMode::FULL_SPECTRUM, double, uint16_t>;
-template struct EigenFunctor<EigensolveMode::ENDS, double, uint16_t>;
-template struct EigenFunctor<EigensolveMode::ENDS_VECTORS, double, uint16_t>;
-template struct EigenFunctor<EigensolveMode::FULL_SPECTRUM_VECTORS, double, uint16_t>;
+template SyclEvent eigensolve<EigensolveMode::FULL_SPECTRUM,         float,  uint16_t>(SyclQueue&, std::span<std::array<float,3>>,  int, int, std::span<float>,  std::span<uint16_t>, size_t, std::span<float>,  std::span<float>,  std::span<float>,  std::span<float>,  std::span<float>,  std::span<float>,  std::span<uint16_t>, Workspace);
+template SyclEvent eigensolve<EigensolveMode::ENDS,                  float,  uint16_t>(SyclQueue&, std::span<std::array<float,3>>,  int, int, std::span<float>,  std::span<uint16_t>, size_t, std::span<float>,  std::span<float>,  std::span<float>,  std::span<float>,  std::span<float>,  std::span<float>,  std::span<uint16_t>, Workspace);
+template SyclEvent eigensolve<EigensolveMode::ENDS_VECTORS,          float,  uint16_t>(SyclQueue&, std::span<std::array<float,3>>,  int, int, std::span<float>,  std::span<uint16_t>, size_t, std::span<float>,  std::span<float>,  std::span<float>,  std::span<float>,  std::span<float>,  std::span<float>,  std::span<uint16_t>, Workspace);
+template SyclEvent eigensolve<EigensolveMode::FULL_SPECTRUM_VECTORS, float,  uint16_t>(SyclQueue&, std::span<std::array<float,3>>,  int, int, std::span<float>,  std::span<uint16_t>, size_t, std::span<float>,  std::span<float>,  std::span<float>,  std::span<float>,  std::span<float>,  std::span<float>,  std::span<uint16_t>, Workspace);
+template SyclEvent eigensolve<EigensolveMode::FULL_SPECTRUM,         double, uint16_t>(SyclQueue&, std::span<std::array<double,3>>, int, int, std::span<double>, std::span<uint16_t>, size_t, std::span<double>, std::span<double>, std::span<double>, std::span<double>, std::span<double>, std::span<double>, std::span<uint16_t>, Workspace);
+template SyclEvent eigensolve<EigensolveMode::ENDS,                  double, uint16_t>(SyclQueue&, std::span<std::array<double,3>>, int, int, std::span<double>, std::span<uint16_t>, size_t, std::span<double>, std::span<double>, std::span<double>, std::span<double>, std::span<double>, std::span<double>, std::span<uint16_t>, Workspace);
+template SyclEvent eigensolve<EigensolveMode::ENDS_VECTORS,          double, uint16_t>(SyclQueue&, std::span<std::array<double,3>>, int, int, std::span<double>, std::span<uint16_t>, size_t, std::span<double>, std::span<double>, std::span<double>, std::span<double>, std::span<double>, std::span<double>, std::span<uint16_t>, Workspace);
+template SyclEvent eigensolve<EigensolveMode::FULL_SPECTRUM_VECTORS, double, uint16_t>(SyclQueue&, std::span<std::array<double,3>>, int, int, std::span<double>, std::span<uint16_t>, size_t, std::span<double>, std::span<double>, std::span<double>, std::span<double>, std::span<double>, std::span<double>, std::span<uint16_t>, Workspace);
+
+// Phase 2: see dualize_buffer_size — returns 0 (local_accessor for scratch).
+// The eigen kernel currently still takes its scratch (off_diagonal, qmat,
+// lanczos, diag, ends_idx) as external Spans; in Phase 3 those move to
+// Workspace, at which point this query becomes non-zero.
+template <EigensolveMode mode, typename T, typename K>
+size_t eigensolve_buffer_size(const Device&, int, int, size_t) { return 0; }
+template size_t eigensolve_buffer_size<EigensolveMode::FULL_SPECTRUM, float, uint16_t>(const Device&, int, int, size_t);
+template size_t eigensolve_buffer_size<EigensolveMode::ENDS, float, uint16_t>(const Device&, int, int, size_t);
+template size_t eigensolve_buffer_size<EigensolveMode::ENDS_VECTORS, float, uint16_t>(const Device&, int, int, size_t);
+template size_t eigensolve_buffer_size<EigensolveMode::FULL_SPECTRUM_VECTORS, float, uint16_t>(const Device&, int, int, size_t);
+template size_t eigensolve_buffer_size<EigensolveMode::FULL_SPECTRUM, double, uint16_t>(const Device&, int, int, size_t);
+template size_t eigensolve_buffer_size<EigensolveMode::ENDS, double, uint16_t>(const Device&, int, int, size_t);
+template size_t eigensolve_buffer_size<EigensolveMode::ENDS_VECTORS, double, uint16_t>(const Device&, int, int, size_t);
+template size_t eigensolve_buffer_size<EigensolveMode::FULL_SPECTRUM_VECTORS, double, uint16_t>(const Device&, int, int, size_t);
