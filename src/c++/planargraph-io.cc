@@ -5,9 +5,9 @@
 #include <stdexcept>
 
 //////////////////////////// FORMAT MULTIPLEXING ////////////////////////////
-vector<string> PlanarGraph::formats{{"ascii","planarcode","xyz","mol2","mathematica","latex","spiral"}};
-vector<string> PlanarGraph::input_formats{{"planarcode","xyz","mol2","spiral"}}; // TODO: Add ASCII
-vector<string> PlanarGraph::output_formats{{"ascii","planarcode","spiral"}}; // TODO: Add LaTeX, Mathematica
+vector<string> PlanarGraph::formats{"ascii","planarcode","xyz","mol2","mathematica","latex","spiral"};
+vector<string> PlanarGraph::input_formats{"planarcode","xyz","mol2","spiral"}; // TODO: Add ASCII
+vector<string> PlanarGraph::output_formats{"ascii","planarcode","spiral"}; // TODO: Add LaTeX, Mathematica
  
 int PlanarGraph::format_id(string name)
 {

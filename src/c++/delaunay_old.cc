@@ -27,13 +27,8 @@ FulleroidDelaunay::FulleroidDelaunay(const Triangulation& T)
 {
   // Edge flips during vertex removal can temporarily push vertex degrees
   // well above 6 (the max for fullerene duals). Restride to give headroom.
-  if (dmax < 20) {
-    auto restrided = restride(20);
-    owned_values = std::move(restrided.owned_values);
-    owned_deg = std::move(restrided.owned_deg);
-    dmax = 20;
-    repoint();
-  }
+  if (dmax < 20)
+    restride_inplace(20);
   for (node_t u = 0; u < N; u++)
     for (node_t v : (*this)[u])
       edge_lengths(u, v) = 1.0;
@@ -72,9 +67,9 @@ bool FulleroidDelaunay::flip_edge(node_t u, node_t v, bool verbose)
   if (!std::isfinite(f) || f <= 0) { if (verbose) fprintf(stderr, "  flip(%d,%d): bad length f=%g\n", u, v, f); return false; }
 
   // Execute flip: remove diagonal u-v, insert diagonal B-D.
-  Graph::remove_edge(edge_t(u, v));
+  GraphView::remove_edge(edge_t(u, v));
   set_length(u, v, 0);
-  Graph::insert_edge(arc_t(B, D), u, v);
+  GraphView::insert_edge(arc_t(B, D), u, v);
   set_length(B, D, f);
 
   if (audit) audit->after_flip(*this, u, v);
@@ -277,7 +272,7 @@ void FulleroidDelaunay::remove_flat_vertex(node_t v)
 
     // Remove all spoke edges.
     for (int i = 0; i < k; i++) set_length(v, nb[i], 0);
-    for (int i = k - 1; i >= 0; i--) Graph::remove_edge(edge_t(v, nb[i]));
+    for (int i = k - 1; i >= 0; i--) GraphView::remove_edge(edge_t(v, nb[i]));
 
     // Insert ear diagonals.
     for (size_t di = 0; di < diagonals.size(); di++) {
@@ -288,7 +283,7 @@ void FulleroidDelaunay::remove_flat_vertex(node_t v)
       node_t suc_uv = next(p_prev, p_ear);
       node_t suc_vu = p_ear;
       assert(find(p_next, p_ear) >= 0);
-      Graph::insert_edge(arc_t(p_prev, p_next), suc_uv, suc_vu);
+      GraphView::insert_edge(arc_t(p_prev, p_next), suc_uv, suc_vu);
       set_length(p_prev, p_next, d.len);
     }
 
@@ -303,9 +298,9 @@ void FulleroidDelaunay::remove_flat_vertex(node_t v)
   auto vrow = (*this)[v];
   node_t a = vrow[0], b = vrow[1], c = vrow[2];
   set_length(v, a, 0); set_length(v, b, 0); set_length(v, c, 0);
-  Graph::remove_edge(edge_t(v, a));
-  Graph::remove_edge(edge_t(v, b));
-  Graph::remove_edge(edge_t(v, c));
+  GraphView::remove_edge(edge_t(v, a));
+  GraphView::remove_edge(edge_t(v, b));
+  GraphView::remove_edge(edge_t(v, c));
 
   assert(v == N - 1);
   pop_back();

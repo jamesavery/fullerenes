@@ -38,10 +38,10 @@ struct SyclVector
         return *this;
     }
 
-    inline constexpr operator Span<T>() const { return Span<T>(data_, size_); }
-    inline constexpr Span<T> to_span() const { return Span<T>(data_, size_); }
-    inline constexpr Span<T> subspan(size_t offset, size_t count) const { return Span<T>(data_ + offset, count); }
-    inline constexpr Span<T> subspan(size_t offset) const { return Span<T>(data_ + offset, size_ - offset); }
+    inline constexpr operator std::span<T>() const { return std::span<T>(data_, size_); }
+    inline constexpr std::span<T> to_span() const { return std::span<T>(data_, size_); }
+    inline constexpr std::span<T> subspan(size_t offset, size_t count) const { return std::span<T>(data_ + offset, count); }
+    inline constexpr std::span<T> subspan(size_t offset) const { return std::span<T>(data_ + offset, size_ - offset); }
     inline constexpr void fill(T data) { std::fill(begin(), end(), data); }
     inline constexpr T *data() const { return data_; }
     inline constexpr size_t size() const { return size_; }
@@ -57,7 +57,7 @@ struct SyclVector
     inline constexpr const T &at(size_t index) const { assert(index < size_); return data_[index]; }
 
     inline constexpr bool operator==(const SyclVector<T> &other) const {
-        return Span<T>(*this) == Span<T>(other);
+        return span_fuzzy_equal(std::span<T>(*this), std::span<T>(other));
     }
 
     inline constexpr void push_back(const T &value) { 

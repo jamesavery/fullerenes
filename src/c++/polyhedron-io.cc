@@ -2,10 +2,10 @@
 #include "fullerenes/layout2d.hh"
 
 //////////////////////////// FORMAT MULTIPLEXING ////////////////////////////
-vector<string> Polyhedron::formats{{"ascii","planarcode","xyz","mol2","mathematica","latex","cc1","turbomole","gaussian","wavefront","spiral"}};
-vector<string> Polyhedron::format_alias{{"txt","ply","xyz","mol2","m","tex","cc1","turbomole","com","obj","rspi"}};
-vector<string> Polyhedron::input_formats{{"xyz","mol2"}}; // TODO: "ascii","planarcode","obj"
-vector<string> Polyhedron::output_formats{{"ascii","xyz","mol2","cc1","turbomole","gaussian","spiral"}};
+vector<string> Polyhedron::formats{"ascii","planarcode","xyz","mol2","mathematica","latex","cc1","turbomole","gaussian","wavefront","spiral"};
+vector<string> Polyhedron::format_alias{"txt","ply","xyz","mol2","m","tex","cc1","turbomole","com","obj","rspi"};
+vector<string> Polyhedron::input_formats{"xyz","mol2"}; // TODO: "ascii","planarcode","obj"
+vector<string> Polyhedron::output_formats{"ascii","xyz","mol2","cc1","turbomole","gaussian","spiral"};
 
 int Polyhedron::format_id(string name)
 {
@@ -477,8 +477,9 @@ Polyhedron Polyhedron::from_mol2(FILE *file)
   }
 
   Polyhedron P;
-  static_cast<Graph&>(P) = static_cast<const Graph&>(G);
-  P.points = std::move(points);
+  static_cast<Owned<PolyhedronView<double>>&>(P) = static_cast<const GraphView&>(G);
+  P.owned_points = std::move(points);
+  P.repoint();
   {
     vector<coord2d> layout = P.tutte_layout();
     layout2d::orient_neighbours(P, layout);

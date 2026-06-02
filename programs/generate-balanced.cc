@@ -64,11 +64,12 @@ int main(int ac, char **av)
   }; 
   
   BuckyGen::buckygen_queue BQ = BuckyGen::start(N,IPR,only_symmetric);
-  Triangulation g;
+  Graph g_buf; Triangulation g;
   
   size_t isomer_ix = 0;
   after_time = steady_clock::now(); // In case isomer 0 is among the selected samples.
-  while( BuckyGen::next_fullerene(BQ,g) && (isomer_ix < M) && (ii<m)){
+  while( BuckyGen::next_fullerene(BQ,g_buf) && (isomer_ix < M) && (ii<m)){
+    g = Triangulation(g_buf);
     before_time = steady_clock::now();
 
     size_t next_sample = sample_ix[ii];

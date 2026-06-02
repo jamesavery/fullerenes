@@ -415,10 +415,11 @@ int main(int ac, char **argv)
   int n_isomers = 0;
   int n_cones[7] = {}; // n_cones[p] counts (p, 12-p)-nanocones; p=6 is nanotube
 
-  FullereneDual dualG;
+  Graph dualG_buf;
   BuckyGen::buckygen_queue Q = BuckyGen::start(N, IPR, only_nontrivial);
 
-  while(BuckyGen::next_fullerene(Q, dualG)){
+  while(BuckyGen::next_fullerene(Q, dualG_buf)){
+    FullereneDual dualG(dualG_buf);
     n_isomers++;
 
     if(verbose >= 0 && n_isomers % 100000 == 0)

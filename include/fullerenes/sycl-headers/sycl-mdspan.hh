@@ -157,7 +157,7 @@ struct MDSpan
     inline constexpr T& operator[](const array_t &index)  {
         for(int axis=0;axis<N;axis++){
             if(index[axis] >= shape_[axis]){
-                std::cout << "index = " << Span(const_cast<int*>(index.data()), N) << "\n";
+                std::cout << "index = " << std::span(const_cast<int*>(index.data()), N) << "\n";
                 printf("axis = %d, index[axis] = %d, shape_[axis] = %d\n", axis, index[axis], shape_[axis]);
             }
              assert(index[axis] < shape_[axis]); // TODO: Langsomt, til debug naar virker
@@ -171,9 +171,9 @@ struct MDSpan
         assert(data_ != 0); 
         size_t offset = offset_of<N>(index);
         if(0) if(offset >= size()){
-            std::cout << "index = " << Span(const_cast<int*>(index.data()),N) << " -> " << offset << " >= " << size() << "\n";
-            std::cout << "stride = " << Span(const_cast<int*>(stride_.data()),N) << "\n";
-            std::cout << "shape = " << Span(const_cast<int*>(shape_.data()),N) << "\n";
+            std::cout << "index = " << std::span(const_cast<int*>(index.data()),N) << " -> " << offset << " >= " << size() << "\n";
+            std::cout << "stride = " << std::span(const_cast<int*>(stride_.data()),N) << "\n";
+            std::cout << "shape = " << std::span(const_cast<int*>(shape_.data()),N) << "\n";
         }
         return data_[offset];
     }    

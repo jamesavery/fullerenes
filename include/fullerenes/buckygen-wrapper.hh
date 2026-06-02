@@ -1,6 +1,7 @@
 #pragma once
 #include <limits.h>
 #include <sys/types.h>
+#include <type_traits>
 #include "fullerenes/graph.hh"
 
 
@@ -40,6 +41,20 @@ namespace BuckyGen {
   void stop(const buckygen_queue& Q);
 
   bool next_fullerene(const buckygen_queue& Q, Graph& G);
+
+  // Backward-compatibility shim: fill any owned graph/triangulation type
+  // (Triangulation, FullereneDual, ...) directly. buckygen emits a dual
+  // triangulation; we fill a Graph, then deep-copy its adjacency into `out`.
+  // In the view-based hierarchy these owned types no longer derive from Graph,
+  // so the Graph& overload above cannot bind them.
+  template<class G_t>
+    requires (!std::is_same_v<std::remove_cv_t<G_t>, Graph>)
+  bool next_fullerene(const buckygen_queue& Q, G_t& out) {
+    Graph G;
+    bool r = next_fullerene(Q, G);
+    if (r) out = G;
+    return r;
+  }
 }
 
 

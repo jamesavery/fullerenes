@@ -177,7 +177,7 @@ TEST_F(DeltahedronTest, GC_3_0_FaceInteriorHarmonicProperty) {
   int k = 3;
   int m = k - 1;
   vector<map<edge_t,node_t>> face_grids;
-  static_cast<const Triangulation&>(ico).halma_transform(m, &face_grids);
+  static_cast<const TriangulationView&>(ico).halma_transform(m, &face_grids);
   Deltahedron D = ico.GCtransform(k, 0);
 
   // Identify face-interior vertices: grid points (a,b) with a>0, b<m+1, a<b
@@ -212,7 +212,7 @@ TEST_F(DeltahedronTest, GC_5_0_FaceInteriorHarmonicProperty) {
   int k = 5;
   int m = k - 1;
   vector<map<edge_t,node_t>> face_grids;
-  static_cast<const Triangulation&>(ico).halma_transform(m, &face_grids);
+  static_cast<const TriangulationView&>(ico).halma_transform(m, &face_grids);
   Deltahedron D = ico.GCtransform(k, 0);
 
   vector<bool> is_face_interior(D.N, false);
@@ -347,7 +347,7 @@ TEST_F(DeltahedronTest, GC_1_1_SurfacePreservation) {
 
 TEST_F(DeltahedronTest, GC_1_1_TopologyConsistency) {
   Deltahedron result = ico.GCtransform(1, 1);
-  Triangulation topo = ico.Triangulation::GCtransform(1, 1);
+  Triangulation topo = ico.TriangulationView::GCtransform(1, 1);
 
   EXPECT_EQ(result.N, topo.N);
   EXPECT_EQ(result.triangles().size(), topo.triangles().size());
@@ -355,7 +355,7 @@ TEST_F(DeltahedronTest, GC_1_1_TopologyConsistency) {
 
 TEST_F(DeltahedronTest, GC_2_1_TopologyConsistency) {
   Deltahedron result = ico.GCtransform(2, 1);
-  Triangulation topo = ico.Triangulation::GCtransform(2, 1);
+  Triangulation topo = ico.TriangulationView::GCtransform(2, 1);
 
   EXPECT_EQ(result.N, topo.N);
   EXPECT_EQ(result.triangles().size(), topo.triangles().size());
@@ -507,7 +507,7 @@ TEST(C44DeltahedronTest, AllC44_GC_1_1_TopologyConsistency) {
     SCOPED_TRACE("isomer " + to_string(idx));
     Deltahedron D = make_C44_deltahedron(idx);
     Deltahedron result = D.GCtransform(1, 1);
-    Triangulation topo = D.Triangulation::GCtransform(1, 1);
+    Triangulation topo = D.TriangulationView::GCtransform(1, 1);
     EXPECT_EQ(result.N, topo.N);
     EXPECT_EQ(result.triangles().size(), topo.triangles().size());
   }
@@ -621,7 +621,7 @@ static void check_C44_GC(int k, int l, const char* label) {
     }
 
     // Topology consistency with Triangulation::GCtransform
-    Triangulation topo = D.Triangulation::GCtransform(k, l);
+    Triangulation topo = D.TriangulationView::GCtransform(k, l);
     EXPECT_EQ(result.N, topo.N);
     EXPECT_EQ(result.triangles().size(), topo.triangles().size());
 

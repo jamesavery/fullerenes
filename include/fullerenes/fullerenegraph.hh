@@ -7,16 +7,25 @@
 #include "fullerenes/geometry.hh"
 #include "fullerenes/triangulation.hh"
 
-class FullereneGraph : public CubicGraph {
+// FullereneGraph: owned fullerene graph (3-regular, 12 pentagons, rest hex).
+// Inherits algorithm methods from FullereneGraphView via Owned<FullereneGraphView>.
+// Adds validation constructor and static C20().
+class FullereneGraph : public Owned<FullereneGraphView> {
+  using base_t = Owned<FullereneGraphView>;
 public:
-  FullereneGraph(const Graph& g) : CubicGraph(g) { if(N>0) fullerene_check();  }
-  FullereneGraph(const PlanarGraph& g) : CubicGraph(g) { if(N>0) fullerene_check(); }
+  FullereneGraph() = default;
+  explicit FullereneGraph(int N) : base_t(N) {}
 
-  FullereneGraph(const int N, const vector<int>& spiral_indices, const jumplist_t& jumps = jumplist_t()); 
+  FullereneGraph(const GraphView& g) : base_t(g) {
+    if(N > 0 && dmax != 3) restride_inplace(3);
+    if(N>0) fullerene_check();
+  }
+
+  FullereneGraph(const int N, const vector<int>& spiral_indices, const jumplist_t& jumps = jumplist_t());
   FullereneGraph(const spiral_nomenclature &fsn){
     *this =  Triangulation(fsn).dual_graph();
-  } 
-  
+  }
+
   void fullerene_check() const
   {
     if(!is_a_fullerene()){
@@ -24,26 +33,6 @@ public:
       abort();
     }
   }
-
-  // Creates the m-point halma-fullerene from the current fullerene C_n with n(1+m)^2 vertices. 
-  // (I.e. 4,9,16,25,... for n=1,2,3,4,...)
-  FullereneGraph halma_fullerene(const int n, const bool do_layout=false) const;
-
-  // Creates the next leapfrog fullerene C_{3n} from the current fullerene C_n
-  FullereneGraph leapfrog_fullerene(const bool do_layout=false) const;
-
-  // Creates the (k,l)-Goldberg-Coxeter construction C_{(k^2+kl+l^2)n} of the current fullerene C_n
-  FullereneGraph GCtransform(unsigned k=1, unsigned l=0) const;
-
-  // spiral from graph, with or without starting point
-  bool get_rspi_from_fg(const node_t f1, const node_t f2, const node_t f3, vector<int> &rspi, jumplist_t &jumps, const bool general=true) const;
-  bool get_rspi_from_fg(vector<int> &rspi, jumplist_t &jumps, const bool general=true, const bool pentagon_start=true) const;
-
-  // create a matrix that holds the topological distances between all pentagons
-  matrix<int> pentagon_distance_mtx() const;
-
-  vector<coord3d> zero_order_geometry(double scalerad=4) const;
-  vector<coord3d> optimized_geometry(std::span<const coord3d> initial_geometry, int opt_method = 3, double ftol = 1e-12) const;
 
   static FullereneGraph C20() {
     // CW-oriented neighbour lists for dodecahedral C20, obtained from buckygen
@@ -56,5 +45,3 @@ public:
     });
   }
 };
-
-

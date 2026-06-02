@@ -135,7 +135,7 @@ bool next_fullerene(const buckygen_queue& Q, Graph& G)
       for(int i=0; 6>i && (msg.neighbours[u*6+i] != -1); i++)
 	adj.push_back(u, msg.neighbours[u*6+i]);
     // Buckygen's e->next traversal preserves cyclic planar order.
-    G = Graph(adj);
+    G = adj;
 
     return true;
   } else if(msg.mtype == WORKER_FINISHED) {	// No more graphs to generate
@@ -206,7 +206,7 @@ bool next_fullerene(const buckygen_queue& Q, Graph& G)
   
 
 
-  bool buckyherd_queue::next_fullerene(Graph& G) 
+  bool buckyherd_queue::next_fullerene(Graph& G)
   {
     buckyherd_queue &H(*this);
     

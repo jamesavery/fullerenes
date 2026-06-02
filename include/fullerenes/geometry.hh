@@ -16,7 +16,8 @@ using namespace std;
 // node_t and neighbours_t defined in auxiliary.hh (included above)
 typedef vector< bool > edges_t;
 
-struct matrix3d; // required for coord3d.outer(coord3d)
+template<typename T> struct coord2; // forward declaration for coord3<T>::polar_angle
+struct matrix3d;                   // required for coord3<T>::outer(coord3<T>)
 
 // TODO: geometry.hh is getting huge. Move most of the implementation to geometryc.cc
 
@@ -38,169 +39,169 @@ namespace std {
 }
 
 
-struct coord2d : public pair<double,double> {
-  coord2d(const pair<double,double>& x) : pair<double,double>(x) {}
-  coord2d(const double x=0, const double y=0) : pair<double,double>(x,y) {}
-  coord2d operator/(const double s)   const { return coord2d(first/s,second/s); }
-  coord2d operator*(const double s)   const { return coord2d(first*s,second*s); }
-  coord2d operator*(const coord2d& y)   const { return coord2d(first*y.first,second*y.second); }
-  coord2d operator+(const coord2d& y) const { return coord2d(first+y.first,second+y.second); }
-  coord2d operator-(const coord2d& y) const { return coord2d(first-y.first,second-y.second); }
-  coord2d& operator+=(const coord2d& y){ first += y.first; second += y.second; return *this; }
-  coord2d& operator-=(const coord2d& y){ first -= y.first; second -= y.second; return *this; }
-  coord2d& operator*=(const coord2d& y){ first *= y.first; second *= y.second; return *this; }
-  coord2d& operator*=(const double s)  { first*=s;second*=s; return *this;}
-  coord2d operator-() const {coord2d y(-first,-second); return y;}
+template<typename T = double>
+struct coord2 : public pair<T,T> {
+  coord2(const pair<T,T>& p) : pair<T,T>(p) {}
+  coord2(const T x=0, const T y=0) : pair<T,T>(x,y) {}
+  coord2 operator/(const T s)        const { return coord2(this->first/s, this->second/s); }
+  coord2 operator*(const T s)        const { return coord2(this->first*s, this->second*s); }
+  coord2 operator*(const coord2& y)  const { return coord2(this->first*y.first, this->second*y.second); }
+  coord2 operator+(const coord2& y)  const { return coord2(this->first+y.first, this->second+y.second); }
+  coord2 operator-(const coord2& y)  const { return coord2(this->first-y.first, this->second-y.second); }
+  coord2& operator+=(const coord2& y){ this->first += y.first; this->second += y.second; return *this; }
+  coord2& operator-=(const coord2& y){ this->first -= y.first; this->second -= y.second; return *this; }
+  coord2& operator*=(const coord2& y){ this->first *= y.first; this->second *= y.second; return *this; }
+  coord2& operator*=(const T s)      { this->first*=s; this->second*=s; return *this; }
+  coord2 operator-() const { return coord2(-this->first, -this->second); }
 
-  double operator()(int i) const { return i? second : first; }
-  double& operator()(int i)      { return i? second : first; }
-  
-  double dot(const coord2d& y) const { return first*y.first+second*y.second; }
+  T operator()(int i) const { return i? this->second : this->first; }
+  T& operator()(int i)      { return i? this->second : this->first; }
 
-  double line_angle(const coord2d& v) const { // CCW between two lines ([-pi;pi] where -*this is +/-pi and *this is 0 -- i.e. pi is "leftmost", -pi is "rightmost")
-    double angle = fmod(atan2(first*v.second-v.first*second,first*v.first+second*v.second)+2*M_PI,2*M_PI)-M_PI;
-    //    fprintf(stderr,"angle[{%f,%f},{%f,%f}] == %f\n",first,second,v.first,v.second,angle);
+  T dot(const coord2& y) const { return this->first*y.first + this->second*y.second; }
+
+  // CCW angle between two lines ([-pi;pi])
+  double line_angle(const coord2& v) const {
+    double angle = fmod(atan2((double)(this->first*v.second - v.first*this->second),
+                              (double)(this->first*v.first  + this->second*v.second))
+                        + 2*M_PI, 2*M_PI) - M_PI;
     return angle;
   }
 
-  double point_angle(const coord2d& y=0, const bool periodic=false) const { 
+  double point_angle(const coord2& y=0, const bool periodic=false) const {
     if(periodic) return point_angle_periodic(y);
     else {
-      const coord2d vx(*this-y);
-      return atan2(vx.second,vx.first);
+      const coord2 vx(*this-y);
+      return atan2((double)vx.second, (double)vx.first);
     }
   }
 
-  // CCW angle of y around point on a periodic surface [0;2pi[ x [0;pi[. 
-  double point_angle_periodic(const coord2d& y=0) const {
-    const coord2d dy[4] = {coord2d(0,0), coord2d(2*M_PI,0), coord2d(0,M_PI), coord2d(2*M_PI,M_PI)};
-    const coord2d& x(*this);
+  // CCW angle of y around point on a periodic surface [0;2pi[ x [0;pi[.
+  double point_angle_periodic(const coord2& y=0) const {
+    const coord2 dy[4] = {coord2(0,0), coord2((T)(2*M_PI),0), coord2(0,(T)M_PI), coord2((T)(2*M_PI),(T)M_PI)};
+    const coord2& self(*this);
 
-    // Step 1: There are four potential "proper" coordinates for y:  y, y+(2pi,0), y+(0,pi), or y+(2pi,pi)
-    //         The appropriate one has the smallest distance to x.
     double rsqrmin = INFINITY;
     int imin = 0;
     for(int i=0;i<4;i++){
-      const coord2d y0(y+dy[i]-x);
-      const double rsqr = y0.dot(y0);
-      if(rsqr < rsqrmin){
-	rsqrmin = rsqr;
-	imin = i;
-      }
+      const coord2 y0(y+dy[i]-self);
+      const double rsqr = (double)y0.dot(y0);
+      if(rsqr < rsqrmin){ rsqrmin = rsqr; imin = i; }
     }
-    // Step 2: Now the angle is calculated as usual.
     return point_angle(y+dy[imin],false);
   }
-  
-  double norm()  const { return sqrt(norm2()); }
-  double norm2() const { return first*first+second*second; }  
-  // d/dx_i ||x|| = x_i/||x||.
-  static coord2d dnorm(const coord2d& x){ return x/x.norm(); }
 
-  static coord2d displacement(const coord2d& x, const coord2d& y, bool layout_is_spherical)
+  T    norm()  const { return (T)sqrt((double)norm2()); }
+  T    norm2() const { return this->first*this->first + this->second*this->second; }
+  static coord2 dnorm(const coord2& x){ return x/x.norm(); }
+
+  static coord2 displacement(const coord2& x, const coord2& y, bool layout_is_spherical)
   {
     if(!layout_is_spherical) return x-y;
-
-    int i0=0,j0=0;
+    int i0=0, j0=0;
     double dmin = INFINITY;
-
     for(int i=0;i<=1;i++)
       for(int j=0;j<=1;j++){
-	double d = (x+coord2d(i*2*M_PI,j*M_PI) - y).norm();
-	if(d < dmin){ i0 = i; j0 = j; }
+        double d = (x + coord2((T)(i*2*M_PI),(T)(j*M_PI)) - y).norm();
+        if(d < dmin){ i0 = i; j0 = j; }
       }
-    return x+coord2d(i0*2*M_PI,j0*M_PI) - y;
+    return x + coord2((T)(i0*2*M_PI),(T)(j0*M_PI)) - y;
   }
 
-  friend ostream& operator<<(ostream &s, const coord2d& x){ s << std::fixed << LIST_OPEN << x.first << "," << x.second << LIST_CLOSE; return s; }
-  friend istream& operator>>(istream &s, coord2d& x){ s >> x.first; s >> x.second; return s; }
+  friend ostream& operator<<(ostream &s, const coord2<T>& x){
+    s << std::fixed << LIST_OPEN << x.first << "," << x.second << LIST_CLOSE; return s; }
+  friend istream& operator>>(istream &s, coord2<T>& x){ s >> x.first; s >> x.second; return s; }
 };
 
+using coord2d = coord2<double>;
 
 
-struct coord3d {
-  double x[3];
 
-  coord3d() { x[0] = 0; x[1] = 0; x[2] = 0; }
-  coord3d(const double y[3]) { x[0] = y[0]; x[1] = y[1]; x[2] = y[2]; }
-  coord3d(const double x_, const double y, const double z) { x[0] = x_; x[1] = y; x[2] = z; }
-  coord3d operator/(const double s)   const { return coord3d(*this) /= s; }
-  coord3d operator*(const double s)   const { return coord3d(*this) *= s; }
-  coord3d operator*(const coord3d& y) const { return coord3d(*this) *= y; }
-  coord3d operator+(const coord3d& y) const { return coord3d(*this) += y; }
-  coord3d operator-(const coord3d& y) const { return coord3d(*this) -= y; }
-  coord3d& operator+=(const coord3d& y){ x[0] += y[0]; x[1] += y[1]; x[2] += y[2]; return *this; }
-  coord3d& operator-=(const coord3d& y){ x[0] -= y[0]; x[1] -= y[1]; x[2] -= y[2]; return *this; }
-  coord3d& operator*=(const coord3d& y){ x[0] *= y[0]; x[1] *= y[1]; x[2] *= y[2]; return *this; }
-  coord3d& operator*=(const double& y){ x[0] *= y; x[1] *= y; x[2] *= y; return *this; }
-  coord3d& operator/=(const double& y){ x[0] /= y; x[1] /= y; x[2] /= y; return *this; }
-  coord3d operator-() const {coord3d y(-x[0],-x[1],-x[2]); return y;}
-  coord3d operator*(const matrix3d& m) const;
+template<typename T = double>
+struct coord3 {
+  T x[3];
 
-  coord3d cross(const coord3d& y) const {
-    return coord3d(x[1]*y[2]-x[2]*y[1], x[2]*y[0]-x[0]*y[2], x[0]*y[1]-x[1]*y[0]);
+  coord3() { x[0] = 0; x[1] = 0; x[2] = 0; }
+  coord3(const T y[3]) { x[0] = y[0]; x[1] = y[1]; x[2] = y[2]; }
+  coord3(const T x_, const T y, const T z) { x[0] = x_; x[1] = y; x[2] = z; }
+  coord3 operator/(const T s)    const { return coord3(*this) /= s; }
+  coord3 operator*(const T s)    const { return coord3(*this) *= s; }
+  coord3 operator*(const coord3& y) const { return coord3(*this) *= y; }
+  coord3 operator+(const coord3& y) const { return coord3(*this) += y; }
+  coord3 operator-(const coord3& y) const { return coord3(*this) -= y; }
+  coord3& operator+=(const coord3& y){ x[0] += y[0]; x[1] += y[1]; x[2] += y[2]; return *this; }
+  coord3& operator-=(const coord3& y){ x[0] -= y[0]; x[1] -= y[1]; x[2] -= y[2]; return *this; }
+  coord3& operator*=(const coord3& y){ x[0] *= y[0]; x[1] *= y[1]; x[2] *= y[2]; return *this; }
+  coord3& operator*=(const T& y){ x[0] *= y; x[1] *= y; x[2] *= y; return *this; }
+  coord3& operator/=(const T& y){ x[0] /= y; x[1] /= y; x[2] /= y; return *this; }
+  coord3 operator-() const { return coord3(-x[0],-x[1],-x[2]); }
+  coord3 operator*(const matrix3d& m) const;
+
+  coord3 cross(const coord3& y) const {
+    return coord3(x[1]*y[2]-x[2]*y[1], x[2]*y[0]-x[0]*y[2], x[0]*y[1]-x[1]*y[0]);
   }
-  matrix3d outer(const coord3d& y) const;
-  double dot(const coord3d& y) const { return x[0]*y[0]+x[1]*y[1]+x[2]*y[2]; }
-  double norm() const { return sqrt(dot(*this)); }
-  coord2d polar_angle(const coord3d& centre = coord3d()) const
-  { 
-    const coord3d& x(*this - centre);
-    const double r = norm();
-    return coord2d(acos(x[2]/r),atan2(x[1],x[0]));
-  }
-
-  double& operator[](unsigned int i){ return x[i]; }
-  double  operator[](unsigned int i) const { return x[i]; }
-
-  static double dist(const coord3d& x, const coord3d& y){ return (x-y).norm(); }
-  // d/dx_i ||x|| = x_i/||x||.
-  static coord3d dnorm(const coord3d& x){ return x/x.norm(); }
-  // d^2/(dx_i dx_j) ||x|| = -x_i x_j/||x||^3 + [i==j]/||x||
-  static void ddnorm(const coord3d& x, vector<double> &H)
+  matrix3d outer(const coord3& y) const;
+  T dot(const coord3& y)  const { return x[0]*y[0]+x[1]*y[1]+x[2]*y[2]; }
+  T norm()                const { return (T)sqrt((double)dot(*this)); }
+  coord2<T> polar_angle(const coord3& centre = coord3()) const
   {
-    const double n = 1.0/x.norm(), n3 = n*n*n;
+    const coord3 rel(*this - centre);
+    const T r = norm();  // norm of *this (preserved from original)
+    return coord2<T>((T)acos((double)rel[2]/r), (T)atan2((double)rel[1],(double)rel[0]));
+  }
 
+  T& operator[](unsigned int i)       { return x[i]; }
+  T  operator[](unsigned int i) const { return x[i]; }
+
+  static T dist(const coord3& a, const coord3& b){ return (a-b).norm(); }
+  static coord3 dnorm(const coord3& v){ return v/v.norm(); }
+  // d^2/(dx_i dx_j) ||x|| = -x_i x_j/||x||^3 + [i==j]/||x||  (double precision)
+  static void ddnorm(const coord3& v, vector<double>& H)
+  {
+    const double n = 1.0/v.norm(), n3 = n*n*n;
     for(int i=0;i<3;i++)
       for(int j=0;j<3;j++)
-	H[i*3+j] = -x[i]*x[j]*n3 + (i==j? n : 0);
+        H[i*3+j] = -(double)v[i]*(double)v[j]*n3 + (i==j? n : 0);
   }
 
   // calculation of the angle beta at b(0,0,0)
-  static double angle(const coord3d& a, const coord3d& c);
-  // calculation of the derivative of angle beta at b(0,0,0) according to coordinates a and c with fixed b
-  static void dangle(const coord3d& a, const coord3d& c, coord3d& da, coord3d& dc);
-  // calculation of the dihedral angle theta at a(0,0,0), b, c and d,  the result is an angle between -\pi and +\pi (in radians)
-  static double dihedral(const coord3d& b, const coord3d& c, const coord3d& d);
-  // calculation of the derivative of dihedral angle theta at a(0,0,0), b, c and d according to coordinates b, c and d with fixed a
-  static void ddihedral(const coord3d& b, const coord3d& c, const coord3d& d, coord3d& db, coord3d& dc, coord3d& dd);
+  static double angle(const coord3& a, const coord3& c);
+  // calculation of the derivative of angle beta at b(0,0,0)
+  static void dangle(const coord3& a, const coord3& c, coord3& da, coord3& dc);
+  // dihedral angle theta at a(0,0,0), b, c and d  [-pi; pi]
+  static double dihedral(const coord3& b, const coord3& c, const coord3& d);
+  // derivative of dihedral angle
+  static void ddihedral(const coord3& b, const coord3& c, const coord3& d,
+                        coord3& db, coord3& dc, coord3& dd);
+  static double ideal_dihedral(const int lA, const int lB, const int lC,
+                               const double ur=1.0, const double us=1.0, const double ut=1.0);
 
-  static double ideal_dihedral(const int lA, const int lB, const int lC, const double ur=1.0, const double us=1.0, const double ut=1.0);
-
-
-  friend vector<coord3d> &operator-=(vector<coord3d>& xs, const coord3d& y)
+  friend vector<coord3<T>>& operator-=(vector<coord3<T>>& xs, const coord3<T>& y)
   {
     for(size_t i=0;i<xs.size();i++) xs[i] -= y;
     return xs;
   }
 
-  friend vector<coord3d> &operator*=(vector<coord3d>& xs, const double& y)
+  friend vector<coord3<T>>& operator*=(vector<coord3<T>>& xs, const T& y)
   {
     for(size_t i=0;i<xs.size();i++) xs[i] *= y;
     return xs;
   }
 
-  // NB: Does this belong here?
-  static coord3d line_plane_intersect(const coord3d& x0, const coord3d& x1, const coord3d& X0, const coord3d& n)
+  static coord3 line_plane_intersect(const coord3& x0, const coord3& x1,
+                                     const coord3& X0, const coord3& n)
   {
-    const coord3d dx(x1-x0);
-    double t = (X0-x0).dot(n)/dx.dot(n);
+    const coord3 dx(x1-x0);
+    T t = (X0-x0).dot(n)/dx.dot(n);
     return x0+dx*t;
   }
 
-  friend ostream& operator<<(ostream &s, const coord3d& x){ s << std::fixed << LIST_OPEN << x[0] << "," << x[1] << "," << x[2]<< LIST_CLOSE; return s; }
-  friend istream& operator>>(istream &s, coord3d& x){ for(int i=0;i<3;i++){ s >> x[i]; } return s; }
+  friend ostream& operator<<(ostream &s, const coord3<T>& v){
+    s << std::fixed << LIST_OPEN << v[0] << "," << v[1] << "," << v[2] << LIST_CLOSE; return s; }
+  friend istream& operator>>(istream &s, coord3<T>& v){
+    for(int i=0;i<3;i++){ s >> v[i]; } return s; }
 };
+
+using coord3d = coord3<double>;
 
 struct matrix2d {
   double A[4];

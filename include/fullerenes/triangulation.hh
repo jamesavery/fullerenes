@@ -5,194 +5,75 @@
 #include "fullerenes/matrix.hh"
 #include "fullerenes/spiral.hh"
 #include "fullerenes/planargraph.hh"
-#include "fullerenes/planargraph.hh"
 
-// TODO: Easy correspondence between cubic and dual 
-//  1. Triangle numbers correspond to cubic nodes
-//  2. 
-class Triangulation : public PlanarGraph {
+class Triangulation : public Owned<TriangulationView> {
+  using base_t = Owned<TriangulationView>;
 public:
   typedef function<bool(Triangulation)> predicate_t;
 
-  // Operations:
-  //  1. Orient triangulation
-  //  2. Unfold (assert deg(v) <= 6 for all v)
-  //  3. GC     (assert deg(v) <= 6 for all v)
-  //  4. Spirals (constructor + all_spirals + canonical_spiral)
-  //  5. Embed in 2D
-  //  6. Embed in 3D
-  Triangulation(int N) : PlanarGraph(N, 6) {}
-  Triangulation(const Graph& g = Graph()) : PlanarGraph(g) {}
-  Triangulation(const neighbours_t& neighbours) : PlanarGraph(Graph(neighbours)) {}
+  Triangulation() = default;
+  explicit Triangulation(int N) : base_t(N) {}
+  Triangulation(const GraphView& g) : base_t(g) {}
+  Triangulation(const neighbours_t& neighbours) : base_t(Graph(neighbours)) {}
 
-  Triangulation(const vector<int>& spiral_string, const jumplist_t& jumps = jumplist_t(), const bool best_effort=false); // and the opposite of 'best-effort' is 'fast and robust'
-  Triangulation(const spiral_nomenclature &fsn): Triangulation(fsn.spiral.spiral_code, fsn.spiral.jumps, true){} // best_effort = true
-  
-  PlanarGraph dual_graph() const;
-  vector<face_t> cubic_faces() const;
-  unordered_map<arc_t,arc_t> arc_translation() const;
-  
-  size_t max_degree() const {
-    size_t max_deg = 0;
-    for(node_t u=0; u<N; u++) max_deg = std::max(max_deg, (size_t)degree(u));
-    return max_deg;
-  }
-
-  vector<uint8_t> n_degrees() const {
-    vector<uint8_t> nd(max_degree(),0);
-    for(node_t u=0; u<N; u++) nd[degree(u)-1]++;
-    return nd;
-  }
-  
-  // takes a triangulation, and returns a dual of the inverse leapfrog
-  // this is cheap because we just remove a set of faces
-  PlanarGraph inverse_leapfrog_dual() const;
-  
-  pair<node_t,node_t> adjacent_tris(const arc_t &e) const;
-
-  vector<tri_t> compute_faces_oriented() const; // Compute oriented triangles given oriented neighbours
-  
-  //  Unfolding unfold() const;
-  Triangulation GCtransform(unsigned k=1, unsigned l=0) const;
-  Triangulation halma_transform(int m, vector<map<edge_t,node_t>>* face_grids = nullptr) const;
-
-  // spiral stuff
-  bool get_spiral_implementation(const node_t f1, const node_t f2, const node_t f3, vector<int>& v, jumplist_t& j,
-				 vector<node_t>& permutation, const bool general=true,
-				 const vector<int>& S0=vector<int>(), const jumplist_t& J0=jumplist_t()) const;
-  // the one defined by three nodes
-  bool get_spiral(const node_t f1, const node_t f2, const node_t f3, vector<int>& v, jumplist_t& j, vector<node_t>& permutation, const bool general=true) const;
-
-
-  // Get canonical general spiral and permutation of nodes compared to current triangulation.
-  // CW_only=true restricts to CW starting triples so orientation is preserved through windup round-trip.
-  bool get_spiral(vector<int>& v, jumplist_t& j, vector<vector<node_t>> &permutations, const bool only_rarest_special=true, const bool general=true, const bool CW_only=false) const;
-  // Get canonical general spiral
-  bool get_spiral(vector<int>& v, jumplist_t& j, const bool rarest_start=true, const bool general=true, const bool CW_only=false) const;
-  general_spiral get_general_spiral(const bool rarest_start=true, const bool CW_only=false) const;
-
-  void get_all_spirals(vector< vector<int> >& spirals, vector<jumplist_t>& jumps,
-		       vector<vector<node_t>>& permutations,
-		       const bool only_special=false, const bool general=false) const;
-
-  void symmetry_information(int N_generators, Graph& coxeter_diagram, vector<int>& coxeter_labels) const;
-
-  vector<node_t> vertex_numbers(vector<vector<node_t>> &perms, const vector<node_t> &loc) const;
-  
-  vector<tri_t> triangles() const { return compute_faces_oriented(); }
-  int n_triangles() const { return 2*N - 4; }
-
-  // A simple geodesic u -> v: the Eisenstein displacement (a, b) (with
-  // a, b >= 0) walked from u, starting along the `axis`-th out-arc at u
-  // (the a-axis). Reaches v = end_of_the_line(u, axis, a, b); squared
-  // length is g.norm2() = a^2 + a*b + b^2.
-  struct simple_geodesic {
-    Eisenstein g;
-    int axis;
-
-    simple_geodesic(int a=0, int b=0, int axis=0) : g(a,b), axis(axis) {}
-  };
-
-  // A general geodesic u -> v: a sequence of simple geodesics
-  // u -> K_1 -> K_2 -> ... -> v, broken at intermediate cones.
-  struct geodesic {
-    vector<simple_geodesic> segments;
-    geodesic() = default;
-    geodesic(int) {}   // matrix<geodesic>(m, n) zero-init compatibility
-  };
-
-  matrix<int>    pentagon_distance_mtx() const;
-
-
-  matrix<int>              simple_square_surface_distances(vector<node_t> only_nodes = {},bool calculate_self_geodesics=false) const;
-  matrix<double>           surface_distances(vector<node_t> only_nodes = {},bool calculate_self_geodesics=false,
-                                             matrix<geodesic>* geodesics_out=nullptr) const;
-
-  matrix<geodesic>         surface_geodesics(vector<node_t> only_nodes = {},bool calculate_self_geodesics=false) const;
-  matrix<simple_geodesic>  simple_geodesics(vector<node_t> only_nodes = {},bool calculate_self_geodesics=false) const;
-
-  // Concatenate simple geodesics along a node-index path:
-  //   [U, K_1, ..., V] -> { simple(U, K_1), simple(K_1, K_2), ..., simple(K_n, V) }.
-  // Returns an empty geodesic for paths of length <= 1 (U == V or unreachable).
-  static geodesic compose_simple_geodesics(const vector<int>& path,
-                                            const matrix<simple_geodesic>& simple);
-  
-  node_t         end_of_the_line(node_t u0, int i, int a, int b) const;
-  vector<vector<node_t>> quads_of_the_line(node_t u0, int i, int a, int b) const;  
-
-  Triangulation sort_nodes() const;
-
-  // Return the permutation that sorts cone vertices (degree != 6) before
-  // flat (degree == 6) vertices, preserving original order within each
-  // group.  pi[u_old] = u_new.  *this is unchanged; apply via
-  // `apply_permutation(pi)` on a copy to materialise the sorted graph.
-  Permutation sort_flat_last() const;
+  Triangulation(const vector<int>& spiral_string, const jumplist_t& jumps = jumplist_t(), const bool best_effort=false);
+  Triangulation(const spiral_nomenclature &fsn): Triangulation(fsn.spiral.spiral_code, fsn.spiral.jumps, true){}
 };
 
 
-class FullereneDual : public Triangulation {
+class FullereneDual : public Owned<FullereneDualView> {
+  using base_t = Owned<FullereneDualView>;
 public:
-  // 1. Fullerene get_dual()
-  // 2. Construct with buckygen
-  // 3. Spiral+gen. spiral special case
-  // 4. Embed-in-3D special case
-  FullereneDual(const Triangulation& g = Triangulation()) : Triangulation(g) {}
+  FullereneDual() = default;
+  FullereneDual(const GraphView& g) : base_t(g) {}
+
   FullereneDual(const int N, const general_spiral& rspi) : FullereneDual(N,rspi.spiral_code,rspi.jumps) {}
   FullereneDual(const int N, const vector<int>& rspi, const jumplist_t& jumps = jumplist_t()) {
     vector<int> spiral(N/2+2,6);
     for(int i: rspi) spiral[i] = 5;
     *this = Triangulation(spiral,jumps);
   }
-  
-  bool get_rspi(const node_t f1, const node_t f2, const node_t f3, vector<int>& r, jumplist_t& j, const bool general=true) const;
-  bool get_rspi(vector<int>& r, jumplist_t& j, const bool general=true, const bool pentagon_start=true) const;
-  general_spiral get_rspi(const bool rarest_start=true) const; // TODO: Replace above by this simplified API
 
   static vector<general_spiral> isomer_search(const Triangulation::predicate_t& predicate, size_t N, size_t print_step=0,
-					      bool IPR=false, bool only_nontrivial_symmetry=false, size_t N_chunks=1, size_t chunk_index=0);
-
-  spiral_nomenclature name(bool rarest_start=true) const;  
+                                              bool IPR=false, bool only_nontrivial_symmetry=false, size_t N_chunks=1, size_t chunk_index=0);
 };
 
 
 class CubicPair {
   Triangulation T;
   PlanarGraph   G;
-  IDCounter<tri_t> triangle_id;  
+  IDCounter<tri_t> triangle_id;
   vector<vector<arc_t>> CtoD, DtoC;
-  
+
   int face_start(const face_t &f){
     node_t i_m = 0;
     for(int i=0, m=INT_MAX; i<int(f.size()); i++) if(f[i] < m){ i_m = i; m = f[i]; }
     return i_m;
   }
-    
+
   CubicPair(const Triangulation &T) : G(T.dual_graph()), CtoD(G.N,vector<arc_t>(3)), DtoC(T.N)
   {
     for(const auto &t: T.triangles()) triangle_id.insert(t.sorted());
-  
+
     for(node_t u=0;u<T.N;u++){
       auto nu = T.nbrs(u);
       DtoC[u].resize(nu.size());
 
-      // For each directed edge v->u
       for(size_t i=0;i<nu.size();i++){
+        node_t v = nu[i];
+        node_t s = nu[(i+1)%nu.size()];
+        node_t t = nu[(i+nu.size()-1)%nu.size()];
 
-	node_t v = nu[i];
-	node_t s = nu[(i+1)%nu.size()];           // u->v->s is triangle associated with u->v
-	node_t t = nu[(i+nu.size()-1)%nu.size()]; // v->u->t is triangle associated with v->u
+        tri_t t1 = {u,v,s}, t2 = {v,u,t};
 
-	tri_t t1 = {u,v,s}, t2 = {v,u,t};
-	
-	// arcs get a unique number: id(u,i) = row_offset[u]+i
-	node_t U   = triangle_id(t1.sorted()), V = triangle_id(t2.sorted());
-	node_t i_V = G.arc_ix(U,V), i_U = G.arc_ix(V,U);
-	node_t i_v = T.arc_ix(u,v), i_u = T.arc_ix(v,u);
-	
-	CtoD[U][i_V] = {u,i_v};
-	CtoD[V][i_U] = {v,i_u};
-	DtoC[u][i_v] = {U,i_V};
-	DtoC[v][i_u] = {V,i_U};
+        node_t U   = triangle_id(t1.sorted()), V = triangle_id(t2.sorted());
+        node_t i_V = G.arc_ix(U,V), i_U = G.arc_ix(V,U);
+        node_t i_v = T.arc_ix(u,v), i_u = T.arc_ix(v,u);
+
+        CtoD[U][i_V] = {u,i_v};
+        CtoD[V][i_U] = {v,i_u};
+        DtoC[u][i_v] = {U,i_V};
+        DtoC[v][i_u] = {V,i_U};
       }
     }
   }

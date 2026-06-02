@@ -11,6 +11,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <span>
+#include <fullerenes/sycl-headers/sycl-span.hh>
 
 extern char LIST_OPEN;
 extern char LIST_CLOSE;
@@ -42,16 +43,8 @@ container_output(vector);
 container_output(list);
 container_output(set);
 
-template<typename T> ostream& operator<<(ostream& s, std::span<T> v)
-{
-  s << LIST_OPEN;
-  for(size_t i=0;i<v.size();i++){
-    if(i) s << ",";
-    s << v[i];
-  }
-  s << LIST_CLOSE;
-  return s;
-}
+// Note: operator<<(ostream&, std::span<T>) is defined in
+// fullerenes/sycl-headers/sycl-span.hh. Include that header where needed.
 
 
 // Directed edge is an ordered pair of nodes

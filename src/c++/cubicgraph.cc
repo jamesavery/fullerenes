@@ -23,7 +23,7 @@ CubicGraph::CubicGraph(const spiral_nomenclature &fsn){
 }
 
 
-bool CubicGraph::get_spiral_from_cg(const node_t f1, const node_t f2, const node_t f3, vector<int> &spiral, jumplist_t &jumps, const bool general) const
+bool CubicGraphView::get_spiral_from_cg(const node_t f1, const node_t f2, const node_t f3, vector<int> &spiral, jumplist_t &jumps, const bool general) const
 {
   spiral.clear();
   jumps.clear();
@@ -36,7 +36,7 @@ bool CubicGraph::get_spiral_from_cg(const node_t f1, const node_t f2, const node
   return true;
 }
 
-bool CubicGraph::get_spiral_from_cg(vector<int> &spiral, jumplist_t &jumps, const bool canonical, const bool general, const bool pentagon_start) const
+bool CubicGraphView::get_spiral_from_cg(vector<int> &spiral, jumplist_t &jumps, const bool canonical, const bool general, const bool pentagon_start) const
 {
   spiral.clear();
   jumps.clear();
@@ -69,7 +69,7 @@ int intersection_3(vector<int> &f1, vector<int> &f2, vector<int> &f3){
 // T is the dual of the cubic graph
 // perm is the permutation as returned by T.get_spiral()
 // locants are vertices that should have small vertex numbers (as far as permitted by symmetry equivalent canonical spirals)
-vector<int> CubicGraph::vertex_numbers(const Triangulation &T, const vector<vector<node_t>> &permutations, const vector<node_t> &locants) const{
+vector<int> CubicGraphView::vertex_numbers(const Triangulation &T, const vector<vector<node_t>> &permutations, const vector<node_t> &locants) const{
   vector<tri_t> tri_faces = T.compute_faces_oriented();
   vector<node_t> vertex_numbers(N);
   vector<node_t> vertex_numbers_inv(N,INT_MAX);

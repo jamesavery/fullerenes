@@ -8,7 +8,7 @@ struct ToleranceLess {
   bool operator()(const coord2d& x,const coord2d& y) const { return x<y && (y-x).norm() > tolerance; }
 };
 
-vector<coord2d> PlanarGraph::tutte_layout(node_t s, node_t t, node_t r, unsigned int face_max) const
+vector<coord2d> PlanarGraphView::tutte_layout(node_t s, node_t t, node_t r, unsigned int face_max) const
 {
   if(count_edges() == 0)       // empty graph
     return vector<coord2d>(); // -> empty layout
@@ -29,7 +29,7 @@ vector<coord2d> PlanarGraph::tutte_layout(node_t s, node_t t, node_t r, unsigned
   return tutte_layout(outer_face);
 }
 
-vector<coord2d> PlanarGraph::tutte_layout(const face_t& outer_face) const
+vector<coord2d> PlanarGraphView::tutte_layout(const face_t& outer_face) const
 {
   unsigned int Nface = outer_face.size();
   vector<coord2d> initial_coords(N);
@@ -52,7 +52,7 @@ vector<coord2d> PlanarGraph::tutte_layout(const face_t& outer_face) const
 # include "../contrib/mgmres.hpp"
 #endif
 
-vector<coord2d> PlanarGraph::tutte_layout_direct(const face_t& outer_face, const vector<coord2d>& initial_coords) const
+vector<coord2d> PlanarGraphView::tutte_layout_direct(const face_t& outer_face, const vector<coord2d>& initial_coords) const
 {
   vector<coord2d> result(N);
 
@@ -195,7 +195,7 @@ vector<coord2d> PlanarGraph::tutte_layout_direct(const face_t& outer_face, const
 }
 
 
-vector<coord2d> PlanarGraph::tutte_layout_iterative(const face_t& outer_face, const vector<coord2d>& initial_coords) const
+vector<coord2d> PlanarGraphView::tutte_layout_iterative(const face_t& outer_face, const vector<coord2d>& initial_coords) const
 {
   vector<coord2d> xys(initial_coords.begin(), initial_coords.end()), newxys(N);
   vector<bool> fixed(N);
@@ -258,13 +258,13 @@ vector<coord2d> PlanarGraph::tutte_layout_iterative(const face_t& outer_face, co
 // spherical_projection moved to layout2d.cc
 
 
-coord2d Graph::centre2d(const vector<coord2d>& layout) const {
+coord2d GraphView::centre2d(const vector<coord2d>& layout) const {
   coord2d centre(0,0);
   for(node_t u=0;u<layout.size();u++) centre += layout[u];
   return centre/double(layout.size());
 }
 
-coord3d Graph::centre3d(std::span<const coord3d> layout) const {
+coord3d GraphView::centre3d(std::span<const coord3d> layout) const {
   coord3d centre(0,0,0);
   for(node_t u=0;u<layout.size();u++) centre += layout[u];
   return centre/double(layout.size());

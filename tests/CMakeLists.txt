@@ -58,7 +58,13 @@ target_link_libraries(dense-graph-test fullerenes GTest::GTest GTest::Main)
 add_test(NAME dense-graph-test COMMAND dense-graph-test)
 
 add_executable(view-test view-test.cc)
-target_link_libraries(view-test fullerenes GTest::GTest GTest::Main)
+# The view/batch layer is header-only (std::vector fallback when SYCL is off),
+# so view-test only needs the SYCL runtime lib in a SYCL build.
+if(ENABLE_SYCL)
+  target_link_libraries(view-test fullerenes sycl_fullerene_lib GTest::GTest GTest::Main)
+else()
+  target_link_libraries(view-test fullerenes GTest::GTest GTest::Main)
+endif()
 add_test(NAME view-test COMMAND view-test)
 
 add_executable(delaunay-test delaunay-test.cc)
