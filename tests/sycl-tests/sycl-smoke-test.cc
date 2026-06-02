@@ -48,18 +48,22 @@ TEST(SyclSmoke, Reduction) {
     std::iota(data.begin(), data.end(), 1.0f);
     float expected = N * (N + 1) / 2.0f;
 
-    float result = 0.0f;
-    {
-        sycl::buffer<float> buf(data.data(), sycl::range<1>(N));
-        sycl::buffer<float> sum(&result, sycl::range<1>(1));
+    // USM-pointer reduction: the buffer-based sycl::reduction(buffer, handler, op)
+    // overload is not provided by all AdaptiveCpp backends, so use the
+    // device-pointer reduction form, which is portable.
+    float* d_data = sycl::malloc_shared<float>(N, Q);
+    float* d_sum  = sycl::malloc_shared<float>(1, Q);
+    std::copy(data.begin(), data.end(), d_data);
+    *d_sum = 0.0f;
 
-        Q.submit([&](sycl::handler& h) {
-            auto acc = buf.get_access<sycl::access::mode::read>(h);
-            auto red = sycl::reduction(sum, h, sycl::plus<float>());
-            h.parallel_for(sycl::range<1>(N), red,
-                [=](sycl::id<1> i, auto& s) { s += acc[i]; });
-        });
-    }
+    Q.submit([&](sycl::handler& h) {
+        h.parallel_for(sycl::range<1>(N), sycl::reduction(d_sum, sycl::plus<float>()),
+            [=](sycl::id<1> i, auto& s) { s += d_data[i]; });
+    }).wait();
+
+    float result = *d_sum;
+    sycl::free(d_data, Q);
+    sycl::free(d_sum, Q);
 
     EXPECT_NEAR(result, expected, 0.1f);
 }

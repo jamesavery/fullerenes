@@ -14,7 +14,11 @@ struct MDSpan
     using pointer    = T*;
     using array_t = std::array<int,N>;
 
-    inline constexpr MDSpan() : data_(nullptr) {}
+    // Value-initialize shape_/stride_ to 0 so a default-constructed MDSpan is
+    // genuinely empty (size()==0, empty()==true). Otherwise size() reads
+    // uninitialized shape_ and empty() can wrongly return false, so guards like
+    // `if(!Q.empty())` (QHQ's optional Q matrix) dereference the null data_.
+    inline constexpr MDSpan() : data_(nullptr), shape_{}, stride_{} {}
     inline constexpr MDSpan(T *data, const array_t &shape) : data_(data), shape_(shape) {
             stride_[N-1] = 1;       
             if(N==1) return;     

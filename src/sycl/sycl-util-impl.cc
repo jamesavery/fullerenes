@@ -45,6 +45,11 @@ SyclVector<T>::SyclVector(size_t size) : size_(size), capacity_(size) {
         std::cout << "Could not allocate " + std::to_string(size) + " elements of type " + typeid(T).name() << std::endl;
         throw std::bad_alloc();
     }
+    // Value-initialize, matching std::vector(size) semantics, so the two
+    // BatchAlloc backends (std::vector on host, SyclVector on device) behave
+    // identically. Code that relies on freshly-sized storage being zeroed must
+    // not break when switching backends.
+    std::fill_n(data_, size, T{});
 }
 
 template <typename T>
@@ -62,6 +67,7 @@ SyclVector<T>::~SyclVector() {if(data_) sycl::free(data_,  sycl::context(device(
 
 template <typename T>
 void SyclVector<T>::resize(size_t new_size) {
+    const size_t old_size = size_;
     if(new_size > capacity_){
         T* new_data = sycl::malloc_shared<T>(new_size, sycl::device(default_selector_v), sycl::context(device(default_selector_v)));
         memcpy(new_data, data_, size_*sizeof(T));
@@ -69,6 +75,9 @@ void SyclVector<T>::resize(size_t new_size) {
         data_ = new_data;
         capacity_ = new_size;
     }
+    // Value-initialize newly-exposed elements (std::vector::resize parity).
+    if(new_size > old_size)
+        std::fill_n(data_ + old_size, new_size - old_size, T{});
     size_ = new_size;
 }
 
