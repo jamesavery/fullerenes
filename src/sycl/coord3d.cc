@@ -127,8 +127,6 @@ template <typename T> T non_resciprocal_bond_length(const std::array<T,3>& ab){
 }
 
 template <typename T> void print_coord(const std::array<T,3>& ab){
-
-    printf("[%.16e, %.16e, %.16e]\n",ab[0],ab[1],ab[2]);
 }
 
 template <typename T1, typename T2> void assign(std::array<T1,3>& a, const std::array<T2,3>& b){

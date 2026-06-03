@@ -50,8 +50,8 @@ struct SyclVector
     
     inline constexpr void clear() { size_ = 0; }
 
-    inline constexpr T &operator[](size_t index) { if(index >= size_) printf("Index: %d, Size: %d\n", index, size_); assert (index < size_); return data_[index]; }
-    inline constexpr const T &operator[](size_t index) const { if (index >= size_) printf("Index: %d, Size: %d\n", index, size_); assert (index < size_); return data_[index]; }
+    inline constexpr T &operator[](size_t index) { assert (index < size_); return data_[index]; }
+    inline constexpr const T &operator[](size_t index) const { assert (index < size_); return data_[index]; }
 
     inline constexpr T &at(size_t index) { assert(index < size_); return data_[index]; }
     inline constexpr const T &at(size_t index) const { assert(index < size_); return data_[index]; }

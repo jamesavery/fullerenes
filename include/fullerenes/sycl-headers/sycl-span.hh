@@ -1,6 +1,7 @@
 #pragma once
 #include <span>
 #include <ostream>
+#include <array>
 #include <algorithm>
 #include <limits>
 #include <cmath>
@@ -13,6 +14,18 @@ constexpr std::span<U> as_span(std::span<T> s) {
     return std::span<U>(reinterpret_cast<U*>(s.data()),
                         (s.size() * sizeof(T)) / sizeof(U));
 }
+
+// Forward declaration for the std::array stream operator (defined generically over
+// element type and size in sycl-util-impl.cc, with more-specialized <T,2>/<T,3>
+// overloads in coord3d.cc). The generic span operator<< below streams each element
+// (os << v[i]); when the element is a std::array, that resolves to this overload.
+// Under the strict two-phase lookup of a conforming compiler, os<<element is bound at
+// THIS template's definition point, and std::array's only associated namespace is std,
+// so this global-namespace overload must be visible here -- otherwise the call is found
+// by neither template-definition lookup nor ADL. (gcc accepted it; clang requires the
+// prior declaration.) One generic declaration covers every array size used.
+template <typename U, std::size_t N>
+constexpr std::ostream& operator<<(std::ostream& os, const std::array<U,N>& a);
 
 template <typename T>
 inline std::ostream& operator<<(std::ostream& os, std::span<T> v) {

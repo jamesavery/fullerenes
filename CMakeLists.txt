@@ -216,9 +216,21 @@ set(SYCL_FULLERENE_LIBS ${SYCL_FULLERENE_LIBS} CACHE STRING "SYCL_FULLERENE_LIBS
 if(ENABLE_SYCL)
   set(PREVIOUS_CXX_COMPILER ${CMAKE_CXX_COMPILER})
   set(PREVIOUS_CXX_FLAGS ${CMAKE_CXX_FLAGS})
+  set(PREVIOUS_CXX_STANDARD ${CMAKE_CXX_STANDARD})
   if(SYCL_TARGETS STREQUAL "NVIDIA" AND SYCL_CUDA_BACKEND STREQUAL "cuda-nvcxx")
     string(REPLACE "-fopenmp" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
     string(REGEX REPLACE " +" " " CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+  else()
+    # acpp's bundled compiler for the clang-based backends (generic/SSCP, AMD hip,
+    # cuda clang) is clang-14, which does not accept CMake's gcc-derived
+    # -std=gnu++23 (clang-14 only knows the pre-standard spelling gnu++2b for
+    # C++23). CMake computed the standard flag against the host g++-13 and does not
+    # re-derive it when CMAKE_CXX_COMPILER is swapped to acpp below. So disable the
+    # automatic standard flag for the acpp subdirs and request gnu++2b explicitly;
+    # g++-13 (X86/omp.library-only backend) also accepts gnu++2b, so this is safe
+    # across all non-nvcxx backends.
+    set(CMAKE_CXX_STANDARD)
+    string(APPEND CMAKE_CXX_FLAGS " -std=gnu++2b")
   endif()
   set(CMAKE_CXX_COMPILER ${SYCL_COMPILER})
   add_subdirectory(src/sycl)
@@ -226,6 +238,7 @@ if(ENABLE_SYCL)
   add_subdirectory(benchmarks/sycl)
   set(CMAKE_CXX_COMPILER ${PREVIOUS_CXX_COMPILER})
   set(CMAKE_CXX_FLAGS ${PREVIOUS_CXX_FLAGS})
+  set(CMAKE_CXX_STANDARD ${PREVIOUS_CXX_STANDARD})
 endif()
 
 message("C++ FLAGS: " ${CMAKE_CXX_FLAGS})

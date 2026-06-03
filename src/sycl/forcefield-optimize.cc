@@ -1772,7 +1772,6 @@ struct ForceField
         // Normalize To match reference python implementation by Buster.
         s_norm = SQRT(sycl::reduce_over_group(cta, dot(s, s), sycl::plus<real_t>{}));
         // s_norm = SQRT(reduction(sdata, dot(s,s)));
-        if (node_id == 0) printf("CG_INIT: s_norm=%f g0=(%f,%f,%f)\n", s_norm, g0[0], g0[1], g0[2]);
         s /= s_norm;
 
         sycl::group_barrier(cta);
@@ -1783,23 +1782,6 @@ struct ForceField
             if (alpha > (real_t)0.0)
             {
                 X1[node_id] = X[node_id] + alpha * s;
-            }
-            // DEBUG: check X1 before gradient call (barrier outside conditional)
-            sycl::group_barrier(cta);
-            if (i == 0 && node_id == 0) {
-                int first_nan = -1;
-                for (size_t k = 0; k < N; k++) {
-                    if (!std::isfinite(X1[k][0]) || !std::isfinite(X1[k][1]) || !std::isfinite(X1[k][2])) { first_nan = k; break; }
-                }
-                printf("CG_PRE_GRAD: first_nan_idx=%d X1[0]=(%f,%f,%f) alpha=%f\n", 
-                       first_nan, X1[0][0], X1[0][1], X1[0][2], alpha);
-                if (first_nan >= 0)
-                    printf("CG_PRE_GRAD: X1[%d]=(%f,%f,%f)\n", first_nan, X1[first_nan][0], X1[first_nan][1], X1[first_nan][2]);
-                // Print all X1 NaN locations
-                for (size_t k = 0; k < N; k++) {
-                    if (!std::isfinite(X1[k][0]) || !std::isfinite(X1[k][1]) || !std::isfinite(X1[k][2]))
-                        printf("  NAN_AT[%d]=(%f,%f,%f)\n", (int)k, X1[k][0], X1[k][1], X1[k][2]);
-                }
             }
             sycl::group_barrier(cta);
             g1 = gradient(X1);
@@ -1824,22 +1806,8 @@ struct ForceField
 #if USE_MAX_NORM == 1
             s_norm = sycl::reduce_over_group(cta, sycl::max(sycl::max(s.x, s.y), s.z), sycl::greater<real_t>{});
 #else
-            // DEBUG: check for NaN in dot(s,s) before reduce
-            {
-                real_t local_dot = dot(s, s);
-                real_t sum_dots = sycl::reduce_over_group(cta, local_dot, sycl::plus<real_t>{});
-                if (node_id == 0 && i == 0) {
-                    printf("CG_ITER0: local_dot[0]=%f sum_dots=%f sqrt=%f g1[0]=(%f,%f,%f) s[0]=(%f,%f,%f)\n", 
-                           local_dot, sum_dots, SQRT(sum_dots), g1[0], g1[1], g1[2], s[0], s[1], s[2]);
-                }
-                s_norm = SQRT(sum_dots);
-            }
+            s_norm = SQRT(sycl::reduce_over_group(cta, dot(s, s), sycl::plus<real_t>{}));
 #endif
-            // DEBUG: detect first NaN
-            if (node_id == 0 && (!std::isfinite(s_norm) || !std::isfinite(alpha) || !std::isfinite(beta))) {
-                printf("CG_NAN: iter=%d alpha=%f beta=%f s_norm=%f g0_norm2=%f X[0]=(%f,%f,%f)\n", 
-                       (int)i, alpha, beta, s_norm, g0_norm2, X[0][0], X[0][1], X[0][2]);
-            }
             s /= s_norm;
 
             // if (node_id == 0) printf("s_norm = %f\n", s_norm);
