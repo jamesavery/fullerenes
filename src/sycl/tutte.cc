@@ -45,18 +45,14 @@ static SyclEvent tutte_view_batch_impl(
     const int N        = graph.N();
     const int capacity = graph.size();
 
-    // Empty batch: a zero-size nd_range launch is a no-op on the host/OpenMP
-    // backend but cuLaunchKernel rejects a zero grid with CUDA_ERROR_INVALID_VALUE.
-    if (capacity == 0 || N == 0) return SyclEvent();
-
     const auto max_iter = (size_t)N * 50;
 
-    SyclEventImpl tutte_done = Q->submit([&](handler& h) {
+    return launch_per_isomer(Q, N, capacity, [&](handler& h, sycl::nd_range<1> ndr) {
         local_accessor<bool, 1>    smem(N, h);
         local_accessor<coord2d, 1> xys_smem(N, h);
         local_accessor<coord2d, 1> newxys_smem(N, h);
 
-        h.parallel_for(sycl::nd_range(sycl::range(N*capacity), sycl::range(N)),
+        h.parallel_for(ndr,
         [=](nd_item<1> nditem) {
             const auto cta        = nditem.get_group();
             const auto a          = nditem.get_local_linear_id();
@@ -114,7 +110,6 @@ static SyclEvent tutte_view_batch_impl(
             if (a == 0 && converged) statuses[isomer_idx] |= StatusEnum::CONVERGED_2D;
         });
     });
-    return SyclEvent(std::move(tutte_done));
 }
 
 template <typename T, typename K>

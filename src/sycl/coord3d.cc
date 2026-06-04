@@ -126,9 +126,6 @@ template <typename T> T non_resciprocal_bond_length(const std::array<T,3>& ab){
     return sycl::sqrt(dot(ab,ab));
 }
 
-template <typename T> void print_coord(const std::array<T,3>& ab){
-}
-
 template <typename T1, typename T2> void assign(std::array<T1,3>& a, const std::array<T2,3>& b){
   a[0] = b[0];
   a[1] = b[1];

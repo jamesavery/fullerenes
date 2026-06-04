@@ -1844,24 +1844,19 @@ static SyclEvent forcefield_optimize_view_batch_impl(
     const int N        = graph.N();
     const int capacity = graph.size();
 
-    // An empty batch (no isomers, or zero vertices) carries no work. The launch
-    // below uses an nd_range of N*capacity work-items; a zero global size is a
-    // silent no-op on the host/OpenMP backend but cuLaunchKernel rejects a zero
-    // grid with CUDA_ERROR_INVALID_VALUE. Return an already-completed event so an
-    // empty batch is a uniform no-op across backends.
-    if (capacity == 0 || N == 0) return SyclEvent();
-
     auto local_mem_bytes_required = N * 3 * sizeof(coord3d) + N * 2 * sizeof(T);
-    assert(Q->get_device().get_info<sycl::info::device::local_mem_size>() >= (size_t)local_mem_bytes_required);
+    if (Q->get_device().get_info<sycl::info::device::local_mem_size>() < (size_t)local_mem_bytes_required)
+        throw std::runtime_error("forcefield_optimize: required local memory (" +
+            std::to_string(local_mem_bytes_required) + " bytes) exceeds the device local_mem_size");
 
-    SyclEventImpl ffopt_done = Q->submit([&](sycl::handler& h) {
+    return launch_per_isomer(Q, N, capacity, [&](sycl::handler& h, sycl::nd_range<1> ndr) {
         sycl::local_accessor<T,1>      sdata(N*2, h);
         sycl::local_accessor<coord3d,1> X(N, h);
         sycl::local_accessor<coord3d,1> X1(N, h);
         sycl::local_accessor<coord3d,1> X2(N, h);
 
         h.parallel_for<ForceFieldOptimizeViewBatchKernel<FFT,T,K>>(
-            sycl::nd_range(sycl::range{(size_t)N*capacity}, sycl::range{(size_t)N}),
+            ndr,
             [=](sycl::nd_item<1> nditem) {
                 auto cta = nditem.get_group();
                 auto tid = nditem.get_local_linear_id();
@@ -1912,7 +1907,6 @@ static SyclEvent forcefield_optimize_view_batch_impl(
                 X_acc[tid] = X[tid];
             });
     });
-    return SyclEvent(std::move(ffopt_done));
 }
 
 template <ForcefieldType FFT, typename T, typename K>

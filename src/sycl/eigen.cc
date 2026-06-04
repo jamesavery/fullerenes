@@ -300,7 +300,7 @@ SyclEvent eigensolve_impl(SyclQueue& Q,
     auto H_acc = hessians;
     auto cols_acc = cols;
     if (lanczos.size() < Natoms*3*nLanczos*batch_size) throw std::runtime_error("Lanczos buffer (of size " + std::to_string(lanczos.size()) + ") is too small for the batch size " + std::to_string(batch_size) + " and number of lanczos iterations " + std::to_string(nLanczos) + " and number of atoms " + std::to_string(Natoms));
-    Q -> submit([&](sycl::handler& h){
+    launch_per_isomer(Q, Natoms*3, batch_size, [&](sycl::handler& h, sycl::nd_range<1> ndr){
         //accessor V_acc(buffers.lanczosBuffers[index], h, write_only);
         //accessor D_acc(buffers.diagBuffers[index], h, read_write);
         //accessor U_acc(buffers.offDiagBuffers[index], h, read_write);
@@ -310,7 +310,7 @@ SyclEvent eigensolve_impl(SyclQueue& Q,
         local_accessor<T,1> smem(range<1>(Natoms*3), h);
         local_accessor<T,1> betas(range<1>(Natoms*3), h);
         local_accessor<T,1> alphas(range<1>(Natoms*3), h);
-        h.parallel_for<Lanczos<mode,T,K>>(sycl::nd_range(sycl::range{Natoms*3*batch_size}, sycl::range{Natoms*3}), [=](nd_item<1> nditem){
+        h.parallel_for<Lanczos<mode,T,K>>(ndr, [=](nd_item<1> nditem){
             auto cta = nditem.get_group();
             auto tid = nditem.get_local_linear_id();
             auto bid = nditem.get_group_linear_id();
@@ -418,7 +418,7 @@ SyclEvent eigensolve_impl(SyclQueue& Q,
     auto Q_acc = qmat;
     auto Eig_acc = eigenvalues;
     auto Idx_acc = ends_idx;
-    SyclEventImpl final_compute = Q -> submit([&](sycl::handler& h){
+    SyclEvent final_compute = launch_per_isomer(Q, 64, batch_size, [&](sycl::handler& h, sycl::nd_range<1> ndr){
         local_accessor<T,1> D(range<1>(nLanczos + 1), h); //Diagonal
         local_accessor<T,1> L(range<1>(nLanczos + 1), h); //Lower subdiagonal
         local_accessor<T,1> U(range<1>(nLanczos*2 + 1), h); //Upper subdiagonal
@@ -430,7 +430,7 @@ SyclEvent eigensolve_impl(SyclQueue& Q,
         //accessor Eig_acc(eigenvalues, h, write_only);
         //accessor Idx_acc(buffers.endsIdxBuffers[index], h, write_only);
 
-        h.parallel_for<QR<mode,T,K>>(sycl::nd_range(sycl::range{batch_size*64}, sycl::range{64}), [=](sycl::nd_item<1> nditem){
+        h.parallel_for<QR<mode,T,K>>(ndr, [=](sycl::nd_item<1> nditem){
             auto tid = nditem.get_local_linear_id();
             auto bid = nditem.get_group_linear_id();
             auto cta = nditem.get_group();
@@ -507,13 +507,13 @@ SyclEvent eigensolve_impl(SyclQueue& Q,
     //Eigenvector calculation signature: (const FullereneBatch B, CuArray<T> Q, CuArray<T> V, CuArray<T> E, int m)
     auto E_acc = eigenvectors;
     if (mode == EigensolveMode::FULL_SPECTRUM_VECTORS || mode == EigensolveMode::ENDS_VECTORS){
-    final_compute = Q -> submit([&](sycl::handler& h){
+    final_compute = launch_per_isomer(Q, Natoms*3, batch_size, [&](sycl::handler& h, sycl::nd_range<1> ndr){
         //accessor V_acc(buffers.lanczosBuffers[index], h, read_only);
         //accessor Q_acc(buffers.QmatBuffers[index], h, read_write);
         //accessor E_acc(eigenvectors, h, write_only);
         //accessor X_acc(B.X, h, read_only);
         //accessor Idx_acc(buffers.endsIdxBuffers[index], h, read_only);
-        h.parallel_for<Vectors<mode,T,K>>(sycl::nd_range(sycl::range{batch_size*Natoms*3}, sycl::range{Natoms*3}), [=](sycl::nd_item<1> nditem){
+        h.parallel_for<Vectors<mode,T,K>>(ndr, [=](sycl::nd_item<1> nditem){
             auto tid = nditem.get_local_linear_id();
             auto bid = nditem.get_group_linear_id();
             auto cta = nditem.get_group();

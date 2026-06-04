@@ -50,6 +50,9 @@ struct SyclVector
     
     inline constexpr void clear() { size_ = 0; }
 
+    // Device-side bounds check: SYCL device code cannot throw, so these stay as
+    // asserts rather than the host throw-discipline of style-failures.md -- on a
+    // conforming device an out-of-bounds index traps in debug builds.
     inline constexpr T &operator[](size_t index) { assert (index < size_); return data_[index]; }
     inline constexpr const T &operator[](size_t index) const { assert (index < size_); return data_[index]; }
 

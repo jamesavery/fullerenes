@@ -69,12 +69,9 @@ SyclEvent eccentricity(SyclQueue& Q, std::span<std::array<T,3>> xyz, int N, int 
                        batch::BatchStateView state, std::span<T> out_ellipticity,
                        Workspace /*ws*/) {
     auto statuses = state.status;
-    // Empty batch: a zero-size nd_range launch is a no-op on the host/OpenMP backend
-    // but cuLaunchKernel rejects a zero grid with CUDA_ERROR_INVALID_VALUE on CUDA.
-    if (capacity == 0 || N == 0) return SyclEvent();
-    SyclEventImpl ret_val = Q->submit([=](sycl::handler& cgh) {
+    return launch_per_isomer(Q, N, capacity, [=](sycl::handler& cgh, sycl::nd_range<1> ndr) {
         cgh.parallel_for<struct EccentricityFunctorView<T,K>>(
-            sycl::nd_range<1>(sycl::range<1>(capacity*N), sycl::range<1>(N)),
+            ndr,
             [=](sycl::nd_item<1> nditem) {
                 auto cta = nditem.get_group();
                 auto bid = cta.get_group_linear_id();
@@ -86,7 +83,6 @@ SyclEvent eccentricity(SyclQueue& Q, std::span<std::array<T,3>> xyz, int N, int 
                 out_ellipticity[bid] = elipsoid[0] / elipsoid[2];
             });
     });
-    return ret_val;
 }
 
 template <typename T, typename K>
@@ -94,12 +90,9 @@ SyclEvent inertia(SyclQueue& Q, std::span<std::array<T,3>> xyz, int N, int capac
                   batch::BatchStateView state, std::span<std::array<T,3>> out_inertia,
                   Workspace /*ws*/) {
     auto statuses = state.status;
-    // Empty batch: a zero-size nd_range launch is a no-op on the host/OpenMP backend
-    // but cuLaunchKernel rejects a zero grid with CUDA_ERROR_INVALID_VALUE on CUDA.
-    if (capacity == 0 || N == 0) return SyclEvent();
-    SyclEventImpl ret_val = Q->submit([=](sycl::handler& cgh) {
+    return launch_per_isomer(Q, N, capacity, [=](sycl::handler& cgh, sycl::nd_range<1> ndr) {
         cgh.parallel_for<struct InertiaFunctorView<T,K>>(
-            sycl::nd_range<1>(sycl::range<1>(capacity*N), sycl::range<1>(N)),
+            ndr,
             [=](sycl::nd_item<1> nditem) {
                 auto cta = nditem.get_group();
                 auto tid = cta.get_local_linear_id();
@@ -110,7 +103,6 @@ SyclEvent inertia(SyclQueue& Q, std::span<std::array<T,3>> xyz, int N, int capac
                 if (tid == 0) out_inertia[bid] = I.eigenvalues();
             });
     });
-    return ret_val;
 }
 
 template <typename T, typename K>
@@ -118,12 +110,9 @@ SyclEvent transform_to_principal_axes(SyclQueue& Q, std::span<std::array<T,3>> x
                                                      batch::BatchStateView state,
                                                      Workspace /*ws*/) {
     auto statuses = state.status;
-    // Empty batch: a zero-size nd_range launch is a no-op on the host/OpenMP backend
-    // but cuLaunchKernel rejects a zero grid with CUDA_ERROR_INVALID_VALUE on CUDA.
-    if (capacity == 0 || N == 0) return SyclEvent();
-    SyclEventImpl ret_val = Q->submit([=](sycl::handler& cgh) {
+    return launch_per_isomer(Q, N, capacity, [=](sycl::handler& cgh, sycl::nd_range<1> ndr) {
         cgh.parallel_for<struct TransformCoordinatesFunctorView<T,K>>(
-            sycl::nd_range<1>(sycl::range<1>(capacity*N), sycl::range<1>(N)),
+            ndr,
             [=](sycl::nd_item<1> nditem) {
                 auto cta = nditem.get_group();
                 auto tid = cta.get_local_linear_id();
@@ -137,7 +126,6 @@ SyclEvent transform_to_principal_axes(SyclQueue& Q, std::span<std::array<T,3>> x
                 X[tid] = dot(P, X[tid]);
             });
     });
-    return ret_val;
 }
 
 template <typename T, typename K>
@@ -147,14 +135,11 @@ SyclEvent surface_area(SyclQueue& Q, std::span<std::array<T,3>> xyz, int N, int 
                                             Workspace /*ws*/) {
     FLOAT_TYPEDEFS(T);
     auto statuses = state.status;
-    // Empty batch: a zero-size nd_range launch is a no-op on the host/OpenMP backend
-    // but cuLaunchKernel rejects a zero grid with CUDA_ERROR_INVALID_VALUE on CUDA.
-    if (capacity == 0 || N == 0) return SyclEvent();
     const int Nf = N / 2 + 2;
-    SyclEventImpl ret_val = Q->submit([=](sycl::handler& cgh) {
+    return launch_per_isomer(Q, Nf, capacity, [=](sycl::handler& cgh, sycl::nd_range<1> ndr) {
         auto X_smem2 = sycl::local_accessor<std::array<T,3>, 1>(N, cgh);
         cgh.parallel_for<struct SurfaceAreaFunctorView<T,K>>(
-            sycl::nd_range<1>(sycl::range<1>(capacity*Nf), sycl::range<1>(Nf)),
+            ndr,
             [=](sycl::nd_item<1> nditem) {
                 auto cta = nditem.get_group();
                 auto tid = cta.get_local_linear_id();
@@ -180,7 +165,6 @@ SyclEvent surface_area(SyclQueue& Q, std::span<std::array<T,3>> xyz, int N, int 
                 if (tid == 0) out_surface_area[bid] = result;
             });
     });
-    return ret_val;
 }
 
 template <typename T, typename K>
@@ -190,14 +174,11 @@ SyclEvent volume(SyclQueue& Q, std::span<std::array<T,3>> xyz, int N, int capaci
                                        Workspace /*ws*/) {
     FLOAT_TYPEDEFS(T);
     auto statuses = state.status;
-    // Empty batch: a zero-size nd_range launch is a no-op on the host/OpenMP backend
-    // but cuLaunchKernel rejects a zero grid with CUDA_ERROR_INVALID_VALUE on CUDA.
-    if (capacity == 0 || N == 0) return SyclEvent();
     const int Nf = N / 2 + 2;
-    SyclEventImpl ret_val = Q->submit([=](sycl::handler& cgh) {
+    return launch_per_isomer(Q, Nf, capacity, [=](sycl::handler& cgh, sycl::nd_range<1> ndr) {
         auto X_smem = sycl::local_accessor<std::array<T,3>, 1>(N, cgh);
         cgh.parallel_for<struct VolumeFunctorView<T,K>>(
-            sycl::nd_range<1>(sycl::range<1>(capacity*Nf), sycl::range<1>(Nf)),
+            ndr,
             [=](sycl::nd_item<1> nditem) {
                 auto cta = nditem.get_group();
                 auto tid = cta.get_local_linear_id();
@@ -223,7 +204,6 @@ SyclEvent volume(SyclQueue& Q, std::span<std::array<T,3>> xyz, int N, int capaci
                 if (tid == 0) out_volume[bid] = result;
             });
     });
-    return ret_val;
 }
 
 

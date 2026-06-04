@@ -69,6 +69,27 @@ struct SyclQueueImpl : public sycl::queue{
     const Device device_;
 };
 
+// @anchor sycl-launch-per-isomer
+// Launch one work-group per isomer over a batch: the work-group size is
+// work_per_isomer and there are `count` isomers, so the global range is
+// work_per_isomer*count and each group handles one isomer. Owns the empty-batch
+// guard, the nd_range, the submit, and the SyclEvent wrap -- the boilerplate every
+// batch kernel shares. The command-group function cgf(handler&, nd_range<1>) creates
+// the kernel's local accessors and issues h.parallel_for(ndr, ...).
+// @post on empty:    (count == 0 || work_per_isomer == 0) -> an already-complete event,
+//                        no kernel submitted. A zero global range is a no-op on the
+//                        host/OpenMP backend but cuLaunchKernel rejects a zero grid
+//                        with CUDA_ERROR_INVALID_VALUE, so empty batches must not launch.
+// @post on nonempty: submits cgf(h, nd_range(work_per_isomer*count, work_per_isomer))
+//                        and returns the event for that submission.
+template <class CGF>
+inline SyclEvent launch_per_isomer(SyclQueue& Q, size_t work_per_isomer, size_t count, CGF&& cgf) {
+    if (count == 0 || work_per_isomer == 0) return SyclEvent();
+    sycl::nd_range<1> ndr(sycl::range<1>(work_per_isomer * count), sycl::range<1>(work_per_isomer));
+    SyclEventImpl ev = Q->submit([&](sycl::handler& h){ cgf(h, ndr); });
+    return SyclEvent(std::move(ev));
+}
+
 #ifdef DEFINE_SYCL_QUEUE_METHODS
 SyclQueue::SyclQueue() : device_({0, DeviceType::CPU}), in_order_(true) {
     impl_ = std::make_unique<SyclQueueImpl>(device_, in_order_);

@@ -1829,18 +1829,14 @@ static SyclEvent compute_hessians_view(
     const int N        = graph.N();
     const int capacity = graph.size();
 
-    // Empty batch: a zero-size nd_range launch is a no-op on the host/OpenMP
-    // backend but cuLaunchKernel rejects a zero grid with CUDA_ERROR_INVALID_VALUE.
-    if (capacity == 0 || N == 0) return SyclEvent();
-
     if ((int)hess.size() < 90*N*capacity || (int)cols.size() < 90*N*capacity)
         throw std::runtime_error("compute_hessians_view: hess and cols buffers must be >= 90*N*capacity");
 
-    SyclEventImpl hessians_finished = Q->submit([&](sycl::handler& h) {
+    return launch_per_isomer(Q, N, capacity, [&](sycl::handler& h, sycl::nd_range<1> ndr) {
         sycl::local_accessor<coord3d, 1> X_smem(N, h);
         sycl::local_accessor<real_t, 1>  sdata(3*N, h);
 
-        h.parallel_for(sycl::nd_range(sycl::range{(size_t)N*capacity}, sycl::range{(size_t)N}),
+        h.parallel_for(ndr,
         [=](sycl::nd_item<1> nditem) {
             auto cta = nditem.get_group();
             auto tid = nditem.get_local_linear_id();
@@ -1886,7 +1882,6 @@ static SyclEvent compute_hessians_view(
             }
         });
     });
-    return SyclEvent(std::move(hessians_finished));
 }
 
 template <ForcefieldType FFT, typename T, typename K>
