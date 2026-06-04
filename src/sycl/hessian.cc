@@ -1829,6 +1829,10 @@ static SyclEvent compute_hessians_view(
     const int N        = graph.N();
     const int capacity = graph.size();
 
+    // Empty batch: a zero-size nd_range launch is a no-op on the host/OpenMP
+    // backend but cuLaunchKernel rejects a zero grid with CUDA_ERROR_INVALID_VALUE.
+    if (capacity == 0 || N == 0) return SyclEvent();
+
     if ((int)hess.size() < 90*N*capacity || (int)cols.size() < 90*N*capacity)
         throw std::runtime_error("compute_hessians_view: hess and cols buffers must be >= 90*N*capacity");
 

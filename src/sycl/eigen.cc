@@ -272,6 +272,10 @@ SyclEvent eigensolve_impl(SyclQueue& Q,
                             std::span<T> diag,
                             std::span<K> ends_idx){
     TEMPLATE_TYPEDEFS(T,K);
+    // Empty batch / zero-size problem: the nd_range launches below would have a
+    // zero global size -- a no-op on the host/OpenMP backend but cuLaunchKernel
+    // rejects a zero grid with CUDA_ERROR_INVALID_VALUE on CUDA.
+    if (batch_size == 0 || Natoms == 0) return SyclEvent();
     //If mode is ENDS or ENDS_VECTORS, we can make do with fewer lanczos iterations, default is 50.
     size_t nLanczos = (mode == EigensolveMode::ENDS || mode == EigensolveMode::ENDS_VECTORS) ? _nLanczos : Natoms*3 - 6; //-6 for 6 degrees of freedom
     if (nLanczos  > Natoms*3) {

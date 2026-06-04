@@ -44,6 +44,11 @@ static SyclEvent tutte_view_batch_impl(
     auto statuses   = state.status;
     const int N        = graph.N();
     const int capacity = graph.size();
+
+    // Empty batch: a zero-size nd_range launch is a no-op on the host/OpenMP
+    // backend but cuLaunchKernel rejects a zero grid with CUDA_ERROR_INVALID_VALUE.
+    if (capacity == 0 || N == 0) return SyclEvent();
+
     const auto max_iter = (size_t)N * 50;
 
     SyclEventImpl tutte_done = Q->submit([&](handler& h) {

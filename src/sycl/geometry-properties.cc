@@ -69,6 +69,9 @@ SyclEvent eccentricity(SyclQueue& Q, std::span<std::array<T,3>> xyz, int N, int 
                        batch::BatchStateView state, std::span<T> out_ellipticity,
                        Workspace /*ws*/) {
     auto statuses = state.status;
+    // Empty batch: a zero-size nd_range launch is a no-op on the host/OpenMP backend
+    // but cuLaunchKernel rejects a zero grid with CUDA_ERROR_INVALID_VALUE on CUDA.
+    if (capacity == 0 || N == 0) return SyclEvent();
     SyclEventImpl ret_val = Q->submit([=](sycl::handler& cgh) {
         cgh.parallel_for<struct EccentricityFunctorView<T,K>>(
             sycl::nd_range<1>(sycl::range<1>(capacity*N), sycl::range<1>(N)),
@@ -91,6 +94,9 @@ SyclEvent inertia(SyclQueue& Q, std::span<std::array<T,3>> xyz, int N, int capac
                   batch::BatchStateView state, std::span<std::array<T,3>> out_inertia,
                   Workspace /*ws*/) {
     auto statuses = state.status;
+    // Empty batch: a zero-size nd_range launch is a no-op on the host/OpenMP backend
+    // but cuLaunchKernel rejects a zero grid with CUDA_ERROR_INVALID_VALUE on CUDA.
+    if (capacity == 0 || N == 0) return SyclEvent();
     SyclEventImpl ret_val = Q->submit([=](sycl::handler& cgh) {
         cgh.parallel_for<struct InertiaFunctorView<T,K>>(
             sycl::nd_range<1>(sycl::range<1>(capacity*N), sycl::range<1>(N)),
@@ -112,6 +118,9 @@ SyclEvent transform_to_principal_axes(SyclQueue& Q, std::span<std::array<T,3>> x
                                                      batch::BatchStateView state,
                                                      Workspace /*ws*/) {
     auto statuses = state.status;
+    // Empty batch: a zero-size nd_range launch is a no-op on the host/OpenMP backend
+    // but cuLaunchKernel rejects a zero grid with CUDA_ERROR_INVALID_VALUE on CUDA.
+    if (capacity == 0 || N == 0) return SyclEvent();
     SyclEventImpl ret_val = Q->submit([=](sycl::handler& cgh) {
         cgh.parallel_for<struct TransformCoordinatesFunctorView<T,K>>(
             sycl::nd_range<1>(sycl::range<1>(capacity*N), sycl::range<1>(N)),
@@ -138,6 +147,9 @@ SyclEvent surface_area(SyclQueue& Q, std::span<std::array<T,3>> xyz, int N, int 
                                             Workspace /*ws*/) {
     FLOAT_TYPEDEFS(T);
     auto statuses = state.status;
+    // Empty batch: a zero-size nd_range launch is a no-op on the host/OpenMP backend
+    // but cuLaunchKernel rejects a zero grid with CUDA_ERROR_INVALID_VALUE on CUDA.
+    if (capacity == 0 || N == 0) return SyclEvent();
     const int Nf = N / 2 + 2;
     SyclEventImpl ret_val = Q->submit([=](sycl::handler& cgh) {
         auto X_smem2 = sycl::local_accessor<std::array<T,3>, 1>(N, cgh);
@@ -178,6 +190,9 @@ SyclEvent volume(SyclQueue& Q, std::span<std::array<T,3>> xyz, int N, int capaci
                                        Workspace /*ws*/) {
     FLOAT_TYPEDEFS(T);
     auto statuses = state.status;
+    // Empty batch: a zero-size nd_range launch is a no-op on the host/OpenMP backend
+    // but cuLaunchKernel rejects a zero grid with CUDA_ERROR_INVALID_VALUE on CUDA.
+    if (capacity == 0 || N == 0) return SyclEvent();
     const int Nf = N / 2 + 2;
     SyclEventImpl ret_val = Q->submit([=](sycl::handler& cgh) {
         auto X_smem = sycl::local_accessor<std::array<T,3>, 1>(N, cgh);

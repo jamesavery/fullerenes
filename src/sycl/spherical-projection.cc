@@ -183,6 +183,10 @@ static SyclEvent spherical_projection_view_batch_impl(
     const int N        = graph.N();
     const int capacity = graph.size();
 
+    // Empty batch: a zero-size nd_range launch is a no-op on the host/OpenMP
+    // backend but cuLaunchKernel rejects a zero grid with CUDA_ERROR_INVALID_VALUE.
+    if (capacity == 0 || N == 0) return SyclEvent();
+
     SyclEventImpl projection_done = Q->submit([&](handler& h) {
         local_accessor<node_t, 1>  work_queue_memory(N*2, h);
         local_accessor<int, 1>     smem(N, h);

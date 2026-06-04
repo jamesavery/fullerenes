@@ -1844,6 +1844,13 @@ static SyclEvent forcefield_optimize_view_batch_impl(
     const int N        = graph.N();
     const int capacity = graph.size();
 
+    // An empty batch (no isomers, or zero vertices) carries no work. The launch
+    // below uses an nd_range of N*capacity work-items; a zero global size is a
+    // silent no-op on the host/OpenMP backend but cuLaunchKernel rejects a zero
+    // grid with CUDA_ERROR_INVALID_VALUE. Return an already-completed event so an
+    // empty batch is a uniform no-op across backends.
+    if (capacity == 0 || N == 0) return SyclEvent();
+
     auto local_mem_bytes_required = N * 3 * sizeof(coord3d) + N * 2 * sizeof(T);
     assert(Q->get_device().get_info<sycl::info::device::local_mem_size>() >= (size_t)local_mem_bytes_required);
 

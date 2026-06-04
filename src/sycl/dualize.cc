@@ -105,6 +105,10 @@ static SyclEvent dualize_view_batch_impl(SyclQueue& Q,
     assert(dst.size()        == capacity);
     assert(int(state.size()) == capacity);
 
+    // Empty batch: a zero-size nd_range launch is a no-op on the host/OpenMP
+    // backend but cuLaunchKernel rejects a zero grid with CUDA_ERROR_INVALID_VALUE.
+    if (capacity == 0 || N == 0) return SyclEvent();
+
     // Raw underlying spans from each view.
     auto [src_adj_std, src_deg_std, src_twin_std] = src.spans();
     auto [dst_adj_std, dst_deg_std, dst_twin_std] = dst.spans();
