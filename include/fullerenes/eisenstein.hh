@@ -3,8 +3,12 @@
 #include <stdlib.h>
 #include <inttypes.h>
 #include <cmath>
+#include <cstdlib>
 #include <algorithm>
 #include <vector>
+#include <optional>
+#include <stdexcept>
+#include <string>
 
 using namespace std;
 
@@ -212,6 +216,137 @@ struct D6Affine {
 // unit by the D6 symmetry of Z[w]; align returns that branch.  Aborts
 // on norm mismatch or non-divisibility.
 D6Affine align(Eisenstein z_from, Eisenstein z_to);
+
+
+// =====================================================================
+// Triangle / sector geometry on Z[w].
+//
+// Exact-integer primitives for unfolding a metric delta-complex into the
+// Eisenstein plane: place a triangle's apex from its three squared edge
+// lengths, and the closed angular sectors that test whether a developed
+// straight line stays inside a face strip.  Promoted from the delta-complex
+// surface-metric project (validated on every fullerene dual C20-C160,
+// 211,203,353 isomers, 0 failures); see the project's
+// DELTA-COMPLEX-SURFACE-METRIC.md for the algorithm and proofs.
+//
+// int components suffice while unfolded-plane positions stay small (fullerene
+// iDTs); widen Eisenstein to 64-bit if a component can exceed ~26000.
+// =====================================================================
+
+// Exact integer square root: the s >= 0 with s*s == n, or -1 if n is not a
+// perfect square (n < 0 yields -1).
+inline long long isqrt_exact(long long n) {
+  if (n < 0) return -1;
+  // round(sqrt(n)) lands within 1 of the true integer root; probe +-2 as a
+  // safe margin against double rounding, and confirm exactness with s*s == n.
+  long long t = (long long)std::round(std::sqrt((double)n));
+  for (long long d = -2; d <= 2; d++) {
+    long long s = t + d;
+    if (s >= 0 && s*s == n) return s;
+  }
+  return -1;
+}
+
+// True iff P lies strictly between the origin and C (collinear, 0 < s < 1 in
+// P = s*C).  Integer-exact.
+inline bool is_on_open_segment(Eisenstein P, Eisenstein C) {
+  if (wedge(C, P) != 0) return false;                // collinear with 0 -> C
+  if (P.first == 0 && P.second == 0) return false;
+  if (P == C)                        return false;
+  if (C.first == 0 && C.second == 0) return false;
+  // Collinear, so P = s*C; read s off C's dominant ("major") component to
+  // avoid division: same sign as C and strictly smaller magnitude there.
+  bool major_a = (std::llabs(C.first) >= std::llabs(C.second));
+  long long pm = major_a ? P.first : P.second;
+  long long cm = major_a ? C.first : C.second;
+  if (cm == 0) return false;
+  if ((pm > 0) != (cm > 0)) return false;            // 0 < s
+  return std::llabs(pm) < std::llabs(cm);            // s < 1
+}
+
+// A Sector (R, L) is the closed CCW angular sector from R to L at the origin.
+//   - is_empty()       iff wedge(R, L) <= 0
+//   - contains(d)      iff wedge(R, d) >= 0 && wedge(d, L) >= 0
+//   - narrow_with(r,l) tightens each side independently against an inner
+//                      candidate.
+struct Sector { Eisenstein R, L;
+  bool is_empty()      const { return wedge(R, L) <= 0; }
+  bool contains(Eisenstein d) const {
+    return wedge(R, d) >= 0 && wedge(d, L) >= 0;
+  }
+  Sector narrow_with(Eisenstein r_new, Eisenstein l_new) const {
+    return { wedge(R, r_new) > 0 ? r_new : R,
+             wedge(l_new, L) > 0 ? l_new : L };
+  }
+};
+
+// Order two non-zero directions into a CCW pair (R, L).  Colinear inputs
+// (wedge == 0) return (B, A): the sector is then empty, but R, L keep their
+// directions so contains() still answers the colinear half-plane correctly.
+inline Sector ccw_order(Eisenstein A, Eisenstein B) {
+  return wedge(A, B) > 0 ? Sector{A, B} : Sector{B, A};
+}
+
+// Entry sector for a child face's two adjacent corner positions.  nullopt iff
+// there is no entry direction (both corners at origin, or two non-origin
+// corners colinear).  One corner at origin collapses to {X, X}.
+inline std::optional<Sector> entry_sector(Eisenstein A, Eisenstein B) {
+  bool A_o = (A.first == 0 && A.second == 0);
+  bool B_o = (B.first == 0 && B.second == 0);
+  if (A_o && B_o)       return std::nullopt;
+  if (A_o)              return Sector{B, B};
+  if (B_o)              return Sector{A, A};
+  if (wedge(A, B) == 0) return std::nullopt;
+  return ccw_order(A, B);
+}
+
+// Thrown by place_third_eis for a triangle with no Z[w] apex -- a degenerate /
+// non-Loeschian face, which cannot occur on a valid delta-complex.  Carries
+// its inputs so the failing placement can be replayed from the caught
+// exception.
+struct DegenerateTriangle : std::logic_error {
+  Eisenstein A, B;
+  int abs2, acs2, bcs2, chirality;
+  DegenerateTriangle(Eisenstein A_, Eisenstein B_,
+                     int abs2_, int acs2_, int bcs2_, int chirality_)
+    : std::logic_error(
+        "place_third_eis: degenerate triangle  A=(" + std::to_string(A_.first)
+        + "," + std::to_string(A_.second) + ") B=(" + std::to_string(B_.first)
+        + "," + std::to_string(B_.second) + ")  |AB|2=" + std::to_string(abs2_)
+        + " |AC|2=" + std::to_string(acs2_) + " |BC|2=" + std::to_string(bcs2_)
+        + " chirality=" + std::to_string(chirality_)),
+      A(A_), B(B_), abs2(abs2_), acs2(acs2_), bcs2(bcs2_), chirality(chirality_) {}
+};
+
+// The Z[w] displacement factor m+n*w of the apex over base A->B:
+//   K = |AB|2+|AC|2-|BC|2  (law of cosines),  xi = 4*|AB|2*|AC|2 - K*K,
+//   t = sqrt(xi/3),  m = (K - chi*t)/2,  n = chi*t.
+// nullopt iff these squared sides admit no Loeschian triangle.
+//   @pre  chirality == +-1, abs2 > 0, acs2 >= 0, bcs2 >= 0.
+inline std::optional<Eisenstein>
+apex_factor(int abs2, int acs2, int bcs2, int chirality) {
+  const int K  = acs2 + abs2 - bcs2;                              // law of cosines
+  const int xi = 4*abs2*acs2 - K*K;                               // 3*(2*area)^2
+  const int t  = (xi >= 0 && xi % 3 == 0) ? (int)isqrt_exact(xi / 3) : -1;
+  const int n  = chirality * t;
+  if (t < 0 || (K - n) % 2) return std::nullopt;
+  return Eisenstein((K - n) / 2, n);                              // m + n*w
+}
+
+// Apex C of the triangle on base A->B, exact in Z[w]:
+//   C = A + (m + n*w)*(B - A) / |AB|2.
+// nullopt = the apex misses the lattice for this chirality (a soft prune);
+// throws DegenerateTriangle when the sides admit no Z[w] triangle.
+//   @pre  chirality == +-1, abs2 > 0, acs2 >= 0, bcs2 >= 0,
+//         abs2 == (B - A).norm2().
+inline std::optional<Eisenstein>
+place_third_eis(Eisenstein A, Eisenstein B, int abs2, int acs2, int bcs2, int chirality) {
+  const auto m_nw = apex_factor(abs2, acs2, bcs2, chirality);     // m + n*w, or empty
+  if (!m_nw) throw DegenerateTriangle(A, B, abs2, acs2, bcs2, chirality);
+  const Eisenstein num = (*m_nw) * (B - A);                       // (m+n*w)*(B-A)
+  if (num.first % abs2 || num.second % abs2) return std::nullopt; // off-lattice for this chi
+  return A + num / abs2;                                          // C = A + .../|AB|2
+}
 
 
 
