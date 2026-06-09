@@ -6,6 +6,12 @@ add_executable(surface-geodesics-test surface-geodesics-test.cc)
 target_link_libraries(surface-geodesics-test fullerenes buckygen GTest::GTest GTest::Main)
 add_test(NAME surface-geodesics-test COMMAND surface-geodesics-test)
 
+# Standalone (no GTest): stresses BuckyGen child-process teardown; exit 0 = pass,
+# 1 = assertion, 2 = watchdog timeout. CLI-tunable for heavy manual runs.
+add_executable(buckygen-stress-test buckygen-stress-test.cc)
+target_link_libraries(buckygen-stress-test fullerenes buckygen)
+add_test(NAME buckygen-stress-test COMMAND buckygen-stress-test)
+
 add_executable(spiral-roundtrip-test spiral-roundtrip-test.cc)
 target_link_libraries(spiral-roundtrip-test fullerenes GTest::GTest GTest::Main)
 add_test(NAME spiral-roundtrip-test COMMAND spiral-roundtrip-test)
