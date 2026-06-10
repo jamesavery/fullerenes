@@ -72,13 +72,32 @@ static int count_crossings(const DelaunayTriangulation& D, const vector<coord3d>
   return count;
 }
 
-static void scan(int N) {
+static void scan(int N, double scale, AlexandrovSolver::Continuation method) {
   BuckyGen::buckygen_queue Q = BuckyGen::start(N, false, false);
   int total = 0;
   int n_ok = 0, n_fail = 0, n_cross = 0, n_badori = 0;
   double worst_edge = 0, worst_curv = 0;
   long long total_steps = 0, total_newton = 0, total_flips = 0;
   vector<double> times_ms;
+
+  // Record every failing isomer to a flushed file (stdout is unreliable here:
+  // buckygen's fork() duplicates the stdout buffer, which both double-prints
+  // and can drop mid-run lines). One ring-spiral per line; reconstructible.
+  string fails_path = "bench_alexandrov_C" + to_string(N) + "_fails.txt";
+  FILE* fails = nullptr;
+  bool fails_open_failed = false;
+  auto record_fail = [&](const char* kind, int idx, const string& rspi) {
+    if (!fails && !fails_open_failed) {
+      fails = fopen(fails_path.c_str(), "w");
+      if (!fails) {
+        fails_open_failed = true;
+        fprintf(stderr, "warning: cannot open %s; failures not recorded\n",
+                fails_path.c_str());
+      }
+    }
+    if (fails) { fprintf(fails, "%s C%d #%d %s\n", kind, N, idx, rspi.c_str());
+                 fflush(fails); }
+  };
 
   // Solve in parallel chunks: pull CHUNK triangulations serially from
   // buckygen, then solve them in parallel via OpenMP.  Per-isomer times
@@ -105,8 +124,15 @@ static void scan(int N) {
     for (int b = 0; b < nb; b++) {
       auto D = DelaunayTriangulation::compute(batch[b]);
 
+      // Scale-invariance probe: multiply the metric by `scale` before solving.
+      // The solver should give scale-invariant pass/fail + metrics.
+      if (scale != 1.0)
+        for (int h = 0; h < D.nh; h++)
+          if (D.alive(h)) D.he_length[h] *= scale;
+
       AlexandrovSolver solver;
       solver.D = D;
+      solver.continuation = method;
       auto t0 = chrono::high_resolution_clock::now();
       auto coords = solver.solve();
       auto t1 = chrono::high_resolution_clock::now();
@@ -123,7 +149,7 @@ static void scan(int N) {
         std::ostringstream oss;
         oss << batch[b].get_general_spiral();
         #pragma omp critical
-        printf("FAIL C%d #%d: convergence failure  rspi=%s\n", N, idx, oss.str().c_str());
+        record_fail("FAIL", idx, oss.str());
         continue;
       }
 
@@ -172,10 +198,10 @@ static void scan(int N) {
       if (pass) n_ok++;
       else {
         std::ostringstream oss;
-        oss << batch[b].get_general_spiral();
+        oss << "cross=" << cx << " vol=" << vol << " curv=" << max_curv
+            << " edge=" << max_edge*100 << "% rspi=" << batch[b].get_general_spiral();
         #pragma omp critical
-        printf("GFAIL C%d #%d: cross=%d vol=%.2f curv=%.4f edge=%.2f%%  rspi=%s\n",
-               N, idx, cx, vol, max_curv, max_edge*100, oss.str().c_str());
+        record_fail("GFAIL", idx, oss.str());
       }
     }
 
@@ -185,6 +211,7 @@ static void scan(int N) {
     fflush(stdout);
   }
   BuckyGen::stop(Q);
+  if (fails) fclose(fails);
 
   auto t_wall_end = chrono::high_resolution_clock::now();
   double wall_s = chrono::duration<double>(t_wall_end - t_wall_start).count();
@@ -213,7 +240,22 @@ static void scan(int N) {
 }
 
 int main(int argc, char** argv) {
-  if (argc < 2) { fprintf(stderr, "Usage: %s N\n", argv[0]); return 1; }
-  scan(atoi(argv[1]));
+  if (argc < 2) {
+    fprintf(stderr, "Usage: %s N [scale] [natural|palc]\n", argv[0]);
+    return 1;
+  }
+  double scale = (argc >= 3) ? atof(argv[2]) : 1.0;
+  auto method = AlexandrovSolver::Continuation::NATURAL;
+  if (argc >= 4) {
+    string m = argv[3];
+    if (m == "palc") method = AlexandrovSolver::Continuation::PALC;
+    else if (m != "natural")
+      fprintf(stderr, "warning: unknown method '%s'; using natural\n", m.c_str());
+  }
+  printf("method: %s, scale: %g\n",
+         method == AlexandrovSolver::Continuation::PALC ? "palc" : "natural",
+         scale);
+  fflush(stdout);  // flush before scan()'s buckygen fork() duplicates the buffer
+  scan(atoi(argv[1]), scale, method);
   return 0;
 }

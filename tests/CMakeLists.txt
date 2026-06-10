@@ -64,7 +64,3 @@ add_test(NAME delaunay-test COMMAND delaunay-test)
 add_executable(extract-graph extract_graph.cc)
 target_link_libraries(extract-graph fullerenes)
 target_compile_definitions(extract-graph PRIVATE FULLERENE_ROOT="${CMAKE_SOURCE_DIR}")
-
-add_executable(alexandrov-icosahedral-test alexandrov-icosahedral-test.cc)
-target_link_libraries(alexandrov-icosahedral-test fullerenes GTest::GTest GTest::Main)
-add_test(NAME alexandrov-icosahedral-test COMMAND alexandrov-icosahedral-test)

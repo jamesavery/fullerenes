@@ -74,6 +74,18 @@ struct AlexandrovSolver {
   // is empty or strength = 0.
   std::vector<double> r_deflate_target;
   double deflate_strength = 0.0;
+
+  // Continuation method for the BI homotopy κ(r)=t·κ₁.
+  //   NATURAL — t-parameterized continuation (BI eq. 38, dr/dt=J⁻¹κ₁).
+  //             The path is monotone in t (BI Thm 5: J non-degenerate,
+  //             constant Lorentzian signature for 0<κᵢ<δᵢ), so no arclength
+  //             is needed; scale-invariant by construction. This is the
+  //             default.
+  //   PALC    — pseudo-arclength continuation (legacy; arclength ds²=dt²+‖dr‖²
+  //             is scale-dependent). Kept for comparison/benchmarking.
+  enum class Continuation { NATURAL, PALC };
+  Continuation continuation = Continuation::NATURAL;
+
   bool verbose = false;
   bool trace_jacobian = false;       // record per-step spectrum of J
   int stats_steps = 0, stats_flips = 0, stats_newton_total = 0;
