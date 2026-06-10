@@ -277,18 +277,21 @@ ostream& operator<<(ostream& S, const polygon& P)
   return S;
 }
 
-matrix3d coord3d::outer(const coord3d& y) const
+template<>
+matrix3d coord3<double>::outer(const coord3<double>& y) const
 {
   return matrix3d(x[0]*y[0],x[0]*y[1],x[0]*y[2],  x[1]*y[0],x[1]*y[1],x[1]*y[2],  x[2]*y[0],x[2]*y[1],x[2]*y[2]);
 }
 
-coord3d coord3d::operator*(const matrix3d& m) const
+template<>
+coord3<double> coord3<double>::operator*(const matrix3d& m) const
 {
-  return coord3d(x[0]*m(0,0)+x[1]*m(1,0)+x[2]*m(2,0),  x[0]*m(0,1)+x[1]*m(1,1)+x[2]*m(2,1),  x[0]*m(0,2)+x[1]*m(1,2)+x[2]*m(2,2));
+  return coord3<double>(x[0]*m(0,0)+x[1]*m(1,0)+x[2]*m(2,0),  x[0]*m(0,1)+x[1]*m(1,1)+x[2]*m(2,1),  x[0]*m(0,2)+x[1]*m(1,2)+x[2]*m(2,2));
 }
 
 // calculation of the angle beta at b(0,0,0)
-double coord3d::angle(const coord3d& a, const coord3d& c)
+template<>
+double coord3<double>::angle(const coord3<double>& a, const coord3<double>& c)
 {
   const double L2 = a.dot(a);
   const double R2 = c.dot(c);
@@ -301,7 +304,8 @@ double coord3d::angle(const coord3d& a, const coord3d& c)
 }
 
 // calculation of the derivative of angle beta at b(0,0,0) according to coordinates a and c with fixed b
-void coord3d::dangle(const coord3d& a, const coord3d& c, coord3d& da, coord3d& dc)
+template<>
+void coord3<double>::dangle(const coord3<double>& a, const coord3<double>& c, coord3<double>& da, coord3<double>& dc)
 {
   const double L2 = a.dot(a);
   const double R2 = c.dot(c);
@@ -331,7 +335,8 @@ void coord3d::dangle(const coord3d& a, const coord3d& c, coord3d& da, coord3d& d
 //    counterclockwise, convex --> positive  ... this is the default case
 //    clockwise, concave --> positive
 //    counterclockwise, concave --> negative
-double coord3d::dihedral(const coord3d& b, const coord3d& c, const coord3d& d)
+template<>
+double coord3<double>::dihedral(const coord3<double>& b, const coord3<double>& c, const coord3<double>& d)
 {
   const coord3d ab = b; // a=0
   const coord3d bc = c-b;
@@ -352,7 +357,8 @@ double coord3d::dihedral(const coord3d& b, const coord3d& c, const coord3d& d)
 }
 
 // calculation of the derivative of dihedral angle theta at a(0,0,0), b, c and d  according to coordinates b, c and d with fixed a
-void coord3d::ddihedral(const coord3d& b, const coord3d& c, const coord3d& d, coord3d& db, coord3d& dc, coord3d& dd)
+template<>
+void coord3<double>::ddihedral(const coord3<double>& b, const coord3<double>& c, const coord3<double>& d, coord3<double>& db, coord3<double>& dc, coord3<double>& dd)
 {
   const coord3d ab = b; // a=0
   const coord3d bc = c-b;
@@ -510,7 +516,8 @@ void coord3d::ddihedral(const coord3d& b, const coord3d& c, const coord3d& d, co
 
 
 // assumes counter clockwise orientation and a convex singularity
-double coord3d::ideal_dihedral(const int A, const int B, const int C, const double ur, const double us, const double ut)
+template<>
+double coord3<double>::ideal_dihedral(const int A, const int B, const int C, const double ur, const double us, const double ut)
 {
 //        t   B   s      
 //          \   /

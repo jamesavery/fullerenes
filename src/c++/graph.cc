@@ -4,7 +4,7 @@ char LIST_OPEN='[';
 char LIST_CLOSE=']';
 
 // Returns true if edge existed prior to call, false if not
-bool Graph::remove_edge(const edge_t& e)
+bool GraphView::remove_edge(const edge_t& e)
 {
   node_t u = e.first, v = e.second;
   bool value = false;
@@ -20,7 +20,7 @@ bool Graph::remove_edge(const edge_t& e)
 // Returns true if edge existed prior to call, false if not
 // insert v right before suc_uv in the list of neighbours of u
 // insert u right before suc_vu in the list of neighbours of v
-bool Graph::insert_edge(const arc_t& e, const node_t suc_uv, const node_t suc_vu)
+bool GraphView::insert_edge(const arc_t& e, const node_t suc_uv, const node_t suc_vu)
 {
   if(edge_exists(e)) return true;	// insert_edge must be idempotent
 
@@ -48,12 +48,12 @@ bool Graph::insert_edge(const arc_t& e, const node_t suc_uv, const node_t suc_vu
   return false;
 }
 
-bool Graph::edge_exists(const edge_t& e) const
+bool GraphView::edge_exists(const edge_t& e) const
 {
   return find(e.first, e.second) >= 0;
 }
 
-// remove all vertices without edges from graph
+// remove all vertices without edges from graph (requires owned storage)
 void Graph::remove_isolated_vertices(){
   vector<int> new_id(N);
 
@@ -72,7 +72,7 @@ void Graph::remove_isolated_vertices(){
   *this = g;
 }
 
-// completely remove all vertices in sv from the graph
+// completely remove all vertices in sv from the graph (requires owned storage)
 void Graph::remove_vertices(set<int> &sv){
   const int N_naught(N);
   for(int u: sv){
@@ -91,32 +91,32 @@ void Graph::remove_vertices(set<int> &sv){
   assert(is_connected());
 }
 
-int  Graph::arc_ix(node_t u, node_t v) const
-{
-  return find(u, v);
-}
-
 void Graph::apply_permutation(const Permutation& pi)
 {
   assert(owns_memory());
   assert((int)pi.size() == N);
-  std::vector<node_t> new_values(N * dmax, node_t(-1));
+  std::vector<node_t> new_neighbours(N * dmax, node_t(-1));
   std::vector<uint8_t> new_deg(N, 0);
   for (int u_old = 0; u_old < N; ++u_old) {
     const int u_new = pi[u_old];
     new_deg[u_new] = owned_deg[u_old];
     for (int i = 0; i < owned_deg[u_old]; ++i) {
-      const int t_old = owned_values[u_old * dmax + i];
-      new_values[u_new * dmax + i] = pi[t_old];
+      const int t_old = owned_neighbours[u_old * dmax + i];
+      new_neighbours[u_new * dmax + i] = pi[t_old];
     }
   }
-  owned_values = std::move(new_values);
-  owned_deg    = std::move(new_deg);
+  owned_neighbours = std::move(new_neighbours);
+  owned_deg        = std::move(new_deg);
   repoint();
 }
 
+int  GraphView::arc_ix(node_t u, node_t v) const
+{
+  return find(u, v);
+}
+
 // Successor to v in oriented neigbhours of u
-node_t Graph::next(node_t u, node_t v) const
+node_t GraphView::next(node_t u, node_t v) const
 {
   const auto &nu((*this)[u]);
   int j = arc_ix(u,v);
@@ -125,27 +125,27 @@ node_t Graph::next(node_t u, node_t v) const
 }
 
 // Predecessor to v in oriented neigbhours of u
-node_t Graph::prev(node_t u, node_t v) const
+node_t GraphView::prev(node_t u, node_t v) const
 {
-  const auto &nu((*this)[u]);  
+  const auto &nu((*this)[u]);
   int j = arc_ix(u,v);
   if(j>=0) return nu[(j-1+nu.size())%nu.size()];
   return -1;            // u-v is not an edge in a triangulation
 }
 
 // Successor to v in face containing directed edge u->v
-node_t Graph::next_on_face(node_t u, node_t v) const
+node_t GraphView::next_on_face(node_t u, node_t v) const
 {
   return prev(v,u);
 }
 
 // Predecessor to v in face containing directed edge u->v
-node_t Graph::prev_on_face(node_t u, node_t v) const
+node_t GraphView::prev_on_face(node_t u, node_t v) const
 {
   return next(v,u);
 }
 
-bool Graph::is_consistently_oriented() const 
+bool GraphView::is_consistently_oriented() const
 {
   map<arc_t,bool> seen_arc;
 
@@ -178,7 +178,7 @@ bool Graph::is_consistently_oriented() const
 }
 
 // TODO: Doesn't need to be planar and oriented, but is easier to write if it is. Make it work in general.
-bool Graph::has_separating_triangles() const
+bool GraphView::has_separating_triangles() const
 {
   assert(is_consistently_oriented());
 
@@ -195,7 +195,7 @@ bool Graph::has_separating_triangles() const
 }
 
 
-bool Graph::adjacency_is_symmetric() const
+bool GraphView::adjacency_is_symmetric() const
 {
   for(node_t u=0;u<N;u++){
     auto nu = (*this)[u];
@@ -211,7 +211,7 @@ bool Graph::adjacency_is_symmetric() const
 }
 
 // TODO: Should make two functions: one that takes subgraph (empty is trivially connected) and one that works on full graph.
-bool Graph::is_connected(const set<node_t> &subgraph) const 
+bool GraphView::is_connected(const set<node_t> &subgraph) const
 {
   vector<int> dist(N);
   if(!subgraph.empty()){
@@ -228,7 +228,7 @@ bool Graph::is_connected(const set<node_t> &subgraph) const
 
     single_source_shortest_paths(s,&dist[0]);
 
-    for(int i=0;i<dist.size();i++) 
+    for(int i=0;i<dist.size();i++)
       if(dist[i] == INT_MAX) return false;
   }
 
@@ -236,7 +236,7 @@ bool Graph::is_connected(const set<node_t> &subgraph) const
 }
 
 #include <queue>
-vector<vector<node_t>> Graph::connected_components() const 
+vector<vector<node_t>> GraphView::connected_components() const
 {
   vector<bool> done(N);
 
@@ -244,7 +244,7 @@ vector<vector<node_t>> Graph::connected_components() const
   for(node_t u=0;u<N;u++)
     if(!done[u]){
       vector<node_t> component;
-  
+
       done[u] = true;
       component.push_back(u);
       queue<node_t> Q;
@@ -255,7 +255,7 @@ vector<vector<node_t>> Graph::connected_components() const
 	if(!done[v]){
 	  done[v] = true;
 	  component.push_back(v);
-	  
+
 	  for(int i=0;i<(*this)[v].size();i++)
 	    if(!done[(*this)[v][i]]) Q.push((*this)[v][i]);
 	}
@@ -267,21 +267,21 @@ vector<vector<node_t>> Graph::connected_components() const
 }
 
 
-void Graph::single_source_shortest_paths(node_t source, int *distances, size_t max_depth) const
+void GraphView::single_source_shortest_paths(node_t source, int *distances, size_t max_depth) const
 {
   vector<node_t> queue_buf(N);
   Deque<node_t> queue(queue_buf);
   for(int u=0;u<N;u++) distances[u] = INT_MAX;
-  
+
   distances[source] = 0;
   queue.push_back(source);
 
   while(!queue.empty()){
     node_t u = queue.pop_front();
-    
+
     for(node_t v: (*this)[u]){
       if(distances[v] == INT_MAX){ // Node is not previously visited
-	distances[v] = distances[u] + 1; 
+	distances[v] = distances[u] + 1;
 	if(distances[v] < max_depth) queue.push_back(v);
       }
     }
@@ -291,7 +291,7 @@ void Graph::single_source_shortest_paths(node_t source, int *distances, size_t m
 // Returns NxN matrix of shortest distances (or INT_MAX if not connected)
 // N^2: allocating d
 // N*(N-1)/2 steps
-matrix<int> Graph::all_pairs_shortest_paths(const unsigned int max_depth) const
+matrix<int> GraphView::all_pairs_shortest_paths(const unsigned int max_depth) const
 {
   matrix<int>   d(N,N,INT_MAX);
   vector<node_t> queue_buf(N);
@@ -321,7 +321,7 @@ matrix<int> Graph::all_pairs_shortest_paths(const unsigned int max_depth) const
 
 // Returns MxM matrix of shortest distances between vertices in V
 // M^2 memory, O(MN) operations
-matrix<int> Graph::all_pairs_shortest_paths(const vector<node_t> &V,
+matrix<int> GraphView::all_pairs_shortest_paths(const vector<node_t> &V,
 					    const unsigned int max_depth) const
 {
   size_t M = V.size();
@@ -332,7 +332,7 @@ matrix<int> Graph::all_pairs_shortest_paths(const vector<node_t> &V,
   Deque<node_t> queue(queue_buf);
 
   for(int i=0;i<M;i++){
-    for(int j=0;j<N;j++) d[j] = INT_MAX; // Mark all nodes as unvisited    
+    for(int j=0;j<N;j++) d[j] = INT_MAX; // Mark all nodes as unvisited
 
     node_t source = V[i];
     d[source] = 0;
@@ -358,7 +358,7 @@ matrix<int> Graph::all_pairs_shortest_paths(const vector<node_t> &V,
 }
 
 
-vector<node_t> Graph::shortest_cycle(node_t s, const int max_depth) const 
+vector<node_t> GraphView::shortest_cycle(node_t s, const int max_depth) const
 {
   face_t cycle;
   int Lmin = INT_MAX;
@@ -375,13 +375,13 @@ vector<node_t> Graph::shortest_cycle(node_t s, const int max_depth) const
 //   1. Compute d(t,*) when excluding the edge (s,t)
 //   2. If d(t,s) == INT_MAX, there is no such cycle <= max_depth
 //   3. Otherwise, back-trace as
-vector<node_t> Graph::shortest_cycle(const vector<node_t>& prefix, const int max_depth) const 
+vector<node_t> GraphView::shortest_cycle(const vector<node_t>& prefix, const int max_depth) const
 {
   // Is this a valid start?
   for(int i=0;i+1<prefix.size();i++) assert(edge_exists({prefix[i],prefix[i+1]}));
 
-  node_t s = prefix[0], t = prefix[1];  
-  
+  node_t s = prefix[0], t = prefix[1];
+
   if(max_depth == 3){ // Triangles need special handling
     switch(prefix.size()){
     case 2:
@@ -416,7 +416,7 @@ vector<node_t> Graph::shortest_cycle(const vector<node_t>& prefix, const int max
       if(distances[w] < dmin && (edge_t(u,w) != edge_t(s,t))){
   	dmin = distances[w];
   	v = w;
-      } 
+      }
     u = v;
     cycle[distances[s]-i] = u;
   }
@@ -425,12 +425,12 @@ vector<node_t> Graph::shortest_cycle(const vector<node_t>& prefix, const int max
 }
 
 
-vector<int> Graph::multiple_source_shortest_paths(const vector<node_t>& sources, const unsigned int max_depth) const
+vector<int> GraphView::multiple_source_shortest_paths(const vector<node_t>& sources, const unsigned int max_depth) const
 {
   vector<int>   distances(N,INT_MAX);
   vector<node_t> queue_buf(N);
   Deque<node_t> queue(queue_buf);
-    
+
   for(node_t s: sources){
     distances[s] = 0;
     queue.push_back(s);
@@ -438,7 +438,7 @@ vector<int> Graph::multiple_source_shortest_paths(const vector<node_t>& sources,
 
   while(!queue.empty()){
     node_t v = queue.pop_front();
-      
+
     for(node_t w: (*this)[v]){
       const edge_t edge(v,w);
       if(distances[w] == INT_MAX){ // Node not previously visited
@@ -451,12 +451,12 @@ vector<int> Graph::multiple_source_shortest_paths(const vector<node_t>& sources,
 }
 
 
-void Graph::flip_all_orientations()
+void GraphView::flip_all_orientations()
 {
   for(node_t u=0;u<N;u++) reverse((*this)[u].begin(), (*this)[u].end());
 }
 
-int Graph::max_degree() const
+int GraphView::max_degree() const
 {
   int max_d = 0;
   for(node_t u=0;u<N;u++) if(degree(u) > max_d) max_d = degree(u);
@@ -464,7 +464,7 @@ int Graph::max_degree() const
 }
 
 
-vector<edge_t> Graph::undirected_edges() const {
+vector<edge_t> GraphView::undirected_edges() const {
   set<edge_t> edges;
   for(node_t u=0;u<N;u++)
     for(int i=0;i<(*this)[u].size();i++)
@@ -472,7 +472,7 @@ vector<edge_t> Graph::undirected_edges() const {
   return vector<edge_t>(edges.begin(),edges.end());
 }
 
-vector<arc_t> Graph::directed_edges() const {
+vector<arc_t> GraphView::directed_edges() const {
   set<arc_t> edges;
   for(node_t u=0;u<N;u++)
     for(int i=0;i<(*this)[u].size();i++)
@@ -480,7 +480,7 @@ vector<arc_t> Graph::directed_edges() const {
   return vector<arc_t>(edges.begin(),edges.end());
 }
 
-size_t Graph::count_edges() const {
+size_t GraphView::count_edges() const {
   // Don't use edge_set -- it's slow
   size_t twoE = 0;
   for(node_t u=0;u<N;u++)
@@ -489,16 +489,15 @@ size_t Graph::count_edges() const {
   return twoE/2;
 }
 
-ostream& operator<<(ostream& s, const Graph& g) 
+ostream& operator<<(ostream& s, const Graph& g)
 {
   vector<edge_t> edges = g.undirected_edges();
 
   s << "Graph[Range["<<(g.N)<<"],\n\tUndirectedEdge@@#&/@{";
-  for(size_t i=0;i<edges.size();i++){    
+  for(size_t i=0;i<edges.size();i++){
     s << "{" << (edges[i].first+1) << "," << (edges[i].second+1) << "}" << (i+1<edges.size()? ", ":"");
-  } 
+  }
   s << "}]";
 
   return s;
 }
-

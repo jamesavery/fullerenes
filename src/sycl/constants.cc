@@ -33,7 +33,7 @@ struct Constants{
     coord3d outer_dih0_m;
     coord3d outer_dih0_p;
 
-    inline Constants(const Span<std::array<K,3>> cubic_neighbours, K idx){
+    inline Constants(const std::span<std::array<K,3>> cubic_neighbours, K idx){
 
         constexpr real_t optimal_corner_cos_angles[2] = {-0.30901699437494734, -0.5}; 
         constexpr real_t optimal_bond_lengths[3] = {1.479, 1.458, 1.401}; 

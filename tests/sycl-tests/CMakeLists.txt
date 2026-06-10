@@ -15,6 +15,7 @@ set(SYCL_EXECUTABLES
   sycl-vector-test
   sycl-smoke-test
   mdspan-test
+  pipeline-view-test
 )
 
 foreach(EXECUTABLE ${SYCL_EXECUTABLES})

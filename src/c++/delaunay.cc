@@ -396,53 +396,49 @@ bool DelaunayTriangulation::is_delaunay_edge(int h) const
   return diamond(h).is_delaunay();
 }
 
-// Body of the flip.  Accepts any non-Delaunay edge with convex diamond;
-// a B == D diamond flips to a self-loop edge at B, which is legal in
-// a delta-complex and strictly Delaunay by Lemma 1 of the proof.
-static bool do_flip(DelaunayTriangulation& D_, int h);
-
-bool DelaunayTriangulation::flip_edge(int h)                 { return do_flip(*this, h); }
-bool DelaunayTriangulation::flip_edge_allow_self_loop(int h) { return do_flip(*this, h); }
-
-static bool do_flip(DelaunayTriangulation& D_, int h)
+// Flip the diagonal of the diamond around edge h.  Returns true on success.
+// Accepts any non-Delaunay edge with a convex diamond, including the
+// B == D case (which produces a self-loop edge at B, strictly Delaunay
+// by Lemma 1 of CORRECTNESS-PROOF.md).
+bool DelaunayTriangulation::flip_edge(int h)
 {
   int t = h ^ 1;
-  int h1 = D_.he_next[h], h2 = D_.he_next[h1];
-  int h4 = D_.he_next[t], h5 = D_.he_next[h4];
-  int u = D_.he_origin[h],  v = D_.he_origin[t];
-  int B = D_.he_origin[h2], D = D_.he_origin[h5];
+  int h1 = he_next[h], h2 = he_next[h1];
+  int h4 = he_next[t], h5 = he_next[h4];
+  int u = he_origin[h],  v = he_origin[t];
+  int B = he_origin[h2], D = he_origin[h5];
 
-  Diamond dm = D_.diamond(h);
+  Diamond dm = diamond(h);
   if (!dm.is_convex()) return false;
   double f_len = dm.flipped_length();
   if (!std::isfinite(f_len) || f_len <= 0) return false;
 
   // Rewire the diagonal: h becomes B->D, t becomes D->B.  Reuse the two
   // face slots fh, ft by rewiring in place (avoids dealloc/realloc).
-  int fh = D_.he_face[h], ft = D_.he_face[t];
-  D_.he_origin[h] = B;
-  D_.he_origin[t] = D;
-  D_.he_length[h] = D_.he_length[t] = f_len;
+  int fh = he_face[h], ft = he_face[t];
+  he_origin[h] = B;
+  he_origin[t] = D;
+  he_length[h] = he_length[t] = f_len;
 
   // Face left of h: (B, D, u) via half-edges h -> h5 -> h1.
-  D_.he_next[h]  = h5;  D_.he_next[h5] = h1;  D_.he_next[h1] = h;
-  D_.he_face[h]  = D_.he_face[h5] = D_.he_face[h1] = fh;
-  D_.f_he[fh] = h;
+  he_next[h]  = h5;  he_next[h5] = h1;  he_next[h1] = h;
+  he_face[h]  = he_face[h5] = he_face[h1] = fh;
+  f_he[fh] = h;
 
   // Face left of t: (D, B, v) via half-edges t -> h2 -> h4.
-  D_.he_next[t]  = h2;  D_.he_next[h2] = h4;  D_.he_next[h4] = t;
-  D_.he_face[t]  = D_.he_face[h2] = D_.he_face[h4] = ft;
-  D_.f_he[ft] = t;
+  he_next[t]  = h2;  he_next[h2] = h4;  he_next[h4] = t;
+  he_face[t]  = he_face[h2] = he_face[h4] = ft;
+  f_he[ft] = t;
 
-  D_.recompute_face_angles(fh);
-  D_.recompute_face_angles(ft);
+  recompute_face_angles(fh);
+  recompute_face_angles(ft);
 
   // u and v lost their incident diagonal; find a new outgoing half-edge.
-  if (D_.v_out[u] == h) D_.v_out[u] = h4;
-  if (D_.v_out[v] == t) D_.v_out[v] = h1;
+  if (v_out[u] == h) v_out[u] = h4;
+  if (v_out[v] == t) v_out[v] = h1;
   // B == D case: h and t are now self-loops at B; ensure_v_out anchors
   // B's outgoing pointer at a live half-edge.
-  if (B == D) D_.ensure_v_out(B);
+  if (B == D) ensure_v_out(B);
   return true;
 }
 
@@ -476,8 +472,20 @@ int DelaunayTriangulation::lawson_sweep()
       in_stack[h >> 1] = true;
     }
 
+  // The Bobenko-Springborn discrete Dirichlet energy strictly decreases on
+  // every flip (Theorem 1, CORRECTNESS-PROOF.md), so the sweep always
+  // terminates in finitely many flips on a metrized delta-complex.  The
+  // 200*nv budget is a defensive guard, not part of the algorithm: if it
+  // fires we have a counterexample to Theorem 1 and must abort loudly
+  // rather than return a non-Delaunay output.
   int budget = 200 * nv;
-  while (!S.empty() && budget > 0) {
+  while (!S.empty()) {
+    if (budget <= 0)
+      throw std::runtime_error(
+          "lawson_sweep: budget exhausted (200*nv = " +
+          std::to_string(200 * nv) + " flips); Theorem 1 should preclude "
+          "this -- see CORRECTNESS-PROOF.md");
+
     int h = S.top(); S.pop();
     in_stack[h >> 1] = false;
 
@@ -487,7 +495,11 @@ int DelaunayTriangulation::lawson_sweep()
     int h1 = he_next[h], h2 = he_next[h1];
     int h4 = he_next[h ^ 1], h5 = he_next[h4];
 
-    if (!flip_edge(h)) continue;
+    if (!flip_edge(h))
+      throw std::runtime_error(
+          "lawson_sweep: flip_edge rejected a non-Delaunay edge h=" +
+          std::to_string(h) + "; Lemma 2 (convex-flippable diamond) "
+          "violated -- see CORRECTNESS-PROOF.md");
     flips++; budget--;
 
     // Push the 4 rim edges.
@@ -563,7 +575,6 @@ struct FanTriangulation {
 
   vector<Diagonal> diagonals;   // k-3 ear diagonals
   vector<Triangle> triangles;   // k-2 ear triangles
-  bool complete = false;        // true if all ears were successfully clipped
 };
 
 // ============================================================================
@@ -617,7 +628,9 @@ static double ear_length_if_acceptable(
 
 // Ear-clip the fan polygon into triangles.  By Meisters' theorem
 // (Lemma 4 of the proof), a simple polygon with k >= 4 always has an
-// ear; the scan below therefore terminates at k = 3.
+// ear; the scan below therefore terminates at k = 3.  If a pass finds no
+// ear we throw rather than return silently: that would be a Meisters
+// counterexample, not a recoverable condition.
 static FanTriangulation ear_clip_fan(const FanPolygon& fan) {
   int k = fan.k;
   FanTriangulation tri;
@@ -639,7 +652,11 @@ static FanTriangulation ear_clip_fan(const FanPolygon& fan) {
       break;
     }
 
-    if (!clipped) return tri;  // shouldn't happen by Meisters; signal incomplete
+    if (!clipped)
+      throw std::runtime_error(
+          "ear_clip_fan: no ear found at remaining polygon size " +
+          std::to_string(poly.size()) + " (Meisters / Lemma 4 violated) "
+          "-- see CORRECTNESS-PROOF.md");
   }
 
   // Compose diagonals into triangle list, appending the final base triangle.
@@ -649,10 +666,10 @@ static FanTriangulation ear_clip_fan(const FanPolygon& fan) {
     tri.triangles.push_back({ear.from, ear.ear, ear.to});
     rpoly.erase(std::find(rpoly.begin(), rpoly.end(), ear.ear));
   }
-  assert(rpoly.size() == 3);
+  if (rpoly.size() != 3)
+    throw std::runtime_error("ear_clip_fan: residual polygon size != 3");
   tri.triangles.push_back({rpoly[0], rpoly[1], rpoly[2]});
 
-  tri.complete = true;
   return tri;
 }
 
@@ -726,11 +743,10 @@ void DelaunayTriangulation::remove_flat_vertex(int v)
   if (deg >= 4) {
     // Phase 2: Ear clipping + DCEL surgery.
     //   extract_fan:  read star geometry -> FanPolygon (isometric 2D embedding)
-    //   ear_clip_fan: triangulate the fan polygon (Meisters)
+    //   ear_clip_fan: triangulate the fan polygon (Meisters; throws on failure)
     //   splice_fan:   replace the star with the triangulation (DCEL surgery)
     FanPolygon fan = extract_fan(*this, v);
     FanTriangulation tri = ear_clip_fan(fan);
-    if (!tri.complete) return;  // stuck (shouldn't happen by Meisters)
     splice_fan(*this, v, fan, tri);
   } else if (deg == 3) {
     // Phase 3: Direct removal (three faces merge into one triangle).

@@ -1,4 +1,5 @@
 #include "fullerenes/delaunay_embed3d.hh"
+#include "fullerenes/union_find.hh"
 
 #include <cmath>
 #include <cassert>
@@ -399,24 +400,11 @@ SymmetryConstraint restrict_symmetry_to_cone_points(
   return result;
 }
 
-// Compute vertex orbits from a group of permutations (union-find).
+// Vertex orbits from a group of permutations -- the connected components of
+// u ~ pi[u]. Members are ascending, so orbit[0] is each orbit's smallest member
+// (the representative callers use); orbit-vector order is an internal relabel.
 vector<vector<int>> compute_orbits(int n, const vector<vector<int>>& G) {
-  vector<int> parent(n);
-  iota(parent.begin(), parent.end(), 0);
-  std::function<int(int)> find = [&](int x) {
-    return parent[x] == x ? x : parent[x] = find(parent[x]);
-  };
-  for (auto& pi : G)
-    for (int v = 0; v < n; v++) {
-      int a = find(v), b = find(pi[v]);
-      if (a != b) parent[a] = b;
-    }
-
-  map<int, vector<int>> m;
-  for (int v = 0; v < n; v++) m[find(v)].push_back(v);
-  vector<vector<int>> orbits;
-  for (auto& [_, orbit] : m) orbits.push_back(orbit);
-  return orbits;
+  return orbits(n, G);
 }
 
 // ============================================================================

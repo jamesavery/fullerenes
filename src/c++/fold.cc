@@ -370,7 +370,7 @@ Triangulation Folding::fold()
   // Step 5: Build neighbour lists directly from dir_nb in CW order.
   // Eisenstein directions 0-5 go CCW, so scanning 5→4→3→2→1→0 gives CW order,
   // which is what Triangulation's next_on_face (= prev) convention requires.
-  Graph neighbours(N, GRAPH_DMAX);
+  Graph neighbours(N, 6);  // Triangulations have max degree 6
   for(node_t u = 0; u < N; u++){
     for(int d = 5; d >= 0; d--){
       if(dir_nb[u][d] >= 0)

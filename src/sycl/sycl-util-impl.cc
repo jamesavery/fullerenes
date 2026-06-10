@@ -1,21 +1,23 @@
 #include <sycl/sycl.hpp>
 #include <fullerenes/kernel-headers/sycl-parallel-primitives.hh>
 #include <fullerenes/sycl-headers/reference-wrapper.hh>
-#include <fullerenes/sycl-headers/sycl-fullerene.hh>
-#include <fullerenes/sycl-headers/sycl-fullerene-structs.hh>
+#include <fullerenes/sycl-headers/sycl-vector.hh>
+#include <fullerenes/sycl-headers/sycl-status-enum.hh>
+#include <fullerenes/geometry.hh>
 #include <unordered_map>
 #include <exception>
 #include <limits>
 #include <cstdint>
 #include <complex>
+#include <bitset>
 #include <fullerenes/sycl-headers/execution-compat.hh>
 #include "coord3d.cc"
 
 #ifndef DEVICE_CAST
     #define DEVICE_CAST(x,ix) (reinterpret_cast<const sycl::device*>(x)[ix])
 #endif
-#include "queue-impl.cc"
-//#define HOST_ALLOCATOR_QUEUE reinterpret_cast<sycl::queue*>(QueueWrapper::allocator_queue_.data())[0]
+#define DEFINE_SYCL_QUEUE_METHODS
+#include "queue-impl.hh"
 
 using namespace sycl;
 
@@ -42,7 +44,12 @@ SyclVector<T>::SyclVector(size_t size) : size_(size), capacity_(size) {
     if (!data_ && size > 0) {
         std::cout << "Could not allocate " + std::to_string(size) + " elements of type " + typeid(T).name() << std::endl;
         throw std::bad_alloc();
-    } 
+    }
+    // Value-initialize, matching std::vector(size) semantics, so the two
+    // BatchAlloc backends (std::vector on host, SyclVector on device) behave
+    // identically. Code that relies on freshly-sized storage being zeroed must
+    // not break when switching backends.
+    std::fill_n(data_, size, T{});
 }
 
 template <typename T>
@@ -60,6 +67,7 @@ SyclVector<T>::~SyclVector() {if(data_) sycl::free(data_,  sycl::context(device(
 
 template <typename T>
 void SyclVector<T>::resize(size_t new_size) {
+    const size_t old_size = size_;
     if(new_size > capacity_){
         T* new_data = sycl::malloc_shared<T>(new_size, sycl::device(default_selector_v), sycl::context(device(default_selector_v)));
         memcpy(new_data, data_, size_*sizeof(T));
@@ -67,6 +75,9 @@ void SyclVector<T>::resize(size_t new_size) {
         data_ = new_data;
         capacity_ = new_size;
     }
+    // Value-initialize newly-exposed elements (std::vector::resize parity).
+    if(new_size > old_size)
+        std::fill_n(data_ + old_size, new_size - old_size, T{});
     size_ = new_size;
 }
 
@@ -117,13 +128,11 @@ void SyclVector<T>::reserve(size_t new_capacity) {
 template <typename T>
 SyclVector<T>& SyclVector<T>::operator=(const SyclVector<T>& other) {
     size_ = other.size_;
-    //Only perform memory allocation if the new size is greater than the current capacity
     if (capacity_ < other.capacity_) {
         capacity_ = other.capacity_;
         if(data_) sycl::free(data_,  sycl::context(device(default_selector_v)));
         data_ = sycl::malloc_shared<T>(capacity_, sycl::device(default_selector_v), sycl::context(device(default_selector_v)));
     }
-    //If the type is trivially copyable, use the sycl memcpy function
     if constexpr(std::is_trivially_copyable_v<T>){
         sycl::queue q{default_selector_v};
         q.memcpy(data_, other.data_, size_*sizeof(T)).wait();
@@ -135,247 +144,8 @@ SyclVector<T>& SyclVector<T>::operator=(const SyclVector<T>& other) {
 
 template <typename U>
 std::ostream& operator<<(std::ostream& os, const SyclVector<U>& vec) {
-    os << (Span<U>)vec;
+    os << (std::span<U>)vec;
     return os;
-}
-
-template <typename U>
-std::ostream& operator<<(std::ostream& os, const Span<U>& vec) {
-    os << "[" ;
-     for (size_t i = 0; i < vec.size(); i++) {
-        os << vec[i];
-        if(i < vec.size() - 1) os << ", ";
-    }
-    os << "]";
-    return os;
-}
-
-template <typename T>
-bool Span<T>::operator==(const Span<T> other) const {
-    if(size_ != other.size_) return false;    
-    if(data() == other.data()) return true;
-    if constexpr (is_floating_point_v<std::decay_t<T>>){
-        return std::equal(begin(), end(), other.begin(), [](auto& a,auto& b){
-            T eps = std::numeric_limits<T>::epsilon() * 20;
-            T max_v = std::max(std::abs(a), std::abs(b));
-            return std::abs(a - b) / (max_v > eps ? max_v : 1) < eps;});
-    } else{
-        return std::equal(begin(), end(), other.begin());
-    }
-    return true;
-}
-
-
-
-template <typename T, typename K>
-bool Fullerene<T,K>::operator==(const Fullerene<T,K> other) const {
-    return (d_ == other.d_ && m_ == other.m_&& N_ == other.N_ && Nf_ == other.Nf_);
-}
-
-template <typename U, typename V>
-std::ostream& operator<<(std::ostream& os, const Fullerene<U, V>& fullerene) {
-    os << "Fullerene with " << fullerene.N_ << " vertices and " << fullerene.Nf_ << " faces\n";
-    os << "Data Members:\n";
-    auto print_data = [&os](auto... args) { (..., (os << args << "\n")); };
-    std::apply(print_data, fullerene.d_.to_tuple());
-    os  << "ID: " << fullerene.m_.ID_ << "\tFlag: " << fullerene.m_.flags_ << "\tIterations: " << fullerene.m_.iterations_ << "\n";
-
-    return os;
-}
-
-template <typename U, typename V>
-std::ostream& operator<<(std::ostream& os, const FullereneBatchView<U, V>& batch) {
-    os << "FullereneBatchView with " << batch.size_ << " isomers\n";
-    os << "N: " << batch.N_ << " Nf: " << batch.Nf_ << "\n";
-    os << "Meta Data:\n";
-    os << "Data Members:\n";
-    std::for_each(batch.begin(), batch.end(), [&os, j = 0](auto fullerene) mutable { os << "Batch[ " << j++ << " ]\n" << fullerene; });
-    return os;
-}
-
-template <typename U, typename V>
-std::ostream& operator<<(std::ostream& os, const FullereneBatch<U, V>& batch) { os << FullereneBatchView<U, V>(batch); return os; }
-
-template <typename T, typename K>
-FullereneBatch<T,K>::FullereneBatch() : N_(0), Nf_(0), capacity_(0), size_(0) {}
-
-
-template <size_t N, typename... Args, std::size_t... I>
-void resize_all(std::array<int,N>&& sizes, std::tuple<Args...>&& args, std::index_sequence<I...>){
-    (std::get<I>(args).resize(sizes[I], typename std::decay_t<decltype(std::get<I>(args))>::value_type{}), ...);
-}
-
-template <typename T, typename K>
-FullereneBatch<T,K>::FullereneBatch(size_t N, int capacity) :
-    N_(N),
-    Nf_(N/2 + 2),
-    capacity_(capacity),
-    size_(0)
-{
-    resize_all(d_.get_size_factors(N_, capacity_), d_.to_tuple(), std::make_index_sequence<std::tuple_size_v<decltype(d_.to_tuple())>>{});
-    resize_all(m_.get_size_factors(capacity_), m_.to_tuple(), std::make_index_sequence<std::tuple_size_v<decltype(m_.to_tuple())>>{});
-}
-
-template <typename T, typename K>
-void FullereneBatch<T,K>::resize(size_t new_capacity) {
-    if(new_capacity <= capacity_) return;
-    capacity_ = new_capacity;
-    resize_all(d_.get_size_factors(N_, capacity_), d_.to_tuple(), std::make_index_sequence<std::tuple_size_v<decltype(d_.to_tuple())>>{});
-    resize_all(m_.get_size_factors(capacity_), m_.to_tuple(), std::make_index_sequence<std::tuple_size_v<decltype(m_.to_tuple())>>{});
-}
-
-template <typename T, typename K>
-void FullereneQueue<T,K>::resize(size_t new_capacity) {
-    if(new_capacity <= capacity_) return;
-    capacity_ = new_capacity;
-    auto resize_all_circularly = [&]<std::size_t... I>(std::index_sequence<I...>, auto&& tup, auto&& size_factors){
-        (std::get<I>(tup).resize(size_factors[I]*new_capacity, size_factors[I]*front_, size_factors[I]*back_, size_factors[I]), ...);
-    };
-    resize_all_circularly(std::make_index_sequence<std::tuple_size_v<decltype(d_.to_tuple())>>{}, d_.to_tuple(), d_.get_size_factors(N_, 1));
-    resize_all_circularly(std::make_index_sequence<std::tuple_size_v<decltype(m_.to_tuple())>>{}, m_.to_tuple(), m_.get_size_factors(1));       
-    front_  = size_ > 0 ? 0 : -1;
-    back_   = size_ - 1;
-}
-template <typename T, typename K>
-void FullereneBatch<T,K>::prepare_for_push_back(const neighbours_t& neighbours){
-    bool is_cubic = neighbours[0].size() == 3;
-    if(N_ == 0 || Nf_ == 0) {
-        if(is_cubic) {N_ = neighbours.size(); Nf_ = N_/2 + 2;}
-        else{ Nf_ = neighbours.size(); N_ = 2*Nf_ - 4;}
-    } else if((is_cubic && N_ != neighbours.size()) || (!is_cubic && Nf_ != neighbours.size())) throw std::runtime_error("Graph size is incompatible with the batch");
-    if(capacity_ == size_) resize(capacity_ > 0 ? 2*capacity_ : 1);
-}
-
-template <typename T, typename K>
-void FullereneBatch<T,K>::push_back(const neighbours_t& neighbours, const int ID) {
-    prepare_for_push_back(neighbours);
-    (*this)[size_++] = std::make_tuple(std::cref(neighbours), ID);
-}
-
-template <typename T, typename K>
-void FullereneBatch<T,K>::push_back(const Graph& G, const int ID) {
-    push_back(static_cast<const neighbours_t&>(G), ID);
-}
-
-template <typename T, typename K>
-void FullereneBatch<T,K>::push_back(const PlanarGraph& G, const int ID) {
-    push_back(static_cast<const neighbours_t&>(G), ID);
-}
-
-template <typename T, typename K>
-void FullereneBatch<T,K>::push_back(const Polyhedron& P, const int ID) {
-    prepare_for_push_back(static_cast<const neighbours_t&>(P));
-    (*this)[size_++] = std::tuple<std::reference_wrapper<const Polyhedron>, size_t>(std::cref(P), static_cast<size_t>(ID));
-}
-
-template <typename T, typename K>
-template <typename U, typename V>
-void FullereneBatch<T,K>::push_back(const Fullerene<U,V>& fullerene, const int ID) {
-    if (fullerene.N_ != N_ || fullerene.Nf_ != Nf_) throw std::runtime_error("Fullerenes have different sizes");
-    if (size_ == capacity_) resize(capacity_ > 0 ? 2*capacity_ : 1);
-    Fullerene<U,V>::copy((*this)[size_++], fullerene);
-}
-
-//Parameter pack expanded copy function
-template <typename... Args>
-void copy_spans(sycl::group<1>& grp, Args&&... args) {
-    auto bdim = grp.get_local_linear_range();
-    auto tix = grp.get_local_linear_id();
-    ([&] {
-        for (int i = tix; i < std::size(std::get<0>(args)); i += bdim) std::get<1>(args).data()[i] = std::get<0>(args).data()[i];
-    }(), ...);
-}
-
-template <typename T, typename K> struct FullereneBatchFill{};
-//Use enum class to express source and destination conditions like:
-//fill(... , !GeometryStatus::EMPTY)
-
-template <typename T> struct is_fullerene_queue : std::false_type{};
-template <typename T, typename K> struct is_fullerene_queue<FullereneQueue<T,K>> : std::true_type{};
-
-template <typename T, typename K>
-void QueueUtil::push(SyclQueue& Q, FullereneQueue<T, K> &dst_queue, FullereneBatch <T, K>&src_batch, ConditionFunctor transfer_cond, StatusEnum consumed_status){
-    push_impl(Q, dst_queue, src_batch, transfer_cond, consumed_status);
-}
-
-template <typename T, typename K>
-void QueueUtil::push(SyclQueue& Q, FullereneBatch<T, K>& dst_batch, FullereneQueue<T, K>& src_queue, ConditionFunctor transfer_cond, StatusEnum consumed_status){
-    push_impl(Q, dst_batch, src_queue, transfer_cond, consumed_status);
-}
-
-template <typename DstBatch, typename SrcBatch>
-void QueueUtil::push_impl(SyclQueue& Q, DstBatch& dst_batch, SrcBatch& src_batch, ConditionFunctor condition, StatusEnum consumed_status){
-if(dst_batch.N_ != src_batch.N_ || src_batch.Nf_ != dst_batch.Nf_) throw std::runtime_error("Fullerenes have different sizes");
-    constexpr bool dst_is_queue = is_fullerene_queue<DstBatch>::value;
-    //If we are pushing from a FullereneQueue, we need to compute the valid indices of the destination batch
-    //The queue is assumed to be contiguous, so we know that all fullernes between the front and back are valid
-    //Vice versa, if we are pushing to a FullereneQueue, we need to compute the valid indices of the source batch
-    auto& indices = dst_is_queue ? src_batch.m_.valid_indices_ : dst_batch.m_.valid_indices_;
-    auto& flags = dst_is_queue ? src_batch.m_.flags_ : dst_batch.m_.flags_;
-    using int_t = std::decay_t<decltype(*indices.begin())>;
-    using float_t = std::decay_t<decltype(src_batch.d_.X_cubic_[0][0])>;
-    bool replace_status = consumed_status != StatusEnum(0); //If consumed_status is not 0, we take that as instruction to replace the status of the copied fullerenes
-    int_t init = 0;
-    Q.wait();
-    std::transform_exclusive_scan(
-        FULLERENE_PAR_UNSEQ
-        flags.begin(),
-        flags.end(),
-        indices.begin(),
-        init,
-        std::plus<int_t>{},
-        [condition](auto f){ return static_cast<int_t>(condition(f)); }
-    );
-    
-
-    auto num_valid = condition(flags.back()) + indices.back(); // Number of valid fullerenes in the source batch
-    if constexpr (dst_is_queue) dst_batch.resize( num_valid + dst_batch.size()  );
-    auto num_transfer = dst_is_queue ? num_valid : std::min((int_t)num_valid, (int_t)src_batch.size());
-
-    FullereneQueue<float_t, int_t>* queue;
-    if constexpr (dst_is_queue) {queue = &dst_batch;} else {queue = &src_batch;}
-
-
-    auto& queue_front = queue->front_;
-    auto& queue_back = queue->back_;
-    auto& queue_size = queue->size_;
-    auto queue_capacity = queue->capacity();
-
-    if (dst_is_queue && queue_front < 0) { 
-        queue_front = 0; 
-    }
-
-    auto src = FullereneBatchView(src_batch, 0, src_batch.capacity());
-    auto dst = FullereneBatchView(dst_batch, 0, dst_batch.capacity());
-
-    std::for_each(indices.begin(), indices.end(), [&](auto& it){
-        auto index_in_indices = &it - &(*indices.begin());
-        //std::cout << "Index in indices: " << index_in_indices << " Condition: " << boolalpha << condition(flags[index_in_indices]) << " Transfer: " << (dst_is_queue || it < num_transfer) << std::endl;
-        if (condition(flags[index_in_indices]) && (dst_is_queue || it < num_transfer)){ 
-            auto index_in_dst = (dst_is_queue ? (queue_back + it + 1) : index_in_indices) % dst_batch.capacity();
-            auto index_in_src = (dst_is_queue ? index_in_indices : queue_front + it) % src_batch.capacity();
-            decltype(dst[0])::copy(dst[index_in_dst], src[index_in_src]);
-            /* if constexpr(dst_is_queue) {
-                std::cout << "Copying from batch[" << index_in_src << "] to queue[" << index_in_dst << "]\n";
-            } else {
-                std::cout << "Copying from queue[" << index_in_src << "] to batch[" << index_in_dst << "]\n";
-            } */
-            if(replace_status) src.m_.flags_[index_in_src] = consumed_status;
-        }
-    });
-
-    queue_size += dst_is_queue ? (num_transfer) : (-num_transfer);
-    if constexpr(dst_is_queue) { queue_back = (queue_back + num_transfer) % queue_capacity;} else { queue_front = (queue_front + num_transfer) % queue_capacity;}
-    if (queue_size == 0) {queue_front = -1; queue_back = -1;}
-    if (!dst_is_queue) dst_batch.size_ = std::min((int)dst_batch.capacity(), (int)(dst_batch.size() + num_transfer));
-}
-
-template <typename T, typename K>
-Fullerene<T,K> FullereneBatch<T,K>::operator[](size_t index) const{
-    if(index >= capacity_) {
-        std::cout << "Index: " << index << " Size: " << capacity_ << std::endl;
-        throw OOR_ERROR(index, capacity_);}
-    return FullereneBatchView(*this)[index];
 }
 
 template struct SyclVector<int8_t>;
@@ -386,6 +156,7 @@ template struct SyclVector<uint8_t>;
 template struct SyclVector<uint16_t>;
 template struct SyclVector<uint32_t>;
 template struct SyclVector<uint64_t>;
+template struct SyclVector<char>;
 template struct SyclVector<float>;
 template struct SyclVector<double>;
 template struct SyclVector<std::complex<float>>;
@@ -393,6 +164,24 @@ template struct SyclVector<std::complex<double>>;
 template struct SyclVector<std::byte>;
 template struct SyclVector<StatusFlag>;
 template struct SyclVector<bool>;
+// coord3<T> lacks operator==, so explicit struct instantiation would fail when
+// instantiating SyclVector<T>::operator==.  Instantiate only the members used
+// by the codebase (ctor/dtor/resize/reserve/assign/etc.).
+#define INSTANTIATE_SYCLVECTOR_MIN(T) \
+    template SyclVector<T>::SyclVector(size_t); \
+    template SyclVector<T>::SyclVector(size_t, T); \
+    template SyclVector<T>::SyclVector(const SyclVector<T>&); \
+    template SyclVector<T>& SyclVector<T>::operator=(const SyclVector<T>&); \
+    template SyclVector<T>::~SyclVector(); \
+    template void SyclVector<T>::resize(size_t); \
+    template void SyclVector<T>::resize(size_t, T); \
+    template void SyclVector<T>::resize(size_t, size_t, size_t, size_t); \
+    template void SyclVector<T>::reserve(size_t);
+INSTANTIATE_SYCLVECTOR_MIN(coord3<float>)
+INSTANTIATE_SYCLVECTOR_MIN(coord3<double>)
+INSTANTIATE_SYCLVECTOR_MIN(coord2<float>)
+INSTANTIATE_SYCLVECTOR_MIN(coord2<double>)
+#undef INSTANTIATE_SYCLVECTOR_MIN
 template struct SyclVector<std::array<double,2>>;
 template struct SyclVector<std::array<double,3>>;
 template struct SyclVector<std::array<float,2>>;
@@ -410,55 +199,6 @@ template struct SyclVector<std::complex<float>*>;
 template struct SyclVector<std::complex<double>*>;
 template struct SyclVector<int*>;
 template struct SyclVector<size_t*>;
-//template struct SyclVector<NodeNeighbours<uint16_t>>;
-//template struct SyclVector<NodeNeighbours<uint32_t>>;
-//template struct SyclVector<Constants<float,uint16_t>>;
-
-template struct Span<int8_t>;
-template struct Span<int16_t>;
-template struct Span<int32_t>;
-template struct Span<int64_t>;
-template struct Span<uint8_t>;
-template struct Span<uint16_t>;
-template struct Span<uint32_t>;
-template struct Span<uint64_t>;
-template struct Span<float>;
-template struct Span<double>;
-template struct Span<std::byte>;
-template struct Span<StatusFlag>;
-template struct Span<bool>;
-template struct Span<std::array<double,2>>;
-template struct Span<std::array<double,3>>;
-template struct Span<std::array<float,2>>;
-template struct Span<std::array<float,3>>;
-template struct Span<std::array<uint16_t,3>>;
-template struct Span<std::array<uint32_t,3>>;
-template struct Span<std::array<uint16_t,6>>;
-template struct Span<std::array<uint32_t,6>>;
-template struct Span<std::bitset<21>>;
-template struct Span<std::bitset<3>>;
-
-template struct Span<float*>;
-template struct Span<double*>;
-//template struct Span<NodeNeighbours<uint16_t>>;
-//template struct Span<NodeNeighbours<uint32_t>>;
-//template struct Span<Constants<float,uint16_t>>;
-
-
-template struct Fullerene<float,uint16_t>;
-template struct Fullerene<double,uint16_t>;
-template struct Fullerene<float,uint32_t>;
-template struct Fullerene<double,uint32_t>;
-
-template struct FullereneBatch<float,uint16_t>;
-template struct FullereneBatch<double,uint16_t>;
-template struct FullereneBatch<float,uint32_t>;
-template struct FullereneBatch<double,uint32_t>;
-
-template struct FullereneQueue<float,uint16_t>;
-template struct FullereneQueue<double,uint16_t>;
-template struct FullereneQueue<float,uint32_t>;
-template struct FullereneQueue<double,uint32_t>;
 
 template std::ostream& operator<<(std::ostream& os, const SyclVector<float>& vec);
 template std::ostream& operator<<(std::ostream& os, const SyclVector<double>& vec);
@@ -477,75 +217,9 @@ template std::ostream& operator<<(std::ostream& os, const SyclVector<std::array<
 template std::ostream& operator<<(std::ostream& os, const SyclVector<std::array<uint16_t,6>>& vec);
 template std::ostream& operator<<(std::ostream& os, const SyclVector<std::array<uint32_t,6>>& vec);
 
-
-template std::ostream& operator<<(std::ostream& os, const Span<float>& vec);
-template std::ostream& operator<<(std::ostream& os, const Span<double>& vec);
-template std::ostream& operator<<(std::ostream& os, const Span<uint16_t>& vec);
-template std::ostream& operator<<(std::ostream& os, const Span<uint32_t>& vec);
-
-template std::ostream& operator<<(std::ostream& os, const Span<int>& vec);
-template std::ostream& operator<<(std::ostream& os, const Span<size_t>& vec);
-template std::ostream& operator<<(std::ostream& os, const Span<StatusFlag>& vec);
-template std::ostream& operator<<(std::ostream& os, const Span<bool>& vec);
-template std::ostream& operator<<(std::ostream& os, const Span<std::array<double,2>>& vec);
-template std::ostream& operator<<(std::ostream& os, const Span<std::array<double,3>>& vec);
-template std::ostream& operator<<(std::ostream& os, const Span<std::array<float,2>>& vec);
-template std::ostream& operator<<(std::ostream& os, const Span<std::array<float,3>>& vec);
-template std::ostream& operator<<(std::ostream& os, const Span<std::array<uint16_t,3>>& vec);
-template std::ostream& operator<<(std::ostream& os, const Span<std::array<uint32_t,3>>& vec);
-template std::ostream& operator<<(std::ostream& os, const Span<std::array<uint16_t,6>>& vec);
-template std::ostream& operator<<(std::ostream& os, const Span<std::array<uint32_t,6>>& vec);
-
-template std::ostream& operator<<(std::ostream& os, const Fullerene<float,uint16_t>& vec);
-template std::ostream& operator<<(std::ostream& os, const Fullerene<double,uint16_t>& vec);
-template std::ostream& operator<<(std::ostream& os, const Fullerene<float,uint32_t>& vec);
-template std::ostream& operator<<(std::ostream& os, const Fullerene<double,uint32_t>& vec);
-
-template std::ostream& operator<<(std::ostream& os, const FullereneBatch<float,uint16_t>& vec);
-template std::ostream& operator<<(std::ostream& os, const FullereneBatch<double,uint16_t>& vec);
-template std::ostream& operator<<(std::ostream& os, const FullereneBatch<float,uint32_t>& vec);
-template std::ostream& operator<<(std::ostream& os, const FullereneBatch<double,uint32_t>& vec);
-
-template std::ostream& operator<<(std::ostream& os, const FullereneBatchView<float,uint16_t>& vec);
-template std::ostream& operator<<(std::ostream& os, const FullereneBatchView<double,uint16_t>& vec);
-template std::ostream& operator<<(std::ostream& os, const FullereneBatchView<float,uint32_t>& vec);
-template std::ostream& operator<<(std::ostream& os, const FullereneBatchView<double,uint32_t>& vec);
-
 template std::ostream& operator<<(std::ostream& os, const ReferenceWrapper<int>& ref);
 template std::ostream& operator<<(std::ostream& os, const ReferenceWrapper<size_t>& ref);
 template std::ostream& operator<<(std::ostream& os, const ReferenceWrapper<float>& ref);
 template std::ostream& operator<<(std::ostream& os, const ReferenceWrapper<double>& ref);
 template std::ostream& operator<<(std::ostream& os, const ReferenceWrapper<uint16_t>& ref);
 template std::ostream& operator<<(std::ostream& os, const ReferenceWrapper<StatusFlag>& ref);
-
-
-
-template void QueueUtil::push(SyclQueue& Q, FullereneQueue<float,uint16_t>& dst_queue, FullereneBatch<float,uint16_t>& src_batch, ConditionFunctor transfer_cond, StatusEnum consumed_status);
-template void QueueUtil::push(SyclQueue& Q, FullereneBatch<float,uint16_t>& dst_batch, FullereneQueue<float,uint16_t>& src_queue, ConditionFunctor transfer_cond, StatusEnum consumed_status);
-template void QueueUtil::push(SyclQueue& Q, FullereneQueue<float,uint32_t>& dst_queue, FullereneBatch<float,uint32_t>& src_batch, ConditionFunctor transfer_cond, StatusEnum consumed_status);
-template void QueueUtil::push(SyclQueue& Q, FullereneBatch<float,uint32_t>& dst_batch, FullereneQueue<float,uint32_t>& src_queue, ConditionFunctor transfer_cond, StatusEnum consumed_status);
-template void QueueUtil::push(SyclQueue& Q, FullereneQueue<double,uint16_t>& dst_queue, FullereneBatch<double,uint16_t>& src_batch, ConditionFunctor transfer_cond, StatusEnum consumed_status);
-template void QueueUtil::push(SyclQueue& Q, FullereneBatch<double,uint16_t>& dst_batch, FullereneQueue<double,uint16_t>& src_queue, ConditionFunctor transfer_cond, StatusEnum consumed_status);
-template void QueueUtil::push(SyclQueue& Q, FullereneQueue<double,uint32_t>& dst_queue, FullereneBatch<double,uint32_t>& src_batch, ConditionFunctor transfer_cond, StatusEnum consumed_status);
-template void QueueUtil::push(SyclQueue& Q, FullereneBatch<double,uint32_t>& dst_batch, FullereneQueue<double,uint32_t>& src_queue, ConditionFunctor transfer_cond, StatusEnum consumed_status);
-//template void push_impl (SyclQueue& Q, FullereneQueue<float,uint16_t>& dst_queue, FullereneBatch<float,uint16_t>& src_batch, ConditionFunctor condition);
-
-template void FullereneBatch<float, uint16_t>::push_back(const Fullerene<float, uint16_t>&, const int);
-template void FullereneBatch<float, uint16_t>::push_back(const Fullerene<double, uint16_t>&, const int);
-template void FullereneBatch<float, uint16_t>::push_back(const Fullerene<float, uint32_t>&, const int);
-template void FullereneBatch<float, uint16_t>::push_back(const Fullerene<double, uint32_t>&, const int);
-
-template void FullereneBatch<float, uint32_t>::push_back(const Fullerene<float, uint16_t>&, const int);
-template void FullereneBatch<float, uint32_t>::push_back(const Fullerene<double, uint16_t>&, const int);
-template void FullereneBatch<float, uint32_t>::push_back(const Fullerene<float, uint32_t>&, const int);
-template void FullereneBatch<float, uint32_t>::push_back(const Fullerene<double, uint32_t>&, const int);
-
-template void FullereneBatch<double, uint16_t>::push_back(const Fullerene<float, uint16_t>&, const int);
-template void FullereneBatch<double, uint16_t>::push_back(const Fullerene<double, uint16_t>&, const int);
-template void FullereneBatch<double, uint16_t>::push_back(const Fullerene<float, uint32_t>&, const int);
-template void FullereneBatch<double, uint16_t>::push_back(const Fullerene<double, uint32_t>&, const int);
-
-template void FullereneBatch<double, uint32_t>::push_back(const Fullerene<float, uint16_t>&, const int);
-template void FullereneBatch<double, uint32_t>::push_back(const Fullerene<double, uint16_t>&, const int);
-template void FullereneBatch<double, uint32_t>::push_back(const Fullerene<float, uint32_t>&, const int);
-template void FullereneBatch<double, uint32_t>::push_back(const Fullerene<double, uint32_t>&, const int);

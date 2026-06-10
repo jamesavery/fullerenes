@@ -1,66 +1,57 @@
 #pragma once
-#include <cassert>
-#include <iterator>
+#include <span>
+#include <ostream>
 #include <array>
+#include <algorithm>
+#include <limits>
+#include <cmath>
+#include <type_traits>
+#include <cstddef>
+
+// Reinterpret-cast a std::span<T> as a std::span<U>.
+template <typename U, typename T>
+constexpr std::span<U> as_span(std::span<T> s) {
+    return std::span<U>(reinterpret_cast<U*>(s.data()),
+                        (s.size() * sizeof(T)) / sizeof(U));
+}
+
+// Forward-declare the generic std::array stream operator (defined in sycl-util-impl.cc)
+// so the span operator<< below can stream arrays of arrays: under strict two-phase
+// lookup the os<<element call binds at this template's definition, and std::array's
+// only associated namespace is std, so this global overload must be visible here.
+template <typename U, std::size_t N>
+constexpr std::ostream& operator<<(std::ostream& os, const std::array<U,N>& a);
 
 template <typename T>
-struct is_std_array : std::false_type {};
-
-template <typename T, std::size_t N>
-struct is_std_array<std::array<T, N>> : std::true_type {};
-
-template <typename T>
-struct Span
-{   
-    using value_type = T;
-    using pointer = T*;
-    using size_t = std::size_t;
-    inline constexpr Span() : data_(nullptr), size_(0) {}
-    inline constexpr Span(T *data, size_t size) : data_(data), size_(size) {}
-    inline constexpr Span(T *begin, T *end) : data_(begin), size_(std::distance(begin, end)) {}
-    inline constexpr Span(const Span<T> &other) = default;
-    inline constexpr Span(Span<T> &&other) = default;
-    inline constexpr Span(const Span<T>& other, size_t offset) : data_(other.data_ + offset), size_(other.size_ - offset) {}
-    inline constexpr Span(Span<T>&& other, size_t offset) : data_(other.data_ + offset), size_(other.size_ - offset) {}
-    inline constexpr Span(T& value) : data_(&value), size_(1) {}
-    
-    template <typename U>
-    inline constexpr Span<U> as_span() const {
-        return Span<U>(reinterpret_cast<U*>(data_), (sizeof(T) * size_ / sizeof(U)) );
+inline std::ostream& operator<<(std::ostream& os, std::span<T> v) {
+    os << "[";
+    for (std::size_t i = 0; i < v.size(); ++i) {
+        os << v[i];
+        if (i + 1 < v.size()) os << ", ";
     }
-
-    inline constexpr Span<T> subspan(size_t offset) const { assert(size_ - offset >= 0); return Span<T>(data_ + offset, size_ - offset); }
-    inline constexpr Span<T> subspan(size_t offset, size_t count) const { assert(offset + count <= size_);  return Span<T>(data_ + offset, count); }
-    inline constexpr Span<T>& operator= (const Span<T> &other) { data_ = other.data_; size_ = other.size_; return *this; }
-    inline constexpr Span<T>& operator= (Span<T> &&other) { return *this = other; }
-    inline bool operator==(const Span<T> other) const;
-    inline constexpr T &operator[](size_t index) const {assert(index < size_); assert(data_); return data_[index];}
-    inline constexpr T &at(size_t index) const{assert(index < size_); assert(data_); return data_[index];}
-    inline constexpr T *data() const { return data_; }
-    inline constexpr size_t size() const { return size_; }
-    inline constexpr bool empty() const { return size_ == 0; }
-    inline constexpr size_t size_bytes() const { return size_ * sizeof(T); }
-    inline constexpr T *begin() const { return data_; }
-    inline constexpr T *end() const { return data_ + size_; }
-    inline constexpr T &front() const { return data_[0]; }
-    inline constexpr T &back() const { return data_[size_ - 1]; }
-    template <typename U>
-    friend std::ostream &operator<<(std::ostream &os, const Span<U> &vec);
-    
-private:
-    T *data_;
-    size_t size_;
-};
+    os << "]";
+    return os;
+}
 
 template <typename T>
-Span(T*, typename Span<T>::size_t) -> Span<T>;
+inline bool span_fuzzy_equal(std::span<T> a, std::span<T> b) {
+    if (a.size() != b.size()) return false;
+    if (a.data() == b.data()) return true;
+    if constexpr (std::is_floating_point_v<std::decay_t<T>>) {
+        return std::equal(a.begin(), a.end(), b.begin(), [](const auto& x, const auto& y) {
+            T eps = std::numeric_limits<T>::epsilon() * 20;
+            T max_v = std::max(std::abs(x), std::abs(y));
+            return std::abs(x - y) / (max_v > eps ? max_v : 1) < eps;
+        });
+    } else {
+        return std::equal(a.begin(), a.end(), b.begin());
+    }
+}
 
+// std::span does not define operator==; provide a fuzzy-element comparison
+// so legacy code that compared SyclVector/FullereneData members through
+// spans keeps working.
 template <typename T>
-Span(T*, std::size_t) -> Span<T>;
-
-template <typename T>
-Span(T*, T*) -> Span<T>;
-
-template <typename T>
-Span(T&) -> Span<T>;
-
+inline bool operator==(std::span<T> a, std::span<T> b) {
+    return span_fuzzy_equal(a, b);
+}

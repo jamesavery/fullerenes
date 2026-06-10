@@ -2,6 +2,16 @@ add_executable(gc-transform-test gc-transform-test.cc)
 target_link_libraries(gc-transform-test fullerenes GTest::GTest GTest::Main)
 add_test(NAME gc-transform-test COMMAND gc-transform-test)
 
+add_executable(surface-geodesics-test surface-geodesics-test.cc)
+target_link_libraries(surface-geodesics-test fullerenes buckygen GTest::GTest GTest::Main)
+add_test(NAME surface-geodesics-test COMMAND surface-geodesics-test)
+
+# Standalone (no GTest): stresses BuckyGen child-process teardown; exit 0 = pass,
+# 1 = assertion, 2 = watchdog timeout. CLI-tunable for heavy manual runs.
+add_executable(buckygen-stress-test buckygen-stress-test.cc)
+target_link_libraries(buckygen-stress-test fullerenes buckygen)
+add_test(NAME buckygen-stress-test COMMAND buckygen-stress-test)
+
 add_executable(spiral-roundtrip-test spiral-roundtrip-test.cc)
 target_link_libraries(spiral-roundtrip-test fullerenes GTest::GTest GTest::Main)
 add_test(NAME spiral-roundtrip-test COMMAND spiral-roundtrip-test)
@@ -54,7 +64,13 @@ target_link_libraries(dense-graph-test fullerenes GTest::GTest GTest::Main)
 add_test(NAME dense-graph-test COMMAND dense-graph-test)
 
 add_executable(view-test view-test.cc)
-target_link_libraries(view-test fullerenes GTest::GTest GTest::Main)
+# The view/batch layer is header-only (std::vector fallback when SYCL is off),
+# so view-test only needs the SYCL runtime lib in a SYCL build.
+if(ENABLE_SYCL)
+  target_link_libraries(view-test fullerenes sycl_fullerene_lib GTest::GTest GTest::Main)
+else()
+  target_link_libraries(view-test fullerenes GTest::GTest GTest::Main)
+endif()
 add_test(NAME view-test COMMAND view-test)
 
 add_executable(delaunay-test delaunay-test.cc)
@@ -64,3 +80,7 @@ add_test(NAME delaunay-test COMMAND delaunay-test)
 add_executable(extract-graph extract_graph.cc)
 target_link_libraries(extract-graph fullerenes)
 target_compile_definitions(extract-graph PRIVATE FULLERENE_ROOT="${CMAKE_SOURCE_DIR}")
+
+add_executable(planargraph-ascii-test planargraph-ascii-test.cc)
+target_link_libraries(planargraph-ascii-test fullerenes GTest::GTest GTest::Main)
+add_test(NAME planargraph-ascii-test COMMAND planargraph-ascii-test)

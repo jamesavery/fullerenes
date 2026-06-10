@@ -1,11 +1,13 @@
 #include "fullerenes/planargraph.hh"
 #include "fullerenes/polyhedron.hh"
 #include <stdio.h>
+#include <cctype>
+#include <stdexcept>
 
 //////////////////////////// FORMAT MULTIPLEXING ////////////////////////////
-vector<string> PlanarGraph::formats{{"ascii","planarcode","xyz","mol2","mathematica","latex","spiral"}};
-vector<string> PlanarGraph::input_formats{{"planarcode","xyz","mol2","spiral"}}; // TODO: Add ASCII
-vector<string> PlanarGraph::output_formats{{"ascii","planarcode","spiral"}}; // TODO: Add LaTeX, Mathematica
+vector<string> PlanarGraph::formats{"ascii","planarcode","xyz","mol2","mathematica","latex","spiral"};
+vector<string> PlanarGraph::input_formats{"planarcode","xyz","mol2","spiral"}; // TODO: Add ASCII
+vector<string> PlanarGraph::output_formats{"ascii","planarcode","spiral"}; // TODO: Add LaTeX, Mathematica
  
 int PlanarGraph::format_id(string name)
 {
@@ -223,6 +225,87 @@ bool PlanarGraph::to_mathematica(const PlanarGraph &G, FILE *file)
 }
 
 ////////////////////////////// INPUT ROUTINES //////////////////////////////
+
+PlanarGraph PlanarGraph::from_ascii(FILE *file)
+{
+  // Inverse of to_ascii. Reads one neighbour-list record of the form
+  //
+  //   [[a,b,c,...],[a,b,c,...],...]
+  //
+  // from the current stream position. Whitespace is tolerated between
+  // tokens (the writer emits none, but a human-edited file may have it).
+  // Reads up to and including the matching outer ']'; subsequent
+  // characters (newline, separator, EOF) are left in the stream so a
+  // caller may iterate multiple records.
+  //
+  // Throws std::runtime_error on EOF before the record, on unterminated
+  // input, or on a parse failure.
+
+  // 1) Consume the record into a buffer by counting bracket balance.
+  std::string buf;
+  int balance = 0;
+  bool started = false;
+  for (int c; (c = fgetc(file)) != EOF; ) {
+    if (!started) {
+      if (std::isspace(c)) continue;
+      if (c != '[') {
+        throw std::runtime_error(
+          std::string("PlanarGraph::from_ascii: expected '[', got '") +
+          char(c) + "'");
+      }
+      started = true;
+      balance = 1;
+      buf.push_back(char(c));
+      continue;
+    }
+    buf.push_back(char(c));
+    if      (c == '[') balance++;
+    else if (c == ']') { if (--balance == 0) break; }
+  }
+  if (!started)     throw std::runtime_error("PlanarGraph::from_ascii: EOF before record");
+  if (balance != 0) throw std::runtime_error("PlanarGraph::from_ascii: unterminated record");
+
+  // 2) Parse the buffered string.
+  std::vector<std::vector<node_t>> adj;
+  size_t i = 1;  // skip outer '['
+  auto skip_ws = [&](){ while (i < buf.size() && std::isspace((unsigned char)buf[i])) i++; };
+
+  skip_ws();
+  if (i < buf.size() && buf[i] != ']') {
+    while (true) {
+      skip_ws();
+      if (i >= buf.size() || buf[i] != '[')
+        throw std::runtime_error("PlanarGraph::from_ascii: expected '[' for row");
+      i++;
+      std::vector<node_t> row;
+      skip_ws();
+      if (i < buf.size() && buf[i] != ']') {
+        while (true) {
+          skip_ws();
+          size_t j = i;
+          if (j < buf.size() && (buf[j] == '-' || buf[j] == '+')) j++;
+          if (j >= buf.size() || !std::isdigit((unsigned char)buf[j]))
+            throw std::runtime_error("PlanarGraph::from_ascii: expected integer in row");
+          while (j < buf.size() && std::isdigit((unsigned char)buf[j])) j++;
+          row.push_back(node_t(std::stol(buf.substr(i, j - i))));
+          i = j;
+          skip_ws();
+          if (i < buf.size() && buf[i] == ',') { i++; continue; }
+          if (i < buf.size() && buf[i] == ']') break;
+          throw std::runtime_error("PlanarGraph::from_ascii: expected ',' or ']' in row");
+        }
+      }
+      i++;  // consume row's ']'
+      adj.push_back(std::move(row));
+      skip_ws();
+      if (i < buf.size() && buf[i] == ',') { i++; continue; }
+      if (i < buf.size() && buf[i] == ']') break;
+      throw std::runtime_error("PlanarGraph::from_ascii: expected ',' or ']' between rows");
+    }
+  }
+
+  return PlanarGraph(Graph(Spanify::OwnedDenseGraph<node_t>(adj)));
+}
 
 PlanarGraph PlanarGraph::from_spiral(FILE *f, const size_t index)  {
   // TODO: Make general! Autodetect fullerene, triangulation, cubic, etc.

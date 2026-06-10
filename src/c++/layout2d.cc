@@ -17,7 +17,7 @@ namespace layout2d {
 // this produces a consistent planar embedding.
 //
 // Returns true if the graph is planar, false otherwise.
-bool planar_orient(Graph& G)
+bool planar_orient(GraphView& G)
 {
   const int N = G.N;
   if(N == 0) return true;
@@ -40,7 +40,7 @@ bool planar_orient(Graph& G)
   return G.is_consistently_oriented();
 }
 
-void orient_neighbours(Graph& G, const vector<coord2d>& layout)
+void orient_neighbours(GraphView& G, const vector<coord2d>& layout)
 {
   for(node_t u=0;u<G.N;u++){
     auto ns = G[u];
@@ -51,7 +51,7 @@ void orient_neighbours(Graph& G, const vector<coord2d>& layout)
   }
 }
 
-bool layout_is_crossingfree(const PlanarGraph& G, const vector<coord2d>& layout)
+bool layout_is_crossingfree(const PlanarGraphView& G, const vector<coord2d>& layout)
 {
   assert(layout.size() == G.N);
   vector<edge_t> es = G.undirected_edges();
@@ -80,7 +80,7 @@ bool layout_is_crossingfree(const PlanarGraph& G, const vector<coord2d>& layout)
 }
 
 
-face_t find_outer_face(const PlanarGraph& G, const vector<coord2d>& layout)
+face_t find_outer_face(const PlanarGraphView& G, const vector<coord2d>& layout)
 {
   assert(layout.size() == G.N);
 
@@ -114,7 +114,7 @@ face_t find_outer_face(const PlanarGraph& G, const vector<coord2d>& layout)
   return outer_face;
 }
 
-vector<double> edge_lengths(const PlanarGraph& G, const vector<coord2d>& layout)
+vector<double> edge_lengths(const PlanarGraphView& G, const vector<coord2d>& layout)
 {
   assert(layout.size() == G.N);
   vector<edge_t> edges = G.undirected_edges();
@@ -149,7 +149,7 @@ void move(vector<coord2d>& layout, const coord2d& x) {
 }
 
 
-vector<coord2d> spherical_projection(const PlanarGraph& G, const vector<coord2d>& layout)
+vector<coord2d> spherical_projection(const PlanarGraphView& G, const vector<coord2d>& layout)
 {
   face_t outer_face_nodes = find_outer_face(G, layout);
   vector<int> vertex_depth(G.multiple_source_shortest_paths(outer_face_nodes));
@@ -189,7 +189,7 @@ vector<coord2d> spherical_projection(const PlanarGraph& G, const vector<coord2d>
 }
 
 
-string to_latex(const PlanarGraph& G, const vector<coord2d>& layout,
+string to_latex(const PlanarGraphView& G, const vector<coord2d>& layout,
                 double w_cm, double h_cm, bool show_dual, bool print_numbers, bool include_latex_header,
                 int edge_colour, int path_colour, int vertex_colour,
                 double edge_width, double path_width, double vertex_diameter,
@@ -285,7 +285,7 @@ string to_latex(const PlanarGraph& G, const vector<coord2d>& layout,
 #define byte1(x) (((x)>>8)&0xff)
 #define byte2(x) (((x)>>16)&0xff)
 
-string to_povray(const PlanarGraph& G, const vector<coord2d>& layout,
+string to_povray(const PlanarGraphView& G, const vector<coord2d>& layout,
                  double w_cm, double h_cm,
                  int edge_colour, int vertex_colour, double edge_width, double vertex_diameter)
 {
@@ -328,7 +328,7 @@ string to_povray(const PlanarGraph& G, const vector<coord2d>& layout,
 
 struct optlayout_params_t
 {
-  PlanarGraph *graph;
+  PlanarGraphView *graph;
   face_t outer_face;
   vector<double> *zero_values_dist;
   vector<double> *k_dist;
@@ -340,7 +340,7 @@ struct optlayout_params_t
 static double optlayout_pot(const gsl_vector* coordinates, void* parameters)
 {
   optlayout_params_t &params = *static_cast<optlayout_params_t*>(parameters);
-  PlanarGraph &graph = *params.graph;
+  PlanarGraphView &graph = *params.graph;
   const face_t &outer_face = params.outer_face;
   vector<double> &zero_values_dist = *params.zero_values_dist;
   vector<double> &k_dist = *params.k_dist;
@@ -442,7 +442,7 @@ static double optlayout_pot(const gsl_vector* coordinates, void* parameters)
 static void optlayout_grad(const gsl_vector* coordinates, void* parameters, gsl_vector* gradient)
 {
   optlayout_params_t &params = *static_cast<optlayout_params_t*>(parameters);
-  PlanarGraph &graph = *params.graph;
+  PlanarGraphView &graph = *params.graph;
   const face_t &outer_face = params.outer_face;
   vector<double> &zero_values_dist = *params.zero_values_dist;
   vector<double> &k_dist = *params.k_dist;
@@ -567,7 +567,7 @@ static void optlayout_pot_grad(const gsl_vector* coordinates, void* parameters, 
 }
 
 
-bool optimize_layout(PlanarGraph& G, vector<coord2d>& layout,
+bool optimize_layout(PlanarGraphView& G, vector<coord2d>& layout,
                      double zv_dist_inp, double k_dist_inp, double k_angle_inp, double k_area_inp)
 {
   if(layout.size()!=G.N){
@@ -632,7 +632,7 @@ bool optimize_layout(PlanarGraph& G, vector<coord2d>& layout,
 }
 
 #else
-bool optimize_layout(PlanarGraph& G, vector<coord2d>& layout,
+bool optimize_layout(PlanarGraphView& G, vector<coord2d>& layout,
                      double, double, double, double){
   cerr << "Optimizing layouts is only available through GSL." << endl;
   return 0;

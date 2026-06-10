@@ -1,506 +1,214 @@
-#include <fullerenes/kernel-headers/all-kernels.hh>
-#include <fullerenes/buckygen-wrapper.hh>
-#include <fullerenes/isomerdb.hh>
-#include <numeric>
+// Tests for the new low-level batch types: batch::Batch<V>,
+// batch::BatchState, batch::BatchQueue<V> and the queue_push transfer
+// helpers. Replaces the legacy FullereneBatch/FullereneQueue test suite.
+
 #include <gtest/gtest.h>
+#include <fullerenes/buckygen-wrapper.hh>
+#include <fullerenes/graph.hh>
+#include <fullerenes/dense_graph.hh>
+#include <fullerenes/batch/batch.hh>
+#include <fullerenes/batch/batch_state.hh>
+#include <fullerenes/batch/batch_queue.hh>
+#include <fullerenes/batch/utilities.hh>
+#include <fullerenes/sycl-headers/sycl-status-enum.hh>
+
+#include <array>
+#include <cstdint>
+#include <cstdlib>
+#include <unistd.h>
+#include <signal.h>
+#include <sys/types.h>
+
+// Initialize SYCL runtime early so that Batch/Queue (which uses SyclVector
+// storage when FULLERENES_ENABLE_SYCL is defined) lazy-init does not leave
+// subsystems half-brought-up, which otherwise causes a hang at global
+// destructor teardown in this test binary.
+#include <fullerenes/kernel-headers/all-kernels.hh>
 
 namespace {
 
-bool same_neighbours(const neighbours_t& lhs, const neighbours_t& rhs) {
-    if (lhs.size() != rhs.size()) {
-        return false;
-    }
-    for (node_t u = 0; u < lhs.size(); ++u) {
-        if (lhs[u].size() != rhs[u].size()) {
-            return false;
-        }
-        if (!std::equal(lhs[u].begin(), lhs[u].end(), rhs[u].begin())) {
-            return false;
-        }
-    }
-    return true;
-}
+using K = uint16_t;
+using RSR = Spanify::RSRAdjacencyView<K>;
 
-}
-
-
-class PushBackTest : public ::testing::TestWithParam<int> {
+class BatchFixture : public ::testing::TestWithParam<int> {
 protected:
-    using Fullerene = Fullerene<float, uint16_t>;
-    using FullereneBatch = FullereneBatch<float, uint16_t>;
-    using FullereneQueue = FullereneQueue<float, uint16_t>;
-    using FullereneBatchView = FullereneBatchView<float, uint16_t>;
-    
-    int N = GetParam();
-    int n_max_isomers = IsomerDB::number_isomers(N);
-    Graph G{node_t(N), GRAPH_DMAX};
-    FullereneBatch batch = FullereneBatch(N, std::min(1,n_max_isomers));
-    FullereneQueue queue = FullereneQueue(N, std::min(1,n_max_isomers));
-
-    BuckyGen::buckygen_queue BQ = BuckyGen::start(N, false, false);
-    SyclQueue Q = SyclQueue(Device::get_devices(DeviceType::GPU)[0]);
-    void SetUp() override {
-        BuckyGen::next_fullerene(BQ, G);
-    }
-
-    void TearDown() override {
-        //BuckyGen::stop(BQ);
-    }
-};
-
-class FullereneTest : public PushBackTest {
-    void SetUp() override {
-        PushBackTest::SetUp();
-        batch.push_back(G, 0);
-        queue.push_back(G, 0);
-    }
-};
-
-class FullereneBatchTest : public PushBackTest {};
-
-class FullereneQueueTest : public PushBackTest {};
-
-class FullereneBatchViewTest : public PushBackTest {
-
-    void SetUp() override {
-        BuckyGen::buckygen_queue BQ;
-        BQ = BuckyGen::start(N, false, false);
-        auto n_resize = std::min(40, n_max_isomers);
-        for (int i = 0; i < n_resize; i++) {
+    int N  = GetParam();
+    int Nf = N/2 + 2;
+    static Graph& shared_graph(int N) {
+        static Graph G(N/2 + 2, GRAPH_DMAX);
+        static bool initialized = false;
+        if (!initialized) {
+            auto BQ = BuckyGen::start(N, false, false);
             BuckyGen::next_fullerene(BQ, G);
-            batch.push_back(G, i);
+            BuckyGen::stop(BQ);
+            initialized = true;
         }
+        return G;
     }
-
-    void TearDown() override {
-        BuckyGen::stop(BQ);
-    }
+    Graph& G = shared_graph(N);
 };
 
-class FullereneFixture : public ::testing::Test {
-protected:
-    using Fullerene = Fullerene<float, uint16_t>;
-    using FullereneBatch = FullereneBatch<float, uint16_t>;
-    using FullereneQueue = FullereneQueue<float, uint16_t>;
-    using FullereneBatchView = FullereneBatchView<float, uint16_t>;
-};
+TEST_P(BatchFixture, BatchConstructAndPush) {
+    batch::Batch<RSR> b(Nf, /*capacity*/3, /*dmax*/6);
+    EXPECT_EQ(b.size(), 0);
+    EXPECT_EQ(b.capacity(), 3);
+    EXPECT_EQ(b.N(), Nf);
+    EXPECT_EQ(b.dmax(), 6);
 
-TEST_P(PushBackTest, PushGraphFromBuckygenToFullereneBatch) {
-    batch.push_back(G, 0);
-    Graph G_batch(batch[0]);
-    // Assert that the data is correctly transferred from Buckygen to batch and back
-    EXPECT_TRUE(same_neighbours(static_cast<const neighbours_t&>(G_batch), static_cast<const neighbours_t&>(G)));
+    batch::push_back(b, G);
+    EXPECT_EQ(b.size(), 1);
+
+    auto v = b.view()[0];
+    auto& adj = std::get<0>(v.to_tuple());
+    EXPECT_EQ(int(adj[0]), G.nbrs(0)[0]);
 }
 
-TEST_P(PushBackTest, PushGraphFromBuckygenToFullereneQueue) {
-    queue.push_back(G, 0);
-    Graph G_queue(queue.front());
-    // Assert that the data is correctly transferred from Buckygen to queue and back
-    EXPECT_TRUE(same_neighbours(static_cast<const neighbours_t&>(G_queue), static_cast<const neighbours_t&>(G)));
+TEST_P(BatchFixture, BatchClear) {
+    batch::Batch<RSR> b(Nf, 5, 6);
+    batch::push_back(b, G);
+    batch::push_back(b, G);
+    EXPECT_EQ(b.size(), 2);
+    b.clear();
+    EXPECT_EQ(b.size(), 0);
+    EXPECT_EQ(b.capacity(), 5);
 }
 
-TEST_P(PushBackTest, PushMoreGraphsThanOriginalCapacityOfBatch) {
-    batch.push_back(G, 0);
-    batch.push_back(G, 1);
-    batch.push_back(G, 2);
-    // Assert that the batch is full
-    EXPECT_EQ(batch.size(), 3);
+TEST_P(BatchFixture, BatchStateBasics) {
+    batch::BatchState s(4);
+    EXPECT_EQ(s.size(), 0);
+    EXPECT_EQ(s.capacity(), 4);
+    s.push_back(7, StatusFlag(int(StatusEnum::DUAL_INITIALIZED)), 3, -1);
+    EXPECT_EQ(s.size(), 1);
+    auto sv = s.view();
+    EXPECT_EQ(int(sv.id[0]), 7);
+    EXPECT_EQ(int(sv.iteration[0]), 3);
+    EXPECT_TRUE(sv.status[0].is_set(StatusEnum::DUAL_INITIALIZED));
+
+    s.write_slot(2, 99,
+                 StatusFlag(int(StatusEnum::FULLERENEGRAPH_PREPARED)), 11);
+    uint64_t id; StatusFlag f; int32_t it;
+    s.read_slot(2, id, f, it);
+    EXPECT_EQ(int(id), 99);
+    EXPECT_EQ(int(it), 11);
+    EXPECT_TRUE(f.is_set(StatusEnum::FULLERENEGRAPH_PREPARED));
 }
 
-TEST_P(FullereneTest, CopyAssignment) {
-    auto fullerene = batch[0];
-    EXPECT_EQ(fullerene.N_, N);
-    EXPECT_EQ(fullerene.Nf_, N/2 + 2);
-    auto view1 = FullereneBatchView(batch, 0, 1);
-    EXPECT_EQ(fullerene.d_, view1.d_);
-    EXPECT_EQ(fullerene.m_.flags_, view1.m_.flags_[0]);
-    EXPECT_EQ(fullerene.m_.iterations_, view1.m_.iterations_[0]);
-    EXPECT_EQ(fullerene.m_.ID_, view1.m_.ID_[0]);
-    EXPECT_EQ(fullerene.m_.iterations_, view1.m_.iterations_[0]);
-}
+TEST_P(BatchFixture, BatchQueuePushPopOrder) {
+    batch::BatchQueue<RSR> q(Nf, /*capacity*/4, /*dmax*/6);
+    EXPECT_TRUE(q.empty());
 
-TEST_P(FullereneTest, EqualityOperator) {
-    auto fullerene1 = batch[0];
-    auto fullerene2 = queue[0];
-    EXPECT_EQ(fullerene1 , fullerene2);
-}
+    for (int i = 0; i < 4; ++i)
+        batch::push_back(q, G, uint64_t(100 + i),
+                         StatusFlag(int(StatusEnum::DUAL_INITIALIZED)),
+                         int32_t(i));
+    EXPECT_EQ(q.size(), 4);
+    EXPECT_EQ(q.front_index(), 0);
+    EXPECT_EQ(q.back_index(),  3);
 
-TEST_P(FullereneTest, CopyMethod) {
-    auto fullerene = batch[0];
-    auto fullerene_copy = fullerene;
-    EXPECT_EQ(fullerene_copy, fullerene);
-}
-
-TEST_P(FullereneTest, CopyConstructor) {
-    Fullerene fullerene_copy(batch[0]);
-    EXPECT_EQ(fullerene_copy, batch[0]);
-}
-
-TEST_P(FullereneTest, CopyAssignmentOperator) {
-    Fullerene fullerene = batch[0];
-    EXPECT_EQ(fullerene, batch[0]);
-}
-
-TEST_P(FullereneTest, CopyAssignmentOperatorFromGraph) {
-    Fullerene fullerene = batch[0];
-    EXPECT_EQ(fullerene, batch[0]);
-    fullerene = G;
-    EXPECT_EQ(fullerene, batch[0]);
-}
-
-TEST_P(FullereneTest, CopyAssignmentOperatorFromPolyhedron) {
-    FullereneDual dual(G);
-    PlanarGraph PG = dual.dual_graph();
-    Polyhedron P(PG);
-    P.points = P.zero_order_geometry();
-    P.optimize();
-    FullereneBatch batch1(N, 1);
-    batch1.push_back(P);
-    EXPECT_FLOAT_EQ(((Polyhedron)batch1[0]).volume_divergence(), P.volume_divergence());
-}
-
-// Test FullereneBatch class
-TEST_P(FullereneBatchTest, Constructor) {
-    FullereneBatch test_batch(N, 1);
-    EXPECT_EQ(test_batch.size(), 0);
-    EXPECT_EQ(test_batch.capacity(), 1);
-}
-
-TEST_P(FullereneBatchTest, PushBack) {
-    FullereneBatch batch(N, 5);
-    batch.push_back(G);
-    EXPECT_EQ(batch.size(), 1);
-    EXPECT_EQ(batch.capacity(), 5);
-}
-
-TEST_P(FullereneBatchTest, Resize) {
-    FullereneBatch batch(N, 5);
-    batch.resize(10);
-    EXPECT_EQ(batch.size(), 0);
-    EXPECT_EQ(batch.capacity(), 10);
-}
-
-TEST_P(FullereneBatchTest, IndexOperator) {
-    FullereneBatch batch(N, 5);
-    batch.push_back(G);
-    Fullerene fullerene = batch[0];
-    Graph G_batch(fullerene);
-    EXPECT_EQ(fullerene.N_, N);
-    EXPECT_TRUE(same_neighbours(static_cast<const neighbours_t&>(G_batch), static_cast<const neighbours_t&>(G)));
-}
-
-TEST_P(FullereneBatchTest, EqualityOperator) {
-    FullereneBatch batch1(N, 1);
-    FullereneBatch batch2(N, 1);
-    batch1.push_back(G);
-    batch2.push_back(G);
-    auto batch1_view = (FullereneBatchView)batch1;
-    auto batch2_view = (FullereneBatchView)batch2;
-
-    EXPECT_EQ(batch1, batch2);
-    EXPECT_EQ(batch1_view, batch2_view);
-}
-
-// Test FullereneQueue class
-TEST_P(FullereneQueueTest, Constructor) {
-    FullereneQueue queue;
-    EXPECT_EQ(queue.size(), 0);
-    EXPECT_EQ(queue.capacity(), 0);
-}
-
-TEST_P(FullereneQueueTest, AssignmentOperator) {
-    FullereneQueue queue1(N, 1);
-    queue1.push_back(G);
-    FullereneQueue queue2 = queue1;
-    EXPECT_EQ(queue1, queue2);
-}
-
-TEST_P(FullereneQueueTest, PushBack) {
-    FullereneQueue queue(N, 5);
-    queue.push_back(G);
-    EXPECT_EQ(queue.size(), 1);
-    EXPECT_EQ(queue.capacity(), 5);
-}
-
-TEST_P(FullereneQueueTest, PushQueueToBatch) {
-    FullereneQueue queue2;
-    FullereneBatch batch(N, 3);
-    for (int i = 0; i < 5; i++) {
-        queue2.push_back(G);
+    // Pop two and check ordering.
+    for (int i = 0; i < 2; ++i) {
+        RSR out_v = q.storage().view_capacity()[0];  // dummy stamp
+        // For pop, we need an addressable RSR; use the storage to give us
+        // properly-shaped spans (pop_front does an internal copy_fields).
+        // Simpler: just discard the first two and check IDs of remaining.
+        uint64_t id; StatusFlag f; int32_t it;
+        q.state().read_slot(q.front_index(), id, f, it);
+        EXPECT_EQ(int(id), 100 + i);
+        q.discard_front();
     }
-    EXPECT_EQ(queue2.size(), 5);
-    EXPECT_EQ(queue2.front_index(), 0);
-    EXPECT_EQ(queue2.back_index(), 4);
-    QueueUtil::push(Q, batch, queue2, ConditionFunctor(0, StatusEnum::DUAL_INITIALIZED));
-    EXPECT_EQ(queue2.size(), 2);
-    EXPECT_EQ(batch.size(), 3);
-    for (int i = 0; i < 3; i++) {
-        EXPECT_TRUE(same_neighbours(static_cast<const neighbours_t&>(Graph(batch[i])), static_cast<const neighbours_t&>(G)));
+    EXPECT_EQ(q.size(), 2);
+    EXPECT_EQ(q.front_index(), 2);
+}
+
+TEST_P(BatchFixture, BatchQueueGrowsCircularly) {
+    batch::BatchQueue<RSR> q(Nf, /*capacity*/0, /*dmax*/6);
+
+    for (int i = 0; i < 5; ++i)
+        batch::push_back(q, G, uint64_t(i),
+                         StatusFlag(int(StatusEnum::DUAL_INITIALIZED)));
+    EXPECT_EQ(q.size(), 5);
+    EXPECT_GE(q.capacity(), 5);
+    // After growth, logical front == 0.
+    EXPECT_EQ(q.front_index(), 0);
+    for (int i = 0; i < 5; ++i) {
+        uint64_t id; StatusFlag f; int32_t it;
+        q.state().read_slot(q.slot_of(i), id, f, it);
+        EXPECT_EQ(int(id), i);
     }
 }
 
-TEST_P(FullereneQueueTest, PushBatchToQueue) {
-    FullereneQueue queue(N, 1);
-    FullereneBatch batch(N, 3);
-    for (int i = 0; i < 5; i++) {
-        batch.push_back(G);
+TEST_P(BatchFixture, QueuePushBatchToQueue) {
+    batch::Batch<RSR> b(Nf, 3, 6);
+    batch::BatchState s(3);
+    for (int i = 0; i < 3; ++i) {
+        batch::push_back(b, G);
+        s.push_back(uint64_t(i),
+                    StatusFlag(int(StatusEnum::DUAL_INITIALIZED)));
     }
-    EXPECT_EQ(queue.size(), 0);
-    EXPECT_EQ(queue.front_index(), -1);
-    EXPECT_EQ(queue.back_index(), -1);
-     QueueUtil::push(Q, queue, batch, ConditionFunctor(StatusEnum::DUAL_INITIALIZED));
-    EXPECT_EQ(queue.size(), 5);
-    EXPECT_EQ(queue.front_index(), 0);
-    EXPECT_EQ(queue.back_index(), 4);
+    batch::BatchQueue<RSR> q(Nf, 3, 6);
+    int n = batch::queue_push(q, b, s,
+        batch::StatusPredicate{StatusEnum::DUAL_INITIALIZED});
+    EXPECT_EQ(n, 3);
+    EXPECT_EQ(q.size(), 3);
+}
 
-    for (int i = 0; i < batch.size(); i++) {
-        EXPECT_EQ(batch[i], queue[i]);
+TEST_P(BatchFixture, QueuePushQueueToBatchWithPredicate) {
+    batch::BatchQueue<RSR> q(Nf, 5, 6);
+    for (int i = 0; i < 5; ++i)
+        batch::push_back(q, G, uint64_t(i),
+                         StatusFlag(i % 2 == 0 ? int(StatusEnum::DUAL_INITIALIZED)
+                                               : int(StatusEnum::EMPTY)));
+    batch::Batch<RSR> dst_b(Nf, 5, 6);
+    batch::BatchState dst_s(5);
+    int n = batch::queue_push(dst_b, dst_s, q,
+        batch::StatusPredicate{StatusEnum::DUAL_INITIALIZED, StatusEnum::EMPTY});
+    EXPECT_EQ(n, 1);    // only the front (id=0) matches before stopping.
+    EXPECT_EQ(dst_b.size(), 1);
+    EXPECT_EQ(int(dst_s.view().id[0]), 0);
+    EXPECT_EQ(q.size(), 4);
+}
+
+TEST_P(BatchFixture, QueuePushSetsConsumedFlag) {
+    batch::Batch<RSR> b(Nf, 2, 6);
+    batch::BatchState s(2);
+    for (int i = 0; i < 2; ++i) {
+        batch::push_back(b, G);
+        s.push_back(uint64_t(i),
+                    StatusFlag(int(StatusEnum::DUAL_INITIALIZED)));
     }
+    batch::BatchQueue<RSR> q(Nf, 2, 6);
+    batch::queue_push(q, b, s, batch::MatchAll{}, StatusEnum::EMPTY);
+    auto sv = s.view();
+    EXPECT_TRUE(sv.status[0].is_set(StatusEnum::EMPTY));
+    EXPECT_TRUE(sv.status[1].is_set(StatusEnum::EMPTY));
 }
 
-TEST_P(FullereneQueueTest, ConsumeFromQueue) {
-    FullereneQueue queue(N, 1);
-    FullereneBatch batch(N, 5);
-    for (int i = 0; i < 5; i++) {
-        queue.push_back(G);
-        if(i%2 == 0) batch.m_.flags_[i] = (StatusEnum::DUAL_INITIALIZED);
-    }
-    EXPECT_EQ(queue.size(), 5);
-    QueueUtil::push(Q, batch, queue, ConditionFunctor(0, StatusEnum::DUAL_INITIALIZED), StatusEnum::EMPTY);
-    EXPECT_EQ(queue.size(), 3);
-    int num_consumed = 2;
-    for (int i = 0; i < 5; i++) {
-        EXPECT_EQ(batch.m_.flags_[i], (int)StatusEnum::DUAL_INITIALIZED); //Expect all flags in batch to be DUAL_INITIALIZED
-        if (i < num_consumed) EXPECT_EQ(queue.m_.flags_[i], (int)StatusEnum::EMPTY); //Queue should have been consumed
-    }
-}
+INSTANTIATE_TEST_SUITE_P(, BatchFixture, ::testing::Values(60));
 
-TEST_P(FullereneQueueTest, ConsumeFromBatch){
-    FullereneQueue queue(N, 1);
-    FullereneBatch batch(N, 5);
-    DualizeFunctor<float, uint16_t> functor;
-    for (int i = 0; i < 5; i++) {
-        batch.push_back(G);
-        if( i%2 == 0) functor(Q, batch[i], LaunchPolicy::SYNC);
-    }
-    EXPECT_EQ(queue.size(), 0);
-    QueueUtil::push(Q, queue, batch, ConditionFunctor(StatusEnum::FULLERENEGRAPH_PREPARED), StatusEnum::EMPTY);
-    EXPECT_EQ(queue.size(), 3);
-    for (int i = 0; i < 5; i++) {
-        if(i%2 == 0) EXPECT_EQ(batch.m_.flags_[i], (int)StatusEnum::EMPTY); //Expect the consumed isomers to be empty
-        if(i < queue.size()) EXPECT_EQ(queue.m_.flags_[i], (int)(StatusEnum::FULLERENEGRAPH_PREPARED | StatusEnum::DUAL_INITIALIZED)); //Expect the queue to be full
+} // namespace
 
-    }
-}
+int main(int argc, char** argv) {
+    // Put ourselves into our own process group so that any child processes
+    // spawned (e.g. AdaptiveCpp helper daemons, BuckyGen workers) can be
+    // reaped together at exit. Without this, child processes inherit the
+    // parent's stdout/stderr pipe and block the parent's controlling
+    // process (e.g. ctest) from observing EOF until they exit on their own.
+    setpgid(0, 0);
 
-TEST_P(FullereneQueueTest, QueueManipulation) {
-    FullereneQueue queue;
-    FullereneBatch batch(N, 3);
-    EXPECT_EQ(queue.size(), 0);
-    EXPECT_EQ(queue.capacity(), 0);
-    auto full_ix = 0;
-    for(int i = 0; i < 5; i++){
-        queue.push_back(G, full_ix++); 
-    } //Queue starts at 0 capacity and resizes to 1, 2, 4, 8
-    EXPECT_EQ(queue.capacity(), 8);
-
-    for (int i = 0; i < 5; i++) {
-        EXPECT_EQ(queue[i].m_.ID_.get(), i);    
-    }
-
-    EXPECT_EQ(queue.size(), 5);
-    EXPECT_EQ(queue.front_index(), 0);
-    EXPECT_EQ(queue.back_index(), 4);
-
-    QueueUtil::push(Q, queue, batch, ConditionFunctor(StatusEnum::DUAL_INITIALIZED));
-    EXPECT_EQ(queue.size(), 5);
-    EXPECT_EQ(queue.front_index(), 0);
-    EXPECT_EQ(queue.back_index(), 4);
-
-    QueueUtil::push(Q, batch, queue, ConditionFunctor(0, StatusEnum::DUAL_INITIALIZED));
-    EXPECT_EQ(queue.size(), 2);
-    EXPECT_EQ(queue.front_index(), 3);
-    EXPECT_EQ(queue.back_index(), 4);
-
-    for (int i = 0; i < 5; i++) {
-        queue.push_back(G, full_ix++);
-    }
-
-    EXPECT_EQ(queue.size(), 7);
-    EXPECT_EQ(queue.front_index(), 3);
-    EXPECT_EQ(queue.back_index(), 1);
-    std::array expected_batch_IDs = {0, 1, 2};
-    std::array expected_queue_IDs = {3, 4, 5, 6, 7, 8, 9};
-
-
-    for (int i = 0; i < 3; i++) {
-        EXPECT_EQ(batch[i].m_.ID_.get(), expected_batch_IDs[i]);
-    }
-
-    for (int i = 0; i < 7; i++) {
-        EXPECT_EQ(queue[i].m_.ID_.get(), expected_queue_IDs[i]);
-    }
-
-    queue.push_back(G, full_ix++);
-
-    EXPECT_EQ(queue.size(), 8); //Queue is full
-    EXPECT_EQ(queue.capacity(), 8);
-    EXPECT_EQ(queue.front_index(), 3);
-    EXPECT_EQ(queue.back_index(), 2);
-
-    queue.push_back(G, full_ix++);
-
-    EXPECT_EQ(queue.size(), 9); //Queue will now have resized to 16
-    EXPECT_EQ(queue.capacity(), 16);
-    EXPECT_EQ(queue.front_index(), 0);
-    EXPECT_EQ(queue.back_index(), 8);
-
-    std::array expected_queue_IDs_2 = {3, 4, 5, 6, 7, 8, 9, 10, 11};
-
-    for (int i = 0; i < 9; i++) {
-        EXPECT_EQ(queue[i].m_.ID_.get(), expected_queue_IDs_2[i]);
-    }
-
-    QueueUtil::push(Q, queue, batch, ConditionFunctor(StatusEnum::DUAL_INITIALIZED));
-
-    EXPECT_EQ(queue.size(), 12);
-    EXPECT_EQ(queue.front_index(), 0);
-    EXPECT_EQ(queue.back_index(), 11);
-
-    std::array expected_queue_IDs_3 = {3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 1, 2};
-    
-    for (int i = 0; i < 12; i++) {
-        EXPECT_EQ(queue[i].m_.ID_.get(), expected_queue_IDs_3[i]);
-        EXPECT_TRUE(same_neighbours(static_cast<const neighbours_t&>(Graph(queue[i])), static_cast<const neighbours_t&>(G)));
-    }
-
-}
-
-// Test That None of the non-owning containers have default constructors (This is to prevent accidental misuse)
-
-TEST_F(FullereneFixture, NoDefaultViewConstructor) {
-    EXPECT_FALSE(std::is_default_constructible_v<FullereneBatchView>);
-}
-
-TEST_F(FullereneFixture, NoDefaultFullereneConstructor) {
-    EXPECT_FALSE(std::is_default_constructible_v<Fullerene>);
-}
-
-TEST_P(FullereneTest, DeletingFullereneDoesNotInvalidateBatch) {
-    EXPECT_EQ(batch.size(), 1);
-    auto ptr = batch.d_.A_cubic_.data();
-    {
-        Fullerene fullerene = batch[0];
-        fullerene.m_.flags_ = StatusEnum::DUAL_INITIALIZED;
-    }
-    EXPECT_EQ(batch.size(), 1);
-    EXPECT_EQ(batch.d_.A_cubic_.data(), ptr);
-}
-
-/* TEST_P(FullereneTest, AccessingFullereneAfterDeletingBatchShouldSegfault) {
-    auto return_fullerene = [&](){
-        FullereneBatch batch(N, 1);
-        batch.push_back(G);
-        return Fullerene(batch[0]);
-    };
-    auto fullerene = return_fullerene();
-    EXPECT_TRUE(fullerene.N_ == N);
-    ASSERT_EXIT((std::cout << fullerene.d_.A_cubic_[0], exit(0)), ::testing::KilledBySignal(SIGSEGV), ".*");
-} */
-
-
-
-TEST_P(FullereneBatchViewTest, ConstructFromBatch) {
-    FullereneBatchView view(batch, 0, 1);
-    EXPECT_EQ(view.size(), 1);
-    EXPECT_EQ(view.capacity(), 1);
-    EXPECT_TRUE(std::equal(view.begin(), view.end(), batch.begin())   );
-}
-
-TEST_P(FullereneBatchViewTest, ConstructFromBatchWithRange) {
-    FullereneBatchView view(batch, 0, 5);
-    EXPECT_EQ(view.size(), 5);
-    EXPECT_EQ(view.capacity(), 5);
-    EXPECT_TRUE(std::equal(view.begin(), view.end(), batch.begin()));
-}
-
-TEST_P(FullereneBatchViewTest, ConstructFromView) {
-
-    FullereneBatchView view1(batch, 0, 5);
-    FullereneBatchView view2(view1, 2, 3);
-    EXPECT_EQ(view2.size(), 3);
-    EXPECT_EQ(view2.capacity(), 3);
-    EXPECT_TRUE(std::equal(view2.begin(), view2.end(), view1.begin() + 2));
-    EXPECT_TRUE(std::equal(view2.begin(), view2.end(), batch.begin() + 2));
-}
-
-TEST_P(FullereneBatchViewTest, ConstructFromIteratorPair) {
-    FullereneBatchView view(batch.begin() + 2, batch.end());
-    FullereneBatchView view2(batch, 2);
-    EXPECT_EQ(view.size(), batch.size() - 2);
-    EXPECT_EQ(view.capacity(), batch.size() - 2);
-    EXPECT_EQ(view, view2);
-    EXPECT_TRUE(std::equal(view.begin(), view.end(), batch.begin() + 2));
-}
-
-
-TEST_P(FullereneBatchViewTest, EqualityOperator) {
-    FullereneBatchView view1(batch, 3, 7);
-    FullereneBatchView view2(batch, 3, 7);
-    EXPECT_EQ(view1, view2);
-}
-
-TEST_P(FullereneBatchViewTest, CopyAssignment) {
-    FullereneBatchView view1(batch, 0, 1);
-    FullereneBatchView view2 = view1;
-    EXPECT_EQ(view1, view2);
-}
-
-TEST_P(FullereneBatchViewTest, CopyConstruction) {
-    FullereneBatchView view1(batch, 0, 1);
-    FullereneBatchView view2(view1);
-    EXPECT_EQ(view1, view2);
-}
-
-TEST_P(FullereneBatchViewTest, ViewIndexOperator) {
-    FullereneBatchView view(batch, 5, 10);
-    Fullerene fullerene = view[0];
-    Fullerene fullerene2 = batch[5];
-    EXPECT_EQ(fullerene, fullerene2);
-}
-
-TEST_P(FullereneQueueTest, Resize) {
-    FullereneQueue queue(N, 5);
-    queue.resize(10);
-    EXPECT_EQ(queue.size(), 0);
-    EXPECT_EQ(queue.capacity(), 10);
-}
-
-TEST_P(FullereneQueueTest, IndexOperator) {
-    FullereneQueue queue(N, 5);
-    queue.push_back(G);
-    Fullerene fullerene = queue[0];
-    Graph G_queue(fullerene);
-    EXPECT_EQ(fullerene.N_, N);
-    EXPECT_TRUE(same_neighbours(static_cast<const neighbours_t&>(G_queue), static_cast<const neighbours_t&>(G)));
-}
-
-TEST_P(FullereneQueueTest, EqualityOperator) {
-    FullereneQueue queue1(N, 1);
-    FullereneQueue queue2(N, 1);
-    queue1.push_back(G);
-    queue2.push_back(G);
-    EXPECT_EQ(queue1, queue2);
-}
-
-    
-INSTANTIATE_TEST_SUITE_P(, FullereneQueueTest, ::testing::Range(60, 61, 20));
-INSTANTIATE_TEST_SUITE_P(, FullereneBatchTest, ::testing::Range(60, 61, 20));
-INSTANTIATE_TEST_SUITE_P(, PushBackTest, ::testing::Range(60, 61, 20));
-INSTANTIATE_TEST_SUITE_P(, FullereneTest, ::testing::Range(60, 61, 20));
-INSTANTIATE_TEST_SUITE_P(, FullereneBatchViewTest, ::testing::Range(60, 61, 20));
-
-int main(int argc, char **argv) {
+    // Force SYCL runtime initialization up front.
+    { SyclQueue Q{Device::get_devices(DeviceType::GPU).at(0), true}; (void)Q; }
     testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
+    int rc = RUN_ALL_TESTS();
+
+    // Flush before we forcibly tear down.
+    std::cout.flush();
+    std::cerr.flush();
+    // Close stdio so any descriptors inherited by child processes that we
+    // cannot directly reap do not keep the parent's stdout pipe alive.
+    ::close(0); ::close(1); ::close(2);
+    // Ignore SIGTERM so we survive the broadcast below, then kill the rest
+    // of our process group.
+    ::signal(SIGTERM, SIG_IGN);
+    ::killpg(0, SIGTERM);
+    std::_Exit(rc);
 }

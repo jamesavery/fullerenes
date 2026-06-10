@@ -20,7 +20,7 @@ int main(int ac, char **av)
   
 #if TEST_BUCKYHERD==0
   BuckyGen::buckygen_queue BQ = BuckyGen::start(N,IPR,only_nontrivial);
-  Triangulation g;
+  Graph g;
 
   size_t cnt = 0;
   while(BuckyGen::next_fullerene(BQ,g)){
@@ -30,7 +30,7 @@ int main(int ac, char **av)
 #else
   // TODO: Add CPU_SET etc. and sched_setaffinity to buckyherd_queue
   BuckyGen::buckyherd_queue HQ(N,Nchunks,Nworkers,IPR,only_nontrivial);
-  Triangulation g;
+  Graph g;
 
   size_t cnt = 0;
   while(HQ.next_fullerene(g)){

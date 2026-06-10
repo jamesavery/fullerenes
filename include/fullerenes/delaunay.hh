@@ -186,12 +186,11 @@ struct DelaunayTriangulation {
 
   // --- Delaunay operations ---
   bool is_delaunay_edge(int h) const;
+  // Flip the diagonal of the diamond around edge h.  Accepts any
+  // non-Delaunay edge with a convex diamond, including the B == D case
+  // (which produces a self-loop edge at B; see Lemma 1 of
+  // claude-projects/delaunay/CORRECTNESS-PROOF.md).
   bool flip_edge(int h);
-  // Like flip_edge, but does not reject the B == D case.  A successful
-  // flip with B == D produces a self-loop edge at B.  The result is a
-  // well-formed delta-complex triangulation; the caller takes
-  // responsibility for handling the self-loop.
-  bool flip_edge_allow_self_loop(int h);
   int  lawson_sweep();
   int  count_non_delaunay() const;
   int  flip_to_delaunay();
@@ -251,6 +250,49 @@ struct DelaunayTriangulation {
   static DelaunayTriangulation compute(const Triangulation& T,
                                        const EdgeLengthFn& length,
                                        double flat_tol = 1e-6);
+
+  // --- Surface metric (intrinsic; promoted from the delta-complex project) ---
+  // Per-cone-pair geodesic distances and geodesics on the metric delta-complex,
+  // by priority-bounded BFS over triangle strips unfolded into the Eisenstein
+  // plane (exact-integer for the simple distances; floating point only in the
+  // APSP step).  The iDT IS the cone graph (flat vertices already removed), so
+  // every vertex 0..nv-1 is a cone: these take no node subset and no source
+  // mesh, and the BFS bound is derived from the iDT's own weighted graph
+  // diameter.  Cone-to-cone only -- self-geodesics (loops based at one cone)
+  // are not computed.  Validated on every fullerene dual C20-C160
+  // (211,203,353 isomers, 0 failures).  Mirror of TriangulationView's
+  // surface-metric methods (graphview.hh).
+
+  // A simple geodesic u -> v, exact in Z[w]: the displacement g (u at origin,
+  // |g|^2 = squared length) in the unfolding seeded at half-edge `axis` with
+  // its far endpoint placed at B_seed (the split-prime representative).  The
+  // triple (axis, B_seed, g) determines the developed face strip uniquely.
+  struct simple_geodesic { Eisenstein g; int axis; Eisenstein B_seed; };
+
+  // A general geodesic u -> K_1 -> ... -> v: simple geodesics broken at
+  // intermediate cones.  Mirror of TriangulationView::geodesic.
+  struct geodesic {
+    std::vector<simple_geodesic> segments;
+    geodesic() = default;
+    geodesic(int) {}   // matrix<geodesic>(m, n) zero-init compatibility
+  };
+
+  // Exact squared simple-geodesic distances; LLONG_MAX where no simple geodesic
+  // exists.  @throws std::logic_error on a deep invariant (degenerate face or
+  // non-Loeschian edge), which cannot occur on a valid iDT.
+  matrix<long long>       simple_square_surface_distances() const;
+  // The realizing simple geodesic per ordered cone pair (in u's unfolding frame).
+  matrix<simple_geodesic> simple_geodesics() const;
+  // Squared surface distances (APSP-smoothed across intermediate cones).  If
+  // geodesics_out != nullptr, also fills it with the composed per-pair geodesics.
+  matrix<double>          surface_distances(matrix<geodesic>* geodesics_out = nullptr) const;
+  // The composed surface geodesic for every cone pair.
+  matrix<geodesic>        surface_geodesics() const;
+
+  // Concatenate the simple geodesics along a cone path [u, K_1, ..., v] into one
+  // multi-segment geodesic; empty for paths of length <= 1.
+  static geodesic compose_simple_geodesics(const std::vector<int>& path,
+                                           const matrix<simple_geodesic>& simple);
 
   // Smallest degree among live (non-removed) vertices, or INT_MAX if
   // none.  A value below 3 is one (but not the only) non-simplicial

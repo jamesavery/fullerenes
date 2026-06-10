@@ -270,7 +270,8 @@ void polyhedron_pot_grad(const gsl_vector* coordinates, void* parameters, double
 }
 
 
-bool Polyhedron::optimize_other(bool optimize_angles, map<edge_t, double> zero_values_dist)
+template<>
+bool PolyhedronView<double>::optimize_other(bool optimize_angles, map<edge_t, double> zero_values_dist)
 {
   //cout << "entering opt other" << endl;
 
@@ -457,7 +458,8 @@ bool Polyhedron::optimize_other(bool optimize_angles, map<edge_t, double> zero_v
 }
 
 #else
-bool Polyhedron::optimize_other(bool, map<edge_t, double>)
+template<>
+bool PolyhedronView<double>::optimize_other(bool, map<edge_t, double>)
 {
   cerr << "Optimizing other polyhedra than fullerenes is only available through GSL." << endl;
   return 0;

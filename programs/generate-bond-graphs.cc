@@ -1,53 +1,95 @@
+#include <algorithm>
+#include <array>
+#include <cstdint>
+#include <fstream>
+#include <iostream>
+#include <string>
+#include <vector>
+
 #include <fullerenes/argparser.hh>
-#include <fullerenes/sycl-headers/sycl-fullerene-structs.hh>
-#include <fullerenes/sycl-headers/sycl-fullerene-structs.hh>
+#include <fullerenes/buckygen-wrapper.hh>
+#include <fullerenes/graph.hh>
+
+#include <fullerenes/batch/batch.hh>
+#include <fullerenes/batch/batch_state.hh>
+#include <fullerenes/batch/utilities.hh>
+#include <fullerenes/kernel-headers/all-kernels.hh>
 #include <fullerenes/sycl-headers/sycl-device-queue.hh>
 #include <fullerenes/sycl-headers/sycl-vector.hh>
-#include <fullerenes/kernel-headers/all-kernels.hh>
-#include <fullerenes/buckygen-wrapper.hh>
 
 int main(int argc, char *argv[]) {
-    // Parse command line arguments
     CmdArgs input_args;
     parseArguments(argc, argv, input_args);
 
-    int N = input_args.natoms; // Number of atoms in the fullerene
-    auto capacity = input_args.nisomers; // Capacity of the queue
-    std::string output_file = input_args.output_file;
+    using real_t  = double;
+    using index_t = std::uint16_t;
+    using RSR     = Spanify::RSRAdjacencyView<index_t>;
 
-    // Create a FullereneQueue with the specified capacity
-    FullereneQueue<double, uint16_t> queue(N, capacity);
-    auto buckyQ = BuckyGen::start(N, false, false);
-    // Generate bond graphs and push them into the queue
-    bool more = true;
-    Graph g(N/2 + 2);
+    const int N        = input_args.natoms;
+    const int Nf       = N/2 + 2;
+    const int capacity = input_args.nisomers;
+    const std::string output_file = input_args.output_file;
+
+    // ---- Allocate batch buffers ----------------------------------------
+    batch::Batch<RSR>   src_dual (Nf, capacity, /*dmax*/6);
+    batch::Batch<RSR>   dst_cubic(N,  capacity, /*dmax*/3);
+    batch::BatchState   st(capacity);
+
+    SyclVector<std::array<index_t,6>> faces_cubic_buf(capacity * Nf);
+    SyclVector<std::array<index_t,3>> faces_dual_buf (capacity * N);
+    SyclVector<std::array<real_t,2>>  layout2d       (capacity * N);
+    SyclVector<std::array<real_t,3>>  xyz            (capacity * N);
+
+    // ---- Fill src_dual from BuckyGen ------------------------------------
     std::cout << "Generating.." << std::endl;
-    while (more && queue.size() < queue.capacity()) {
-        more = BuckyGen::next_fullerene(buckyQ, g);
-        queue.push_back(g);
-    }
-    FullereneBatch<double, uint16_t> batch(N, capacity);
-    std::cout << "Dualizing.." << std::endl;
-    
-    DualizeFunctor<double, uint16_t> dualizer;
-    std::cout << "Computing Tutte Embeddings.." << std::endl;
-    TutteFunctor<double, uint16_t> tutter;
-    std::cout << "Computing Projections.." << std::endl;
-    SphericalProjectionFunctor<double, uint16_t> projector;
-    std::cout << "Optimizing Forcefield.." << std::endl;
-    ForcefieldOptimizeFunctor<ForcefieldType::PEDERSEN, double, uint16_t> forcefield_optimizer;
 
+    auto BQ = BuckyGen::start(N, false, false);
+    Graph G(Nf, std::vector<node_t>(6, -1));
+    int pushed = 0;
+    for (int i = 0; i < capacity; ++i) {
+        if (!BuckyGen::next_fullerene(BQ, G)) break;
+        batch::push_back(src_dual, G);
+        st.push_back(uint64_t(i),
+                     StatusFlag(int(StatusEnum::DUAL_INITIALIZED)));
+        ++pushed;
+    }
+    BuckyGen::stop(BQ);
+    std::cout << "Generated " << pushed << " dual graphs" << std::endl;
+
+    // ---- Pipeline --------------------------------------------------------
     SyclQueue ctx(Device::default_device(), true);
-    QueueUtil::push(ctx, batch, queue);
-    dualizer(ctx, batch, LaunchPolicy::SYNC);
-    tutter(ctx, batch, LaunchPolicy::SYNC);
-    projector(ctx, batch, LaunchPolicy::SYNC);
-    forcefield_optimizer(ctx, batch, LaunchPolicy::SYNC, 5*N, 5*N);
-    
+    auto src_view = src_dual .view_capacity();
+    auto dst_view = dst_cubic.view_capacity();
+
+    std::cout << "Dualizing.." << std::endl;
+    dualize<real_t, index_t>(ctx, src_view, dst_view, st.view(),
+        std::span<std::array<index_t,6>>(faces_cubic_buf.data(), faces_cubic_buf.size()),
+        std::span<std::array<index_t,3>>(faces_dual_buf .data(), faces_dual_buf .size())
+    ).wait();
+    std::cout << "Computing Tutte Embeddings.." << std::endl;
+    tutte_layout<real_t, index_t>(ctx, dst_view,
+        std::span<std::array<real_t,2>>(layout2d.data(), layout2d.size()),
+        st.view()
+    ).wait();
+    std::cout << "Computing Projections.." << std::endl;
+    spherical_projection<real_t, index_t>(ctx, dst_view,
+        std::span<std::array<real_t,2>>(layout2d.data(), layout2d.size()),
+        std::span<std::array<real_t,3>>(xyz     .data(), xyz     .size()),
+        st.view()
+    ).wait();
+    std::cout << "Optimizing Forcefield.." << std::endl;
+    forcefield_optimize<ForcefieldType::PEDERSEN, real_t, index_t>(ctx, dst_view,
+        std::span<std::array<real_t,3>>(xyz.data(), xyz.size()),
+        st.view(), /*batch_iters=*/5*N, /*max_iters=*/5*N
+    ).wait();
     ctx.wait();
-    std::cout << count_if(batch.d_.X_cubic_.begin(), batch.d_.X_cubic_.end(), [](const auto number) {
-        return std::isnan(number[0]) || std::isnan(number[1]) || std::isnan(number[2]);
-    }) << " NaNs found" << std::endl;
+
+    int nan_count = 0;
+    for (size_t i = 0; i < xyz.size(); ++i) {
+        const auto& c = xyz[i];
+        if (std::isnan(c[0]) || std::isnan(c[1]) || std::isnan(c[2])) ++nan_count;
+    }
+    std::cout << nan_count << " NaNs found" << std::endl;
 
     std::cout << "Writing coordinates to binary file: " << output_file << std::endl;
     std::ofstream out(output_file, std::ios::binary);
@@ -55,12 +97,9 @@ int main(int argc, char *argv[]) {
         std::cerr << "Error opening output file: " << output_file << std::endl;
         return 1;
     }
-
-    // Get the number of structures in the queue
-    size_t num_structures = queue.size();
-    out.write(reinterpret_cast<const char*>(batch.d_.X_cubic_.data()), batch.d_.X_cubic_.to_span().size_bytes());
+    out.write(reinterpret_cast<const char*>(xyz.data()),
+              xyz.size() * sizeof(std::array<real_t,3>));
     out.close();
-
 
     return 0;
 }

@@ -45,11 +45,12 @@ int main(int ac, char **av)
     return 1;
   }
 
-  Triangulation dualG;
+  Graph dualG_buf;
   BuckyGen::buckygen_queue Q = BuckyGen::start(N, false, false);
 
   int count = 0, written = 0;
-  while(BuckyGen::next_fullerene(Q, dualG)){
+  while(BuckyGen::next_fullerene(Q, dualG_buf)){
+    Triangulation dualG(dualG_buf);
     count++;
     // Extract spiral and convert to pentagon indices
     vector<int> spiral_code;

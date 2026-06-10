@@ -1,5 +1,6 @@
 #include "fullerenes/symmetry.hh"
 #include "fullerenes/auxiliary.hh"
+#include "fullerenes/union_find.hh"
 using namespace std;
 
 //////////////////////////////////////////////////////////////////////
@@ -229,14 +230,14 @@ vector<int> Symmetry::site_symmetry_counts(const vector<Permutation>& pi) const
     int orbit_length = 1;
     for(int j=0;j<order;j++){
       int I = pi[j][i];
-      assert(I<M);
+      assert(I<M); // TODO: No asserts/aborts allowed. Eliminate failure modes instead, throw exception on should-never-happen-failures, incorporate remaining-failures-that-can-happen into return type or status param.
       assert(I>=0);
       if(seen[I]) continue;
       seen[I] = true;
       orbit_length++;
     }	
     int site_order = order/orbit_length; 
-    assert(site_order <= 12); // Only holds for fullerenes?
+    assert(site_order <= 12); // TODO: Only holds for fullerenes. Remove or make general.
     m[site_order-1]++;
   }
   return m;
@@ -489,13 +490,8 @@ vector< pair<int,int> > Symmetry::NMR_pattern() const
 
 
 vector<vector<node_t>> Symmetry::equivalence_classes(const vector<Permutation>& G) const {
-  size_t N = G[0].size();
-  Graph E(N);
-
-  for(auto &pi: G)
-    for(node_t u=0;u<N;u++) E.insert_edge({u,pi[u]});
-
-  return E.connected_components();
+  // Vertex orbits under the group G -- the connected components of u ~ pi[u].
+  return orbits((int)G[0].size(), G);
 }
 
 // ============================================================================

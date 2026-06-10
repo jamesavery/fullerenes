@@ -166,3 +166,9 @@ struct ConditionFunctor
     }
     inline constexpr bool operator()(const int flag) const { return condition_detail::not_set(flag, not_conditions) && condition_detail::all_set(flag, and_conditions) && condition_detail::any_set(flag, or_conditions); }
 };
+
+// Phase 9: make the operator overloads (|=, &=, etc.) and the helper
+// functions (all_set, any_set, not_set) available to code that previously
+// relied on the legacy `using namespace condition_detail;` pulled in via
+// sycl-fullerene-structs.hh.
+using namespace condition_detail;
