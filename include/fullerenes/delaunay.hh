@@ -295,8 +295,8 @@ struct DelaunayTriangulation {
   matrix<simple_geodesic> simple_geodesics(bool calculate_self_geodesics = false) const;
   // Squared surface distances (APSP-smoothed across intermediate cones).  If
   // geodesics_out != nullptr, also fills it with the composed per-pair geodesics.
-  matrix<double>          surface_distances(matrix<geodesic>* geodesics_out = nullptr,
-                                            bool calculate_self_geodesics = false) const;
+  matrix<double>          surface_distances(bool calculate_self_geodesics = false,
+                                            matrix<geodesic>* geodesics_out = nullptr) const;
   // The composed surface geodesic for every cone pair.
   matrix<geodesic>        surface_geodesics(bool calculate_self_geodesics = false) const;
 

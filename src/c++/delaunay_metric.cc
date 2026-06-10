@@ -164,23 +164,23 @@ WalkResult walk_from_seed(const DelaunayTriangulation& D, int u_start,
         "DelaunayTriangulation surface metric: seed |B|^2 != Lsq(h_seed) at h="
         + std::to_string(h_seed));
 
+  // Seed-time self-loop record (self mode): run BEFORE the seed-apex check so
+  // a chirality-barrier early return doesn't discard a valid seed-edge closure
+  // -- B_seed is a Loeschian representative of the seed-edge length regardless
+  // of whether the adjacent face's third vertex lands on the lattice.
+  if (target_label == u_start && D.dest(h_seed) == u_start) {
+    R.dist[u_start] = B_seed.norm2();
+    R.disp[u_start] = B_seed;
+  } else if (target_label != u_start) {
+    // Cone-to-cone API pin (the BFS would otherwise record valid self-geodesics).
+    R.dist[u_start] = 0;
+    R.disp[u_start] = Eisenstein(0, 0);
+  }
+
   FaceLengths fl = face_lengths_through(D, h_seed);
   std::optional<Eisenstein> apex_seed =
       place_third_eis({0, 0}, B_seed, fl.abs2, fl.acs2, fl.bcs2, chirality);
   if (!apex_seed) { R.code = Code::SeedChiralityBarrier; return R; }
-
-  // Cone-to-cone: pin R.dist[u_start] = 0 (the BFS would otherwise record
-  // valid self-geodesics that the cone-to-cone API excludes by convention).
-  // Self mode: lift the pin; seed-edge self-loops (D.dest(h_seed) == u_start)
-  // are recorded directly at seed setup because B_seed itself is a copy of
-  // u_start, which the BFS apex loop never offers for relaxation.
-  if (target_label != u_start) {
-    R.dist[u_start] = 0;
-    R.disp[u_start] = Eisenstein(0, 0);
-  } else if (D.dest(h_seed) == u_start) {
-    R.dist[u_start] = B_seed.norm2();
-    R.disp[u_start] = B_seed;
-  }
   std::priority_queue<Front, std::vector<Front>, FrontGreater> pq;
   std::vector<ConeChain> chain;
   chain.push_back({-1, B_seed});
@@ -270,11 +270,14 @@ SimpleMetric compute_simple(const DelaunayTriangulation& D, long long bound_sq,
     }
   }
 
-  // Seal the diagonal: cones with no closed geodesic found within bound_sq
-  // get the bound sentinel (off-diagonal "unreached" stays LLONG_MAX).
+  // Seal the diagonal: cones with no closed geodesic found get a sentinel
+  // strictly greater than any recordable squared length (the BFS records iff
+  // priority <= bound_sq).  bound_sq + 1 avoids ambiguity against a real
+  // closure of length exactly bound_sq and stays positive when bound_sq == 0.
+  // Off-diagonal "unreached" entries stay at LLONG_MAX.
   if (calculate_self_geodesics)
     for (int u = 0; u < n; u++)
-      if (S.square(u, u) == LLONG_MAX) S.square(u, u) = bound_sq;
+      if (S.square(u, u) == LLONG_MAX) S.square(u, u) = bound_sq + 1;
   return S;
 }
 
@@ -315,8 +318,8 @@ DelaunayTriangulation::compose_simple_geodesics(const std::vector<int>& path,
 }
 
 matrix<double>
-DelaunayTriangulation::surface_distances(matrix<geodesic>* geodesics_out,
-                                         bool calculate_self_geodesics) const {
+DelaunayTriangulation::surface_distances(bool calculate_self_geodesics,
+                                         matrix<geodesic>* geodesics_out) const {
   SimpleMetric S = compute_simple(*this, bound_for(*this, calculate_self_geodesics),
                                   calculate_self_geodesics);
 
@@ -336,15 +339,24 @@ DelaunayTriangulation::surface_distances(matrix<geodesic>* geodesics_out,
   APSPResult<double> apsp = H.APSP_with_paths();
   *geodesics_out = matrix<geodesic>(n, n, geodesic{});
   for (int u = 0; u < n; u++)
-    for (int v = 0; v < n; v++)
+    for (int v = 0; v < n; v++) {
+      // Self-mode diagonal: reconstruct_path(preds, u, u) returns [u], which
+      // compose_simple_geodesics turns into an empty geodesic{}.  Emit the
+      // single recorded closing simple_geodesic directly so the diagonal
+      // matches the squared distance flowing through APSP.
+      if (u == v && calculate_self_geodesics && S.geo(u, u).g.norm2() > 0) {
+        (*geodesics_out)(u, v).segments.push_back(S.geo(u, u));
+        continue;
+      }
       (*geodesics_out)(u, v) =
           compose_simple_geodesics(reconstruct_path(apsp.preds, u, v), S.geo);
+    }
   return apsp.dist.square_elementwise();
 }
 
 matrix<DelaunayTriangulation::geodesic>
 DelaunayTriangulation::surface_geodesics(bool calculate_self_geodesics) const {
   matrix<geodesic> G(0, 0, geodesic{});
-  surface_distances(&G, calculate_self_geodesics);
+  surface_distances(calculate_self_geodesics, &G);
   return G;
 }
