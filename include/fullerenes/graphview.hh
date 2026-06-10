@@ -243,6 +243,18 @@ struct TriangulationView : PlanarGraphView {
         geodesic(int) {}   // matrix<geodesic>(m, n) zero-init compatibility
     };
 
+    // One iteration of the simple_geodesics search from a traced source: the
+    // (axis,a,b) ray probed vertex v at squared distance d2; H_before is the
+    // running min H(U,V) *before* this probe; improved == (d2 <= H_before) ==
+    // "the witness geodesic was (re)assigned". Aggregate; emitted in the exact
+    // search order (axis outer, then a, then b) so a viz can replay the min.
+    struct geodesic_step {
+        int    axis, a, b;
+        node_t v;
+        int    d2, H_before;
+        bool   improved;
+    };
+
     // --- Triangulation methods ---
     PlanarGraph dual_graph() const;
     vector<face_t> cubic_faces() const;
@@ -298,7 +310,13 @@ struct TriangulationView : PlanarGraphView {
     matrix<double> surface_distances(vector<node_t> only_nodes={}, bool calculate_self_geodesics=false,
                                      matrix<geodesic>* geodesics_out=nullptr) const;
     matrix<geodesic> surface_geodesics(vector<node_t> only_nodes={}, bool calculate_self_geodesics=false) const;
-    matrix<simple_geodesic> simple_geodesics(vector<node_t> only_nodes={}, bool calculate_self_geodesics=false) const;
+    // trace_u (optional): if >= 0, every (axis,a,b) ray probed from source
+    // trace_u is appended to *trace_out in search order, and *M_out receives
+    // its search radius M[U] = max graph distance from trace_u. Additive: with
+    // trace_u<0 the run is byte-identical to the untraced search.
+    matrix<simple_geodesic> simple_geodesics(vector<node_t> only_nodes={}, bool calculate_self_geodesics=false,
+                                             node_t trace_u=-1, vector<geodesic_step>* trace_out=nullptr,
+                                             int* M_out=nullptr) const;
 
     // Concatenate simple geodesics along a node-index path:
     //   [U, K_1, ..., V] -> { simple(U, K_1), simple(K_1, K_2), ..., simple(K_n, V) }.
@@ -307,7 +325,11 @@ struct TriangulationView : PlanarGraphView {
                                              const matrix<simple_geodesic>& simple);
 
     node_t end_of_the_line(node_t u0, int i, int a, int b) const;
-    vector<vector<node_t>> quads_of_the_line(node_t u0, int i, int a, int b) const;
+    // coords_out (optional): per quad vertex, its integer Eisenstein lattice coord
+    // (origin u0 at (0,0), axis i along (1,0)); filled in lockstep with the vertex
+    // quads. Lets callers lay the unfolded strip in the plane / lift it to 3D.
+    vector<vector<node_t>> quads_of_the_line(node_t u0, int i, int a, int b,
+                                             vector<vector<Eisenstein>>* coords_out=nullptr) const;
 
     Triangulation sort_nodes() const;
 

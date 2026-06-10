@@ -963,7 +963,8 @@ node_t TriangulationView::end_of_the_line(node_t u0, int i, int a, int b) const
 //   s---t
 //  / \ /
 // q---r
-vector<vector<node_t>> TriangulationView::quads_of_the_line(node_t u0, int i, int a, int b) const
+vector<vector<node_t>> TriangulationView::quads_of_the_line(node_t u0, int i, int a, int b,
+                                                            vector<vector<Eisenstein>>* coords_out) const
 {
   node_t q,r,s,t;                // Current square
 
@@ -1022,6 +1023,33 @@ vector<vector<node_t>> TriangulationView::quads_of_the_line(node_t u0, int i, in
     //    printf("quads_of_the_line(%d,%d,(%d,%d)) -> %d: ",u0,i,a,b,t);
     //    cout << quad_runs << endl;
   //  }
+  // Fill the per-vertex Eisenstein lattice coords in lockstep with the vertex
+  // quads above (origin u0 = (0,0), axis i along (1,0); go_east -> +x, go_north
+  // -> +y; corners q=(x,y) r=(x+1,y) s=(x,y+1) t=(x+1,y+1)). Mirrors the loop
+  // above exactly; the caller's cross-check (terminal corner == (a,b),
+  // vid == end_of_the_line) guards against any drift. Valid for a,b >= 1
+  // (the axis-aligned b==0 case is the plain graph walk, handled by callers).
+  if(coords_out){
+    coords_out->assign(runlengths.size(), vector<Eisenstein>());
+    int cx=0, cy=0;
+    for(size_t ri=0; ri<runlengths.size(); ri++){
+      int L = runlengths[ri];
+      vector<Eisenstein> cr(2*L+2);
+      if(a>=b){                                    // a is major axis (go_east in-run)
+        cr[0]=Eisenstein(cx,cy);   cr[1]=Eisenstein(cx,cy+1);
+        cr[2]=Eisenstein(cx+1,cy); cr[3]=Eisenstein(cx+1,cy+1);
+        for(int j=0;j<L-1;j++){ cx++;
+          cr[2*(j+2)+0]=Eisenstein(cx+1,cy); cr[2*(j+2)+1]=Eisenstein(cx+1,cy+1); }
+        (*coords_out)[ri]=cr; cy++;               // go_north between runs
+      } else {                                     // b is major axis (go_north in-run)
+        cr[0]=Eisenstein(cx,cy);   cr[2]=Eisenstein(cx,cy+1);
+        cr[1]=Eisenstein(cx+1,cy); cr[3]=Eisenstein(cx+1,cy+1);
+        for(int j=0;j<L-1;j++){ cy++;
+          cr[2*(j+2)+0]=Eisenstein(cx,cy+1); cr[2*(j+2)+1]=Eisenstein(cx+1,cy+1); }
+        (*coords_out)[ri]=cr; cx++;               // go_east between runs
+      }
+    }
+  }
   return quad_runs;                        // End node is upper right corner.
 }
 
@@ -1035,7 +1063,10 @@ matrix<int> TriangulationView::pentagon_distance_mtx() const {
 // TODO: Do we need to do Dijkstra on sqrt(H) after all?
 matrix<TriangulationView::simple_geodesic>
 TriangulationView::simple_geodesics(vector<node_t> nodes,
-				bool calculate_self_geodesics) const
+				bool calculate_self_geodesics,
+				node_t trace_u,
+				vector<geodesic_step>* trace_out,
+				int* M_out) const
 {
   if(nodes.empty()){
     nodes.resize(N);
@@ -1065,6 +1096,9 @@ TriangulationView::simple_geodesics(vector<node_t> nodes,
       M[U]  *= 2;           // ...by walking up to twice the diameter
     }
 
+  // Report the traced source's search radius (after any self-geodesic doubling).
+  if(trace_u>=0 && M_out && nodes_inverse[trace_u]!=-1) *M_out = M[nodes_inverse[trace_u]];
+
   // Loop bounds inclusive (a <= M[U], a^2+ab+b^2 <= M[U]^2) so the
   // axis-aligned (a,0) geodesic of length a == d_g(u,v) is recorded
   // when it matches H(U,V) = d_g(u,v)^2. Tie-breaking: last walk wins.
@@ -1079,7 +1113,10 @@ TriangulationView::simple_geodesics(vector<node_t> nodes,
 	  if(nodes_inverse[v] != -1){ // Endpoint v is in nodes
 	    node_t V = nodes_inverse[v];
 	    int d_sqr = a*a + a*b + b*b;
-	    if(d_sqr <= H(U,V)){
+	    const bool improved = (d_sqr <= H(U,V));
+	    if(trace_out && u==trace_u)        // record the probe before the update
+	      trace_out->push_back({i,a,b,v,d_sqr,H(U,V),improved});
+	    if(improved){
 	      H(U,V) = d_sqr;
 	      G(U,V) = simple_geodesic(a,b,i);
 	    }
