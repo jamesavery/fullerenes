@@ -117,9 +117,12 @@ StepKind step_walk(const DelaunayTriangulation& D, int chirality, long long boun
   const int h_prev = D.he_next[h_next];
   const int v_apex = D.he_origin[h_prev];
 
-  const bool is_closure = (target_label >= 0 && v_apex == target_label && n_C > 0);
-  const bool sector_ok  = is_closure || fr.sector.contains(C);
-  if (sector_ok && !chain_shadows(chain, fr.chain_idx, C)
+  // Cone-to-cone and self mode share the same validity test: apex inside the
+  // BFS strip's narrowed sector AND no prior chain cone shadows origin->C.
+  // (Wrap-around self closures are found by the seed whose multi-seed sector
+  // contains the closure point; a sector bypass here admits invalid lines.)
+  (void)target_label;
+  if (fr.sector.contains(C) && !chain_shadows(chain, fr.chain_idx, C)
       && v_apex >= 0 && v_apex < (int)R.dist.size() && n_C < R.dist[v_apex]) {
     R.dist[v_apex] = n_C;
     R.disp[v_apex] = C;
