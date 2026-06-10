@@ -69,6 +69,12 @@ public:
   vector< pair<int,int> > NMR_pattern() const;
 
   PointGroup point_group() const;
+
+  // @anchor symmetry-equivalence-classes
+  // @pre  nonempty: !G.empty() -- always holds (G contains the identity for any
+  //                 Symmetry); stated because the body reads G[0].
+  // @post result == orbits((int)G[0].size(), G) -- the partition of the vertices
+  //                 into orbits under the permutation group G.
   vector<vector<node_t>> equivalence_classes(const vector<Permutation>& G) const;
 
   // Compute the 3D rotation/reflection matrices for each element of G.
