@@ -1,6 +1,7 @@
 #pragma once
 #include <span>
 #include <ostream>
+#include <array>
 #include <algorithm>
 #include <limits>
 #include <cmath>
@@ -13,6 +14,13 @@ constexpr std::span<U> as_span(std::span<T> s) {
     return std::span<U>(reinterpret_cast<U*>(s.data()),
                         (s.size() * sizeof(T)) / sizeof(U));
 }
+
+// Forward-declare the generic std::array stream operator (defined in sycl-util-impl.cc)
+// so the span operator<< below can stream arrays of arrays: under strict two-phase
+// lookup the os<<element call binds at this template's definition, and std::array's
+// only associated namespace is std, so this global overload must be visible here.
+template <typename U, std::size_t N>
+constexpr std::ostream& operator<<(std::ostream& os, const std::array<U,N>& a);
 
 template <typename T>
 inline std::ostream& operator<<(std::ostream& os, std::span<T> v) {

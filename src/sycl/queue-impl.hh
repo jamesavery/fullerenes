@@ -2,6 +2,8 @@
 
 #include <sycl/sycl.hpp>
 #include <fullerenes/sycl-headers/sycl-device-queue.hh>
+#include <tuple>
+#include <type_traits>
 
 #ifndef DEVICE_CAST
     #define DEVICE_CAST(x,ix) (reinterpret_cast<const sycl::device*>(x)[ix])
@@ -46,18 +48,47 @@ SyclEventImpl& SyclEvent::operator *() const {return *impl_;}
 struct SyclQueueImpl : public sycl::queue{
     using sycl::queue::queue;
 
-    inline static const auto device_arrays = std::array{ 
+    // Heap-allocated and intentionally never freed: the cached sycl::device
+    // objects keep the AdaptiveCpp runtime alive, and destroying them from a
+    // static destructor at process exit tears the runtime down out of order
+    // (SIGSEGV in allocation_tracker::unregister_allocation during
+    // __cxa_finalize). Leaking this one-time cache lets the OS reclaim it at
+    // process death without the crashing teardown.
+    inline static const auto& device_arrays = *new std::array{ 
                 sycl::device::get_devices(sycl::info::device_type::cpu), 
                 sycl::device::get_devices(sycl::info::device_type::gpu), 
                 sycl::device::get_devices(sycl::info::device_type::accelerator),
                 sycl::device::get_devices(sycl::info::device_type::host)};
 
-    static_assert(device_arrays.size() == (int)DeviceType::NUM_DEV_TYPES && "DeviceType enum does not match device_arrays size");
+    // size() on the runtime-initialized reference is not constexpr; check the
+    // (CTAD-deduced) array size from its type instead.
+    static_assert(std::tuple_size_v<std::remove_reference_t<decltype(device_arrays)>> == (size_t)DeviceType::NUM_DEV_TYPES && "DeviceType enum does not match device_arrays size");
     
     SyclQueueImpl(Device dev, bool in_order) : sycl::queue( device_arrays.at((int)dev.type).at(dev.idx), in_order ? sycl::property::queue::in_order{} : sycl::property_list{}), device_(dev) {}
     SyclQueueImpl() : sycl::queue( device_arrays.at((int)DeviceType::CPU).at(0)), device_(Device{0, DeviceType::CPU}) {}
     const Device device_;
 };
+
+// @anchor sycl-launch-per-isomer
+// Launch one work-group per isomer over a batch: the work-group size is
+// work_per_isomer and there are `count` isomers, so the global range is
+// work_per_isomer*count and each group handles one isomer. Owns the empty-batch
+// guard, the nd_range, the submit, and the SyclEvent wrap -- the boilerplate every
+// batch kernel shares. The command-group function cgf(handler&, nd_range<1>) creates
+// the kernel's local accessors and issues h.parallel_for(ndr, ...).
+// @post on empty:    (count == 0 || work_per_isomer == 0) -> an already-complete event,
+//                        no kernel submitted. A zero global range is a no-op on the
+//                        host/OpenMP backend but cuLaunchKernel rejects a zero grid
+//                        with CUDA_ERROR_INVALID_VALUE, so empty batches must not launch.
+// @post on nonempty: submits cgf(h, nd_range(work_per_isomer*count, work_per_isomer))
+//                        and returns the event for that submission.
+template <class CGF>
+inline SyclEvent launch_per_isomer(SyclQueue& Q, size_t work_per_isomer, size_t count, CGF&& cgf) {
+    if (count == 0 || work_per_isomer == 0) return SyclEvent();
+    sycl::nd_range<1> ndr(sycl::range<1>(work_per_isomer * count), sycl::range<1>(work_per_isomer));
+    SyclEventImpl ev = Q->submit([&](sycl::handler& h){ cgf(h, ndr); });
+    return SyclEvent(std::move(ev));
+}
 
 #ifdef DEFINE_SYCL_QUEUE_METHODS
 SyclQueue::SyclQueue() : device_({0, DeviceType::CPU}), in_order_(true) {

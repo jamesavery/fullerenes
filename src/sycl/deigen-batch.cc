@@ -409,13 +409,9 @@ std::pair<real_t,int> eigensystem_hermitian(const SpanMatrix& A,
 	shift    = D[k];
 
       if(i>max_iterations){
-	printf("%dth run: Cannot converge eigenvalue %d to tolerance " G
-	       " using machine precision " G " (d=" G ", shift=" G ", G=" G ")\n"
-	       "D[k] = " G ", L[k-1] = " G ", L[k] = " G "\n",
-	       nth_time,k,tolerance,
-	       machine_precision,d,shift,GR,
-	       D[k], (k>0)?L[k-1]:0, (k+1<n)?L[k]:0);
-	
+	// Non-convergence is reported to the caller via max_error (and the
+	// per-isomer status flag); no in-kernel printf (unsupported on the
+	// CUDA SSCP device path).
 	max_error = std::max(max_error,GR);
 	break;
       }

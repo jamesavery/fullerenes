@@ -123,13 +123,13 @@ static SyclEvent dualize_view_batch_impl(SyclQueue& Q,
     std::span<std::array<K,3>>         faces_dual  = faces_dual_scratch;
     std::span<StatusFlag> statuses(state.status.data(), state.status.size());
 
-    SyclEventImpl cubic_graph_event = Q->submit([&](handler &h) {
+    return launch_per_isomer(Q, N, capacity, [&](handler &h, sycl::nd_range<1> ndr) {
         local_accessor<std::array<K,MaxDegree>, 1> triangle_numbers(Nf, h);
         local_accessor<std::array<K,MaxDegree>, 1> cached_neighbours(Nf, h);
         local_accessor<node_t, 1>                  cached_degrees(Nf, h);
         local_accessor<node2, 1>                   arc_list(N, h);
 
-        h.parallel_for(sycl::nd_range(sycl::range{size_t(N)*size_t(capacity)}, sycl::range{size_t(N)}), [=](nd_item<1> nditem) {
+        h.parallel_for(ndr, [=](nd_item<1> nditem) {
             auto cta     = nditem.get_group();
             node_t f     = nditem.get_local_linear_id();
             auto isomer  = nditem.get_group_linear_id();
@@ -206,7 +206,6 @@ static SyclEvent dualize_view_batch_impl(SyclQueue& Q,
             if (f == 0) statuses[isomer].set(StatusEnum::FULLERENEGRAPH_PREPARED);
         });
     });
-    return SyclEvent(std::move(cubic_graph_event));
 }
 
 template <typename T, typename K>

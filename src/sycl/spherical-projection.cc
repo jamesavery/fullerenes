@@ -183,13 +183,13 @@ static SyclEvent spherical_projection_view_batch_impl(
     const int N        = graph.N();
     const int capacity = graph.size();
 
-    SyclEventImpl projection_done = Q->submit([&](handler& h) {
+    return launch_per_isomer(Q, N, capacity, [&](handler& h, sycl::nd_range<1> ndr) {
         local_accessor<node_t, 1>  work_queue_memory(N*2, h);
         local_accessor<int, 1>     smem(N, h);
         local_accessor<coord2d, 1> atomic_coordinate_memory(N, h);
         local_accessor<coord3d, 1> xyz_smem(N, h);
 
-        h.parallel_for(sycl::nd_range(sycl::range(N*capacity), sycl::range(N)),
+        h.parallel_for(ndr,
         [=](nd_item<1> nditem) {
             auto cta        = nditem.get_group();
             auto tid        = nditem.get_local_linear_id();
@@ -242,7 +242,6 @@ static SyclEvent spherical_projection_view_batch_impl(
             if (tid == 0) statuses[isomer_idx] |= StatusEnum::NOT_CONVERGED;
         });
     });
-    return SyclEvent(std::move(projection_done));
 }
 
 template <typename T, typename K>

@@ -18,10 +18,7 @@ Eisenstein Eisenstein::unit[7] = {{1,0},{0,1},{-1,1},{-1,0},{0,-1},{1,-1},{1,0}}
 std::vector<Eisenstein> sector0_reps_of_norm(int N) {
   std::vector<Eisenstein> out;
   if (N == 0) { out.push_back(Eisenstein(0, 0)); return out; }
-  if (N < 0) {
-    std::fprintf(stderr, "sector0_reps_of_norm: negative norm %d\n", N);
-    std::abort();
-  }
+  if (N < 0) return out;   // not a norm: no reps (callers treat empty as "non-Loeschian")
   // a >= 0, b >= 0:  a^2 + a*b + b^2 == N
   for (int b = 0; 3 * b * b <= 4 * N; ++b) {
     const long disc = 4L * N - 3L * b * b;
