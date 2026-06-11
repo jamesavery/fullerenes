@@ -258,10 +258,18 @@ struct DelaunayTriangulation {
   // APSP step).  The iDT IS the cone graph (flat vertices already removed), so
   // every vertex 0..nv-1 is a cone: these take no node subset and no source
   // mesh, and the BFS bound is derived from the iDT's own weighted graph
-  // diameter.  Cone-to-cone only -- self-geodesics (loops based at one cone)
-  // are not computed.  Validated on every fullerene dual C20-C160
-  // (211,203,353 isomers, 0 failures).  Mirror of TriangulationView's
-  // surface-metric methods (graphview.hh).
+  // diameter.  Validated on every fullerene dual C20-C160 (211,203,353 isomers,
+  // 0 failures).  Mirror of TriangulationView's surface-metric methods
+  // (graphview.hh).
+  //
+  // Default scope: cone-to-cone.  Self-geodesics (closed loops based at one
+  // cone) are excluded by an API pin in the walk and not computed; pass
+  // calculate_self_geodesics = true to compute the diagonal too -- the BFS
+  // runs in self-mode for each cone, picking up seed-edge self-loops at seed
+  // setup and apex closures (including the wrap-around flavour, via sector
+  // bypass at recording).  Mirrors TriangulationView's calculate_self_geodesics
+  // flag.  See claude-projects/delta-complex/DELTA-COMPLEX-SURFACE-METRIC.md
+  // §"Self-geodesics" for the three flavours and the underlying mechanism.
 
   // A simple geodesic u -> v, exact in Z[w]: the displacement g (u at origin,
   // |g|^2 = squared length) in the unfolding seeded at half-edge `axis` with
@@ -278,16 +286,19 @@ struct DelaunayTriangulation {
   };
 
   // Exact squared simple-geodesic distances; LLONG_MAX where no simple geodesic
-  // exists.  @throws std::logic_error on a deep invariant (degenerate face or
+  // exists.  Diagonal: 0 in cone-to-cone mode; the closed-geodesic squared length
+  // (or the search-radius sentinel) in self mode.
+  // @throws std::logic_error on a deep invariant (degenerate face or
   // non-Loeschian edge), which cannot occur on a valid iDT.
-  matrix<long long>       simple_square_surface_distances() const;
+  matrix<long long>       simple_square_surface_distances(bool calculate_self_geodesics = false) const;
   // The realizing simple geodesic per ordered cone pair (in u's unfolding frame).
-  matrix<simple_geodesic> simple_geodesics() const;
+  matrix<simple_geodesic> simple_geodesics(bool calculate_self_geodesics = false) const;
   // Squared surface distances (APSP-smoothed across intermediate cones).  If
   // geodesics_out != nullptr, also fills it with the composed per-pair geodesics.
-  matrix<double>          surface_distances(matrix<geodesic>* geodesics_out = nullptr) const;
+  matrix<double>          surface_distances(bool calculate_self_geodesics = false,
+                                            matrix<geodesic>* geodesics_out = nullptr) const;
   // The composed surface geodesic for every cone pair.
-  matrix<geodesic>        surface_geodesics() const;
+  matrix<geodesic>        surface_geodesics(bool calculate_self_geodesics = false) const;
 
   // Concatenate the simple geodesics along a cone path [u, K_1, ..., v] into one
   // multi-segment geodesic; empty for paths of length <= 1.

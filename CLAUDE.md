@@ -9,15 +9,27 @@ Fullerenes is a C++17/Fortran application for topological analysis and 3D struct
 ## Build Commands
 
 ```bash
-# Configure (from repo root). Pin the toolchain to gcc-13 / gfortran-13:
+# Configure (from repo root). Compiler choice is platform-dependent:
+#
+# On the GCC toolchain, pin to gcc-13 / gfortran-13:
 # gcc-14 + -std=gnu++23 miscompiles the file-scope vector<vector<string>>
 # initializers in isomerdb.cc / polyhedron-io.cc / planargraph-io.cc, and the
 # resulting libfullerenes.so aborts with length_error during dynamic-load
-# static init. Stick with gcc-13 until the code is audited for this.
+# static init. This is a regression in current gcc's C++23 support, NOT a bug
+# in our code -- stick with gcc-13 until a fixed gcc release is verified.
 mkdir build && cd build
 cmake -DCMAKE_C_COMPILER=gcc-13 \
       -DCMAKE_CXX_COMPILER=g++-13 \
       -DCMAKE_Fortran_COMPILER=gfortran-13 ..
+
+# On macOS, just use the system clang (Apple clang) -- it is not affected by
+# the gcc C++23 regression. Let CMake auto-detect the default toolchain:
+mkdir build && cd build
+cmake ..
+# Tests/tools that use OpenMP need Homebrew libomp, since Apple clang ships
+# without it: brew install libomp, then build/run with libomp on the include/
+# lib/rpath search paths. The library itself (libfullerenes.dylib) builds with
+# the auto-detected clang as-is.
 
 # Build everything
 cmake --build build

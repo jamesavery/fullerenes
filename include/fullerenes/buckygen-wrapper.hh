@@ -13,6 +13,9 @@ namespace BuckyGen {
     int   qid{};
     int   Nvertices{};
     int   chunk_index{}, worker_index{}, chunk_number{};
+    long  msg_qbytes{};  // per-queue byte cap (IPC_STAT msg_qbytes); graphs are
+                         // chunked to fit it. macOS defaults to 2048, far below
+                         // a single large-fullerene message; Linux to 16384.
   } buckygen_queue;
 
   struct buckyherd_queue {
@@ -22,6 +25,13 @@ namespace BuckyGen {
     vector<size_t> chunks_todo{}, chunks_done{};
     vector<buckygen_queue>  worker_processes{};
     size_t free_cpu_cores{};
+    long   msg_qbytes{};  // per-queue byte cap; see buckygen_queue::msg_qbytes.
+
+    // Per-worker reassembly buffers: graphs arrive split across messages that
+    // interleave across workers on the shared queue, but a single worker's
+    // chunks stay FIFO-ordered, so each worker reassembles independently.
+    vector<vector<int>> reasm_buf{};
+    vector<int>         reasm_fill{}, reasm_got{}, reasm_nchunks{};
 
     buckygen_queue new_worker(int worker_index);
     bool next_fullerene(Graph& G);

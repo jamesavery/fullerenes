@@ -29,7 +29,7 @@ vector<tri_t> TriangulationView::compute_faces_oriented() const
 	  printf("next_on_face(%d,%d) = prev(%d,%d) = -1\n",u,v,v,u);
 	  printf("\tneighbours[%d] = ",u); for(auto x: (*this)[u]) cout << x << ' '; cout << endl;
 	  printf("\tneighbours[%d] = ",v); for(auto x: (*this)[v]) cout << x << ' '; cout << endl;	  
-	  assert(w != -1);
+	  assert(w != -1); // TODO: assert is forbidden in isomerspace calculations (kills the whole computation if one isomer fails!) Need to throw with useful information instead.
 	}
         //Is This Condition necessary? 
         //since every directed edge is only part of 1 triangle it ought to be sufficient
@@ -65,6 +65,7 @@ void Triangulation::compute_lookup_tables(const PlanarGraph&            cubic_gr
   size_t Nf = N;		// To remind ourselves that this is the number of faces
   size_t Nc = 2*(N-2);		// This function assumes the triangulation is the dual of a cubic graph 
 
+  //TODO: Convert asserts to throws with useful information
   assert(triangles.size() == Nc); // Make sure triangles array is initialized before calling
   assert(is_consistently_oriented());	  // We don't bother with non-oriented surfaces
 
@@ -1184,24 +1185,36 @@ matrix<int> TriangulationView::simple_square_surface_distances(vector<node_t> no
   //  cout << "H = " << H << endl;
 
   if(calculate_self_geodesics) for(node_t U=0;U<nodes.size();U++){
-      H(U,U) = INT_MAX; // Initialize diagonal to infinity -- we want shortest self-geodesics, i.e. circling 2pi of curvature
+      H(U,U) = 4*M[U]*M[U]; // Diagonal sentinel (2*M[U])^2 -- H is in squared units: "no self-geodesic strictly inside the search radius". Finite (unlike INT_MAX) so max(H)-based termination bounds stay usable.
       M[U] *= 2;        // To capture self-geodesics, we need to look twice as far (there and back again)
-    }  
+    }
 
-  // Note: All Eisenstein numbers of the form (a,0) or (0,b) yield same lengths
-  //       as graph distance, and are hence covered by initial step. So start from 1.
-  //       M is upper bound for distance, so only need to do a^2+ab+b^2 strictly less than M.
+  // Eisenstein walks (a,b) with a^2+ab+b^2 < Mu^2.  Axis-aligned (a,0)
+  // off-diagonal entries are already captured by the initial graph-SP
+  // matrix (axis-aligned length == graph distance), but the self-diagonal
+  // is NOT: H(U,U) starts as 0 (graph SP u->u), then in self mode gets
+  // overwritten to the 4*M^2 sentinel above, so an axis-aligned closure
+  // like end_of_the_line(u, i, 3, 0) == u would be missed if we started
+  // b at 1.  Looping b from 0 covers it; the redundant off-diagonal
+  // axis-aligned checks are cheap and idempotent (min against the same
+  // value).
   for(node_t u: nodes){
     node_t U = nodes_inverse[u];
     const int Mu = M[U];
-    
+
     for(int i=0;i<degree(u);i++)
       for(int a=1; a<Mu; a++)
-	for(int b=1; a*a + a*b + b*b < Mu*Mu; b++){
+	for(int b=0; a*a + a*b + b*b < Mu*Mu; b++){
 	  const node_t v = end_of_the_line(u,i,a,b);
 
 	  if(nodes_inverse[v] != -1){ // Endpoint v is in nodes
 	    node_t V = nodes_inverse[v];
+	    // Skip the trivial (a, 0) closure that ends back at u_start at
+	    // zero geodesic distance: in self mode H(U,U) carries the
+	    // sentinel and we only want non-trivial closures (a*a+ab+b*b > 0,
+	    // which holds here since a >= 1).  In cone-to-cone mode the
+	    // diagonal stays 0 by initialisation and we don't get here for
+	    // U==V (graph SP from u to u is 0, so H(U,U)=0 and no update fires).
 	    int d_sqr = a*a + a*b + b*b;
 	    H(U,V) = min(H(U,V),d_sqr);
 	  }

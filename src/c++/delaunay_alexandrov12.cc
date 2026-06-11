@@ -1014,12 +1014,16 @@ struct Deflation {
 
 struct Tangent { double t_dot; vector<double> r_dot; };
 
-// Tangent to the homotopy curve at (t, r).
-// From J·ṙ = κ₁·ṫ and ||(ṫ, ṙ)|| = 1, ṫ < 0.
-// With deflation:  J_def·ṙ = κ₁_eff·ṫ where J_def = J + (1−t)·∂D/∂r
-// and κ₁_eff = κ₁ + D(r).
+// Homotopy velocity dr/dt = J⁻¹κ₁ along κ(r)=t·κ₁ (the un-normalized tangent
+// direction). Returns an invalid vector (LinAlg::is_valid == false) if J is
+// singular.
+V dr_dt(const matrix<double>& J, const V& kappa1) {
+  return LinAlg::solve(J, kappa1);
+}
+
+// PALC unit tangent (ṫ, ṙ) at (t, r): from J·ṙ = κ₁·ṫ and ‖(ṫ, ṙ)‖ = 1, ṫ < 0.
 Tangent compute_tangent(const matrix<double>& J, const vector<double>& kappa1) {
-  auto v = LinAlg::solve(J, kappa1);  // v = J⁻¹ κ₁
+  auto v = dr_dt(J, kappa1);
   if (!LinAlg::is_valid(v))
     return {-1.0, vector<double>(kappa1.size(), 0.0)};
   double vn = LinAlg::norm(v);
@@ -1188,11 +1192,151 @@ V initial_radii(const DelaunayTriangulation& T) {
   return V(T.nv, 2 * R);
 }
 
-// Track the homotopy κ(r) = t·κ₁ from t=1 toward t_target.
+// Plain (un-bordered) Newton driving κ(r) → target: r −= J⁻¹(κ(r) − target).
+// Returns the iteration count: nit ∈ [0, max_iter) converged to tol, max_iter
+// if not, −1 on a failed linear solve. (PALC's `correct` is the bordered
+// analogue that also advances t; Newton::polish is the trust-region κ→0 one.)
+int newton_correct(const DelaunayTriangulation& T, V& r, const V& target,
+                   double tol, int max_iter) {
+  for (int nit = 0; nit < max_iter; nit++) {
+    V F = GCP::kappa(T, r) - target;
+    if (LinAlg::max_abs(F) < tol) return nit;
+    auto dr = LinAlg::solve(GCP::jacobian(T, r), F);
+    if (!LinAlg::is_valid(dr)) return -1;
+    r = r - dr;
+  }
+  return max_iter;
+}
+
+// ---- Natural (t-parameterized) continuation ----
 //
-// Pre:  r ∈ F(T), 0 < κᵢ(T, r) < δᵢ, t_target > 0.
-// Post: t_final ≤ t_target (if PALC converges) or t_final > t_target
-//       (if PALC stalls — caller should fall back to Tier-2).
+// Bobenko–Izmestiev 2008 (eq. 38) lift the curvature path κ(r)=t·κ₁ as a
+// function of t:  dr/dt = J⁻¹κ₁.  By Thm 5 / Lemma 3.4, J = ∂κ/∂r is
+// non-degenerate with constant Lorentzian signature (1,n−1) while 0<κᵢ<δᵢ —
+// which the homotopy preserves for all t∈(0,1] (Lemma 4.2) — so the path is
+// monotone in t with NO turning points.  Plain t-continuation therefore needs
+// neither arclength nor the bordered pseudo-arclength system.  It is
+// scale-invariant by construction: t is dimensionless, dr/dt=J⁻¹κ₁ is degree
+// +1, and the corrector residual κ(r)−t·κ₁ is degree 0 — nothing mixes the
+// dimensionless homotopy parameter with the length-dimensioned radii the way
+// the PALC arclength ds²=dt²+‖dr‖² does (the root cause of PALC's scale bug).
+
+// Step bounds on dt. Unlike the PALC DS_* bounds (which measure (t,r)-space
+// arclength), dt steps the dimensionless homotopy parameter t∈[0,1] directly:
+// DT_MAX caps it at 10% of the t-range per step; DT_MIN is the give-up floor.
+constexpr double DT_MIN = 1e-9;
+constexpr double DT_MAX = 0.1;
+
+// One natural-continuation step to t1 = t0 − dt: Euler predictor r0 − dt·(dr/dt)
+// then a fixed-t1 Newton correction of κ(r) onto t1·κ₁.
+StepResult natural_step(const DelaunayTriangulation& T,
+                        double t0, const V& r0, const V& kappa1,
+                        const matrix<double>& J, double dt) {
+  double t1 = t0 - dt;
+  auto v = dr_dt(J, kappa1);
+  if (!LinAlg::is_valid(v)) return {-1, t1, r0};
+  V r = r0 - v * dt;
+  int nit = newton_correct(T, r, kappa1 * t1, CORRECTOR_TOL, CORRECTOR_MAX_ITER);
+  return nit < 0 ? StepResult{-1, t1, r0} : StepResult{nit, t1, std::move(r)};
+}
+
+// Policy for the shared continuation driver: target, step-size bounds, whether
+// to clamp the step against overshooting t_target (natural), and the PALC-only
+// symmetry-escape knobs (stochastic perturbation, batch multi-flip).
+struct ContinuationParams {
+  double t_target;
+  double h_init, h_min, h_max;
+  bool clamp_to_target;
+  double interior_margin_coeff = 0.0;
+  double stochastic_eps = 0.0;
+  uint32_t stochastic_seed = 1;
+  double batch_multiflip_threshold = 0.0;
+  bool gauge_snap = false;        // PALC-only translation-gauge canonicalisation
+};
+
+// Post-accept bookkeeping for one accepted continuation step: re-Delaunay-flip
+// (strict-interior margin c·t, →0 at t=0 where flat-face diagonals legitimately
+// reach θ→π; c=0 uses the −1e-10 closure buffer), apply the PALC symmetry-escape
+// moves (batch multi-flip, stochastic perturbation — off unless enabled), and
+// record (t, r) in the history.
+void on_accept(DelaunayTriangulation& T, V& r, PALCStats& stats,
+               vector<pair<double, V>>& history, double t,
+               const ContinuationParams& p, std::mt19937& rng) {
+  double margin = (p.interior_margin_coeff > 0) ? p.interior_margin_coeff * t
+                                                : -1e-10;
+  stats.flips += Topology::flip_to_delaunay(T, r, margin);
+  if (p.batch_multiflip_threshold > 0) {
+    int bf = Topology::batch_multi_flip(T, r, p.batch_multiflip_threshold);
+    if (bf > 0) {
+      stats.flips += bf;
+      stats.flips += Topology::flip_to_delaunay(T, r, margin);
+    }
+  }
+  if (p.stochastic_eps > 0) {
+    std::uniform_real_distribution<double> jitter(-1.0, 1.0);
+    for (size_t i = 0; i < r.size(); i++)
+      r[i] *= 1.0 + p.stochastic_eps * jitter(rng);
+  }
+  // Translation-gauge fixing (Direction 5): canonicalise r to the apex-at-
+  // centroid representative of its translation orbit.  Gated on small-κ iterates
+  // (Gram-BFS positions are a B-I generalized polytope, not a real one, at high
+  // κ).  PALC-only — natural continuation leaves p.gauge_snap = false.
+  if (p.gauge_snap && LinAlg::max_abs(GCP::kappa(T, r)) < 0.5)
+    Gauge::snap(T, r);
+  if (!history.empty() && fabs(t - history.back().first) < 1e-14)
+    history.back() = {t, r};
+  else
+    history.push_back({t, r});
+}
+
+// ---- Shared continuation driver ----
+//
+// Trace κ(r)=t·κ₁ from t=1 toward p.t_target by repeated predictor-corrector
+// `step`s, re-Delaunay-flipping after each accepted step (on_accept) and
+// adapting the step size h.  PALC and natural continuation are the two `step`
+// kernels; they differ only in the kernel and the ContinuationParams.
+//   Pre:  r ∈ F(T), 0 < κᵢ(T, r) < δᵢ, p.t_target > 0.
+//   Post: t_final ≤ p.t_target if the continuation reached it, else it stalled.
+template <class StepFn>
+TrackResult continuation_loop(DelaunayTriangulation& T, V r, const V& kappa1,
+                              const StepFn& step, char phase,
+                              const ContinuationParams& p,
+                              vector<AlexandrovSolver::TraceEntry>* trace,
+                              vector<AlexandrovSolver::DiagEntry>* diag) {
+  double t = 1.0, h = p.h_init;
+  vector<pair<double, V>> history;
+  PALCStats stats;
+  std::mt19937 rng(p.stochastic_seed);
+
+  for (int step_i = 0; step_i < 500 && t > p.t_target; step_i++) {
+    auto J = GCP::jacobian(T, r);
+    double h_eff = p.clamp_to_target ? min(h, t - p.t_target) : h;
+    auto result = step(T, t, r, kappa1, J, h_eff);
+
+    if (result.accepted()) {
+      t = result.t; r = std::move(result.r);
+      on_accept(T, r, stats, history, t, p, rng);
+      h = adapt_ds(h, result.nit, CORRECTOR_MAX_ITER, p.h_max);
+    } else {
+      h *= 0.5;
+      if (h < p.h_min) break;
+    }
+    if (trace)
+      trace->push_back(make_trace(phase, step_i, t, h, result.nit,
+                                   GCP::kappa(T, r), J));
+    if (diag) {
+      auto Jd = GCP::jacobian(T, r);  // J on the (possibly post-flip) state
+      diag->push_back(make_diag(phase, step_i, t, h, result.nit,
+                                  T, r, GCP::kappa(T, r), Jd, stats.flips));
+    }
+    stats.steps++;
+    stats.newton_total += max(result.nit, 0);
+  }
+  return {t, std::move(r), std::move(history), stats};
+}
+
+// Pseudo-arclength continuation (legacy; arclength is scale-dependent). Kept
+// for comparison via AlexandrovSolver::Continuation::PALC.
 TrackResult palc_track(DelaunayTriangulation& T, V r, const V& kappa1,
                         double t_target, double ds_init,
                         vector<AlexandrovSolver::TraceEntry>* trace,
@@ -1206,85 +1350,34 @@ TrackResult palc_track(DelaunayTriangulation& T, V r, const V& kappa1,
                         bool gauge_project = false,
                         bool use_tsvd = false,
                         double rcond = 5e-3) {
-  double t = 1.0, ds = ds_init;
-  vector<pair<double, V>> history;
-  PALCStats stats;
-  std::mt19937 rng(stochastic_seed);
-  std::uniform_real_distribution<double> jitter(-1.0, 1.0);
+  auto kernel = [&](const DelaunayTriangulation& T_, double t_, const V& r_,
+                    const V& k1_, const matrix<double>& J_, double ds_) {
+    return palc_step(T_, t_, r_, k1_, J_, ds_, deflation,
+                     gauge_project, use_tsvd, rcond);
+  };
+  ContinuationParams p{.t_target = t_target, .h_init = ds_init,
+                       .h_min = DS_MIN, .h_max = DS_MAX,
+                       .clamp_to_target = false,
+                       .interior_margin_coeff = interior_margin_coeff,
+                       .stochastic_eps = stochastic_eps,
+                       .stochastic_seed = stochastic_seed,
+                       .batch_multiflip_threshold = batch_multiflip_threshold,
+                       .gauge_snap = gauge_snap};
+  return continuation_loop(T, std::move(r), kappa1, kernel, 'P', p, trace, diag);
+}
 
-  for (int step = 0; step < 500 && t > t_target; step++) {
-    auto J = GCP::jacobian(T, r);
-    auto result = palc_step(T, t, r, kappa1, J, ds, deflation,
-                             gauge_project, use_tsvd, rcond);
-
-    if (result.accepted()) {
-      t = result.t; r = std::move(result.r);
-      // Strict-interior margin schedule: c·t at intermediate t shrinks to
-      // 0 at t = 0 (where flat-face diagonals legitimately have θ → π).
-      // c = 0 (default) reproduces pre-#28 behaviour (closure check via
-      // the negative -1e-10 numerical buffer in needs_flip).
-      double margin = (interior_margin_coeff > 0)
-                        ? interior_margin_coeff * t
-                        : -1e-10;
-      stats.flips += Topology::flip_to_delaunay(T, r, margin);
-
-      // Batch multi-flip (Direction 2): after the regular post-accept
-      // flip cleanup, do a single synchronized batch flip of any
-      // remaining near-π edges to escape sequential-flip cycles.
-      // Then a final flip_to_delaunay cleans up the post-batch state.
-      if (batch_multiflip_threshold > 0) {
-        int batch_flips = Topology::batch_multi_flip(T, r,
-                                                       batch_multiflip_threshold);
-        if (batch_flips > 0) {
-          stats.flips += batch_flips;
-          stats.flips += Topology::flip_to_delaunay(T, r, margin);
-        }
-      }
-
-      // Stochastic perturbation (Direction 1): r ← r·(1 + ε·u_v) per
-      // vertex, with u_v ~ uniform[−1,+1].  Applied after the post-
-      // accept flip phase so the corrector starts the next step from
-      // a perturbed but still in-F(T)-near r (small eps preserves
-      // F(T)).  Breaks symmetry continuously rather than only at
-      // t = 1.  ε = 0 disables.
-      if (stochastic_eps > 0) {
-        for (size_t i = 0; i < r.size(); i++) {
-          r[i] *= 1.0 + stochastic_eps * jitter(rng);
-        }
-      }
-
-      // Translation-gauge fixing (Direction 5): canonicalise r to the
-      // apex-at-centroid representative of its translation orbit.
-      // Gated on small-κ iterates: the snap reconstructs positions via
-      // Gram-BFS, but at high-κ those are a B-I generalized polytope
-      // (not a real polytope), so its centroid is geometrically
-      // meaningless and snapping adds noise.  Threshold 0.5 catches
-      // the moderate-κ PALC-stall regime where the soft kernel is
-      // dominant, while excluding initial-uniform-r iterates where
-      // |κ|_max ≈ 1 (B-I admissibility κ_i < δ_i ≈ 1.05).
-      if (gauge_snap && LinAlg::max_abs(GCP::kappa(T, r)) < 0.5)
-        Gauge::snap(T, r);
-      if (!history.empty() && fabs(t - history.back().first) < 1e-14)
-        history.back() = {t, r};
-      else
-        history.push_back({t, r});
-      ds = adapt_ds(ds, result.nit, CORRECTOR_MAX_ITER, DS_MAX);
-    } else {
-      ds *= 0.5;
-      if (ds < DS_MIN) break;
-    }
-    if (trace)
-      trace->push_back(make_trace('P', step, t, ds, result.nit,
-                                   GCP::kappa(T, r), J));
-    if (diag) {
-      auto Jd = GCP::jacobian(T, r);  // J on the (possibly post-flip) state
-      diag->push_back(make_diag('P', step, t, ds, result.nit,
-                                  T, r, GCP::kappa(T, r), Jd, stats.flips));
-    }
-    stats.steps++;
-    stats.newton_total += max(result.nit, 0);
-  }
-  return {t, std::move(r), std::move(history), stats};
+// Natural t-continuation (the default). Scale-invariant; the path is monotone,
+// so the PALC symmetry-escape and gauge-fixing knobs are unused.
+TrackResult natural_track(DelaunayTriangulation& T, V r, const V& kappa1,
+                          double t_target, double dt_init,
+                          vector<AlexandrovSolver::TraceEntry>* trace,
+                          vector<AlexandrovSolver::DiagEntry>* diag,
+                          double interior_margin_coeff = 0.0) {
+  ContinuationParams p{.t_target = t_target, .h_init = dt_init,
+                       .h_min = DT_MIN, .h_max = DT_MAX,
+                       .clamp_to_target = true,
+                       .interior_margin_coeff = interior_margin_coeff};
+  return continuation_loop(T, std::move(r), kappa1, natural_step, 'T', p, trace, diag);
 }
 
 // Polynomial extrapolation: given (t_i, r_i) pairs approaching t=0,
@@ -1543,6 +1636,9 @@ const char* AlexandrovSolver::status_str(ValidationStatus s) {
   return "UNKNOWN";
 }
 
+// The 5-step B-I algorithm: initial radii → continuation (κ(r)=t·κ₁, t:1→0)
+// → endgame extrapolation → Newton polish → reconstruct. `continuation`
+// selects the t-parameterized (default) or legacy PALC homotopy.
 vector<coord3d> AlexandrovSolver::solve() {
   stats_steps = stats_flips = stats_newton_total = 0;
   trace.clear();
@@ -1557,22 +1653,32 @@ vector<coord3d> AlexandrovSolver::solve() {
   }
   auto kappa1 = GCP::kappa(D, r);
 
-  // 2. PALC: trace κ(r) = t·κ₁ from t=1 toward t_target
-  PALC::Deflation defl;
-  defl.target = r_deflate_target;
-  defl.strength = deflate_strength;
-  auto track = PALC::palc_track(D, r, kappa1, /*t_target=*/0.1, /*ds_init=*/0.1,
+  // 2. Continuation: trace κ(r) = t·κ₁ from t=1 toward t_target.
+  PALC::TrackResult track;
+  if (continuation == Continuation::NATURAL) {
+    // Natural t-continuation (BI eq. 38) — scale-invariant, no arclength.
+    track = PALC::natural_track(D, r, kappa1, /*t_target=*/0.1, /*dt_init=*/0.05,
                                  trace_jacobian ? &trace : nullptr,
                                  record_diag ? &diag_trace : nullptr,
-                                 palc_interior_margin,
-                                 stochastic_perturbation_eps,
-                                 stochastic_seed,
-                                 palc_batch_multiflip_threshold,
-                                 defl.active(D.nv) ? &defl : nullptr,
-                                 palc_gauge_snap,
-                                 palc_gauge_project,
-                                 palc_tsvd,
-                                 palc_tsvd_rcond);
+                                 palc_interior_margin);
+  } else {
+    // Legacy pseudo-arclength continuation (kept for comparison).
+    PALC::Deflation defl;
+    defl.target = r_deflate_target;
+    defl.strength = deflate_strength;
+    track = PALC::palc_track(D, r, kappa1, /*t_target=*/0.1, /*ds_init=*/0.1,
+                              trace_jacobian ? &trace : nullptr,
+                              record_diag ? &diag_trace : nullptr,
+                              palc_interior_margin,
+                              stochastic_perturbation_eps,
+                              stochastic_seed,
+                              palc_batch_multiflip_threshold,
+                              defl.active(D.nv) ? &defl : nullptr,
+                              palc_gauge_snap,
+                              palc_gauge_project,
+                              palc_tsvd,
+                              palc_tsvd_rcond);
+  }
   r = std::move(track.r_final);
   stats_steps        = track.stats.steps;
   stats_flips        = track.stats.flips;

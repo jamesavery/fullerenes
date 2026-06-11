@@ -1,5 +1,16 @@
 #include "fullerenes/barycentric.hh"
 
+// Cross-cell idempotent paint requires barycentric_combine to be bit-identical
+// for a shared-edge point regardless of which barycentric slot holds the zero
+// weight (two cells sharing an iDT edge label that edge's opposite corner
+// differently). With FP contraction on (the arm64/clang default), the sum
+// m0*C0 + m1*C1 + m2*C2 fuses into a left-to-right FMA chain whose nesting
+// depends on the zero's slot, so the two cells diverge by 1 ULP. Disabling
+// contraction makes the surviving two-term sum commutative and exact-order-
+// independent, restoring bit-for-bit agreement. Keep this at the site that
+// needs it so it survives build-flag changes.
+#pragma STDC FP_CONTRACT OFF
+
 namespace {
 
 long gcd_long(long a, long b) {

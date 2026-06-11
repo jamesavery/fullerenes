@@ -10,8 +10,11 @@
 // Promoted from the delta-complex surface-metric project, validated on every
 // fullerene dual C20-C160 (211,203,353 isomers, 0 failures).  See
 // claude-projects/delta-complex/DELTA-COMPLEX-SURFACE-METRIC.md for the design.
-// Cone-to-cone only: self-geodesics (loops based at one cone) are not computed
-// -- the convex sector walk cannot wrap >pi around a cone to close a loop.
+// Default scope: cone-to-cone.  Pass calculate_self_geodesics = true to also
+// compute self-geodesics (closed loops based at one cone).  Self mode lifts
+// the R.dist[u_start] pin, records seed-edge self-loops at seed setup, and
+// bypasses the convex-sector containment test for u_start apex placements
+// at recording time so the wrap-around closure flavour is also captured.
 
 #include "fullerenes/delaunay.hh"
 #include "fullerenes/eisenstein.hh"
@@ -88,8 +91,14 @@ constexpr long long kWalkStateCap = 2'000'000;
 enum class StepKind { Continue, Drained, BoundedOut, CapHit, ApexChirality };
 
 // One pop-and-expand BFS step; mutates pq, chain, R.dist/R.disp, R.n_states.
+// `target_label`: -1 for cone-to-cone; the u_start label in self mode (the
+// apex's containment test relaxes when v_apex == target_label so wrap-around
+// closures are recorded; the chain-shadow test is *not* relaxed -- a closure
+// whose line passes through a prior chain cone is a composed loop, picked up
+// by APSP).
 // Throws DegenerateTriangle (via place_third_eis) on a degenerate face.
 StepKind step_walk(const DelaunayTriangulation& D, int chirality, long long bound_sq,
+                   int target_label,
                    std::priority_queue<Front, std::vector<Front>, FrontGreater>& pq,
                    std::vector<ConeChain>& chain, WalkResult& R, long long state_cap) {
   if (pq.empty())                   return StepKind::Drained;
@@ -108,6 +117,11 @@ StepKind step_walk(const DelaunayTriangulation& D, int chirality, long long boun
   const int h_prev = D.he_next[h_next];
   const int v_apex = D.he_origin[h_prev];
 
+  // Cone-to-cone and self mode share the same validity test: apex inside the
+  // BFS strip's narrowed sector AND no prior chain cone shadows origin->C.
+  // (Wrap-around self closures are found by the seed whose multi-seed sector
+  // contains the closure point; a sector bypass here admits invalid lines.)
+  (void)target_label;
   if (fr.sector.contains(C) && !chain_shadows(chain, fr.chain_idx, C)
       && v_apex >= 0 && v_apex < (int)R.dist.size() && n_C < R.dist[v_apex]) {
     R.dist[v_apex] = n_C;
@@ -133,12 +147,16 @@ StepKind step_walk(const DelaunayTriangulation& D, int chirality, long long boun
 }
 
 // Geodesic distances from cone u_start via one seed config (h_seed, B_seed, chirality).
+// `target_label`: -1 for cone-to-cone (R.dist[u_start] is pinned to 0); u_start
+// for self mode (the pin is lifted, the seed-edge self-loop is recorded at seed
+// setup, and step_walk relaxes the sector test for u_start apex placements).
 // Throws std::logic_error if B_seed does not realize the seed edge length, and
 // DegenerateTriangle (from place_third_eis) on a degenerate face -- both deep
 // invariants that cannot occur on a valid iDT.
 WalkResult walk_from_seed(const DelaunayTriangulation& D, int u_start,
                           int h_seed, Eisenstein B_seed, int chirality,
-                          long long bound_sq, long long state_cap = kWalkStateCap) {
+                          long long bound_sq, int target_label = -1,
+                          long long state_cap = kWalkStateCap) {
   using Code = WalkResult::Code;
   WalkResult R;
   R.dist.assign(D.nv, LLONG_MAX);
@@ -149,20 +167,30 @@ WalkResult walk_from_seed(const DelaunayTriangulation& D, int u_start,
         "DelaunayTriangulation surface metric: seed |B|^2 != Lsq(h_seed) at h="
         + std::to_string(h_seed));
 
+  // Seed-time self-loop record (self mode): run BEFORE the seed-apex check so
+  // a chirality-barrier early return doesn't discard a valid seed-edge closure
+  // -- B_seed is a Loeschian representative of the seed-edge length regardless
+  // of whether the adjacent face's third vertex lands on the lattice.
+  if (target_label == u_start && D.dest(h_seed) == u_start) {
+    R.dist[u_start] = B_seed.norm2();
+    R.disp[u_start] = B_seed;
+  } else if (target_label != u_start) {
+    // Cone-to-cone API pin (the BFS would otherwise record valid self-geodesics).
+    R.dist[u_start] = 0;
+    R.disp[u_start] = Eisenstein(0, 0);
+  }
+
   FaceLengths fl = face_lengths_through(D, h_seed);
   std::optional<Eisenstein> apex_seed =
       place_third_eis({0, 0}, B_seed, fl.abs2, fl.acs2, fl.bcs2, chirality);
   if (!apex_seed) { R.code = Code::SeedChiralityBarrier; return R; }
-
-  R.dist[u_start] = 0;
-  R.disp[u_start] = Eisenstein(0, 0);
   std::priority_queue<Front, std::vector<Front>, FrontGreater> pq;
   std::vector<ConeChain> chain;
   chain.push_back({-1, B_seed});
   pq.push({h_seed, {0, 0}, B_seed, ccw_order(B_seed, *apex_seed), /*chain_idx=*/0, /*priority=*/0});
 
   for (;;) {
-    StepKind k = step_walk(D, chirality, bound_sq, pq, chain, R, state_cap);
+    StepKind k = step_walk(D, chirality, bound_sq, target_label, pq, chain, R, state_cap);
     if (k == StepKind::ApexChirality) continue;                 // soft prune; keep going
     if (k == StepKind::CapHit) { R.code = Code::StateCapHit; break; }
     if (k == StepKind::Drained || k == StepKind::BoundedOut) break;
@@ -207,15 +235,22 @@ struct SimpleMetric {
 
 // For every ordered cone pair, the shortest simple geodesic over every seed
 // config at u (each fan half-edge x each sector-0 rep of its squared length x
-// both chiralities).  Throws on a deep-invariant failure -- non-Loeschian seed,
-// degenerate face, or a BFS state-cap trip -- none of which occur on a valid iDT.
-SimpleMetric compute_simple(const DelaunayTriangulation& D, long long bound_sq) {
+// both chiralities).  Self mode (calculate_self_geodesics): each walk runs with
+// target_label = u so the diagonal is filled with the closed-geodesic squared
+// length when one fits within bound_sq, or sealed with bound_sq (the "no closure
+// in this bound" sentinel).  Throws on a deep-invariant failure -- non-Loeschian
+// seed, degenerate face, or a BFS state-cap trip -- none of which occur on a
+// valid iDT.
+SimpleMetric compute_simple(const DelaunayTriangulation& D, long long bound_sq,
+                            bool calculate_self_geodesics) {
   const int n = D.nv;
   SimpleMetric S{ matrix<long long>(n, n, LLONG_MAX),
                   matrix<simple_geodesic>(n, n, simple_geodesic{}) };
-  for (int u = 0; u < n; u++) S.square(u, u) = 0;   // geo(u,u) stays trivial
+  if (!calculate_self_geodesics)
+    for (int u = 0; u < n; u++) S.square(u, u) = 0;   // geo(u,u) stays trivial
 
-  for (int u = 0; u < n; u++)
+  for (int u = 0; u < n; u++) {
+    const int target = calculate_self_geodesics ? u : -1;
     for (int h : fan_half_edges(D, u)) {
       std::vector<Eisenstein> Bs = sector0_reps_of_norm(Lsq_of(D, h));
       if (Bs.empty())
@@ -224,7 +259,7 @@ SimpleMetric compute_simple(const DelaunayTriangulation& D, long long bound_sq) 
             + std::to_string(Lsq_of(D, h)) + " at h=" + std::to_string(h));
       for (Eisenstein B : Bs)
         for (int chi : {+1, -1}) {
-          WalkResult R = walk_from_seed(D, u, h, B, chi, bound_sq);
+          WalkResult R = walk_from_seed(D, u, h, B, chi, bound_sq, target);
           if (R.code == WalkResult::Code::StateCapHit)
             throw std::logic_error(
                 "DelaunayTriangulation surface metric: BFS state cap hit at u="
@@ -236,6 +271,16 @@ SimpleMetric compute_simple(const DelaunayTriangulation& D, long long bound_sq) 
             }
         }
     }
+  }
+
+  // Seal the diagonal: cones with no closed geodesic found get a sentinel
+  // strictly greater than any recordable squared length (the BFS records iff
+  // priority <= bound_sq).  bound_sq + 1 avoids ambiguity against a real
+  // closure of length exactly bound_sq and stays positive when bound_sq == 0.
+  // Off-diagonal "unreached" entries stay at LLONG_MAX.
+  if (calculate_self_geodesics)
+    for (int u = 0; u < n; u++)
+      if (S.square(u, u) == LLONG_MAX) S.square(u, u) = bound_sq + 1;
   return S;
 }
 
@@ -245,13 +290,23 @@ SimpleMetric compute_simple(const DelaunayTriangulation& D, long long bound_sq) 
 // Public DelaunayTriangulation surface-metric methods
 // ============================================================================
 
-matrix<long long> DelaunayTriangulation::simple_square_surface_distances() const {
-  return compute_simple(*this, metric_bound(*this)).square;
+// Self mode walks need to reach the (2*diameter) bound for the wrap-around
+// closure flavour to be visible, mirroring TriangulationView's M *= 2.
+static long long bound_for(const DelaunayTriangulation& D, bool calculate_self_geodesics) {
+  long long b = metric_bound(D);
+  return calculate_self_geodesics ? 4 * b : b;
+}
+
+matrix<long long>
+DelaunayTriangulation::simple_square_surface_distances(bool calculate_self_geodesics) const {
+  return compute_simple(*this, bound_for(*this, calculate_self_geodesics),
+                        calculate_self_geodesics).square;
 }
 
 matrix<DelaunayTriangulation::simple_geodesic>
-DelaunayTriangulation::simple_geodesics() const {
-  return compute_simple(*this, metric_bound(*this)).geo;
+DelaunayTriangulation::simple_geodesics(bool calculate_self_geodesics) const {
+  return compute_simple(*this, bound_for(*this, calculate_self_geodesics),
+                        calculate_self_geodesics).geo;
 }
 
 DelaunayTriangulation::geodesic
@@ -266,11 +321,15 @@ DelaunayTriangulation::compose_simple_geodesics(const std::vector<int>& path,
 }
 
 matrix<double>
-DelaunayTriangulation::surface_distances(matrix<geodesic>* geodesics_out) const {
-  SimpleMetric S = compute_simple(*this, metric_bound(*this));
+DelaunayTriangulation::surface_distances(bool calculate_self_geodesics,
+                                         matrix<geodesic>* geodesics_out) const {
+  SimpleMetric S = compute_simple(*this, bound_for(*this, calculate_self_geodesics),
+                                  calculate_self_geodesics);
 
   // sqrt of the integer simple distances (unreachable -> +inf), then APSP
   // smoothing to enforce the triangle inequality across intermediate cones.
+  // In self mode the diagonal carries the closed-geodesic squared length (or
+  // bound sentinel); the APSP relaxes it to min(closed_loop, 2*nearest_neighbor).
   matrix<double> H(S.square.m, S.square.n, 0.0);
   for (std::size_t i = 0; i < S.square.size(); i++)
     H[i] = (S.square[i] < LLONG_MAX) ? std::sqrt((double)S.square[i])
@@ -283,15 +342,24 @@ DelaunayTriangulation::surface_distances(matrix<geodesic>* geodesics_out) const 
   APSPResult<double> apsp = H.APSP_with_paths();
   *geodesics_out = matrix<geodesic>(n, n, geodesic{});
   for (int u = 0; u < n; u++)
-    for (int v = 0; v < n; v++)
+    for (int v = 0; v < n; v++) {
+      // Self-mode diagonal: reconstruct_path(preds, u, u) returns [u], which
+      // compose_simple_geodesics turns into an empty geodesic{}.  Emit the
+      // single recorded closing simple_geodesic directly so the diagonal
+      // matches the squared distance flowing through APSP.
+      if (u == v && calculate_self_geodesics && S.geo(u, u).g.norm2() > 0) {
+        (*geodesics_out)(u, v).segments.push_back(S.geo(u, u));
+        continue;
+      }
       (*geodesics_out)(u, v) =
           compose_simple_geodesics(reconstruct_path(apsp.preds, u, v), S.geo);
+    }
   return apsp.dist.square_elementwise();
 }
 
 matrix<DelaunayTriangulation::geodesic>
-DelaunayTriangulation::surface_geodesics() const {
+DelaunayTriangulation::surface_geodesics(bool calculate_self_geodesics) const {
   matrix<geodesic> G(0, 0, geodesic{});
-  surface_distances(&G);
+  surface_distances(calculate_self_geodesics, &G);
   return G;
 }
