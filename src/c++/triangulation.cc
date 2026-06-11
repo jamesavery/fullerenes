@@ -1151,16 +1151,22 @@ matrix<int> TriangulationView::simple_square_surface_distances(vector<node_t> no
       M[U] *= 2;        // To capture self-geodesics, we need to look twice as far (there and back again)
     }  
 
-  // Note: All Eisenstein numbers of the form (a,0) or (0,b) yield same lengths
-  //       as graph distance, and are hence covered by initial step. So start from 1.
-  //       M is upper bound for distance, so only need to do a^2+ab+b^2 strictly less than M.
+  // Eisenstein walks (a,b) with a^2+ab+b^2 < Mu^2.  Axis-aligned (a,0)
+  // off-diagonal entries are already captured by the initial graph-SP
+  // matrix (axis-aligned source length == graph distance), but the
+  // self-diagonal is NOT: H(U,U) starts as 0 (graph SP u->u), then in
+  // self mode gets overwritten to the INT_MAX (sentinel) above, so an
+  // axis-aligned closure end_of_the_line(u, i, a, 0) == u would be
+  // missed if we started b at 1.  Looping b from 0 covers it; the
+  // redundant off-diagonal axis-aligned checks are cheap and idempotent
+  // (min against the same value).
   for(node_t u: nodes){
     node_t U = nodes_inverse[u];
     const int Mu = M[U];
-    
+
     for(int i=0;i<degree(u);i++)
       for(int a=1; a<Mu; a++)
-	for(int b=1; a*a + a*b + b*b < Mu*Mu; b++){
+	for(int b=0; a*a + a*b + b*b < Mu*Mu; b++){
 	  const node_t v = end_of_the_line(u,i,a,b);
 
 	  if(nodes_inverse[v] != -1){ // Endpoint v is in nodes
