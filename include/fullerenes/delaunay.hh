@@ -266,10 +266,11 @@ struct DelaunayTriangulation {
   // cone) are excluded by an API pin in the walk and not computed; pass
   // calculate_self_geodesics = true to compute the diagonal too -- the BFS
   // runs in self-mode for each cone, picking up seed-edge self-loops at seed
-  // setup and apex closures (including the wrap-around flavour, via sector
-  // bypass at recording).  Mirrors TriangulationView's calculate_self_geodesics
-  // flag.  See claude-projects/delta-complex/DELTA-COMPLEX-SURFACE-METRIC.md
-  // §"Self-geodesics" for the three flavours and the underlying mechanism.
+  // setup and any u_start apex placements the unmodified BFS validity gate
+  // accepts.  Wrap-around closures rely on multi-seed coverage of the full
+  // cone angle.  Mirrors TriangulationView's calculate_self_geodesics flag.
+  // See claude-projects/delta-complex/DELTA-COMPLEX-SURFACE-METRIC.md
+  // §"Self-geodesics" for the full account.
 
   // A simple geodesic u -> v, exact in Z[w]: the displacement g (u at origin,
   // |g|^2 = squared length) in the unfolding seeded at half-edge `axis` with
