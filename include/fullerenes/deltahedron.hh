@@ -3,6 +3,7 @@
 #include "fullerenes/geometry.hh"
 #include <functional>
 #include <cstdint>
+#include <cstdio>
 
 class Polyhedron;  // forward declaration
 
@@ -156,6 +157,15 @@ public:
     owned_points = std::move(pts);
     repoint();
   }
+
+  // PLY mesh I/O (see polyhedron-io.cc / deltahedron-io.cc). from_ply builds an
+  // oriented Polyhedron and requires it to be a triangulation.
+  // @post   result.is_consistently_oriented() && all faces are triangles
+  // @throws mesh_io_error  as Polyhedron::from_ply, plus NotATriangulation on a non-triangular face
+  static Deltahedron from_ply(FILE *file);
+  // @post   result == (no write error occurred)
+  // @throws mesh_io_error  on a null file
+  static bool to_ply(const Deltahedron &D, FILE *file, bool binary=true);
 
   // Optimize geometry (uses Deltahedron-specific state fields).
   // Returns OptResult indicating why the optimizer stopped.

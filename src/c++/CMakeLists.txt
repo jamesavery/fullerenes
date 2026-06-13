@@ -4,7 +4,7 @@ add_library(fullerenes SHARED
   delaunay.cc  delaunay_embed3d.cc  delaunay_old.cc  delaunay_alexandrov12.cc  graph_fortran.cc isomerdb.cc layout.cc layout2d.cc argparser.cc
   polyhedron-optimize.cc symmetry.cc eisenstein.cc eisenstein_raster.cc barycentric.cc
   delaunay_strip.cc delaunay_unfold.cc delaunay_metric.cc eisenstein_paint.cc
-  deltahedron.cc buckinverse.cc ../contrib/mgmres.cc ${MORE_SOURCES}
+  deltahedron.cc deltahedron-io.cc buckinverse.cc ../contrib/mgmres.cc ${MORE_SOURCES}
 )
 
 #Ensure that CMAKE_Fortran_IMPLICIT_LINK_LIBRARIES is defined

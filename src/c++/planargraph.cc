@@ -1,4 +1,5 @@
 #include <queue>
+#include <stdexcept>
 
 #include "fullerenes/spiral.hh"
 #include "fullerenes/planargraph.hh"
@@ -172,10 +173,11 @@ PlanarGraph PlanarGraphView::dual_graph(unsigned int Fmax) const
       dual.push_back(i_f, face_numbers[e_g]);
 
       w = prev(v,u); u = v; v = w;
-      assert(++i <= Fmax);
+      if(++i > Fmax) throw std::logic_error("dual_graph: face exceeds Fmax (corrupted/non-oriented graph)");
     } while (u != e_f.first);
   }
-  assert(dual.is_consistently_oriented());
+  if(!dual.is_consistently_oriented())
+    throw std::logic_error("dual_graph: produced dual is not consistently oriented");
 
   return dual;
 }
@@ -503,21 +505,24 @@ vector<coord3d> PlanarGraphView::zero_order_geometry(double scalerad) const
 // is a unique representation of the face.
 arc_t PlanarGraphView::get_face_representation(arc_t e, int Fmax) const
 {
-  assert(is_consistently_oriented());
-
-
-  int i=0;  
+  // Precondition (consistent orientation) is a maintained global invariant and is
+  // checked once (throwing) by the batch callers (compute_face_representations,
+  // dual_graph). It is NOT re-checked here: this accessor is called O(E) times per
+  // batch, and is_consistently_oriented() is itself O(E) -- re-checking would make
+  // face computation O(E^2). The Fmax back-stop below is the always-compiled guard
+  // that turns a corrupted/non-oriented graph into a throw rather than an infinite loop.
+  int i=0;
   arc_t e_min = e;
   node_t u = e.first, v = e.second;
 
   while(v!=e.first){
     node_t w = next_on_face(u,v);
-    u=v; v=w; 
+    u=v; v=w;
 
     if(u<e_min.first) e_min = {u,v};
-    
-    assert(w != -1);
-    assert(++i<=Fmax); // Fmax is a back-stop to avoid infinite loops in a corrupted graph
+
+    if(w == -1)    throw std::logic_error("get_face_representation: dangling arc (corrupted/non-oriented graph)");
+    if(++i > Fmax) throw std::logic_error("get_face_representation: face exceeds Fmax (corrupted/non-oriented graph)");
   }
   return e_min;
 }
@@ -526,7 +531,10 @@ arc_t PlanarGraphView::get_face_representation(arc_t e, int Fmax) const
 // is a unique representation of the face.
 vector<arc_t> PlanarGraphView::compute_face_representations(int Fmax) const
 {
-  assert(is_consistently_oriented());
+  // @pre: graph is consistently oriented. Checked once here (O(E)) so the O(E)
+  // per-arc tracer below can trust it; a violation throws rather than aborting.
+  if(!is_consistently_oriented())
+    throw std::logic_error("compute_face_representations: graph is not consistently oriented");
 
   unordered_set<arc_t> faces(2*count_edges());
   
@@ -543,25 +551,29 @@ vector<arc_t> PlanarGraphView::compute_face_representations(int Fmax) const
 
 face_t PlanarGraphView::get_face_oriented(const arc_t &e, int Fmax) const
 {
-  assert(is_consistently_oriented());
-
+  // See get_face_representation: orientation precondition is checked once by the
+  // batch caller (compute_faces_oriented), not per-arc, to keep face computation
+  // linear rather than O(E^2). The Fmax back-stop below throws (always compiled)
+  // on a corrupted/non-oriented graph rather than looping forever.
   int i=0;
   node_t u = e.first, v=e.second;
   face_t f = vector<int>(1,u);
-  
+
   while(v!=e.first){
     node_t w = prev(v,u);        // Previous neighbour to u in v defines corner u-v-w in face
 
     f.push_back(v);
     u=v; v=w; i++;
-    assert(w != -1);
-    assert(i<=Fmax);                // Fmax is a back-stop to avoid infinite loops in a corrupted graph
+    if(w == -1)  throw std::logic_error("get_face_oriented: dangling arc (corrupted/non-oriented graph)");
+    if(i > Fmax) throw std::logic_error("get_face_oriented: face exceeds Fmax (corrupted/non-oriented graph)");
   }
   return f;
 }
 
 vector<face_t> PlanarGraphView::compute_faces_oriented(int Fmax) const
 {
+  // @pre (consistent orientation) is enforced once by compute_face_representations,
+  // called first below, before any face is traced.
   vector<arc_t> face_representations = compute_face_representations(Fmax);
 
   vector<face_t> faces(face_representations.size());

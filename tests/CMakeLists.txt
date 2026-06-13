@@ -55,6 +55,10 @@ add_executable(orientation-test orientation-test.cc)
 target_link_libraries(orientation-test fullerenes GTest::GTest GTest::Main)
 add_test(NAME orientation-test COMMAND orientation-test)
 
+add_executable(ply-io-test ply-io-test.cc)
+target_link_libraries(ply-io-test fullerenes GTest::GTest GTest::Main)
+add_test(NAME ply-io-test COMMAND ply-io-test)
+
 add_executable(csr-test csr-test.cc)
 target_link_libraries(csr-test fullerenes GTest::GTest GTest::Main)
 add_test(NAME csr-test COMMAND csr-test)

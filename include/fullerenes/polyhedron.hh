@@ -3,11 +3,31 @@
 #include <fstream>
 #include <sstream>
 #include <list>
+#include <stdexcept>
 
 #include "fullerenes/owned.hh"
 #include "fullerenes/fullerenegraph.hh"
 
 using namespace std;
+
+// Failure reading or interpreting a geometry file. A catchable std::runtime_error
+// subtype thrown by the from_file / from_ply / to_ply readers so a malformed file
+// never takes down the host process. The Code is a closed, reason-named set of the
+// modeled failure categories (style-failures.md); .what() carries the specifics.
+struct mesh_io_error : std::runtime_error {
+  enum class Code {
+    NullFile,           // no readable / writable stream
+    UnsupportedFormat,  // header format unsupported, or a required property/type missing
+    MalformedFile,      // truncated body, bad element count, or allocation failure
+    InvalidTopology,    // out-of-range index, non-manifold arc, open fan, bad degree, inconsistent winding
+    NotATriangulation,  // a valid polyhedron, but the target type requires triangular faces
+    FaceTooLarge,       // writer: a face has more than 255 vertices
+    UnknownFormat,      // from_file: file extension / format string not recognised
+    EmptyGraph,         // from_file: the delegated parser produced zero vertices
+  };
+  Code code;
+  mesh_io_error(Code code_, const std::string &what_) : std::runtime_error(what_), code(code_) {}
+};
 
 // Polyhedron: owned planar graph with 3D vertex coordinates.
 // Inherits geometry methods from PolyhedronView via Owned<PolyhedronView<double>>.
@@ -58,13 +78,18 @@ struct Polyhedron : public Owned<PolyhedronView<double>> {
 
   // Graph I/O
   static vector<string> formats,format_alias, input_formats, output_formats;
-  enum {ASCII,PLANARCODE,XYZ,MOL2,MATHEMATICA,LATEX,CC1,TURBOMOLE,GAUSSIAN,WAVEFRONT_OBJ,SPIRAL} formats_t;
+  enum {ASCII,PLANARCODE,XYZ,MOL2,MATHEMATICA,LATEX,CC1,TURBOMOLE,GAUSSIAN,WAVEFRONT_OBJ,SPIRAL,PLY} formats_t;
   static int format_id(string id);
 
   static Polyhedron from_file(string path);
   static Polyhedron from_file(FILE *file, string format);
   static Polyhedron from_xyz(FILE *file);
   static Polyhedron from_mol2(FILE *file);
+  // PLY (ascii or binary_little_endian) -> oriented Polyhedron, normalised to
+  // outward-facing (CCW-on-outside) by a signed-volume check + flip if inward.
+  // @post   result.is_consistently_oriented() && signed enclosed volume >= 0
+  // @throws mesh_io_error  on a null/unsupported/malformed file or invalid topology
+  static Polyhedron from_ply(FILE *file);
 
   static bool to_file(const Polyhedron &G, string path);
   static bool to_file(const Polyhedron &G, FILE *file, string format);
@@ -74,6 +99,11 @@ struct Polyhedron : public Owned<PolyhedronView<double>> {
   static bool to_gaussian(const Polyhedron &P, FILE *file, string header="");
   static bool to_xyz(const Polyhedron &G, FILE *file);
   static bool to_mol2(const Polyhedron &G, FILE *file);
+  // PLY writer (binary_little_endian by default, else ascii). n-gon faces and
+  // triangles serialise through the same per-face (count, indices) record.
+  // @post   result == (no write error occurred)
+  // @throws mesh_io_error  on a null file (NullFile) or a face with > 255 vertices (FaceTooLarge)
+  static bool to_ply(const Polyhedron &G, FILE *file, bool binary=true);
   static bool to_cc1(const Polyhedron &G, FILE *file);
 
   string to_latex(bool show_dual = false, bool number_vertices = false, bool include_latex_header = false) const;
