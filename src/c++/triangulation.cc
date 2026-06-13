@@ -1152,75 +1152,182 @@ TriangulationView::surface_geodesics(vector<node_t> nodes,
   return G;
 }
 
+// ── File-local helpers for the level-synchronous simple_square_surface_distances ──
+//
+// The Eisenstein ray sweep is reordered so rays are grouped by squared length
+// d2 = a^2+ab+b^2 (the Loeschian numbers) and processed in increasing-d2
+// "levels". This is bit-identical to the old source-major (u,i,a,b) loop but
+// (a) hoists each rep's run-length tape out of the per-(source,sector) fan and
+// (b) lets a dynamic d2 > max(H) cut and active-source compaction skip work.
+// It is also parallel-ready: within one level every write to H stores the SAME
+// d2, so the per-level sweep is a race-free parallel-for and the levels are the
+// only synchronisation points. The `PARALLEL:` markers below show where the
+// parallel-primitives ctx (par::seq / par::omp / SYCL) drops in once that API
+// settles -- until then this runs serially with no atomics or OpenMP.
+namespace {
+
+// Loeschian level table: reps {(a,b) : a>=1, b>=0, a^2+ab+b^2 < M_max^2},
+// sorted by norm2() and grouped into constant-d2 levels.  The (a,0) axis reps
+// are included so axis self-closures reach the self-diagonal (see the loop
+// comment below); off-diagonal they idempotently re-min the graph distance.
+struct EisensteinLevels {
+  vector<Eisenstein> reps;     // sorted by norm2(), tie-break (a,b); level-contiguous
+  vector<int>        first;    // level l = reps[first[l], first[l+1)); size()+1 entries
+  int size()  const { return (int)first.size() - 1; }
+  int d2(int l) const { return reps[first[l]].norm2(); }
+  std::span<const Eisenstein> level(int l) const {
+    return {reps.data() + first[l], size_t(first[l+1] - first[l])};
+  }
+};
+
+EisensteinLevels loeschian_levels(int M_max)
+{
+  EisensteinLevels L;
+  for(int a=1; a*a < M_max*M_max; a++)                          // (a,0): smallest is a^2
+    for(int b=0; Eisenstein(a,b).norm2() < M_max*M_max; b++)
+      L.reps.push_back(Eisenstein(a,b));
+
+  std::sort(L.reps.begin(), L.reps.end(), [](Eisenstein g, Eisenstein h){
+    return std::tuple(g.norm2(), g) < std::tuple(h.norm2(), h);
+  });
+  for(int r=0; r<(int)L.reps.size(); r++)
+    if(r==0 || L.reps[r].norm2() != L.reps[r-1].norm2()) L.first.push_back(r);
+  L.first.push_back(L.reps.size());
+  return L;
+}
+
+// Concatenated per-rep turn tapes for one level: rep r's tape is
+// tape[tape_first[r], tape_first[r+1)).  Axis reps (b==0) get an empty segment
+// -- they are walked directly, and draw_path is undefined for minor==0.
+void build_tapes(std::span<const Eisenstein> reps, vector<int>& tape, vector<int>& tape_first)
+{
+  tape.clear();
+  tape_first.assign(1, 0);
+  for(auto [a,b] : reps){
+    if(b >= 1){
+      vector<int> t = draw_path(max(a,b), min(a,b));            // reuse the file-local DDA
+      tape.insert(tape.end(), t.begin(), t.end());
+    }
+    tape_first.push_back(tape.size());
+  }
+}
+
+// Tape-driven straight-line walk: the rolling-square pump of end_of_the_line,
+// but driven by a precomputed tape (interior b>=1) or walked directly (axis
+// b==0).  Hoisting the tape is the point; for a one-off walk use the member
+// end_of_the_line instead.
+node_t walk_line(const TriangulationView& G, node_t u0, int i,
+                 Eisenstein g, std::span<const int> tape)
+{
+  if(g.second == 0){                                            // axis ray (a,0)
+    auto axis_step = [&](node_t prev, node_t v){ return G.next(G.next(G.next(prev,v),v),v); };
+    node_t prev = u0, v = G[u0][i];
+    for(int k=1; k<g.first; k++){ node_t nv = axis_step(prev,v); prev = v; v = nv; }
+    return v;
+  }
+  node_t q,r,s,t;
+  auto go_north = [&]{ const node_t S(s),T(t); q=S; r=T; s=G.next(S,T); t=G.next(s,r); };
+  auto go_east  = [&]{ const node_t R(r),T(t); q=R; s=T; r=G.next(s,q); t=G.next(s,r); };
+  q = u0; r = G[u0][i]; s = G.next(q,r); t = G.next(s,r);       // initial square
+  const bool a_major = g.first >= g.second;
+  for(size_t k=0; k<tape.size(); k++){
+    for(int j=0;j<tape[k]-1;j++) a_major ? go_east() : go_north();
+    if(k+1 < tape.size())        a_major ? go_north() : go_east();
+  }
+  return t;                                                     // upper-right corner
+}
+
+} // anonymous namespace
+
 matrix<int> TriangulationView::simple_square_surface_distances(vector<node_t> nodes,
 							   bool calculate_self_geodesics) const
 {
   if(nodes.empty()){ nodes.resize(N); for(int i=0;i<N;i++) nodes[i] = i;  } // If no node list is given, calculate all distances
-  
+  const int n = nodes.size(), max_deg = max_degree();
+
   vector<int> nodes_inverse(N,-1);
-  for(int i=0;i<nodes.size();i++){
-    node_t     u = nodes[i];
-    nodes_inverse[u] = i;
-  }
-  //  cout << "nodes = " << nodes << endl;
-  //  cout << "nodes_inverse = " << nodes_inverse << endl;  
-  
+  for(int i=0;i<n;i++) nodes_inverse[nodes[i]] = i;
 
-  // Initialize H to graph distances, which are upper bound to surface distances:
-  // 3/4 d_g^2 <= d_surface^2 <= d_g^2
-  matrix<int>             H(nodes.size(),nodes.size(),all_pairs_shortest_paths(nodes));
+  // Initialize H to graph distances, an upper bound to surface distances:
+  // 3/4 d_g^2 <= d_surface^2 <= d_g^2.  Off-diagonal axis-aligned rays (a,0)
+  // have length == graph distance, so they are already captured here.
+  matrix<int> H(n, n, all_pairs_shortest_paths(nodes));
 
+  // M[U] = max_V d_g(u,v): per-source search radius (upper bound to surface dist).
+  vector<int> M(n,0);
+  for(node_t U=0; U<n; U++) for(node_t V=0; V<n; V++) M[U] = max(M[U], H(U,V));
 
-  // M[u] = max_v(d_g(u,v)) is upper bound to surface distance from u  
-  vector<int> M(nodes.size(),0);	// M[u] = max_v(d_g(u,v)) is upper bound to surface distance from u
-  for(node_t U=0; U<nodes.size();U++)
-    for(node_t V=0;V<nodes.size();V++)
-      M[U] = max(M[U], H(U,V));
+  for(int i=0;i<H.size();i++) H[i] *= H[i];                     // work in squared distances
 
-  //  cout << "M = " << M << endl;
-
-  // Work with square distances, which are all integers  
-  for(int i=0;i<H.size();i++) H[i] *= H[i];     
-
-  //  cout << "H = " << H << endl;
-
-  if(calculate_self_geodesics) for(node_t U=0;U<nodes.size();U++){
-      H(U,U) = 4*M[U]*M[U]; // Diagonal sentinel (2*M[U])^2 -- H is in squared units: "no self-geodesic strictly inside the search radius". Finite (unlike INT_MAX) so max(H)-based termination bounds stay usable.
-      M[U] *= 2;        // To capture self-geodesics, we need to look twice as far (there and back again)
+  if(calculate_self_geodesics) for(node_t U=0;U<n;U++){
+      M[U] *= 2;             // a self-geodesic loops there and back: look twice as far
     }
 
-  // Eisenstein walks (a,b) with a^2+ab+b^2 < Mu^2.  Axis-aligned (a,0)
-  // off-diagonal entries are already captured by the initial graph-SP
-  // matrix (axis-aligned length == graph distance), but the self-diagonal
-  // is NOT: H(U,U) starts as 0 (graph SP u->u), then in self mode gets
-  // overwritten to the 4*M^2 sentinel above, so an axis-aligned closure
-  // like end_of_the_line(u, i, 3, 0) == u would be missed if we started
-  // b at 1.  Looping b from 0 covers it; the redundant off-diagonal
-  // axis-aligned checks are cheap and idempotent (min against the same
-  // value).
-  for(node_t u: nodes){
-    node_t U = nodes_inverse[u];
-    const int Mu = M[U];
+  vector<int> M2(n);                                           // per-source search radii, squared
+  for(node_t U=0; U<n; U++) M2[U] = M[U]*M[U];
 
-    for(int i=0;i<degree(u);i++)
-      for(int a=1; a<Mu; a++)
-	for(int b=0; a*a + a*b + b*b < Mu*Mu; b++){
-	  const node_t v = end_of_the_line(u,i,a,b);
+  if(calculate_self_geodesics) for(node_t U=0;U<n;U++)
+      H(U,U) = M2[U];        // Diagonal sentinel (2*M[U])^2: "no self-geodesic strictly
+                             // inside the search radius".  Finite (unlike INT_MAX) so the
+                             // max(H)-based cut below stays usable.  The self-diagonal is
+                             // NOT covered by the graph-SP init (it would be 0 then this
+                             // sentinel), so axis self-closures end_of_the_line(u,i,a,0)==u
+                             // must be shot explicitly -- hence the (a,0) reps in the table.
 
-	  if(nodes_inverse[v] != -1){ // Endpoint v is in nodes
-	    node_t V = nodes_inverse[v];
-	    // Skip the trivial (a, 0) closure that ends back at u_start at
-	    // zero geodesic distance: in self mode H(U,U) carries the
-	    // sentinel and we only want non-trivial closures (a*a+ab+b*b > 0,
-	    // which holds here since a >= 1).  In cone-to-cone mode the
-	    // diagonal stays 0 by initialisation and we don't get here for
-	    // U==V (graph SP from u to u is 0, so H(U,U)=0 and no update fires).
-	    int d_sqr = a*a + a*b + b*b;
-	    H(U,V) = min(H(U,V),d_sqr);
-	  }
-	}
+  // Sources sorted by search radius: as d2 grows a contiguous prefix retires
+  // (M2[U] <= d2 => U can shoot no further), so each level sweeps only the
+  // still-active suffix order[lo..n) instead of pruning every item.
+  vector<int> order(n);
+  for(int U=0;U<n;U++) order[U] = U;
+  std::sort(order.begin(), order.end(), [&](int a,int b){ return M2[a] < M2[b]; });
+
+  const int M_max = M.empty() ? 0 : *std::max_element(M.begin(), M.end());
+  const EisensteinLevels levels = loeschian_levels(M_max);
+  vector<int> tape, tape_first;
+
+  // Levels in increasing d2.  Each level shoots {(U,i,g) : g.norm2()==d2(l) <
+  // M2[U]} over the active sources; the old bound a < Mu is implied by d2 < Mu^2,
+  // so the union over levels is exactly the old candidate set.
+  constexpr int bound_refresh_period = 16;     // n^2 max-scan period (guard, not a knob)
+  int bound = INT_MAX, lo = 0;
+  for(int l=0; l<levels.size(); l++){
+    const int d2 = levels.d2(l);
+    while(lo < n && M2[order[lo]] <= d2) lo++;                 // retire sources past their radius
+    const int n_active = n - lo;
+    if(n_active == 0) break;                                   // no source can shoot further
+
+    if(l % bound_refresh_period == 0){
+      // Dynamic global cut: once d2 exceeds every current entry, no later
+      // (longer) ray can improve any entry.
+      int hmax = 0;
+      // PARALLEL: hmax = ctx.reduce(n*n, 0, par::max_op{}, [&](int k){ return H[k]; });
+      for(int k=0;k<n*n;k++) hmax = max(hmax, H[k]);
+      bound = hmax;
+    }
+    if(d2 > bound) break;
+
+    const std::span<const Eisenstein> reps = levels.level(l);
+    const int R = reps.size();
+    build_tapes(reps, tape, tape_first);                       // hoisted once per level
+
+    // One work item = one ray (active source, sector i, rep): walk, then min.
+    // rep innermost so consecutive items share a tape.  Within a level every
+    // write stores the same d2, so this loop is a race-free parallel-for.
+    const int n_items = n_active * max_deg * R;
+    // PARALLEL: ctx.for_each(n_items, shoot); ctx.barrier();  (shoot = loop body below,
+    //           with H(U,V)=min(...) becoming a relaxed atomic_ref store of the equal d2)
+    for(int flat=0; flat<n_items; flat++){
+      const int rep = flat % R, i = (flat / R) % max_deg;
+      const node_t U = order[lo + flat / (R * max_deg)];
+      const node_t u = nodes[U];
+      if(i >= degree(u)) continue;
+      const node_t v = walk_line(*this, u, i, reps[rep],
+                                 std::span<const int>(tape).subspan(tape_first[rep],
+                                                                    tape_first[rep+1]-tape_first[rep]));
+      const int V = nodes_inverse[v];
+      if(V != -1) H(U,V) = min(H(U,V), d2);
+    }
   }
-  
   return H;
 }
 
