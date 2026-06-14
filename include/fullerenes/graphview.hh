@@ -475,6 +475,36 @@ template<> bool PolyhedronView<double>::optimize_other(bool optimize_angles, map
 // Forward declaration for return types.
 class Deltahedron;
 
+// --- Curvature-cone detection (DeltahedronView<double>::find_cones) ---
+//
+// A closed genus-0 triangulation carries total Gaussian curvature 4*pi
+// (Gauss-Bonnet); a fullerene shell concentrates it in 12 cones of pi/3 each.
+// find_cones locates those cones as surface points with the angle-defect mass
+// each integrates -- the inverse of placing pentagons on a sphere. See
+// src/c++/deltahedron-cones.cc for the algorithm.
+
+// A curvature cone located on the triangulation surface.
+struct SurfaceCone {
+  int                  face;                 // triangle index (into triangles())
+  std::array<double,3> bary;                 // barycentric coords within `face`
+  coord3d              position;             // 3D position = bary . triangle corners
+  double               integrated_K;         // signed angle defect summed over the cone's
+                                             // R-disk, EXCLUDING vertices already claimed by
+                                             // an earlier cone (so cones partition the mass);
+                                             // ~pi/3 ideal, slightly less if disks overlap
+  bool                 meanshift_converged;
+  int                  meanshift_iters;
+};
+
+struct ConeFinderParams {
+  double R_pent;                  // disk + exclusion radius, mesh units (required)
+  double threshold_frac  = 0.1;   // accept a cone iff disk-K >= this * pi/3
+  int    max_centres     = 12;    // upper bound (fullerene: exactly 12 pentagons)
+  int    taubin_iters    = 10;    // Taubin smoothing passes
+  int    meanshift_iters = 200;   // max mean-shift iterations per centre
+  explicit ConeFinderParams(double R) : R_pent(R) {}
+};
+
 template<typename T = double>
 struct DeltahedronView : TriangulationView {
     std::span<coord3<T>> points;
@@ -518,6 +548,29 @@ struct DeltahedronView : TriangulationView {
     // --- Geometry operations ---
     vector<face_t> compute_dual_faces() const;
     void smooth(double q);
+    // Taubin lambda|mu low-pass: `iters` passes of a forward step smooth(lambda)
+    // then a shrink-correcting step smooth(mu) (mu < -lambda). Modifies points.
+    void taubin_smooth(int iters, double lambda=0.5, double mu=-0.53);
+    // Discrete Gaussian curvature K(v) = 2*pi - sum of incident triangle angles
+    // (the angle defect), per vertex, on the current embedding. Size N. The
+    // tris overload reuses an already-computed triangulation (triangles() is O(E)).
+    std::vector<double> angle_defects() const;
+    std::vector<double> angle_defects(const std::vector<tri_t>& tris) const;
+    // Locate up to params.max_centres curvature cones (e.g. the 12 fullerene
+    // pentagons of a tomogram shell), detected on a Taubin-smoothed copy (this
+    // mesh is untouched) and reported on the original geometry, in a deterministic
+    // order. Fewer than max_centres is under-segmentation, a legitimate outcome.
+    // If smoothed_points is non-null it receives the smoothed copy. See
+    // deltahedron-cones.cc.
+    // @pre     radius:    params.R_pent > 0 (and finite)
+    // @pre     fraction:  params.threshold_frac in [0,1]
+    // @pre     finite:    every vertex coordinate is finite (no NaN/inf)
+    // @post    bounded:   result.size() <= params.max_centres
+    // @post    gated:     every returned cone has integrated_K >= threshold_frac * pi/3
+    // @post    on_mesh:   every cone's face is a valid triangle index, position lies on it
+    // @throws  std::invalid_argument when a @pre is violated (bad params or non-finite geometry)
+    std::vector<SurfaceCone> find_cones(const ConeFinderParams& params,
+                                        std::vector<coord3d>* smoothed_points = nullptr) const;
     Deltahedron GCtransform(unsigned k, unsigned l) const;
     Deltahedron halma_transform(int m) const;
 
@@ -544,6 +597,11 @@ template<> double DeltahedronView<double>::max_angle_relerr() const;
 template<> int    DeltahedronView<double>::count_concave() const;
 template<> vector<face_t> DeltahedronView<double>::compute_dual_faces() const;
 template<> void   DeltahedronView<double>::smooth(double q);
+template<> void   DeltahedronView<double>::taubin_smooth(int iters, double lambda, double mu);
+template<> std::vector<double> DeltahedronView<double>::angle_defects() const;
+template<> std::vector<double> DeltahedronView<double>::angle_defects(const std::vector<tri_t>& tris) const;
+template<> std::vector<SurfaceCone> DeltahedronView<double>::find_cones(
+    const ConeFinderParams& params, std::vector<coord3d>* smoothed_points) const;
 template<> Deltahedron DeltahedronView<double>::GCtransform(unsigned k, unsigned l) const;
 template<> Deltahedron DeltahedronView<double>::halma_transform(int m) const;
 template<> int DeltahedronView<double>::reflect_concave(std::span<coord3d> pts, double threshold,
