@@ -505,6 +505,8 @@ struct ConeFinderParams {
   explicit ConeFinderParams(double R) : R_pent(R) {}
 };
 
+struct DelaunayTriangulation;   // forward decl for DeltahedronView::intrinsic_metric()
+
 template<typename T = double>
 struct DeltahedronView : TriangulationView {
     std::span<coord3<T>> points;
@@ -571,6 +573,10 @@ struct DeltahedronView : TriangulationView {
     // @throws  std::invalid_argument when a @pre is violated (bad params or non-finite geometry)
     std::vector<SurfaceCone> find_cones(const ConeFinderParams& params,
                                         std::vector<coord3d>* smoothed_points = nullptr) const;
+    // The intrinsic surface metric: the iDT whose edge lengths are this mesh's
+    // Euclidean edge lengths. The bridge from a 3D embedding to the purely-intrinsic
+    // curvature flow (curvature-flow.hh); the only step that reads 3D coordinates.
+    DelaunayTriangulation intrinsic_metric() const;
     Deltahedron GCtransform(unsigned k, unsigned l) const;
     Deltahedron halma_transform(int m) const;
 
@@ -602,6 +608,7 @@ template<> std::vector<double> DeltahedronView<double>::angle_defects() const;
 template<> std::vector<double> DeltahedronView<double>::angle_defects(const std::vector<tri_t>& tris) const;
 template<> std::vector<SurfaceCone> DeltahedronView<double>::find_cones(
     const ConeFinderParams& params, std::vector<coord3d>* smoothed_points) const;
+template<> DelaunayTriangulation DeltahedronView<double>::intrinsic_metric() const;
 template<> Deltahedron DeltahedronView<double>::GCtransform(unsigned k, unsigned l) const;
 template<> Deltahedron DeltahedronView<double>::halma_transform(int m) const;
 template<> int DeltahedronView<double>::reflect_concave(std::span<coord3d> pts, double threshold,

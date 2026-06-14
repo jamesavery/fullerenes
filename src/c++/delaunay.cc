@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <map>
 #include <climits>
+#include <limits>
+#include <queue>
 #include <stdexcept>
 #include <string>
 #include <sstream>
@@ -1153,17 +1155,8 @@ static int bisect_edge(DelaunayTriangulation& D, int h) {
   double wD2 = (c*c + d*d) / 2.0 - L*L / 4.0;
   double wD = wD2 > 0 ? sqrt(wD2) : 0;
 
-  // Allocate new vertex w.
-  int w = D.nv++;
-  if (w >= (int)D.v_out.size()) {
-    D.v_out.push_back(-1);
-    D.v_cone_angle.push_back(2.0 * M_PI);  // flat
-    D.v_orig_degree.push_back(4);
-  } else {
-    D.v_out[w] = -1;
-    D.v_cone_angle[w] = 2.0 * M_PI;
-    D.v_orig_degree[w] = 4;
-  }
+  // Allocate new vertex w (flat, original degree 4).
+  int w = D.alloc_vertex(2.0 * M_PI, 4);
 
   // Delete original edge and its two faces.
   D.dealloc_face(D.he_face[h]);
@@ -1211,6 +1204,114 @@ int DelaunayTriangulation::bisect_multi_edges() {
     }
   }
   return n_inserted;
+}
+
+// --- Vertex / face surgery ---
+
+int DelaunayTriangulation::alloc_vertex(double cone_angle, int orig_degree) {
+  int v = nv++;
+  if (v >= (int)v_out.size()) {
+    v_out.push_back(-1);
+    v_cone_angle.push_back(cone_angle);
+    v_orig_degree.push_back(orig_degree);
+  } else {
+    v_out[v] = -1;
+    v_cone_angle[v] = cone_angle;
+    v_orig_degree[v] = orig_degree;
+  }
+  return v;
+}
+
+int DelaunayTriangulation::split_face(int h0, std::array<double,3> spoke) {
+  int h1 = he_next[h0], h2 = he_next[h1];
+  int a = he_origin[h0], b = he_origin[h1], c = he_origin[h2];
+  int f = he_face[h0];
+
+  int P = alloc_vertex(2.0 * M_PI, 3);
+  dealloc_face(f);                                  // only the face; the 3 edges stay
+  int sa = alloc_directed_edge(P, a, spoke[0]);
+  int sb = alloc_directed_edge(P, b, spoke[1]);
+  int sc = alloc_directed_edge(P, c, spoke[2]);
+  wire_triangle(sa, h0, twin(sb));                  // (P, a, b)
+  wire_triangle(sb, h1, twin(sc));                  // (P, b, c)
+  wire_triangle(sc, h2, twin(sa));                  // (P, c, a)
+
+  v_out[P] = sa;
+  v_out[a] = twin(sa); v_out[b] = twin(sb); v_out[c] = twin(sc);
+  // wire_triangle set the new faces' angles; refresh the cached cone angle at the four
+  // vertices whose incident faces changed.
+  for (int v : {P, a, b, c}) v_cone_angle[v] = vertex_angle_sum(v);
+  return P;
+}
+
+// --- Curvature ---
+
+std::vector<double> DelaunayTriangulation::curvature() const {
+  std::vector<double> K(nv);
+  for (int v = 0; v < nv; v++) K[v] = 2.0 * M_PI - v_cone_angle[v];
+  return K;
+}
+
+// --- Geodesic disks (bounded multi-source Voronoi) ---
+
+// Fast-marching update: the wavefront reaches the two ends of an edge (length `edge`)
+// at times d0, d1; return its arrival time at the triangle's opposite vertex, whose
+// edges to those two ends are e0, e1, travelling straight across the unfolded
+// interior. +inf when the straight crossing is invalid (obtuse triangle, or d0,d1
+// inconsistent) so the caller's edge relaxation is the fallback.
+static double fast_march(double d0, double d1, double edge, double e0, double e1) {
+  const double kInf = std::numeric_limits<double>::infinity();
+  if (edge <= 0.0) return kInf;
+  double xt  = (edge*edge + e0*e0 - e1*e1) / (2.0*edge);   // target, unfolded above
+  double yt2 = e0*e0 - xt*xt;
+  if (yt2 <= 0.0) return kInf;                             // degenerate face
+  double yt  = sqrt(yt2);
+  double xs  = (d0*d0 - d1*d1 + edge*edge) / (2.0*edge);   // virtual source, below
+  double ys2 = d0*d0 - xs*xs;
+  if (ys2 < 0.0) return kInf;                              // |d0-d1| > edge
+  double ys  = -sqrt(ys2);
+  double cross = xs + (xt - xs) * (-ys) / (yt - ys);       // line source->target meets edge
+  if (cross < 0.0 || cross > edge) return kInf;            // wave rounds a vertex
+  double d = hypot(xt - xs, yt - ys);
+  return d >= std::max(d0, d1) ? d : kInf;                 // causality (monotone front)
+}
+
+std::vector<GeodesicDisk>
+DelaunayTriangulation::geodesic_disks(const std::vector<int>& sources, double R,
+                                      DiskMetric metric) const {
+  const double kInf = std::numeric_limits<double>::infinity();
+  std::vector<GeodesicDisk> disks;
+  for (int s : sources) disks.push_back({s, {}});
+  std::vector<double> dist(nv, kInf);
+  std::vector<int>    owner(nv, -1);    // index into sources/disks of the claiming source
+  std::vector<char>   frozen(nv, 0);
+  std::priority_queue<std::pair<double,int>, std::vector<std::pair<double,int>>,
+                      std::greater<>> frontier;
+  for (int i = 0; i < (int)sources.size(); i++) {
+    dist[sources[i]] = 0.0; owner[sources[i]] = i; frontier.push({0.0, sources[i]});
+  }
+
+  auto relax = [&](int v, double cand, int own) {
+    if (!frozen[v] && cand <= R && cand < dist[v]) { dist[v] = cand; owner[v] = own; frontier.push({cand, v}); }
+  };
+  while (!frontier.empty()) {
+    auto [d, u] = frontier.top(); frontier.pop();
+    if (frozen[u]) continue;
+    frozen[u] = 1;
+    int o = owner[u];
+    disks[o].members.push_back({u, d});
+    for (int h : incident(u)) {                     // each incident face (u, x, y)
+      int    h1 = he_next[h], h2 = he_next[h1];
+      int    x = dest(h), y = he_origin[h2];
+      double L_ux = he_length[h], L_xy = he_length[h1], L_uy = he_length[h2];
+      relax(x, d + L_ux, o);                         // edge u -> x
+      if (metric == DiskMetric::Unfold) {            // wavefront across the face, within the cell
+        if (frozen[x] && owner[x] == o) relax(y, fast_march(d, dist[x], L_ux, L_uy, L_xy), o);
+        if (frozen[y] && owner[y] == o) relax(x, fast_march(d, dist[y], L_uy, L_ux, L_xy), o);
+      }
+    }
+  }
+  return disks;
 }
 
 // --- Validation ---

@@ -24,6 +24,7 @@
 // mean-shift centroid uses the positive part (a signed centroid is ill-defined).
 
 #include "fullerenes/deltahedron.hh"
+#include "fullerenes/delaunay.hh"
 #include "fullerenes/geometry.hh"
 
 #include <algorithm>
@@ -359,4 +360,14 @@ DeltahedronView<double>::find_cones(const ConeFinderParams& params,
 
   canonical_cone_order(cones);
   return cones;
+}
+
+// The intrinsic surface metric: the iDT whose edge lengths are this mesh's Euclidean
+// edge lengths. The lone step that reads 3D coordinates; the curvature flow downstream
+// (curvature-flow.hh) is purely intrinsic.
+template<>
+DelaunayTriangulation DeltahedronView<double>::intrinsic_metric() const {
+  Triangulation T(static_cast<const GraphView&>(*this));   // combinatorial part, oriented
+  auto length = [&](node_t u, node_t v) { return (points[u] - points[v]).norm(); };
+  return DelaunayTriangulation::from_intrinsic_metric(T, length);
 }

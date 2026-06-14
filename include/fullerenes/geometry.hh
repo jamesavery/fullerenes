@@ -116,6 +116,15 @@ struct coord2 : public pair<T,T> {
 
 using coord2d = coord2<double>;
 
+// The apex of a flat triangle with base a=(0,0), b=(L_ab,0), given its three edge
+// lengths (law of cosines); apex placed at y >= 0. The Euclidean analogue of
+// place_third_eis (the Z[w] lattice version, eisenstein.hh).
+inline coord2d place_apex(double L_ab, double L_bc, double L_ca) {
+  const double x  = (L_ab*L_ab + L_ca*L_ca - L_bc*L_bc) / (2.0*L_ab);
+  const double y2 = L_ca*L_ca - x*x;
+  return coord2d(x, sqrt(y2 > 0 ? y2 : 0.0));
+}
+
 
 
 template<typename T = double>
