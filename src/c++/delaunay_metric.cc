@@ -205,24 +205,16 @@ std::vector<int> fan_half_edges(const DelaunayTriangulation& D, int u) {
   return hs;
 }
 
-// Self-contained BFS bound: the iDT's edge-length-weighted graph diameter,
-// squared, plus slack.  Surface distance <= graph distance, so a squared
-// surface distance never exceeds this -- every cone pair is reachable.
+// Self-contained BFS bound: an upper bound on the iDT's squared weighted
+// graph diameter, plus slack.  Surface distance <= graph distance, so a
+// squared surface distance never exceeds this -- every cone pair is
+// reachable.  Uses DelaunayTriangulation::diameter_upper_bound (a
+// 2-approximation via double-sweep Dijkstra, O(N log N)) rather than a
+// full O(N^3) APSP -- the BFS this bounds tolerates a looser bound.
 long long metric_bound(const DelaunayTriangulation& D) {
-  const int n = D.nv;
-  matrix<double> W(n, n, std::numeric_limits<double>::infinity());
-  for (int u = 0; u < n; u++) W(u, u) = 0.0;
-  for (int h = 0; h < D.nh; h++) {
-    if (!D.alive(h)) continue;
-    int u = D.he_origin[h], v = D.he_origin[h ^ 1];
-    if (u == v || u < 0 || v < 0 || u >= n || v >= n) continue;
-    if (D.he_length[h] < W(u, v)) W(u, v) = D.he_length[h];
-  }
-  matrix<double> G = W.APSP(false);
-  double dmax = 0.0;
-  for (std::size_t i = 0; i < G.size(); i++)
-    if (std::isfinite(G[i])) dmax = std::max(dmax, G[i]);
-  return (long long)std::ceil(dmax * dmax) + 4;
+  if (D.nv == 0) return 4;
+  const double d = D.diameter_upper_bound();
+  return (long long)std::ceil(d * d) + 4;
 }
 
 struct SimpleMetric {
