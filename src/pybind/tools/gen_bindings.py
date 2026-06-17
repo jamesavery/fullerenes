@@ -29,7 +29,10 @@ import os
 import re
 import subprocess
 import sys
-import tomllib
+try:
+    import tomllib                      # Python 3.11+
+except ModuleNotFoundError:             # 3.9/3.10: pip install tomli (see the test extra)
+    import tomli as tomllib
 from dataclasses import dataclass, field
 
 HERE = os.path.dirname(os.path.abspath(__file__))

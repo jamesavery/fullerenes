@@ -11,7 +11,8 @@ requires-python = ">=3.9"
 dependencies = ["numpy>=1.23"]
 
 [project.optional-dependencies]
-test = ["pytest>=7"]
+# tomli backports tomllib (3.11+) so the binding-drift gate / generator run on 3.9/3.10.
+test = ["pytest>=7", "tomli; python_version < '3.11'"]
 
 [tool.scikit-build]
 cmake.version = ">=3.18"

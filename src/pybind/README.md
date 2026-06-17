@@ -13,40 +13,55 @@ by the pytest suite and two fail-closed drift gates (see
 `doc/pybind-interface.tex` for the full write-up). GPU/SYCL batch is deferred by
 design.
 
-## Build
+## Install (plain pip, recommended)
 
-> ABI: the module **must** be built with the same compiler/stdlib as the library
-> (clang++ 23, `-std=gnu++23`); as an in-tree target it inherits the parent
-> toolchain automatically. The system pybind11 (2.9.1) is too old for Python 3.13 —
-> use the pip `pybind11` (>=2.13): `-Dpybind11_DIR=$(python3 -m pybind11 --cmakedir)`.
+Build from source against a prebuilt `libfullerenes.so` — no conda required.
+Prerequisites: a C++ compiler matching the library (clang++ by default; see ABI
+below), the Python development headers (`python3-dev`), and the library built once
+at `<repo>/build`.
 
-In-tree, with the rest of the library:
+```bash
+python3 -m venv .venv && . .venv/bin/activate     # from the repo root
+pip install -e src/pybind                         # build isolation fetches pybind11 + scikit-build-core
+python -c "import fullerenes as f; print(f.version())"
+```
+
+`numpy` comes as a dependency; `pybind11` and `scikit-build-core` are pulled into
+pip's isolated build env automatically. To run the test suite too:
+
+```bash
+pip install -e "src/pybind[test]"
+pytest src/pybind/tests
+```
+
+For a faster dev loop, pre-install the build deps
+(`pip install "pybind11>=2.13" scikit-build-core`) and add `--no-build-isolation`.
+The editable install rebuilds the extension on import, so C++ edits take effect on
+the next `import`.
+
+> ABI: the module must match the library's compiler/stdlib. The build pins
+> `clang++` (what `libfullerenes.so` is built with), and system Python's
+> `libstdc++` is the very one the library links — so plain system Python is
+> ABI-safe with no conda. If your library was built with gcc, override:
+> `pip install -e src/pybind --config-settings=cmake.define.CMAKE_CXX_COMPILER=g++-13`.
+> A non-editable `pip install` from an sdist is not supported yet (the wheel does
+> not bundle `libfullerenes.so` + its native deps — deferred).
+
+## Build with the library (in-tree CMake)
+
+To build the bindings as part of a full library build instead of via pip:
 
 ```bash
 cmake -S <repo> -B <repo>/build -DENABLE_PYTHON=ON \
   -DPython_EXECUTABLE=$(which python3) -Dpybind11_DIR=$(python3 -m pybind11 --cmakedir)
-cmake --build <repo>/build --target _fullerenes
+cmake --build <repo>/build --target _fullerenes   # drops the .so into src/pybind/fullerenes/
 ctest --test-dir <repo>/build -R pybind_pytest
 ```
 
-Standalone dev loop (this directory as its own project; links a prebuilt
-`../../build/libfullerenes.so`):
-
-```bash
-cmake -S . -B build-py -DPython_EXECUTABLE=$(which python3) \
-  -Dpybind11_DIR=$(python3 -m pybind11 --cmakedir)
-cmake --build build-py -j4        # drops _fullerenes*.so into ./fullerenes/
-python3 -m pytest tests -q
-```
-
-Tier-2 editable install (so any program can `import fullerenes`):
-
-```bash
-pip install -e . --no-build-isolation     # needs the library prebuilt at ../../build
-```
-
-A non-editable `pip install .` (from an sdist) is not supported yet: the wheel
-does not bundle `libfullerenes.so` and its native deps (deferred).
+This imports from the source tree; don't combine it with an editable install (the
+editable finder shadows the source-tree `.so`). Conda works for either path (its
+`libstdc++` is a superset of the library's) — just run with the conda interpreter
+active.
 
 ## Design contract
 
