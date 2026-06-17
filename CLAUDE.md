@@ -240,7 +240,7 @@ When angle_tol is set, the optimizer tracks whether energy decreases meaningfull
 - **step_mol2** — Step-by-step quality evolution. Builds partial ExtensionPaths (first k steps) and shows quality stats at each intermediate size.
 - **difficult_isomers.json** — 78 difficult isomers (C200/C250/C300) that fail to converge under LBFGS+ST with default budget. Contains spiral representations for instant reconstruction without buckygen enumeration.
 
-Build (from build2/): `cmake --build . --target bench_epopt` (or bench_quality_pipeline, patch_diag, step_mol2).
+Build: `cmake --build build --target bench_epopt` (or bench_quality_pipeline, patch_diag, step_mol2).
 
 
 ## Recent Development Notes
