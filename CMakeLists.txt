@@ -72,6 +72,17 @@ else()
   message(STATUS "Could not find an AdaptiveCpp compiler (looked for: acpp, syclcc)")
 endif()
 
+# --- Python bindings (optional) -------------------------------------------
+# Build the pybind11 module under src/pybind. Built as a subdirectory, it
+# INHERITS this build's compiler/standard/include dirs (it crosses the
+# libfullerenes .so ABI boundary, so it must match the library). Opt-in. Extra
+# deps when ON: pybind11 >= 2.13 (pass -Dpybind11_DIR=$(python -m pybind11
+# --cmakedir)) and the Python development module -- find_package(... REQUIRED) in
+# src/pybind, so configure FAILS FAST if either is missing (like ENABLE_SYCL).
+# The binding-drift gate additionally wants clang + Python 3.11+ (tomllib) but
+# self-skips if clang is absent. The python ctests register only when this is ON.
+option(ENABLE_PYTHON "Build the Python (pybind11) bindings (src/pybind)" OFF)
+
 if(ENABLE_SYCL)
   if(NOT SYCL_COMPILER)
     message(FATAL_ERROR "ENABLE_SYCL=ON requires AdaptiveCpp compiler (acpp or syclcc)")
@@ -254,6 +265,12 @@ message("FLAGS: " ${FLAGS})
 add_subdirectory(programs)
 add_subdirectory(benchmarks)
 add_subdirectory(tests)
+
+# Python bindings last: src/pybind links the `fullerenes` target (defined in
+# add_subdirectory(src/c++) above) and registers its own ctests.
+if(ENABLE_PYTHON)
+  add_subdirectory(src/pybind)
+endif()
 
 
 

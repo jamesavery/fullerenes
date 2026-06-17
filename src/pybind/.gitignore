@@ -1,0 +1,7 @@
+# Build artifacts — never commit the compiled extension or build trees.
+/build-py/
+build*/
+*.so
+*.egg-info/
+__pycache__/
+.pytest_cache/
