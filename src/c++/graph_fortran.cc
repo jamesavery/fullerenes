@@ -189,7 +189,13 @@ polyhedron_ptr new_polyhedron_(const graph_ptr *g, const double *points)
   return new Polyhedron(G,vertex_points,6); 
 }
 
-polyhedron_ptr read_polyhedron_(const char *path) { return new Polyhedron(Polyhedron::from_file(path)); }
+polyhedron_ptr read_polyhedron_(const char *path) {
+  // C-linkage boundary into Fortran: an exception (e.g. mesh_io_error from a
+  // malformed file) must not unwind across it. Return NULL on failure, matching
+  // read_fullerene_graph_hog_'s contract.
+  try { return new Polyhedron(Polyhedron::from_file(path)); }
+  catch (const std::exception&) { return nullptr; }
+}
 
 void delete_polyhedron_(polyhedron_ptr *P){ delete *P; }
 

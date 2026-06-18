@@ -147,32 +147,30 @@ node_t GraphView::prev_on_face(node_t u, node_t v) const
 
 bool GraphView::is_consistently_oriented() const
 {
-  map<arc_t,bool> seen_arc;
-
-  set<arc_t> work;
+  // Every directed arc must lie in exactly one face cycle: walk each CW face,
+  // marking its arcs consumed; a re-visited arc means it bounds two faces. Per-arc
+  // state is a flat vector<uint8_t> indexed by the dense arc id (arcid) -- no per-arc
+  // tree node, no O(log E) insert/find/erase.
+  vector<uint8_t> pending(size_t(N)*dmax, 0);
   for(node_t u=0;u<N;u++)
-    for(auto v: (*this)[u])
-      work.insert({u,v});
+    for(int i=0;i<deg[u];i++)
+      pending[arcid(u,i)] = 1;
 
-  while(!work.empty()){
-    const arc_t e = *work.begin();
-    node_t u(e.first), v(e.second);
-
-    // Process CW face starting in u->v
-    const node_t u0 = u;
-    work.erase(arc_t(u,v));
-    while(v != u0){
-      node_t w = next(v,u);	// u--v--w is CW-most corner
-      u = v;
-      v = w;
-      if(work.find(arc_t(u,v)) == work.end()){ // We have already processed arc u->v
-	//	cerr << "Directed edge " << arc_t(u,v) << " is part of two faces.\n";
-	return false;
+  for(node_t u0=0;u0<N;u0++)
+    for(int i0=0;i0<deg[u0];i0++){
+      const size_t s0 = arcid(u0,i0);
+      if(!pending[s0]) continue;
+      pending[s0] = 0;
+      node_t u = u0, v = neighbours[s0];
+      while(v != u0){                            // CW face u0 -> v -> ... -> u0
+        const int j = find(v,u);                 // position of u in v's row == next(v,u)
+        if(j < 0) return false;                  // reverse arc v->u missing: not oriented
+        const size_t s = arcid(v, (j+1)%deg[v]); // arc v->w
+        if(!pending[s]) return false;            // arc already part of another face
+        pending[s] = 0;
+        u = v; v = neighbours[s];
       }
-
-      work.erase(arc_t(u,v));
     }
-  }
   // Every directed edge is part of exactly one face <-> orientation is consistent
   return true;
 }

@@ -4,6 +4,7 @@
 #include "triangulation.hh"
 #include "geometry.hh"
 
+#include <array>
 #include <functional>
 
 
@@ -87,6 +88,20 @@ struct CanonicalTesselation {
   std::string to_string() const;
 };
 
+// How a geodesic disk measures distance on the metric DCEL:
+//   Edge   -- Dijkstra along mesh edges (a graph upper bound on the geodesic).
+//   Unfold -- fast marching: the wavefront crosses unfolded triangle interiors, so
+//             paths cut across faces (the true intrinsic geodesic, to first order).
+enum class DiskMetric { Edge, Unfold };
+
+// One cell of a geodesic-disk partition: the seeding vertex and the vertices it
+// claims (nearest source, within R), each with its geodesic distance. See
+// DelaunayTriangulation::geodesic_disks.
+struct GeodesicDisk {
+  int                                source;
+  std::vector<std::pair<int,double>> members;   // (vertex, geodesic distance <= R)
+};
+
 // ============================================================================
 // DCEL-based intrinsic Delaunay triangulation (delta-complex).
 //
@@ -147,6 +162,21 @@ struct DelaunayTriangulation {
 
   int vertex_degree(int v) const;  // count outgoing half-edges from v
 
+  // Range over the outgoing half-edges of v (the cw ring from v_out[v]); empty if v
+  // has no incident live edge. The canonical vertex traversal.
+  struct IncidentHalfEdges {
+    const DelaunayTriangulation& D; int v;
+    struct iterator {
+      const DelaunayTriangulation* D; int start, h; bool done;
+      int       operator*()  const { return h; }
+      iterator& operator++()       { h = D->cw(h); done = (h == start); return *this; }
+      bool      operator!=(const iterator&) const { return !done; }
+    };
+    iterator begin() const { int h0 = D.v_out[v]; return {&D, h0, h0, h0 < 0}; }
+    iterator end()   const { return {}; }
+  };
+  IncidentHalfEdges incident(int v) const { return {*this, v}; }
+
   // --- Construction ---
 
   // A metric on the edges: length of the undirected edge {u,v}.
@@ -183,6 +213,10 @@ struct DelaunayTriangulation {
   // a CEPS conformal solve, whose layout-cut seams leave ~5e-4 spurious
   // curvature at genuinely flat vertices) needs ~1e-2.
   bool is_flat(int v, double flat_tol = 1e-6) const;
+
+  // Discrete Gaussian curvature K(v) = 2*pi - cone angle, per live vertex (the angle
+  // defect). Reads the cached v_cone_angle, so requires it current.
+  std::vector<double> curvature() const;
 
   // --- Delaunay operations ---
   bool is_delaunay_edge(int h) const;
@@ -221,12 +255,24 @@ struct DelaunayTriangulation {
   // length = L on both sides.  Faces remain unassigned.
   int  alloc_directed_edge(int u, int v, double L);
 
+  // Allocate a vertex with the given cone angle and original degree, growing the
+  // three per-vertex arrays (v_out, v_cone_angle, v_orig_degree) in lockstep.
+  // Returns its id; v_out is left at -1 (the caller wires its edges).
+  int  alloc_vertex(double cone_angle, int orig_degree);
+
   // Wire three half-edges into a CCW triangle face and compute its angles
   // from the stored edge lengths.  Returns the new face id.
   // Preconditions: h0, h1, h2 already have their origin and length set;
   // their endpoints form a triangle with origin(h0)=u, dest(h0)=v=origin(h1),
   // dest(h1)=w=origin(h2), dest(h2)=u.
   int  wire_triangle(int h0, int h1, int h2);
+
+  // Split the face left of h0 (= a->b, with he_next giving b->c, c->a) into three
+  // triangles fanning to a new flat vertex P, at spoke lengths {P->a, P->b, P->c}.
+  // The three boundary edges are kept, so the metric is preserved exactly and P has
+  // cone angle 2*pi. Refreshes v_cone_angle at P and the three corners. Returns P.
+  // The 1->3 sibling of the (internal) edge bisection.
+  int  split_face(int h0, std::array<double,3> spokes);
 
   // Ensure v_out[v] points to a live outgoing half-edge from v.
   // Walks the CW ring at v if the current pointer is stale.  Leaves v_out[v]
@@ -300,6 +346,14 @@ struct DelaunayTriangulation {
                                             matrix<geodesic>* geodesics_out = nullptr) const;
   // The composed surface geodesic for every cone pair.
   matrix<geodesic>        surface_geodesics(bool calculate_self_geodesics = false) const;
+
+  // Partition the surface into geodesic R-disks: one multi-source front seeded at all
+  // `sources` at distance 0, so each vertex is claimed by its NEAREST source -- a
+  // geodesic Voronoi cell clipped at R. Disjoint by construction (no vertex in two
+  // disks). Edge metric relaxes along edges; Unfold also runs the triangle wavefront
+  // across each incident face within a cell (cross-cell seams stay on the edge metric).
+  std::vector<GeodesicDisk> geodesic_disks(const std::vector<int>& sources, double R,
+                                           DiskMetric metric) const;
 
   // Concatenate the simple geodesics along a cone path [u, K_1, ..., v] into one
   // multi-segment geodesic; empty for paths of length <= 1.

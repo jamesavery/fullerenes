@@ -1,4 +1,6 @@
 #include <algorithm>
+#include <sstream>
+#include <stdexcept>
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/unfold.hh"
 #include "fullerenes/buckygen-wrapper.hh"
@@ -12,36 +14,38 @@ pair<node_t,node_t> TriangulationView::adjacent_tris(const arc_t& e) const
 
 vector<tri_t> TriangulationView::compute_faces_oriented() const
 {
-  //Why is this information stored in a hashmap seems like std::vector is perfectly suitable here.
-  unordered_map<arc_t,bool> arc_done(2*count_edges());
+  // Per-arc "done" flags as a flat vector<uint8_t> indexed by the dense arc id
+  // (arcid) -- no hashing, no allocation.
+  vector<uint8_t> arc_done(size_t(N)*dmax, 0);
   vector<tri_t> triangles;
   triangles.reserve(2*(N-2));        // Most common case is cubic dual, but we no longer know it for sure.
 
   for(node_t u=0;u<N;u++){
     auto nu = nbrs(u);
-    for(int i=0;i<nu.size();i++){
-      const node_t& v(nu[i]);    // Process directed edge u->v
-      const arc_t uv(u,v);
-
-      if(!arc_done[uv]){
-        node_t w = next_on_face(u,v);
-	if(w==-1){
-	  printf("next_on_face(%d,%d) = prev(%d,%d) = -1\n",u,v,v,u);
-	  printf("\tneighbours[%d] = ",u); for(auto x: (*this)[u]) cout << x << ' '; cout << endl;
-	  printf("\tneighbours[%d] = ",v); for(auto x: (*this)[v]) cout << x << ' '; cout << endl;	  
-	  assert(w != -1); // TODO: assert is forbidden in isomerspace calculations (kills the whole computation if one isomer fails!) Need to throw with useful information instead.
-	}
-        //Is This Condition necessary? 
-        //since every directed edge is only part of 1 triangle it ought to be sufficient
-        //to check arc_done[{u,v}].
-        if(!arc_done[{v,w}] && !arc_done[{w,u}]){ 
-
-          triangles.push_back(tri_t(u,v,w));
-
-          arc_done[{u,v}] = true;
-          arc_done[{v,w}] = true;
-          arc_done[{w,u}] = true;
-        }
+    for(int i=0;i<(int)nu.size();i++){
+      const size_t s_uv = arcid(u,i);          // directed edge u->v
+      if(arc_done[s_uv]) continue;
+      const node_t v = nu[i];
+      const int jv = find(v,u);                // w = next_on_face(u,v) = prev(v,u)
+      if(jv == -1){                            // reverse arc v->u missing: not an oriented triangulation
+        ostringstream msg;
+        msg << "compute_faces_oriented: arc " << u << "->" << v << " has no reverse arc "
+            << v << "->" << u << " (graph is not a consistently oriented triangulation)";
+        throw logic_error(msg.str());
+      }
+      const int    jw   = (jv - 1 + deg[v]) % deg[v];
+      const size_t s_vw = arcid(v,jw);         // arc v->w
+      const node_t w    = neighbours[s_vw];
+      const int    ju   = find(w,u);           // arc w->u, the triangle's third edge
+      const bool   has_wu = ju >= 0;           // a real edge in a valid triangulation; guarded for robustness
+      const size_t s_wu = has_wu ? arcid(w,ju) : 0;
+      // Every directed edge is part of exactly one triangle, so arc_done[s_uv]
+      // alone would suffice; the v->w / w->u checks mirror the original guard.
+      if(!arc_done[s_vw] && (!has_wu || !arc_done[s_wu])){
+        triangles.push_back(tri_t(u,v,w));
+        arc_done[s_uv] = 1;
+        arc_done[s_vw] = 1;
+        if(has_wu) arc_done[s_wu] = 1;
       }
     }
   }

@@ -413,6 +413,33 @@ void DeltahedronView<double>::smooth(double q) {
   std::copy(new_points.begin(), new_points.end(), points.begin());
 }
 
+// Taubin lambda|mu low-pass: a forward umbrella step (lambda>0) then a shrink-
+// correcting step (mu<-lambda), per pass -- the standard volume-preserving filter
+// that suppresses high-frequency mesh noise without the shrinkage of plain smoothing.
+template<>
+void DeltahedronView<double>::taubin_smooth(int iters, double lambda, double mu) {
+  for(int i = 0; i < iters; i++){ smooth(lambda); smooth(mu); }
+}
+
+// Discrete Gaussian curvature: the angle defect K(v) = 2*pi - sum of the triangle
+// corner angles at v. A degenerate triangle (a zero-length incident edge) has an
+// undefined corner angle and is skipped, contributing nothing to the defect. The
+// tris-taking overload lets a caller that already has the triangulation avoid
+// recomputing it (triangles() is O(E)).
+template<>
+std::vector<double> DeltahedronView<double>::angle_defects(const std::vector<tri_t>& tris) const {
+  std::vector<double> K(N, 2.0*M_PI);
+  for(const tri_t& t : tris)
+    for(int c = 0; c < 3; c++){
+      coord3d e1 = points[t[(c+1)%3]] - points[t[c]], e2 = points[t[(c+2)%3]] - points[t[c]];
+      if(e1.norm2() > 1e-300 && e2.norm2() > 1e-300) K[t[c]] -= coord3d::angle(e1, e2);
+    }
+  return K;
+}
+
+template<>
+std::vector<double> DeltahedronView<double>::angle_defects() const { return angle_defects(triangles()); }
+
 template<>
 Deltahedron DeltahedronView<double>::halma_transform(int m) const {
     // Halma path: direct subdivision via face grids, preserves node IDs
@@ -2563,51 +2590,6 @@ int DeltahedronView<double>::reflect_all_concave(std::span<coord3d> pts, double 
 // then project every concave vertex onto the nearest hull face.
 // ============================================================
 
-// Closest point on triangle (a,b,c) to point p.
-// Returns the point on the triangle surface nearest to p,
-// handling interior, edge, and vertex cases via Voronoi regions.
-static coord3d closest_point_on_triangle(const coord3d& p,
-                                         const coord3d& a, const coord3d& b, const coord3d& c)
-{
-  coord3d ab = b - a, ac = c - a, ap = p - a;
-  double d1 = ab.dot(ap), d2 = ac.dot(ap);
-  if(d1 <= 0 && d2 <= 0) return a;  // vertex A region
-
-  coord3d bp = p - b;
-  double d3 = ab.dot(bp), d4 = ac.dot(bp);
-  if(d3 >= 0 && d4 <= d3) return b;  // vertex B region
-
-  coord3d cp = p - c;
-  double d5 = ab.dot(cp), d6 = ac.dot(cp);
-  if(d6 >= 0 && d5 <= d6) return c;  // vertex C region
-
-  // Edge AB
-  double vc = d1*d4 - d3*d2;
-  if(vc <= 0 && d1 >= 0 && d3 <= 0){
-    double v = d1 / (d1 - d3);
-    return a + ab * v;
-  }
-
-  // Edge AC
-  double vb = d5*d2 - d1*d6;
-  if(vb <= 0 && d2 >= 0 && d6 <= 0){
-    double w = d2 / (d2 - d6);
-    return a + ac * w;
-  }
-
-  // Edge BC
-  double va = d3*d6 - d5*d4;
-  if(va <= 0 && (d4-d3) >= 0 && (d5-d6) >= 0){
-    double w = (d4-d3) / ((d4-d3) + (d5-d6));
-    return b + (c - b) * w;
-  }
-
-  // Interior
-  double denom = 1.0 / (va + vb + vc);
-  double v = vb * denom, w = vc * denom;
-  return a + ab * v + ac * w;
-}
-
 // Incremental convex hull returning just the triangle list.
 // Each triangle is an array of 3 vertex indices into the pts array.
 // Triangles are oriented with outward normals.
@@ -2734,17 +2716,15 @@ int DeltahedronView<double>::project_onto_convex_hull(std::span<coord3d> pts) co
   auto tris = build_convex_hull(pts);
   if(tris.empty()) return 0;
 
-  // 3. For each concave vertex, project onto nearest hull face
+  // 3. For each concave vertex, project onto nearest hull face. closest_point_on_triangle
+  // reports dist2 = +inf for a degenerate (zero-area) face; only move the vertex if some
+  // non-degenerate face was found, else leave it in place (never snap it to the origin).
   for(int v : concave){
-    double best_dist2 = 1e30;
-    coord3d best_pt;
+    double best_dist2 = std::numeric_limits<double>::infinity();
+    coord3d best_pt = pts[v];
     for(auto& tri : tris){
-      coord3d cp = closest_point_on_triangle(pts[v], pts[tri[0]], pts[tri[1]], pts[tri[2]]);
-      double d2 = (cp - pts[v]).dot(cp - pts[v]);
-      if(d2 < best_dist2){
-        best_dist2 = d2;
-        best_pt = cp;
-      }
+      ClosestPoint cp = closest_point_on_triangle(pts[v], tri_t(tri[0],tri[1],tri[2]), pts);
+      if(cp.dist2 < best_dist2){ best_dist2 = cp.dist2; best_pt = cp.pos; }
     }
     pts[v] = best_pt;
   }

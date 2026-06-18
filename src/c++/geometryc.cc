@@ -1,4 +1,5 @@
 #include <limits.h>
+#include <limits>
 #include <iostream>
 #include <cstdio>
 #include <vector>
@@ -301,6 +302,40 @@ double coord3<double>::angle(const coord3<double>& a, const coord3<double>& c)
   if(arg > 1)  arg = 1.0;
   if(arg < -1) arg = -1.0;
   return acos(arg);
+}
+
+// Nearest point of triangle t to p (metric projection onto the filled triangle):
+// project p onto the triangle's plane; if the foot is inside, that is the answer,
+// else clamp to the nearest edge. dist2 = |pos-p|^2, +inf for a degenerate face.
+ClosestPoint closest_point_on_triangle(const coord3d& p, const tri_t& t,
+                                       std::span<const coord3d> points)
+{
+  const Tri3D T(points, t);
+  const double nn = T.n.dot(T.n);                          // |u x v|^2 == denominator
+  if(nn < 1e-300)                                          // degenerate face: never nearest
+    return {T.a, {1,0,0}, std::numeric_limits<double>::infinity()};
+
+  const coord3d proj = p - T.n * (T.n.dot(p - T.a) / nn);  // foot of the perpendicular
+  const coord3d w = proj - T.a;
+  const double uu = T.u.dot(T.u), uv = T.u.dot(T.v), vv = T.v.dot(T.v),
+               wu = w.dot(T.u), wv = w.dot(T.v);
+  const double beta  = (vv*wu - uv*wv)/nn;
+  const double gamma = (uu*wv - uv*wu)/nn;
+  if(beta >= 0 && gamma >= 0 && beta + gamma <= 1)
+    return {proj, {1-beta-gamma, beta, gamma}, (p-proj).dot(p-proj)};
+
+  // Foot outside the triangle: clamp to the nearest edge.
+  ClosestPoint best{T.a, {1,0,0}, std::numeric_limits<double>::infinity()};
+  const coord3d corner[3] = {T.a, T.b, T.c};
+  for(int e = 0; e < 3; e++){
+    int i0 = e, i1 = (e+1)%3;
+    coord3d p0 = corner[i0], edge = corner[i1] - p0;
+    double s = std::clamp((p - p0).dot(edge) / std::max(edge.dot(edge), 1e-300), 0.0, 1.0);
+    coord3d q = p0 + edge*s;
+    double d2 = (p-q).dot(p-q);
+    if(d2 < best.dist2){ best = {q, {0,0,0}, d2}; best.bary[i0] = 1-s; best.bary[i1] = s; }
+  }
+  return best;
 }
 
 // calculation of the derivative of angle beta at b(0,0,0) according to coordinates a and c with fixed b
