@@ -1,0 +1,208 @@
+# spec.toml — what the binding generator (gen_bindings.py) binds.
+#
+# One [[klass]] per Python class. The generator harvests public methods from the
+# C++ view chain (`harvest`, leaf first; a leaf method hides a base method of the
+# same name), classifies each by its return/parameter types, and emits the
+# mechanical .def surface into src/bindings_generated.cc plus a .pyi stub.
+# Anything it cannot classify goes to unbound_report.md (never silently dropped).
+#
+# Where a hand-written stub goes (three cases, one convention -- un-indented .pyi
+# body lines; the generator adds the 4-space indent):
+#   - a HARVESTED class (has a C++ view) that also has hand-written methods:
+#     a [[klass]] with `extra_stub` (the generated defs + your extra_stub lines).
+#   - a NON-harvested class (bound by hand in module.cc/isomerdb.cc/enumeration.cc,
+#     no view to harvest): a [[preamble_klass]] (pyname + stub body lines).
+#   - a module-level function: a line in [meta].pyi_module_functions.
+# Keep any new [meta] key ABOVE the [[preamble_klass]] blocks (a bare key after
+# them attaches to the last preamble table, not to [meta]).
+#
+# [[klass]] fields:
+#   pyname     Python class name.
+#   owned/view C++ owned class and its (possibly templated) view; the wrapper is
+#              pyf::PyGraph<owned,view> (wrapper="graph", default) or
+#              pyf::PyGeom<owned,view> (wrapper="geom", carries coord3d points).
+#   harvest    C++ view classes (AST names, no template args) to harvest from.
+#   skip       method names handled by the hand-written .cc (not re-bound).
+#   extra_stub hand-written methods, as .pyi lines, so the stub is complete.
+# [[preamble_klass]]: pyname + stub (un-indented .pyi body lines).
+
+[meta]
+# Provided by the hand-written core (bind_*_common) or batchability contract noise.
+skip = ["is_a_fullerene", "to_tuple", "get_size_factors", "polar_mapping"]
+# Top-level .pyi function stubs (module funcs, hand-written like preamble_klass).
+pyi_module_functions = [
+  'def version() -> str: ...',
+  'def number_isomers(N: int, sym: str = ..., IPR: bool = ...) -> int: ...',
+  'def symmetries(N: int, IPR: bool = ...) -> list[str]: ...',
+  'def buckygen(N: int, IPR: bool = ..., only_nontrivial: bool = ...) -> "BuckyGenerator": ...',
+  'def set_database_path(path: str) -> None: ...',
+  'def get_database_path() -> str: ...',
+]
+
+# Hand-written .pyi class stubs for classes the generator does NOT harvest (no
+# [[klass]] -- bound by hand in module.cc/isomerdb.cc/enumeration.cc). Emitted into
+# the preamble; body lines are indented by the generator, same convention as the
+# per-klass `extra_stub`.
+[[preamble_klass]]
+pyname = "OptResult"
+stub = [
+  'CONVERGED: OptResult',
+  'STAGNATED: OptResult',
+  'BUDGET_EXHAUSTED: OptResult',
+  'CONVEXITY_STUCK: OptResult',
+]
+
+[[preamble_klass]]
+pyname = "Symmetry"
+stub = [
+  'def __init__(self, dual: "FullereneDual") -> None: ...',
+  'def point_group(self) -> str: ...',
+  'def order(self) -> int: ...',
+  'def equivalence_classes(self) -> list[list[int]]: ...',
+  'def representation_3d(self) -> numpy.ndarray: ...',
+]
+
+[[preamble_klass]]
+pyname = "IsomerEntry"
+stub = [
+  'group: str',
+  'rspi: list[int]',
+  'hlgap: float',
+]
+
+[[preamble_klass]]
+pyname = "IsomerDB"
+stub = [
+  'N: int',
+  'IPR: bool',
+  'n_isomers: int',
+  '@staticmethod',
+  'def read(N: int, IPR: bool = ...) -> "IsomerDB": ...',
+  'def __len__(self) -> int: ...',
+  'def __getitem__(self, i: int) -> IsomerEntry: ...',
+  'def make_isomer(self, i: int) -> "FullereneGraph": ...',
+]
+
+[[preamble_klass]]
+pyname = "BuckyGenerator"
+stub = [
+  'def __iter__(self) -> "BuckyGenerator": ...',
+  'def __next__(self) -> "FullereneDual": ...',
+  'def __enter__(self) -> "BuckyGenerator": ...',
+  'def __exit__(self, exc_type: object, exc: object, tb: object) -> bool: ...',
+  'def close(self) -> None: ...',
+]
+
+[[klass]]
+pyname  = "FullereneGraph"
+owned   = "FullereneGraph"
+view    = "FullereneGraphView"
+wrapper = "graph"
+harvest = ["FullereneGraphView", "CubicGraphView", "PlanarGraphView", "GraphView"]
+# Hand-written transforms (C++ view method names; params + owned return).
+skip = ["GCtransform", "leapfrog_fullerene", "halma_fullerene"]
+extra_stub = [
+  '@staticmethod',
+  'def C20() -> "FullereneGraph": ...',
+  '@staticmethod',
+  'def from_arrays(neighbours: numpy.ndarray, deg: numpy.ndarray | None = ...) -> "FullereneGraph": ...',
+  'def name(self) -> str: ...',
+  'def dual(self) -> "FullereneDual": ...',
+  'def gc_transform(self, k: int, l: int = ...) -> "FullereneGraph": ...',
+  'def leapfrog(self) -> "FullereneGraph": ...',
+  'def halma(self, n: int) -> "FullereneGraph": ...',
+]
+
+[[klass]]
+pyname  = "FullereneDual"
+owned   = "FullereneDual"
+view    = "FullereneDualView"
+wrapper = "graph"
+harvest = ["FullereneDualView", "TriangulationView", "PlanarGraphView", "GraphView"]
+# Hand-written transforms (C++ view method names; params + owned return).
+skip = ["GCtransform", "halma_transform",
+        "surface_distances", "simple_geodesics", "quads_of_the_line", "end_of_the_line"]
+extra_stub = [
+  '@staticmethod',
+  'def from_rspi(N: int, rspi: list[int], jumps: list[tuple[int, int]] | None = ...) -> "FullereneDual": ...',
+  '@staticmethod',
+  'def from_arrays(neighbours: numpy.ndarray, deg: numpy.ndarray) -> "FullereneDual": ...',
+  'def rspi(self) -> tuple[list[int], list[tuple[int, int]]]: ...',
+  'def name(self) -> str: ...',
+  'def dual(self) -> "FullereneGraph": ...',
+  'def gc_transform(self, k: int, l: int = ...) -> "FullereneDual": ...',
+  'def halma(self, m: int) -> "FullereneDual": ...',
+  'def surface_distances(self, only_nodes: list[int] = ..., calc_self: bool = ...) -> numpy.ndarray: ...',
+  'def simple_geodesics_from(self, u: int, calc_self: bool = ...) -> list[tuple[int, int, int, int, int]]: ...',
+  'def simple_geodesics_trace(self, u: int) -> tuple[int, list[tuple[int, int, int, int, int, int, bool]]]: ...',
+  'def alexandrov_polytope(self) -> tuple[list[tuple[float, float, float]], list[list[int]], list[int], int, str]: ...',
+  'def end_of_the_line(self, u0: int, axis: int, a: int, b: int) -> int: ...',
+  'def geodesic_strip(self, u0: int, axis: int, a: int, b: int) -> list[list[tuple[int, int, int]]]: ...',
+]
+
+[[klass]]
+pyname  = "Polyhedron"
+owned   = "Polyhedron"
+view    = "PolyhedronView<double>"
+wrapper = "geom"
+harvest = ["PolyhedronView", "PlanarGraphView", "GraphView"]
+# Hand-written in polyhedron.cc. These are the C++ VIEW method names the
+# generator harvests (NOT the Python names), listed explicitly so the generator
+# never emits a duplicate .def if a library signature change (e.g. faces losing
+# its default arg) would otherwise make one classifiable. (write/to_povray/
+# to_latex are owned-Polyhedron methods, not harvested, so they need no skip.)
+skip = ["bounding_box", "faces", "optimize", "move_to_origin", "align_with_axes",
+        "scale", "move", "incremental_convex_hull", "dual", "leapfrog_dual"]
+extra_stub = [
+  '@staticmethod',
+  'def from_fullerene(graph: "FullereneGraph", verbose: bool = ...) -> "Polyhedron": ...',
+  '@staticmethod',
+  'def C20() -> "Polyhedron": ...',
+  '@staticmethod',
+  'def from_arrays(neighbours: numpy.ndarray, points: numpy.ndarray, deg: numpy.ndarray | None = ...) -> "Polyhedron": ...',
+  '@staticmethod',
+  'def from_file(path: str) -> "Polyhedron": ...',
+  'def bounding_box(self) -> tuple[numpy.ndarray, numpy.ndarray]: ...',
+  'def faces(self) -> list[list[int]]: ...',
+  'def optimize(self, method: int = ..., ftol: float = ..., verbose: bool = ...) -> bool: ...',
+  'def move_to_origin(self) -> None: ...',
+  'def align_with_axes(self) -> None: ...',
+  'def scale(self, s) -> None: ...',
+  'def move(self, d) -> None: ...',
+  'def convex_hull(self) -> "Polyhedron": ...',
+  'def dual(self) -> "Polyhedron": ...',
+  'def leapfrog_dual(self) -> "Polyhedron": ...',
+  'def write(self, path: str) -> bool: ...',
+  'def to_povray(self) -> str: ...',
+  'def to_latex(self) -> str: ...',
+]
+
+[[klass]]
+pyname  = "Deltahedron"
+owned   = "Deltahedron"
+view    = "DeltahedronView<double>"
+wrapper = "geom"
+harvest = ["DeltahedronView", "TriangulationView", "PlanarGraphView", "GraphView"]
+# Hand-written in deltahedron.cc -- C++ VIEW method names harvested by the
+# generator (the transforms are GCtransform/halma_transform on the view; the
+# Python names are gc_transform/halma). optimize is on the owned Deltahedron,
+# not the view, so it is not harvested.
+skip = ["smooth", "reflect_concave", "reflect_all_concave",
+        "GCtransform", "halma_transform"]
+extra_stub = [
+  '@staticmethod',
+  'def from_dual(dual: "FullereneDual") -> "Deltahedron": ...',
+  '@staticmethod',
+  'def from_arrays(neighbours: numpy.ndarray, points: numpy.ndarray, deg: numpy.ndarray | None = ...) -> "Deltahedron": ...',
+  'def smooth(self, q: float) -> None: ...',
+  'def reflect_concave(self, threshold: float = ...) -> int: ...',
+  'def reflect_all_concave(self, threshold: float = ...) -> int: ...',
+  'def optimize(self, target_L: float = ..., grad_tol: float = ..., max_work: int = ..., angle_tol: float = ...) -> "OptResult": ...',
+  'def gc_transform(self, k: int, l: int = ...) -> "Deltahedron": ...',
+  'def halma(self, m: int) -> "Deltahedron": ...',
+  'iterations_used: int',
+  'final_gmax_L: float',
+  'final_angle_relerr: float',
+  'final_n_concave: int',
+  'final_opt_result: "OptResult"',
+]
