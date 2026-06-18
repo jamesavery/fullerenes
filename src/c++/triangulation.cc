@@ -1239,6 +1239,27 @@ node_t walk_line(const TriangulationView& G, node_t u0, int i,
 
 } // anonymous namespace
 
+// Squared surface distances via straight Eisenstein rays, refined by the
+// APSP pass in surface_distances().
+//
+// A simple geodesic is a straight ray with no cone (deg != 6 vertex) in its
+// interior. The segment u->(a,b) meets an interior lattice vertex iff
+// g = gcd(a,b) > 1, at the points (j*a/g, j*b/g), j=1..g-1; a coprime (a,b)
+// therefore crosses only flat edges/faces and is exactly a simple geodesic of
+// length sqrt(a^2+ab+b^2), while a non-coprime ray is the g-fold repeat of its
+// primitive and is a *composition* of simple geodesics, not a simple one.
+//
+// This routine shoots every (a,b), not just the coprimes. That is exact here
+// because every cone has curvature kappa = (pi/3)(6 - deg) >= 0 (deg <= 6): a
+// ray developed through a non-negative cone records sqrt(a^2+ab+b^2), which is
+// an UPPER bound on the true distance to the landed vertex -- developing
+// ignores the removed wedge, and re-gluing the wedge is 1-Lipschitz (distances
+// only shrink). So the non-simple rays can only over-estimate; the entrywise
+// min discards them, and the APSP pass recomposes the exact distance from the
+// primitive cone-free segments. (For a negative cone, deg >= 7, a through-cone
+// ray could under-estimate; only the coprime, cone-free enumeration would then
+// be valid -- see coprime-simple-geodesics.tex, and the cone-free fan-sweep in
+// geodesics/refactor-debt.md.)
 matrix<int> TriangulationView::simple_square_surface_distances(vector<node_t> nodes,
 							   bool calculate_self_geodesics) const
 {
