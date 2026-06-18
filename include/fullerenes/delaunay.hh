@@ -266,10 +266,11 @@ struct DelaunayTriangulation {
   // cone) are excluded by an API pin in the walk and not computed; pass
   // calculate_self_geodesics = true to compute the diagonal too -- the BFS
   // runs in self-mode for each cone, picking up seed-edge self-loops at seed
-  // setup and apex closures (including the wrap-around flavour, via sector
-  // bypass at recording).  Mirrors TriangulationView's calculate_self_geodesics
-  // flag.  See claude-projects/delta-complex/DELTA-COMPLEX-SURFACE-METRIC.md
-  // §"Self-geodesics" for the three flavours and the underlying mechanism.
+  // setup and any u_start apex placements the unmodified BFS validity gate
+  // accepts.  Wrap-around closures rely on multi-seed coverage of the full
+  // cone angle.  Mirrors TriangulationView's calculate_self_geodesics flag.
+  // See claude-projects/delta-complex/DELTA-COMPLEX-SURFACE-METRIC.md
+  // §"Self-geodesics" for the full account.
 
   // A simple geodesic u -> v, exact in Z[w]: the displacement g (u at origin,
   // |g|^2 = squared length) in the unfolding seeded at half-edge `axis` with
@@ -304,6 +305,21 @@ struct DelaunayTriangulation {
   // multi-segment geodesic; empty for paths of length <= 1.
   static geodesic compose_simple_geodesics(const std::vector<int>& path,
                                            const matrix<simple_geodesic>& simple);
+
+  // --- Weighted graph algorithms on the 1-skeleton ---
+  // Single-source weighted shortest paths on the DCEL with he_length as edge
+  // weights.  Returns dist[v] for v in 0..nv-1; +infinity for unreachable v.
+  // Standard Dijkstra with a binary heap; O((nv + alive_edges) log nv).
+  std::vector<double> single_source_shortest_paths(int src) const;
+
+  // An upper bound on the weighted graph diameter, via a textbook double-sweep
+  // of single_source_shortest_paths (Dijkstra from any vertex u_0 -> find the
+  // farthest vertex u_1 -> Dijkstra from u_1).  For metric graphs the
+  // double-sweep result d(u_1, u_2) is a lower bound on the true diameter D
+  // satisfying d(u_1, u_2) >= D/2, so the returned value is 2 * d(u_1, u_2)
+  // and is guaranteed to be an upper bound on D.  Used to size BFS priority
+  // cutoffs in the surface-metric routines.  O((nv + alive_edges) log nv).
+  double diameter_upper_bound() const;
 
   // Smallest degree among live (non-removed) vertices, or INT_MAX if
   // none.  A value below 3 is one (but not the only) non-simplicial

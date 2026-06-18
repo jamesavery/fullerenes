@@ -74,7 +74,7 @@ public:
 
     node_t N_outline = 0;
     for(auto o: outline) N_outline = max(N_outline,o.second);
-    degrees = vector<int>(N_outline,0);
+    degrees = vector<int>(N_outline + 1, 0);  // +1: indices 0..N_outline inclusive
     
     polygon P(get_keys(outline));
     for(int i=0;i<outline.size();i++){
