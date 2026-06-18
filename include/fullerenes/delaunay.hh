@@ -360,6 +360,21 @@ struct DelaunayTriangulation {
   static geodesic compose_simple_geodesics(const std::vector<int>& path,
                                            const matrix<simple_geodesic>& simple);
 
+  // --- Weighted graph algorithms on the 1-skeleton ---
+  // Single-source weighted shortest paths on the DCEL with he_length as edge
+  // weights.  Returns dist[v] for v in 0..nv-1; +infinity for unreachable v.
+  // Standard Dijkstra with a binary heap; O((nv + alive_edges) log nv).
+  std::vector<double> single_source_shortest_paths(int src) const;
+
+  // An upper bound on the weighted graph diameter, via a textbook double-sweep
+  // of single_source_shortest_paths (Dijkstra from any vertex u_0 -> find the
+  // farthest vertex u_1 -> Dijkstra from u_1).  For metric graphs the
+  // double-sweep result d(u_1, u_2) is a lower bound on the true diameter D
+  // satisfying d(u_1, u_2) >= D/2, so the returned value is 2 * d(u_1, u_2)
+  // and is guaranteed to be an upper bound on D.  Used to size BFS priority
+  // cutoffs in the surface-metric routines.  O((nv + alive_edges) log nv).
+  double diameter_upper_bound() const;
+
   // Smallest degree among live (non-removed) vertices, or INT_MAX if
   // none.  A value below 3 is one (but not the only) non-simplicial
   // signature -- use is_simplicial() for a complete check.

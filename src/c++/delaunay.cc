@@ -12,6 +12,8 @@
 #include <string>
 #include <sstream>
 #include <cstdio>
+#include <limits>
+#include <queue>
 
 // ============================================================================
 // Intrinsic geometry primitives
@@ -219,6 +221,66 @@ int DelaunayTriangulation::vertex_degree(int v) const
   int h0 = v_out[v], h = h0, deg = 0;
   do { deg++; h = cw(h); } while (h != h0);
   return deg;
+}
+
+// ============================================================================
+// Weighted graph algorithms on the 1-skeleton (he_length as edge weight)
+// ============================================================================
+
+std::vector<double>
+DelaunayTriangulation::single_source_shortest_paths(int src) const
+{
+  const double kInf = std::numeric_limits<double>::infinity();
+  std::vector<double> dist(nv, kInf);
+  if (src < 0 || src >= nv || v_out[src] < 0) return dist;
+  dist[src] = 0.0;
+
+  using Item = std::pair<double, int>;     // (dist, vertex)
+  std::priority_queue<Item, std::vector<Item>, std::greater<Item>> pq;
+  pq.push({0.0, src});
+
+  while (!pq.empty()) {
+    auto [d, u] = pq.top(); pq.pop();
+    if (d > dist[u]) continue;             // stale entry
+    const int h0 = v_out[u];
+    if (h0 < 0) continue;
+    int h = h0;
+    do {
+      if (alive(h)) {
+        int v = he_origin[h ^ 1];
+        if (v >= 0 && v < nv) {
+          double nd = d + he_length[h];
+          if (nd < dist[v]) { dist[v] = nd; pq.push({nd, v}); }
+        }
+      }
+      h = cw(h);
+    } while (h != h0);
+  }
+  return dist;
+}
+
+double DelaunayTriangulation::diameter_upper_bound() const
+{
+  if (nv == 0) return 0.0;
+  // Pick the first live vertex as the seed.
+  int seed = -1;
+  for (int v = 0; v < nv; v++) if (v_out[v] >= 0) { seed = v; break; }
+  if (seed < 0) return 0.0;
+
+  auto farthest = [&](int src) {
+    std::vector<double> d = single_source_shortest_paths(src);
+    int    far = src;
+    double m   = 0.0;
+    for (int v = 0; v < nv; v++)
+      if (std::isfinite(d[v]) && d[v] > m) { m = d[v]; far = v; }
+    return std::pair<int, double>{far, m};
+  };
+
+  auto [u1, _ ] = farthest(seed);
+  auto [u2, m1] = farthest(u1);
+  // Double-sweep returns m1 with m1 >= D/2 (lower bound on true diameter D);
+  // 2 * m1 is therefore a safe upper bound on D.
+  return 2.0 * m1;
 }
 
 // --- Construction ---
