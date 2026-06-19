@@ -1,11 +1,17 @@
 #include "fullerenes/polyhedron.hh"
 #include "fullerenes/layout2d.hh"
 
+#include <algorithm>
+#include <cstdint>
+#include <cstring>
+#include <span>
+#include <unordered_map>
+
 //////////////////////////// FORMAT MULTIPLEXING ////////////////////////////
-vector<string> Polyhedron::formats{"ascii","planarcode","xyz","mol2","mathematica","latex","cc1","turbomole","gaussian","wavefront","spiral"};
-vector<string> Polyhedron::format_alias{"txt","ply","xyz","mol2","m","tex","cc1","turbomole","com","obj","rspi"};
-vector<string> Polyhedron::input_formats{"xyz","mol2"}; // TODO: "ascii","planarcode","obj"
-vector<string> Polyhedron::output_formats{"ascii","xyz","mol2","cc1","turbomole","gaussian","spiral"};
+vector<string> Polyhedron::formats{"ascii","planarcode","xyz","mol2","mathematica","latex","cc1","turbomole","gaussian","wavefront","spiral","ply"};
+vector<string> Polyhedron::format_alias{"txt","pc","xyz","mol2","m","tex","cc1","turbomole","com","obj","rspi","ply"};
+vector<string> Polyhedron::input_formats{"xyz","mol2","ply"}; // TODO: "ascii","planarcode","obj"
+vector<string> Polyhedron::output_formats{"ascii","xyz","mol2","cc1","turbomole","gaussian","spiral","ply"};
 
 int Polyhedron::format_id(string name)
 {
@@ -27,12 +33,24 @@ Polyhedron Polyhedron::from_file(FILE *file, string format)
     return from_xyz(file);
   case MOL2:
     return from_mol2(file);
+  case PLY:
+    return from_ply(file);
   default: {
+    // Reject a genuinely-unknown format here: PlanarGraph::from_file still
+    // abort()s on its own default, which would bypass the catchable mesh_io_error
+    // contract this reader promises.
+    if(PlanarGraph::format_id(format) < 0){
+      ostringstream msg;
+      msg << "Polyhedron::from_file: unknown format '"<<format<<"'; must be one of: "
+          << input_formats << " or " << PlanarGraph::input_formats;
+      throw mesh_io_error(mesh_io_error::Code::UnknownFormat, msg.str());
+    }
     PlanarGraph G = PlanarGraph::from_file(file,format);
 
-    if(!G.N){    
-      cerr << "Input format is '"<<format<<"'; must be one of: " << input_formats << " or " << PlanarGraph::input_formats << "\n";
-      abort();
+    if(!G.N){
+      ostringstream msg;
+      msg << "Polyhedron::from_file: format '"<<format<<"' parsed an empty graph";
+      throw mesh_io_error(mesh_io_error::Code::EmptyGraph, msg.str());
     } else {
       Polyhedron P(G,G.zero_order_geometry(),6);
       P.optimize();
@@ -61,8 +79,10 @@ bool Polyhedron::to_file(const Polyhedron &G, FILE *file, string format)
     return Polyhedron::to_gaussian(G,file);
   case WAVEFRONT_OBJ:
     return Polyhedron::to_wavefront_obj(G,file);
+  case PLY:
+    return Polyhedron::to_ply(G,file);
   case SPIRAL:
-    return PlanarGraph::to_spiral(G,file);    
+    return PlanarGraph::to_spiral(G,file);
   default:
     cerr << "Output format is '"<<format<<"'  must be one of: " << output_formats << "\n";
     return false;
@@ -499,3 +519,290 @@ size_t file_size(const char *filename) {
   return -1;
 }
 size_t file_size(const string filename) { return file_size(filename.c_str()); }
+
+
+////////////////////////////// PLY MESH I/O //////////////////////////////
+// PLY (Stanford polygon) read/write for arbitrary polygon meshes. A PLY face is
+// a per-face (count, indices) record, so triangles and n-gons serialise the same
+// way; the file's consistent face winding IS the embedding orientation, so the
+// oriented graph is built directly (no orient_neighbours / 2D layout). The raw
+// read_ply/write_ply + the graph-from-faces builder are file-static; the public
+// surface is Polyhedron::{from,to}_ply (and Deltahedron's in deltahedron-io.cc).
+namespace {
+
+using Code = mesh_io_error::Code;   // local alias so the throw sites below read cleanly
+
+// A PLY scalar type, resolved from its header name once (parse_ply_scalar_type)
+// so the per-value read is an integer switch, not a string compare. `unknown`
+// is a recognised-as-unrecognised tag: ascii ignores the type (so it stays
+// harmless), binary rejects it at read time -- preserving the prior behaviour.
+enum class ply_scalar { i8, u8, i16, u16, i32, u32, f32, f64, unknown };
+
+ply_scalar parse_ply_scalar_type(const string& t) {
+  if (t=="char"   || t=="int8")    return ply_scalar::i8;
+  if (t=="uchar"  || t=="uint8")   return ply_scalar::u8;
+  if (t=="short"  || t=="int16")   return ply_scalar::i16;
+  if (t=="ushort" || t=="uint16")  return ply_scalar::u16;
+  if (t=="int"    || t=="int32")   return ply_scalar::i32;
+  if (t=="uint"   || t=="uint32")  return ply_scalar::u32;
+  if (t=="float"  || t=="float32") return ply_scalar::f32;
+  if (t=="double" || t=="float64") return ply_scalar::f64;
+  return ply_scalar::unknown;
+}
+
+int ply_scalar_bytes(ply_scalar t) {
+  switch (t) {
+    case ply_scalar::i8:  case ply_scalar::u8:                     return 1;
+    case ply_scalar::i16: case ply_scalar::u16:                    return 2;
+    case ply_scalar::i32: case ply_scalar::u32: case ply_scalar::f32: return 4;
+    case ply_scalar::f64:                                         return 8;
+    case ply_scalar::unknown:                                     return 0;
+  }
+  return 0;   // unreachable; all enumerators handled above
+}
+
+// The parsed PLY header: body format, element counts, the vertex property list
+// (resolved type, name) with the indices of x/y/z within it, and the face-list
+// element types. All types are resolved to ply_scalar once, at header parse.
+struct ply_header {
+  bool binary;
+  int  nv, nf;
+  vector<pair<ply_scalar,string>> vprops;      // (resolved type, name) in file order
+  int  xi, yi, zi;                             // positions of x,y,z within vprops
+  ply_scalar face_count_type, face_index_type;
+};
+
+// One scalar read for both body formats: binary decodes the resolved type at its
+// true width and signedness; ascii reads a whitespace-separated number (type
+// irrelevant). An unknown type in a binary body is a hard error, never a silent skip.
+double read_ply_scalar(FILE* file, ply_scalar type, bool binary) {
+  if (!binary) {
+    double v; if (fscanf(file, "%lf", &v) != 1) throw mesh_io_error(Code::MalformedFile, "read_ply: truncated body");
+    return v;
+  }
+  int sz = ply_scalar_bytes(type);
+  if (sz == 0) throw mesh_io_error(Code::UnsupportedFormat, "read_ply: unknown binary property type");
+  unsigned char buf[8];
+  if (fread(buf,1,sz,file) != (size_t)sz) throw mesh_io_error(Code::MalformedFile, "read_ply: truncated body");
+  switch (type) {
+    case ply_scalar::f32: { float    v; memcpy(&v,buf,4); return v; }
+    case ply_scalar::f64: { double   v; memcpy(&v,buf,8); return v; }
+    case ply_scalar::i8:  { int8_t   v; memcpy(&v,buf,1); return v; }
+    case ply_scalar::u8:  { uint8_t  v; memcpy(&v,buf,1); return v; }
+    case ply_scalar::i16: { int16_t  v; memcpy(&v,buf,2); return v; }
+    case ply_scalar::u16: { uint16_t v; memcpy(&v,buf,2); return v; }
+    case ply_scalar::i32: { int32_t  v; memcpy(&v,buf,4); return v; }
+    case ply_scalar::u32: { uint32_t v; memcpy(&v,buf,4); return v; }
+    case ply_scalar::unknown: ;   // unreachable: sz==0 already threw above
+  }
+  return 0;   // unreachable; all readable enumerators return above
+}
+
+// Read header lines up to end_header. Throws on an unsupported body format, a
+// negative element count, or a vertex element lacking x/y/z.
+ply_header parse_ply_header(FILE* file) {
+  if (!file) throw mesh_io_error(Code::NullFile, "read_ply: null file handle");
+
+  string fmt;
+  ply_header h{}; h.face_count_type = ply_scalar::u8; h.face_index_type = ply_scalar::i32;
+  bool in_vertex = false, in_face = false;
+  char line[256];
+  while (fgets(line, sizeof line, file)) {
+    char a[64]={0}, b[64]={0}, c[64]={0}, d[64]={0};
+    int n = sscanf(line, "%63s %63s %63s %63s", a, b, c, d);
+    string t0 = a;
+    if (t0 == "end_header") break;
+    if (t0 == "format") fmt = b;
+    else if (t0 == "element" && strcmp(b,"vertex")==0) { h.nv = atoi(c); in_vertex=true; in_face=false; }
+    else if (t0 == "element" && strcmp(b,"face")==0)   { h.nf = atoi(c); in_vertex=false; in_face=true; }
+    else if (t0 == "property" && in_vertex && n>=3) h.vprops.push_back({parse_ply_scalar_type(b), c});
+    else if (t0 == "property" && in_face && strcmp(b,"list")==0 && n>=4) {
+      h.face_count_type = parse_ply_scalar_type(c); h.face_index_type = parse_ply_scalar_type(d);
+    }
+  }
+
+  h.binary = (fmt == "binary_little_endian");
+  if (fmt != "ascii" && !h.binary) throw mesh_io_error(Code::UnsupportedFormat, "read_ply: unsupported format '" + fmt + "'");
+  if (h.nv < 0 || h.nf < 0) throw mesh_io_error(Code::MalformedFile, "read_ply: negative element count");
+  h.xi = h.yi = h.zi = -1;
+  for (int i=0;i<(int)h.vprops.size();i++) {
+    if (h.vprops[i].second=="x") h.xi=i; else if (h.vprops[i].second=="y") h.yi=i; else if (h.vprops[i].second=="z") h.zi=i;
+  }
+  if (h.xi<0||h.yi<0||h.zi<0) throw mesh_io_error(Code::UnsupportedFormat, "read_ply: missing x/y/z vertex properties");
+  return h;
+}
+
+// Read h.nv vertices, keeping x/y/z and skipping any other scalar vertex properties.
+void read_ply_vertices(FILE* file, const ply_header& h, vector<coord3d>& points) {
+  // A bogus vertex count would otherwise throw std::length_error/bad_alloc here
+  // (not a mesh_io_error); convert it to the file-failure channel.
+  try { points.assign(h.nv, coord3d()); }
+  catch (const std::exception&) { throw mesh_io_error(Code::MalformedFile, "read_ply: vertex count too large to allocate"); }
+  for (int i=0;i<h.nv;i++) {
+    double x=0,y=0,z=0;
+    for (int k=0;k<(int)h.vprops.size();k++) {
+      double val = read_ply_scalar(file, h.vprops[k].first, h.binary);
+      if (k==h.xi) x=val; else if (k==h.yi) y=val; else if (k==h.zi) z=val;
+    }
+    points[i] = coord3d(x,y,z);
+  }
+}
+
+// Read h.nf polygon faces. No nf pre-reserve: a too-large nf simply exhausts the
+// body and trips read_ply_scalar's truncated-body guard.
+void read_ply_faces(FILE* file, const ply_header& h, vector<face_t>& faces) {
+  faces.clear();
+  for (int i=0;i<h.nf;i++) {
+    int cnt = (int)read_ply_scalar(file, h.face_count_type, h.binary);
+    if (cnt < 3 || cnt > h.nv) throw mesh_io_error(Code::InvalidTopology, "read_ply: face vertex count out of range [3, nv]");
+    face_t f(cnt);
+    for (int k=0;k<cnt;k++) {
+      int idx = (int)read_ply_scalar(file, h.face_index_type, h.binary);
+      if (idx < 0 || idx >= h.nv)            // never trust a raw index: an out-of-range
+        throw mesh_io_error(Code::InvalidTopology, "read_ply: face vertex index out of range");  // one is an OOB write downstream
+      f[k] = idx;
+    }
+    faces.push_back(std::move(f));
+  }
+}
+
+// Parse a PLY (ascii or binary_little_endian) into its x,y,z vertices and polygon
+// face list. Throws mesh_io_error on an unsupported header, missing x/y/z, or a
+// truncated body.
+void read_ply(FILE* file, vector<coord3d>& points, vector<face_t>& faces) {
+  ply_header h = parse_ply_header(file);
+  read_ply_vertices(file, h, points);
+  read_ply_faces(file, h, faces);
+}
+
+// Oriented neighbour lists (the rotation system) from a consistently-wound
+// polygon face list over vertices 0..N-1: for each boundary arc x -> v -> y the
+// neighbour of v after x is y; chaining around each vertex yields its fan. The
+// chain is then REVERSED to match the library's rotation convention: face tracing
+// follows next_on_face(u,v) = prev(v,u), so reproducing an input face ...u->v->w...
+// requires w to sit immediately BEFORE u in nb[v] (prev(v,u)=w), i.e. the reverse
+// of the after-chain order [u, after{u,v}=w, ...]. (A symmetric mesh like K4 hides
+// the direction; a general mesh does not -- a wrong rotation makes compute_faces
+// trace non-closing faces and spin forever.) Satisfies the orientation invariant
+// by construction (no orient_neighbours); returned as owned lists since
+// neighbours_t is a non-owning view.
+vector<vector<node_t>> oriented_neighbours_from_faces(int N, const vector<face_t>& faces) {
+  unordered_map<arc_t,int> after;             // arc (x->v) -> next vertex y; O(1) lookup
+  vector<int> start(N, -1), incident(N, 0);   // incident[v] = #faces (= arcs) at v
+  for (const auto& f : faces) {
+    int k = (int)f.size();
+    for (int i=0;i<k;i++) {
+      int x = f[i], v = f[(i+1)%k], y = f[(i+2)%k];
+      if (!after.insert({{x,v}, y}).second)   // a directed arc in two faces == non-manifold
+        throw mesh_io_error(Code::InvalidTopology, "from_ply: directed edge shared by two faces (non-manifold or inconsistent winding)");
+      incident[v]++;
+      if (start[v] < 0) start[v] = x;
+    }
+  }
+  vector<vector<node_t>> nb(N);
+  for (int v=0; v<N; v++) {
+    if (start[v] < 0) continue;               // unreferenced vertex; caught by check_degrees
+    int x = start[v];
+    bool closed = false;
+    for (int step=0; step <= incident[v]; step++) {
+      nb[v].push_back(x);
+      auto it = after.find({x, v});
+      if (it == after.end()) break;           // boundary edge: the fan has an open end
+      x = it->second;
+      if (x == start[v]) { closed = true; break; }
+    }
+    // The rotation must close having visited every incident face -- else the
+    // vertex is a boundary (hole) or a non-manifold pinch (two fans meet at v).
+    if (!closed || (int)nb[v].size() != incident[v])
+      throw mesh_io_error(Code::InvalidTopology, "from_ply: vertex fan does not close (boundary hole or non-manifold pinch)");
+    std::reverse(nb[v].begin(), nb[v].end());   // after-chain order -> library prev-convention
+  }
+  return nb;
+}
+
+// Flatten owned adjacency into the row-major CSR an RSRAdjacencyView wraps.
+// `flat`/`deg` must outlive the returned view.
+neighbours_t csr_view(const vector<vector<node_t>>& nb, vector<node_t>& flat, vector<uint8_t>& deg) {
+  const int N = (int)nb.size();
+  int dmax = 1;
+  for (const auto& l : nb) dmax = std::max(dmax, (int)l.size());
+  flat.assign((size_t)N*dmax, 0);
+  deg.assign(N, 0);
+  for (int v=0; v<N; v++) {
+    deg[v] = (uint8_t)nb[v].size();
+    for (int k=0;k<(int)nb[v].size();k++) flat[(size_t)v*dmax + k] = nb[v][k];
+  }
+  return neighbours_t(N, dmax, std::span<node_t>(flat), std::span<uint8_t>(deg));
+}
+
+// A valid closed mesh has every vertex degree in [3, 255]: 3 is the minimum on a
+// closed surface, 255 the uint8_t degree ceiling. Rejecting degree < 3 catches a
+// stray unreferenced vertex (degree 0) before it produces a malformed graph.
+void check_degrees(const vector<vector<node_t>>& nb, const char* who) {
+  for (const auto& row : nb) {
+    if (row.size() < 3)   throw mesh_io_error(Code::InvalidTopology, string(who) + ": vertex of degree < 3 (isolated or non-manifold)");
+    if (row.size() > 255) throw mesh_io_error(Code::InvalidTopology, string(who) + ": vertex degree exceeds 255");
+  }
+}
+
+// Signed enclosed volume * 6 (fan triangulation): its sign is the orientation
+// handedness -- positive for outward-facing (CCW-on-outside) faces.
+double signed_volume6(const Polyhedron& P) {
+  double V = 0;
+  for (const auto& f : P.faces())
+    for (size_t i=1; i+1<f.size(); i++)
+      V += P.points[f[0]].dot(P.points[f[i]].cross(P.points[f[i+1]]));
+  return V;
+}
+
+void write_ply(FILE* file, std::span<const coord3d> points, const vector<face_t>& faces, bool binary) {
+  if (!file) throw mesh_io_error(Code::NullFile, "write_ply: null file handle");
+  for (const auto& f : faces)
+    if (f.size() > 255) throw mesh_io_error(Code::FaceTooLarge, "write_ply: face with more than 255 vertices");
+  fprintf(file, "ply\nformat %s 1.0\n", binary ? "binary_little_endian" : "ascii");
+  fprintf(file, "element vertex %zu\n", points.size());
+  fprintf(file, "property float x\nproperty float y\nproperty float z\n");
+  fprintf(file, "element face %zu\n", faces.size());
+  fprintf(file, "property list uchar int vertex_indices\nend_header\n");
+  if (binary) {
+    for (const auto& p : points) { float xyz[3]={(float)p[0],(float)p[1],(float)p[2]}; fwrite(xyz,4,3,file); }
+    for (const auto& f : faces) {
+      unsigned char n = (unsigned char)f.size(); fwrite(&n,1,1,file);
+      for (int idx : f) { int32_t v = idx; fwrite(&v,4,1,file); }
+    }
+  } else {
+    for (const auto& p : points) fprintf(file, "%.10g %.10g %.10g\n", p[0], p[1], p[2]);
+    for (const auto& f : faces) {
+      fprintf(file, "%zu", f.size());
+      for (int idx : f) fprintf(file, " %d", idx);
+      fprintf(file, "\n");
+    }
+  }
+}
+
+} // namespace
+
+Polyhedron Polyhedron::from_ply(FILE *file)
+{
+  vector<coord3d> points;
+  vector<face_t>  faces;
+  read_ply(file, points, faces);
+
+  vector<vector<node_t>> nb = oriented_neighbours_from_faces((int)points.size(), faces);
+  check_degrees(nb, "Polyhedron::from_ply");
+  vector<node_t> flat; vector<uint8_t> deg;
+  neighbours_t view = csr_view(nb, flat, deg);
+  PlanarGraphView G(view.N, view.dmax, view.neighbours, view.deg);
+  if (!G.is_consistently_oriented())
+    throw mesh_io_error(mesh_io_error::Code::InvalidTopology, "Polyhedron::from_ply: input faces are not consistently wound");
+
+  Polyhedron P(G, points);
+  if (signed_volume6(P) < 0) P.flip_all_orientations();   // normalise to outward (CCW-on-outside)
+  return P;
+}
+
+bool Polyhedron::to_ply(const Polyhedron &P, FILE *file, bool binary)
+{
+  write_ply(file, P.points, P.faces(), binary);
+  return ferror(file) == 0;
+}

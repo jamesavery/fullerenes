@@ -21,7 +21,7 @@ public:
   vector< pair<Eisenstein,node_t> > outline; // Polygon outline in the Eisenstein plane. This is always initialized.
   vector<int> degrees;
 
-  vector<vector<Eisenstein>> tri_coords()
+  vector<vector<Eisenstein>> tri_coords() const
   {
     vector<tri_t> triangles = graph.compute_faces_oriented();
     vector<vector<Eisenstein>> coords(triangles.size());

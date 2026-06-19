@@ -9,6 +9,8 @@
 #include <sstream>
 #include <list>
 #include <algorithm>
+#include <array>
+#include <span>
 #include "auxiliary.hh"
 
 using namespace std;
@@ -114,6 +116,15 @@ struct coord2 : public pair<T,T> {
 
 using coord2d = coord2<double>;
 
+// The apex of a flat triangle with base a=(0,0), b=(L_ab,0), given its three edge
+// lengths (law of cosines); apex placed at y >= 0. The Euclidean analogue of
+// place_third_eis (the Z[w] lattice version, eisenstein.hh).
+inline coord2d place_apex(double L_ab, double L_bc, double L_ca) {
+  const double x  = (L_ab*L_ab + L_ca*L_ca - L_bc*L_bc) / (2.0*L_ab);
+  const double y2 = L_ca*L_ca - x*x;
+  return coord2d(x, sqrt(y2 > 0 ? y2 : 0.0));
+}
+
 
 
 template<typename T = double>
@@ -141,6 +152,7 @@ struct coord3 {
   }
   matrix3d outer(const coord3& y) const;
   T dot(const coord3& y)  const { return x[0]*y[0]+x[1]*y[1]+x[2]*y[2]; }
+  T norm2()               const { return dot(*this); }                       // squared length
   T norm()                const { return (T)sqrt((double)dot(*this)); }
   coord2<T> polar_angle(const coord3& centre = coord3()) const
   {
@@ -592,6 +604,18 @@ struct Tri3D {
     return s;
   }
 };
+
+// The closest point of a triangle to a query point: its 3D position, barycentric
+// coordinates, and squared distance to the query.
+struct ClosestPoint { coord3d pos; std::array<double,3> bary; double dist2; };
+
+// Nearest point of triangle t (vertices points[t[0..2]]) to p -- the metric
+// projection of p onto the filled triangle: the foot of the perpendicular if it
+// lands inside, else the nearest point on an edge or vertex. dist2 = |pos-p|^2,
+// and is +infinity for a degenerate (zero-area) face so it is never selected as
+// the nearest among several.
+ClosestPoint closest_point_on_triangle(const coord3d& p, const tri_t& t,
+                                        std::span<const coord3d> points);
 
 struct Tetra3D {
   coord3d a,b,c,d;

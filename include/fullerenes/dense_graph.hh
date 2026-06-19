@@ -124,6 +124,17 @@ struct RSRAdjacencyView {
         return {u, uint8_t(find(u, v))};
     }
 
+    // Flat arc id in [0, N*dmax): the dense canonical index of the directed arc at
+    // position i in u's row (the arc u -> neighbours[u*dmax+i]). It indexes both
+    // `neighbours` and any arc-attribute vector<T>(N*dmax) identically, so an arc-flag
+    // array replaces a hash map keyed by arc_t -- denser, allocation-free, and parallel
+    // arcs / self-loops stay distinct (an (u,v) key conflates them). The arc VALUE is
+    // recoverable O(1): source = id/dmax (arc_of), target = neighbours[id]. size_t so
+    // the index can never overflow before the (size_t-sized) backing buffer does.
+    size_t  arcid(K u, int i) const { return size_t(u) * dmax + i; }
+    size_t  arcid(arcix_t a)  const { return arcid(a.first, a.second); }
+    arcix_t arc_of(size_t id) const { return {K(id / dmax), uint8_t(id % dmax)}; }
+
     K target(arcix_t a) const {
         return neighbours[a.first * dmax + a.second];
     }
