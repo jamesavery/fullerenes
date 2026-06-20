@@ -200,6 +200,9 @@ struct DelaunayTriangulation {
   // Recompute he_angle for every face, then refresh the v_cone_angle cache.
   // THE entry point for restoring angle coherence after a metric (length) change.
   void recompute_all_angles();
+  // Recompute he_angle for every face only (no cone-cache refresh) -- for hot
+  // callers that read just he_angle; pair with recompute_cone_angles when needed.
+  void recompute_all_face_angles();
   // Refresh only the v_cone_angle cache from the current he_angle. Cone angle is
   // flip-invariant, so flips do not need this; a length change does.
   void recompute_cone_angles();

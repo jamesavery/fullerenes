@@ -433,9 +433,17 @@ void DelaunayTriangulation::recompute_face_angles(int f)
 // v_cone_angle correct on its own.
 void DelaunayTriangulation::recompute_all_angles()
 {
+  recompute_all_face_angles();
+  recompute_cone_angles();
+}
+
+// Recompute he_angle for every face, WITHOUT refreshing the v_cone_angle cache.
+// For a hot caller (a line search) that reads only he_angle per trial; pair with
+// recompute_cone_angles once the kept metric needs the cone cache.
+void DelaunayTriangulation::recompute_all_face_angles()
+{
   for (int f = 0; f < nf; f++)
     recompute_face_angles(f);
-  recompute_cone_angles();
 }
 
 // Refresh the cone-angle cache v_cone_angle[v] = vertex_angle_sum(v) for every
