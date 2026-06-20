@@ -1,6 +1,8 @@
 #include "fullerenes/unfold.hh"
 #include <array>
 #include <queue>
+#include <sstream>
+#include <stdexcept>
 
 /*************************************************************/
 /*************************************************************/
@@ -159,7 +161,8 @@ vector<int> Folding::identify_nodes(const IDCounter<Eisenstein>& grid, const vec
     Eisenstein omega     = Eisenstein::unit[i_omega],
                omega_inv = Eisenstein::unit[6-i_omega];
 
-    assert((omega * omega_inv == Eisenstein{1,0}));
+    if(omega * omega_inv != Eisenstein{1, 0})
+      throw std::logic_error("Folding::identify_nodes: omega * omega_inv != 1 -- Eisenstein::unit table corrupt");
 
     // Register reverse arcs
     for(int i=0;i<outline.size();i++){
@@ -402,8 +405,13 @@ vector<node_t> Folding::outline_nodes() const
     int stored_up = new_nodenames[u];
 
     if(stored_up != -1 && same_nodes[stored_up] != same_nodes[outline_newnames[i]]){
-      fprintf(stderr,"outline[%d] = {{%d,%d},%d} -> u = %d. stored_up = %d, outline_newnames[%d] = %d\n",i,outline[i].first.first,outline[i].first.second,outline[i].second,u,stored_up,i,outline_newnames[i]);
-      abort();
+      std::ostringstream msg;
+      msg << "Folding::outline_nodes: same-node disagreement at outline["
+          << i << "] = {{" << outline[i].first.first << ","
+          << outline[i].first.second << "}," << outline[i].second
+          << "} -> u = " << u << ". stored_up = " << stored_up
+          << ", outline_newnames[" << i << "] = " << outline_newnames[i];
+      throw std::logic_error(msg.str());
     }
     new_nodenames[u] = same_nodes[outline_newnames[i]];
   }

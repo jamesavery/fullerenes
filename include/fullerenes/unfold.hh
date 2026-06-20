@@ -1,7 +1,9 @@
 #pragma once
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/eisenstein.hh"
+#include <sstream>
 #include <stack>
+#include <stdexcept>
 
 
 class Unfolding {
@@ -33,8 +35,9 @@ public:
       for(int j=0;j<3;j++) tie(x[2*j],x[2*j+1]) = arc_coords.at({t[j],t[(j+1)%3]});
       for(int j=0;j<2;j++)
 	if(x[2*j+1] != x[2*(j+1)]){
-	  cerr << "Broken triangle: " << t << " has coordinates " << x << ". :'-(\n";
-	  abort();
+	  std::ostringstream msg;
+	  msg << "Unfolding::tri_coords: broken triangle " << t << " coords " << x;
+	  throw std::logic_error(msg.str());
 	}
 
       coords[i] = {{x[0],x[2],x[4]}};
