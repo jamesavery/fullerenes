@@ -380,9 +380,7 @@ DelaunayTriangulation::from_intrinsic_metric(const Triangulation& T,
     double L = length(D.he_origin[h], D.he_origin[h ^ 1]);
     D.he_length[h] = D.he_length[h ^ 1] = L;
   }
-  D.recompute_all_angles();
-  for (node_t v = 0; v < D.nv; v++)
-    D.v_cone_angle[v] = D.vertex_angle_sum(v);
+  D.recompute_all_angles();   // fills he_angle AND refreshes the v_cone_angle cache
   return D;
 }
 
@@ -425,10 +423,29 @@ void DelaunayTriangulation::recompute_face_angles(int f)
     he_angle[h[i]] = triangle_angle(L[i], L[(i + 2) % 3], L[(i + 1) % 3]);
 }
 
+// Recompute every corner angle (he_angle) from the current edge lengths, then
+// refresh the per-vertex cone-angle cache (v_cone_angle) that curvature() /
+// is_flat() / remove_flat_vertices() read. Both are derived from he_length, so
+// this is THE entry point that re-establishes angle coherence after any change
+// to the metric (e.g. a conformal rescale of the lengths). Delaunay flips do NOT
+// need it: the cone angle is flip-invariant (the quad's interior angle at each
+// diamond vertex is independent of which diagonal is present), so flip_edge keeps
+// v_cone_angle correct on its own.
 void DelaunayTriangulation::recompute_all_angles()
 {
   for (int f = 0; f < nf; f++)
     recompute_face_angles(f);
+  recompute_cone_angles();
+}
+
+// Refresh the cone-angle cache v_cone_angle[v] = vertex_angle_sum(v) for every
+// live vertex. Requires he_angle current (call after recompute_face_angles /
+// recompute_all_angles). O(sum of degrees) = O(nh).
+void DelaunayTriangulation::recompute_cone_angles()
+{
+  for (int v = 0; v < nv; v++)
+    if (v_out[v] >= 0)
+      v_cone_angle[v] = vertex_angle_sum(v);
 }
 
 double DelaunayTriangulation::vertex_angle_sum(int v) const

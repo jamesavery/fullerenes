@@ -197,7 +197,12 @@ struct DelaunayTriangulation {
   // --- Geometry ---
   Diamond diamond(int h) const;
   void recompute_face_angles(int f);
+  // Recompute he_angle for every face, then refresh the v_cone_angle cache.
+  // THE entry point for restoring angle coherence after a metric (length) change.
   void recompute_all_angles();
+  // Refresh only the v_cone_angle cache from the current he_angle. Cone angle is
+  // flip-invariant, so flips do not need this; a length change does.
+  void recompute_cone_angles();
 
   // Total angle at vertex v = sum of incident corner angles. The Gaussian
   // curvature / angle defect is 2*pi - vertex_angle_sum(v); a flat vertex
