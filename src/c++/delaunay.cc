@@ -203,18 +203,6 @@ int DelaunayTriangulation::wire_triangle(int h0, int h1, int h2)
   return fid;
 }
 
-void DelaunayTriangulation::ensure_v_out(int v)
-{
-  int h = v_out[v];
-  if (h >= 0 && alive(h) && he_origin[h] == v) return;
-  // Scan all half-edges for a live outgoing one from v.  O(nh) fallback;
-  // only used to recover after structural edits that may have killed
-  // the previously-recorded outgoing pointer.
-  for (int hh = 0; hh < nh; hh++)
-    if (alive(hh) && he_origin[hh] == v) { v_out[v] = hh; return; }
-  v_out[v] = -1;
-}
-
 int DelaunayTriangulation::vertex_degree(int v) const
 {
   if (v_out[v] < 0) return 0;
@@ -525,9 +513,10 @@ bool DelaunayTriangulation::flip_edge(int h)
   // u and v lost their incident diagonal; find a new outgoing half-edge.
   if (v_out[u] == h) v_out[u] = h4;
   if (v_out[v] == t) v_out[v] = h1;
-  // B == D case: h and t are now self-loops at B; ensure_v_out anchors
-  // B's outgoing pointer at a live half-edge.
-  if (B == D) ensure_v_out(B);
+  // B == D case: h and t are now self-loops at B. he_origin[h5] is never reassigned
+  // by the flip and equals D == B; h5 is not deallocated and is wired into face fh
+  // above -- so it is a valid outgoing half-edge from B. Set it directly.
+  if (B == D) v_out[B] = h5;
   return true;
 }
 
@@ -550,15 +539,37 @@ int DelaunayTriangulation::count_non_delaunay() const
 
 int DelaunayTriangulation::lawson_sweep()
 {
+  // Global Delaunay restore: seed with every live edge (identical to the
+  // historical sweep -- same edges, same push order, hence same LIFO processing).
+  vector<int> all;
+  all.reserve(nh / 2);
+  for (int h = 0; h < nh; h += 2)
+    if (alive(h)) all.push_back(h);
+  vector<bool> in_stack(nh / 2, false);
+  return lawson_sweep(all, in_stack);
+}
+
+// Lawson flip-to-Delaunay seeded with a frontier of edges (any half-edge id per
+// edge; twins/dups coalesce). Flips each non-Delaunay seed and propagates to the 4
+// rim edges of every flip, so a cascade is chased to completion. On a mesh that is
+// already Delaunay outside the region the seeds bound, this reaches the SAME iDT a
+// full sweep would: Theorem 1 confluence, and cocircular edges are Delaunay
+// (is_delaunay) so never flipped. The no-arg lawson_sweep() seeds with all edges.
+//
+// in_stack is the caller-owned stack-membership bitmap (sized >= nh/2). Every push
+// is matched by a pop that clears its bit, so on NORMAL return in_stack is all-false
+// again -- a hot loop (remove_flat_vertices) reuses one buffer across local sweeps
+// without the per-call O(nh) zero-fill. (A budget throw leaves it dirty, but that
+// aborts the whole reduction, so the buffer is discarded.)
+int DelaunayTriangulation::lawson_sweep(const vector<int>& seed_edges, vector<bool>& in_stack)
+{
   int flips = 0;
 
-  // Mark all live edges for checking.
-  vector<bool> in_stack(nh / 2, false);
   stack<int> S;
-  for (int h = 0; h < nh; h += 2)
+  for (int h : seed_edges)
     if (alive(h)) {
-      S.push(h);
-      in_stack[h >> 1] = true;
+      int eid = h >> 1;
+      if (!in_stack[eid]) { S.push(eid << 1); in_stack[eid] = true; }
     }
 
   // The Bobenko-Springborn discrete Dirichlet energy strictly decreases on
@@ -766,13 +777,6 @@ static void splice_fan(DelaunayTriangulation& D, int v,
                         const FanPolygon& fan, const FanTriangulation& tri) {
   int k = fan.k;
 
-  // --- Fix v_out for neighbors before deallocation ---
-  for (int i = 0; i < k; i++) {
-    int spoke_twin = fan.spoke_he[i] ^ 1;
-    if (D.v_out[fan.nb[i]] == spoke_twin)
-      D.v_out[fan.nb[i]] = fan.inner_rim[(i - 1 + k) % k] ^ 1;
-  }
-
   // --- Deallocate fan faces and spoke edges ---
   for (int i = 0; i < k; i++) {
     D.dealloc_face(D.he_face[fan.spoke_he[i]]);
@@ -797,7 +801,12 @@ static void splice_fan(DelaunayTriangulation& D, int v,
       local_arc.at({t.v1, t.v2}),
       local_arc.at({t.v2, t.v0}));
 
-  for (int i = 0; i < k; i++) D.ensure_v_out(fan.nb[i]);
+  // Restore each rim vertex's outgoing pointer directly from a known-live local edge.
+  // inner_rim[i] = he_next[spoke_he[i]] originates at nb[i] (extract_fan), is never
+  // deallocated (only spokes are), and was just re-wired into an ear triangle above --
+  // so it is always a valid outgoing half-edge from nb[i]. Setting it unconditionally
+  // keeps the v_out invariant local and exact (no global rescan needed).
+  for (int i = 0; i < k; i++) D.v_out[fan.nb[i]] = fan.inner_rim[i];
 }
 
 // Remove a degree-3 vertex: three fan faces merge into one triangle.
@@ -814,10 +823,12 @@ static void remove_degree3(DelaunayTriangulation& D, int v) {
   D.dealloc_edge(h0); D.dealloc_edge(h1); D.dealloc_edge(h2);
   D.v_out[v] = -1;
 
-  // Repair v_out for each neighbour whose outgoing pointer was a killed spoke.
-  for (int nbr : {nb0, nb1, nb2}) D.ensure_v_out(nbr);
-
   D.wire_triangle(inner0, inner1, inner2);
+
+  // Restore v_out directly: inner_i = he_next[h_i] originates at nb_i, survives the
+  // spoke deallocation, and is now wired into the merged triangle -- always a valid
+  // outgoing half-edge from nb_i. Keeps the v_out invariant local (no global rescan).
+  D.v_out[nb0] = inner0; D.v_out[nb1] = inner1; D.v_out[nb2] = inner2;
 }
 
 // ============================================================================
@@ -891,20 +902,25 @@ static void flip_away_self_loops(DelaunayTriangulation& D, int v) {
 
 void DelaunayTriangulation::remove_flat_vertices(double flat_tol)
 {
-  // Scan all live flat vertices top-down; any single removable vertex keeps
-  // the algorithm moving.  Repeat until a pass produces no removals, then
-  // apply a Delaunay restructuring sweep and try once more.  Only after
-  // two consecutive fruitless passes do we declare the graph truly stuck.
+  // Remove every flat (cone angle 2*pi) vertex, leaving the cones, via a WORK-LIST.
   //
-  // Rationale: removing in strict descending-index order aborts as soon as
-  // the highest-index flat vertex resists, even when other flat vertices
-  // are still removable — which strands labeling-dependent multi-edge
-  // clusters and leaves the iDT with > 12 vertices.  A full-scan pass is
-  // O(N) per iteration and has no worse asymptotic cost than the old loop.
-  // Progress reporting (when verbose_removal > 0). Counts live vertices and
-  // reports every `verbose_removal` removals. fprintf(stderr) is unbuffered;
-  // we fflush each line so it shows on a slow run (don't pipe — piping
-  // re-introduces block buffering).
+  // Removing a flat vertex re-triangulates its star (flip_away_self_loops +
+  // remove_flat_vertex) and restores Delaunay locally with a seeded Lawson sweep over
+  // the star rim. Flatness is isometric-invariant (cone angle never changes), so a
+  // removal can only change the REMOVABILITY of a star neighbour -- hence on each
+  // removal we re-push the live flat rim neighbours. Each vertex is therefore touched
+  // O(deg) times per round -> O(N) total, with no full re-scan inside a round.
+  //
+  // Two effects the local re-push cannot reach are handled by the OUTER round loop,
+  // preserving the previous driver's fixed-point semantics exactly:
+  //   - a flat made removable by a seeded-sweep flip OUTSIDE the rim (re-seed-all
+  //     catches it next round), and
+  //   - a low-degree (deg <= 2) flat that remove_flat_vertex cannot remove until a
+  //     global Delaunay restructure (flip_to_delaunay) raises its degree.
+  // A round that removes nothing terminates the loop (the same stuck-detection as the
+  // previous full-scan-plus-restructure driver).
+  //
+  // Progress reporting (verbose_removal > 0): unbuffered, flushed per line (don't pipe).
   auto count_live = [&]() {
     int n = 0;
     for (int v = 0; v < nv; v++) if (v_out[v] >= 0) n++;
@@ -916,43 +932,93 @@ void DelaunayTriangulation::remove_flat_vertices(double flat_tol)
     std::fflush(stderr);
   }
 
-  auto remove_any_flat = [&]() {
-    bool progress = false;
-    for (int v = nv - 1; v >= 0; v--) {
-      if (v_out[v] < 0 || !is_flat(v, flat_tol)) continue;
-      flip_away_self_loops(*this, v);
-      remove_flat_vertex(v);
-      if (v_out[v] < 0) {
-        progress = true;
-        while (nv > 0 && v_out[nv - 1] < 0) nv--;
-        lawson_sweep();
-        if (verbose_removal && (++removed % verbose_removal == 0)) {
-          std::fprintf(stderr, "[remove_flat] removed %lld, %d live remain\n",
-                       removed, count_live());
-          std::fflush(stderr);
-        }
-      }
+  // Reused across the per-removal seeded sweeps: each sweep leaves it all-false on
+  // normal return, so this O(nh) zero-fill happens once, not once per removal.
+  vector<bool> sweep_in_stack(nh / 2, false);
+
+  // Work-list of candidate flat vertices. nv only shrinks during reduction (no vertex is
+  // allocated here), so on_queue sized at the current nv stays in range and ids are
+  // never reused upward. on_queue dedups: a vertex is enqueued at most once at a time.
+  std::vector<int>  work;
+  std::vector<bool> on_queue(nv, false);
+  auto push = [&](int v) {
+    if (v >= 0 && v < nv && v_out[v] >= 0 && !on_queue[v] && is_flat(v, flat_tol)) {
+      work.push_back(v); on_queue[v] = true;
     }
-    return progress;
   };
 
+  // Attempt to remove one flat vertex; on success restore Delaunay locally and re-push
+  // the affected (live, flat) rim neighbours. Returns true iff v was removed.
+  auto try_remove = [&](int v) -> bool {
+    if (v < 0 || v >= nv || v_out[v] < 0 || !is_flat(v, flat_tol)) return false;
+    // Collect the star rim on BOTH sides of flip_away_self_loops (its self-loop flips
+    // perturb the pre-flip ring; the removal re-triangulates the post-flip rim) -- a
+    // complete superset of the edges whose Delaunay status the surgery can change.
+    std::vector<int> ring;
+    for (int h : incident(v)) ring.push_back(dest(h));
+    flip_away_self_loops(*this, v);
+    for (int h : incident(v)) ring.push_back(dest(h));
+    remove_flat_vertex(v);
+    if (v_out[v] >= 0) return false;                         // deg <= 2: not removed
+    while (nv > 0 && v_out[nv - 1] < 0) nv--;
+    std::vector<int> seeds;
+    for (int w : ring)
+      if (w >= 0 && w < nv && v_out[w] >= 0)
+        for (int h : incident(w)) seeds.push_back(h);
+    lawson_sweep(seeds, sweep_in_stack);
+    for (int w : ring) push(w);                              // re-push affected rim flats
+    if (verbose_removal && (++removed % verbose_removal == 0)) {
+      std::fprintf(stderr, "[remove_flat] removed %lld, %d live remain\n", removed, count_live());
+      std::fflush(stderr);
+    }
+    return true;
+  };
+
+  // Seed the work-list with every live flat vertex; returns whether any were added.
+  auto seed_all_flats = [&]() {
+    bool any = false;
+    for (int v = 0; v < nv; v++) {
+      if (v_out[v] >= 0 && !on_queue[v] && is_flat(v, flat_tol)) {
+        work.push_back(v); on_queue[v] = true; any = true;
+      }
+    }
+    return any;
+  };
+
+  // Drain the work-list, removing each flat that becomes removable (re-pushes chase the
+  // cascade). Returns whether any vertex was removed.
+  auto drain = [&]() {
+    bool any = false;
+    while (!work.empty()) {
+      int v = work.back(); work.pop_back(); on_queue[v] = false;
+      if (try_remove(v)) any = true;
+    }
+    return any;
+  };
+
+  // Establish the intrinsic Delaunay triangulation up front, so every per-removal seeded
+  // restore starts from a globally-Delaunay mesh (from_intrinsic_metric does not pre-flip).
+  // A no-op on an already-Delaunay input (the equilateral from_triangulation path).
+  flip_to_delaunay();
+
+  seed_all_flats();
+  drain();
+  // Restructure rounds: a global Delaunay sweep can unblock deg<=2 stragglers and expose
+  // flats the local re-push missed. Re-seed and drain until a full round removes nothing.
   while (true) {
-    if (remove_any_flat()) continue;
-    // Nothing removable this pass; restructure via full Delaunay sweep and retry.
     flip_to_delaunay();
-    if (!remove_any_flat()) break;
+    if (!seed_all_flats()) break;   // no flats remain -> done
+    if (!drain())          break;   // flats remain but none removable even after restructure -> done
   }
 
   if (verbose_removal) {
-    std::fprintf(stderr, "[remove_flat] done: removed %lld, %d live remain\n",
-                 removed, count_live());
+    std::fprintf(stderr, "[remove_flat] done: removed %lld, %d live remain\n", removed, count_live());
     std::fflush(stderr);
   }
 
-  // Final Lawson.  With guards dropped, this converges unconditionally by
-  // Theorem 1 (Bobenko-Springborn energy strictly decreases on every flip,
-  // including B == D self-loop-creating flips; the new self-loop is
-  // strictly Delaunay by Lemma 1).
+  // Final Lawson.  The output is globally Delaunay regardless of removal order by
+  // Theorem 1 (Bobenko-Springborn energy strictly decreases on every flip, including
+  // B == D self-loop-creating flips; the new self-loop is strictly Delaunay by Lemma 1).
   flip_to_delaunay();
 }
 
