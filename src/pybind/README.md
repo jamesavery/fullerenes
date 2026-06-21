@@ -47,6 +47,65 @@ the next `import`.
 > A non-editable `pip install` from an sdist is not supported yet (the wheel does
 > not bundle `libfullerenes.so` + its native deps — deferred).
 
+## Quickstart
+
+```python
+import fullerenes as f
+
+# Counts and point groups are file-free (no database needed):
+f.number_isomers(60)              # 1812
+f.symmetries(60)                  # point groups present among the isomers
+
+# Enumerate isomers. buckygen yields DUAL triangulations; .dual() gives the
+# cubic FullereneGraph. The generator is iterable and a context manager:
+with f.buckygen(60) as gen:
+    for dual in gen:
+        fg = dual.dual()          # FullereneGraph
+        print(dual.name())        # canonical spiral name, e.g. [GS:...]-fullerene
+        break
+
+# Build and inspect a graph:
+fg = f.FullereneGraph.C20()
+fg.N, fg.count_edges()           # 20, 30
+fg.is_cubic(), fg.is_a_fullerene()
+fd = fg.dual()                   # FullereneDual
+fd.rspi()                        # (pentagon indices, jumps)
+
+# Zero-copy numpy: .neighbours/.deg/.points are views into the C++ storage
+# (the wrapper is their .base; padded columns >= deg[u] are -1).
+nb = fg.neighbours               # int32 (N, dmax)
+assert nb.base is fg
+fg.adjacency()                   # clean ragged copy
+
+# 3D geometry. optimize() writes back into .points in place:
+P = f.Polyhedron.from_fullerene(fg)
+P.optimize()
+P.volume(), P.surface_area(), P.diameter()
+xyz = P.points                   # float64 (N,3) view
+P.write("c20.mol2")              # or .to_povray() / .to_latex()
+
+# Equilateral-triangle dual embedding:
+D = f.Deltahedron.from_dual(fd)
+D.optimize()                     # -> OptResult.CONVERGED / STAGNATED / ...
+D.max_angle_relerr(), D.count_concave()
+
+# Symmetry, names, database:
+f.Symmetry(fd).point_group()
+f.FullereneDual.from_rspi(60, [1,7,9,11,13,15,18,20,22,24,26,32])
+f.set_database_path("/path/to/database")    # only IsomerDB needs files
+db = f.IsomerDB.read(60); db[0].rspi; db.make_isomer(0)
+```
+
+Conventions:
+
+- **N/dmax-changing ops return a new object** (`gc_transform`, `leapfrog`, `halma`,
+  `dual`, `convex_hull`); in-place mutators (`optimize`, `move`, `scale`,
+  `align_with_axes`) write through `.points`. So outstanding numpy views never dangle.
+- **Out-of-range node/axis arguments raise `IndexError`** (e.g. `simple_geodesics_from`,
+  `end_of_the_line`) rather than corrupting memory.
+- The full typed API is in `fullerenes/_fullerenes.pyi`; the full write-up is
+  `doc/pybind-interface.tex`.
+
 ## Build with the library (in-tree CMake)
 
 To build the bindings as part of a full library build instead of via pip:
