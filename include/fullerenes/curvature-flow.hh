@@ -44,6 +44,12 @@ enum class CurvatureMode { Shape, Uniform, Gaussian, Point };
 // from the 3D cone finder's SurfaceCone (graphview.hh).
 struct ConeSite { tri_t face; std::array<double,3> bary; };
 
+// Where confine_curvature actually inserts a cone, given its requested barycentric: the triple
+// nudged strictly interior (each coord >= 1e-3) and renormalised, so a cone detected on a triangle
+// edge/vertex still lands inside the face. Exposed so a warm-start 3D placement can match the
+// inserted cone's intrinsic position rather than the un-nudged detector centre.
+std::array<double,3> interior_bary(std::array<double,3> bary);
+
 // The prescribed curvature on the cone-refined metric.
 struct ConePrescription {
   DelaunayTriangulation surface;   // DCEL metric with the cone vertices inserted

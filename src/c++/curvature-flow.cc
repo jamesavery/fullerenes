@@ -63,13 +63,6 @@ std::vector<double> prescribe_curvature(const DelaunayTriangulation& D,
 // detector-clamped on-edge/vertex centre cannot make a zero-length spoke or sliver.
 constexpr double kMinBary = 1e-3;
 
-// Nudge a barycentric triple strictly interior (each coord >= kMinBary) and renormalize.
-std::array<double,3> interior_bary(std::array<double,3> b) {
-  for (double& w : b) w = std::max(w, kMinBary);
-  const double s = b[0] + b[1] + b[2];
-  return {b[0]/s, b[1]/s, b[2]/s};
-}
-
 // Spoke lengths {P->a, P->b, P->c} from a barycentric interior point P to the corners
 // of a triangle with the given edge lengths: lay the triangle flat and measure
 // |P - corner|. Metric-preserving since P stays inside the flat face.
@@ -99,6 +92,15 @@ int insert_cone(DelaunayTriangulation& D, const ConeSite& cone) {
 }
 
 } // namespace
+
+// Exposed (declared in curvature-flow.hh): nudge a barycentric triple strictly interior (each coord
+// >= kMinBary) and renormalize. Both insert_cone (above) and warm-start placement use it so the two
+// agree on where a cone actually sits.
+std::array<double,3> interior_bary(std::array<double,3> b) {
+  for (double& w : b) w = std::max(w, kMinBary);
+  const double s = b[0] + b[1] + b[2];
+  return {b[0]/s, b[1]/s, b[2]/s};
+}
 
 ConePrescription confine_curvature(DelaunayTriangulation surface,
                                    const std::vector<ConeSite>& cones,
