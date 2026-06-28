@@ -6,6 +6,10 @@ add_executable(surface-geodesics-test surface-geodesics-test.cc)
 target_link_libraries(surface-geodesics-test fullerenes buckygen GTest::GTest GTest::Main)
 add_test(NAME surface-geodesics-test COMMAND surface-geodesics-test)
 
+add_executable(unfold-straighten-test unfold-straighten-test.cc)
+target_link_libraries(unfold-straighten-test fullerenes buckygen GTest::GTest GTest::Main)
+add_test(NAME unfold-straighten-test COMMAND unfold-straighten-test)
+
 # Standalone (no GTest): stresses BuckyGen child-process teardown; exit 0 = pass,
 # 1 = assertion, 2 = watchdog timeout. CLI-tunable for heavy manual runs.
 add_executable(buckygen-stress-test buckygen-stress-test.cc)
