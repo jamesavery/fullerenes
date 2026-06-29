@@ -508,8 +508,11 @@ Deltahedron DeltahedronView<double>::GCtransform(unsigned k, unsigned l) const {
     const tri_t& tri = tris[i];
     node_t nu = tri[0], nv = tri[1], nw = tri[2];
 
-    // Scaled Eisenstein corners of this face
-    auto [EU,EV] = gcu.arc_coords.at({nu,nv});
+    // Scaled Eisenstein corners of this face. nu,nv are ORIGINAL labels (from
+    // triangles()); gcu.arc_coords is keyed by the cones-first labels, so map through
+    // gcu.cone_perm (which survives the *w copy). final_grid (read below) is already
+    // back in original labels, matching T_new.
+    auto [EU,EV] = gcu.arc_coords.at({gcu.cone_perm[nu], gcu.cone_perm[nv]});
     Eisenstein EW = EU + (EV - EU).nextCCW();
 
     // Side vectors and determinant (should equal T for CCW faces)

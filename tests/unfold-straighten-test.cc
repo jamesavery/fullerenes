@@ -29,16 +29,15 @@ static bool is_simple(const vector<pair<Eisenstein,node_t>>& O){
   return true;
 }
 
-// Straighten every C_N isomer (cones-first relabelled, the documented precondition)
-// and require a simple cone-star each time.
+// Straighten every C_N isomer and require a simple cone-star each time. The
+// Unfolding(Triangulation) ctor now establishes the cones-first precondition itself
+// (via sort_flat_last), so no manual relabelling is needed at the call site.
 static void check_all(int N){
   BuckyGen::buckygen_queue Q = BuckyGen::start(N, false, false);
   Graph G; long count=0;
   while(BuckyGen::next_fullerene(Q,G)){
     Triangulation T(G);
-    Triangulation sorted = T;
-    sorted.apply_permutation(T.sort_flat_last());                  // cones -> labels 0..11
-    Unfolding S = Unfolding(sorted).straighten_lines();
+    Unfolding S = Unfolding(T).straighten_lines();
     ASSERT_TRUE(is_simple(S.outline)) << "C" << N << " isomer " << count << ": cone-star not simple";
     count++;
   }

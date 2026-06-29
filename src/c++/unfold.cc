@@ -416,7 +416,11 @@ Unfolding Unfolding::straighten_lines() const
   const int Ncones = 12;   // a fullerene has exactly 12 pentagon (degree-5) cones
   ConeSegments g = develop_cone_segments(outline, degrees, Ncones);
   reduce_cone_star(g, Ncones);
-  return Unfolding(vector<pair<Eisenstein,node_t>>(g.O.begin(), g.O.end()));
+  // The straightened outline is in the cones-first labelling, so it shares this
+  // Unfolding's cone_perm; carry it forward for original-label recovery.
+  Unfolding S(vector<pair<Eisenstein,node_t>>(g.O.begin(), g.O.end()));
+  S.cone_perm = cone_perm;
+  return S;
 }
 
 string Unfolding::to_latex(int K, int L, int label_vertices,  bool draw_equilaterally, bool include_headers) const 
