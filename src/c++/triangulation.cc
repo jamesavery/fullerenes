@@ -1392,6 +1392,119 @@ matrix<double> TriangulationView::surface_distances(vector<node_t> nodes,
   return apsp.dist.square_elementwise();
 }
 
+// --- Thurston star unfolding (@anchor tri-star-unfold in graphview.hh;
+//     construction + proofs: claude-projects/visualization/STAR-UNFOLDING.md).
+
+namespace {
+
+// w^k as an Eisenstein unit: CCW rotation by k * 60 degrees; rotation is
+// Eisenstein multiplication.
+Eisenstein w_pow(int k) {
+  static const Eisenstein w[6] = {{1,0},{0,1},{-1,1},{-1,0},{0,-1},{1,-1}};
+  return w[((k % 6) + 6) % 6];
+}
+
+// Lattice shoelace of a closed labelled (a,b)-polygon: counts covered unit
+// lattice triangles, each contributing +-1 ((0,0)(1,0)(0,1) -> +1).
+long long lattice_shoelace(const vector<pair<Eisenstein, node_t>>& poly) {
+  long long s = 0;
+  for (size_t i = 0; i < poly.size(); ++i) {
+    const Eisenstein& p = poly[i].first;
+    const Eisenstein& q = poly[(i + 1) % poly.size()].first;
+    s += (long long)p.first * q.second - (long long)q.first * p.second;
+  }
+  return s;
+}
+
+// One cut source -> cone: the fan data (axis, g) kept raw for the exact
+// angular comparator, the developed fan direction delta = w^axis * g, the
+// Loeschian squared length, and the leaf's degree (cone angle / (pi/3)).
+struct StarCut {
+  node_t     cone;
+  int        axis, deg;
+  Eisenstein g, delta;
+  long long  d2;
+};
+
+// Angular order within the developed fan [0, deg(source)*60): by sector,
+// then by the in-sector cross product.  Total and exact; equal directions
+// are the CollinearCuts degeneracy, detected before sorting.
+bool fan_less(const StarCut& x, const StarCut& y) {
+  if (x.axis != y.axis) return x.axis < y.axis;
+  return (long long)x.g.first * y.g.second - (long long)y.g.first * x.g.second > 0;
+}
+
+}  // namespace
+
+TriangulationView::star_unfolding
+TriangulationView::star_unfold(node_t source, const vector<node_t>& cones,
+                               const matrix<simple_geodesic>& simple,
+                               const matrix<double>& dist) const
+{
+  using SU = star_unfolding;
+
+  const int n = (int)cones.size();
+  int       S = -1;
+  for (int i = 0; i < n; ++i)
+    if (cones[i] == source) S = i;
+  if (S < 0) return SU::error(SU::Code::SourceNotCone, std::to_string(source));
+
+  SU out;
+  out.source = source;
+
+  vector<StarCut> cuts;
+  for (int I = 0; I < n; ++I) {
+    if (I == S) continue;
+    const simple_geodesic& sg = simple(S, I);
+    const long long d2 = sg.g.norm2();
+    if (d2 <= 0)
+      return SU::error(SU::Code::NoSimpleGeodesic, std::to_string(cones[I]));
+    if ((double)d2 > dist(S, I) + 1e-6) out.cuts_globally_shortest = false;
+    cuts.push_back({cones[I], sg.axis, (int)degree(cones[I]),
+                    sg.g, w_pow(sg.axis) * sg.g, d2});
+  }
+  for (const StarCut& x : cuts)              // collinear pre-scan (k is tiny)
+    for (const StarCut& y : cuts)
+      if (&x != &y && x.axis == y.axis && !fan_less(x, y) && !fan_less(y, x))
+        return SU::error(SU::Code::CollinearCuts,
+                         std::to_string(x.cone) + "," + std::to_string(y.cone));
+  sort(cuts.begin(), cuts.end(), fan_less);
+
+  // The walk (STAR-UNFOLDING.md: LEAF TURN + FAN FRAME, telescoped):
+  //   v_i = s^i + w^(D_(i-1)) delta_i,   s^(i+1) = v_i - w^(D_i) delta_i.
+  // Emitted directly as the standard CW labelled outline.
+  Eisenstein s(0, 0);
+  int        D = 0;
+  for (const StarCut& c : cuts) {
+    const Eisenstein v = s + w_pow(D) * c.delta;
+    out.outline.push_back({s, source});
+    out.outline.push_back({v, c.cone});
+    D = (D + c.deg) % 6;
+    s = v - w_pow(D) * c.delta;
+  }
+
+  if (!(s == Eisenstein(0, 0)))
+    throw std::runtime_error("star_unfold: boundary does not close at (" +
+                             std::to_string(s.first) + "," +
+                             std::to_string(s.second) + ")");
+  const long long n_tri = 2LL * N - 4;
+  if (lattice_shoelace(out.outline) != -n_tri)
+    throw std::runtime_error("star_unfold: area check failed: shoelace " +
+                             std::to_string(lattice_shoelace(out.outline)) +
+                             " != -" + std::to_string(n_tri));
+  return out;
+}
+
+TriangulationView::star_unfolding
+TriangulationView::star_unfold(node_t source) const
+{
+  vector<node_t> cones;
+  for (node_t u = 0; u < (node_t)N; ++u)
+    if (degree(u) != 6) cones.push_back(u);
+  return star_unfold(source, cones, simple_geodesics(cones),
+                     surface_distances(cones));
+}
+
 Triangulation TriangulationView::sort_nodes() const
 {
   vector< pair<int,int> > degrees(N);

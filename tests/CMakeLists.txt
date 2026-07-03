@@ -99,3 +99,7 @@ target_compile_definitions(extract-graph PRIVATE FULLERENE_ROOT="${CMAKE_SOURCE_
 add_executable(planargraph-ascii-test planargraph-ascii-test.cc)
 target_link_libraries(planargraph-ascii-test fullerenes GTest::GTest GTest::Main)
 add_test(NAME planargraph-ascii-test COMMAND planargraph-ascii-test)
+
+add_executable(star-unfold-test star-unfold-test.cc)
+target_link_libraries(star-unfold-test fullerenes GTest::GTest GTest::Main)
+add_test(NAME star-unfold-test COMMAND star-unfold-test)
