@@ -380,11 +380,21 @@ Triangulation TriangulationView::GCtransform(unsigned k, unsigned l) const
 {
   if(l==0) return halma_transform(k-1);
 
-  Unfolding u(*this);
-  Unfolding gcu(u*Eisenstein(k,l));
-  Folding gcf(gcu);
-  Triangulation t(gcf.fold());
-   return t;
+  // Develop via the Thurston star unfolding (the validated fold producer): the
+  // first cone whose star is non-degenerate. The raw BFS-develop outline used
+  // previously carries deg-6 boundary vertices that fold's seam step is not
+  // defined on.
+  star_unfolding st;
+  bool ok = false;
+  for(node_t s=0; s<N && !ok; s++){
+    if(degree(s) == 6) continue;                 // only cones (deg != 6) are valid star sources
+    st = star_unfold(s);
+    ok = (st.code == star_unfolding::Code::Ok);
+  }
+  if(!ok) throw std::runtime_error("GCtransform: no non-degenerate star unfolding");
+
+  Unfolding gcu(Unfolding(st.outline) * Eisenstein(k,l));
+  return Folding(gcu).fold();
 }
 
 Triangulation TriangulationView::halma_transform(int m, vector<map<edge_t,node_t>>* face_grids) const {
