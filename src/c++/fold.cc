@@ -144,12 +144,25 @@ void Folding::connect_polygon(int i_omega, vector<array<node_t,6>>& neighbours)
 
 // Write arc p0--p1 (rotated back by omega_inv) into both endpoints' oriented
 // slots. Idempotent: a shared edge written twice with the same value is a no-op.
+//
+// Invariant (checked; verified dead across C20-C60 all rotations and
+// gc-transform up to (4,3)): connect_polygon emits arcs only between developed
+// lattice points -- scanConvert covers exactly the point_included lattice
+// points, every one of which is a developed vertex, hence in final_grid -- and
+// two horizontally-adjacent developed points are distinct vertices. A violation
+// is a development bug (a missing vertex, or a self-overlapping development
+// pinching one vertex onto its neighbour); silently dropping the arc or writing
+// a self-loop would corrupt the folded graph, so we fail loudly instead.
 void Folding::connect_arc(vector<array<node_t,6>>& nb, Eisenstein p0, Eisenstein p1,
                           Eisenstein omega_inv, int i_omega) const
 {
   auto a = final_grid.find(p0*omega_inv), b = final_grid.find(p1*omega_inv);
-  if(a==final_grid.end() || b==final_grid.end()) return; // <- JA Note: This looks like a silent failure, corrupting the result!
-  if(a->second == b->second) return;                     // <- JA Note: This also looks like a silent failure, corrupting the result.
+  if(a==final_grid.end() || b==final_grid.end())
+    throw std::logic_error("connect_arc: scan-converted lattice point absent from final_grid "
+                           "(development does not cover its own outline interior)");
+  if(a->second == b->second)
+    throw std::logic_error("connect_arc: horizontally-adjacent lattice points identify to one "
+                           "vertex (degenerate self-overlapping development)");
   nb[a->second][i_omega]   = b->second;
   nb[b->second][i_omega+3] = a->second;
 }
