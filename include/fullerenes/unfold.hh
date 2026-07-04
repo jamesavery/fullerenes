@@ -353,26 +353,16 @@ public:
 
   // Build the folded graph's oriented neighbour slots by scan-converting the
   // outline polygon in each of the 3 lattice edge-directions and drawing the
-  // horizontal edges (interior + across the seam). neighbours[u][d] is u's
-  // neighbour in Eisenstein unit-direction d; slots i_omega and i_omega+3 are
-  // the +/- of rotation i_omega.
+  // horizontal interior edges. neighbours[u][d] is u's neighbour in Eisenstein
+  // unit-direction d; slots i_omega and i_omega+3 are the +/- of rotation i_omega.
   void connect(vector<array<node_t,6>>& neighbours);
   void connect_polygon(int i_omega, vector<array<node_t,6>>& neighbours);  // Scan-convert interior edges (rotated by omega).
-  void connect_cross(int i_omega, vector<array<node_t,6>>& neighbours);    // Connect edges across the seam.
-  void connect(int i_omega, vector<array<node_t,6>>& neighbours);          // Both of the above, for one rotation.
+  void connect(int i_omega, vector<array<node_t,6>>& neighbours);          // connect_polygon for one rotation.
 
   // Write arc p0--p1 (rotated back by omega_inv) into both endpoints' oriented
   // slots i_omega / i_omega+3. Idempotent -- a shared edge written twice is harmless.
   void connect_arc(vector<array<node_t,6>>& nb, Eisenstein p0, Eisenstein p1,
                    Eisenstein omega_inv, int i_omega) const;
-
-  // Assemble a cone's CCW neighbour cycle: chain its wedges via the outline
-  // seam-segment matches, glue each wedge into one frame with transform_line,
-  // read the unit-distance neighbours from final_grid in each wedge's sector,
-  // and round about U. Only for the cones (degree != 6). seg_index maps an
-  // outline segment's (srcLabel,tgtLabel) to its outline index (for finding the
-  // reverse-label mate that names the adjacent wedge).
-  vector<node_t> assemble_cone(node_t cid, const map<pair<node_t,node_t>,size_t>& seg_index) const;
 
   // Collect nodes in unfolding that will correspond to the same nodes in the folded graph.
   vector<node_t> identify_nodes(const IDCounter<Eisenstein>& grid, const vector< pair<Eisenstein,node_t>>& outline) const;

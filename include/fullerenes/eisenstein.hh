@@ -316,27 +316,27 @@ struct Sector { Eisenstein R, L;
   bool contains(Eisenstein d) const {
     return wedge(R, d) >= 0 && wedge(d, L) >= 0;
   }
-  // Reflex-safe HALF-OPEN membership, valid for sectors up to 300 degrees
-  // (unlike contains(), which assumes a convex <= 180-degree sector).
-  //   contains_oc: d in the half-open CCW sector (R, L]  -- open at R, closed at L.
-  //   contains_co: d in [R, L)                           -- closed at R, open at L.
-  bool contains_oc(Eisenstein d) const {
-    if (same_dir(d, L)) return true;
-    if (same_dir(d, R)) return false;
+  // d strictly inside the OPEN sector (R, L) -- excludes both boundary rays.
+  // Reflex-safe (sectors up to 300 degrees); throws on a degenerate sector
+  // where R, L are parallel and same-sense (there is no interior).
+  bool strictly_inside(Eisenstein d) const {
     const long rl = wedge(R, L);
     if (rl > 0) return wedge(R, d) > 0 && wedge(d, L) > 0;      // convex (< 180)
     if (rl < 0) return !(wedge(L, d) > 0 && wedge(d, R) > 0);   // reflex: complement of (L, R)
     if (dot2(R, L) < 0) return wedge(R, d) > 0;                 // exactly 180 (R, L antiparallel)
-    throw std::logic_error("Sector::contains_oc: degenerate sector (R, L parallel, same sense)");
+    throw std::logic_error("Sector::strictly_inside: degenerate sector (R, L parallel, same sense)");
   }
-  bool contains_co(Eisenstein d) const {
+  // Reflex-safe HALF-OPEN membership (unlike contains(), which assumes a convex
+  // <= 180-degree sector): the shared boundary ray belongs to exactly one side.
+  bool contains_oc(Eisenstein d) const {   // (R, L] -- open at R, closed at L
+    if (same_dir(d, L)) return true;
+    if (same_dir(d, R)) return false;
+    return strictly_inside(d);
+  }
+  bool contains_co(Eisenstein d) const {   // [R, L) -- closed at R, open at L
     if (same_dir(d, R)) return true;
     if (same_dir(d, L)) return false;
-    const long rl = wedge(R, L);
-    if (rl > 0) return wedge(R, d) > 0 && wedge(d, L) > 0;
-    if (rl < 0) return !(wedge(L, d) > 0 && wedge(d, R) > 0);
-    if (dot2(R, L) < 0) return wedge(R, d) > 0;
-    throw std::logic_error("Sector::contains_co: degenerate sector (R, L parallel, same sense)");
+    return strictly_inside(d);
   }
   Sector narrow_with(Eisenstein r_new, Eisenstein l_new) const {
     return { wedge(R, r_new) > 0 ? r_new : R,

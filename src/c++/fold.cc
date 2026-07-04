@@ -67,11 +67,10 @@ static bool in_wedge(Eisenstein a, Eisenstein b, Eisenstein d){
 //   - connect_polygon : scan-convert the outline interior in each of the 3
 //                       lattice edge-directions, drawing horizontal edges into
 //                       oriented neighbour slots.
-//   - connect_cross   : This is for connecting deg 6 vertices across seams.
-//                       forward/backward raster of each seam segment; where the
-//                       two rasters disagree (a split triangle), connect the
-//                       edge across the seam via a gluing transform.
-//                       //JA Note: There can be up to 5 split edges incident to a deg6 vertex (consider a thin long triangle). Scanning in the 3 lattice edge-directions is necessary here also.
+//   - seam step       : each seam-crossing arc is completed by an exact per-arc
+//                       chart walk (resolve_arc, seam_step.hh) across the outline
+//                       glues -- the former raster connect_cross is gone (its
+//                       index-paired detection was invalid on slanted seams).
 //   - connect_cones   : Connect neigbours to cone vertices U (corners of outline). 
 //                       Chain the wedges W(U)_i = V_i -> U -> V_{i+1}, gluing each outgoing
 //                       seam segment of W_i to its matching seam segment of W_{i+1},
@@ -81,8 +80,8 @@ static bool in_wedge(Eisenstein a, Eisenstein b, Eisenstein d){
 //
 // Orientation note: neighbours[u][d] is u's neighbour in Eisenstein unit-
 // direction d, so single-copy (deg-6) vertices come out CCW for free in connect_polygon. Split
-// arcs must be transformed to a single frame for this to work. That is the job of connect_cross and
-// connect_cones (currently named assemble_cone).
+// arcs must be transformed to a single frame for this to work. That is the job
+// of the seam step (resolve_arc) and assemble_corners.
 // JA Note: I edited the above to remove some confusion and align with my intent.
 
 // Assemble every outline-corner label exactly via the glue-chained cone
@@ -93,8 +92,8 @@ static bool in_wedge(Eisenstein a, Eisenstein b, Eisenstein d){
 // glue chain). Overwrites the provisional ctor-3 degrees; for graph-backed
 // unfoldings the result must agree with the graph. `degrees` is indexed by
 // compacted id; outline labels are tracked originals, preserved by the
-// compaction. Replaces the retired assemble_cone (unit-cell angle binning,
-// which mis-collected pinched and sliver wedges, e.g. on star unfoldings).
+// compaction. Supersedes the earlier unit-cell angle-binning approach, which
+// mis-collected pinched and sliver wedges (e.g. on star unfoldings).
 void Folding::assemble_corners()
 {
   const SeamAtlas atlas(outline);
@@ -117,80 +116,6 @@ void Folding::assemble_corners()
     cyc.clear();
     for(const auto& r : ring.ring) cyc.push_back(r.id);
     corner_rings[c] = ring;
-  }
-}
-
-// connect_cross connects edges in split triangles
-// (for outline segments that do not align with the Eisenstein grid).
-void Folding::connect_cross(int i_omega, vector<array<node_t,6>>& neighbours)
-{
-  map<arc_t,arccoord_t> reverse_arc;
-  Eisenstein xu, xv;
-  node_t u,v;
-
-  Eisenstein omega     = Eisenstein::unit[i_omega];
-  Eisenstein omega_inv = Eisenstein::unit[6-i_omega];
-
-  // Register reverse arcs (rotated coordinates of arc v->u, keyed by {v,u}).
-  for(size_t i=0;i<outline.size();i++){
-    tie(xu,u) = outline[i];
-    tie(xv,v) = outline[(i+1) % outline.size()];
-
-    reverse_arc[{v,u}] = {xu*omega, xv*omega};
-  }
-
-  for(size_t i=0;i<outline.size();i++){
-    tie(xu,u) = outline[i];
-    tie(xv,v) = outline[(i+1) % outline.size()];
-
-    // Coordinates of arc u->v and its glued mate v->u.
-    arccoord_t Xuv = {xu*omega,xv*omega}, Xvu = reverse_arc[{u,v}];
-
-    // Affine transform taking the line segment Xuv into Xvu.
-    Eisenstein xu0, xu1, T;
-    Unfolding::transform_line(Xuv,Xvu, xu0,xu1, T);
-
-    // Rasterize the u->v segment forwards and backwards.
-    vector<Eisenstein> segment   (polygon::draw_line(xu*omega,xv*omega)),
-                       revsegment(polygon::draw_line(xv*omega,xu*omega));
-    reverse(revsegment.begin(),revsegment.end());
-    if(segment.size() != revsegment.size()) continue;
-
-    // Forward rasterization rounds one way, backwards the other; where they
-    // agree (x==y), we have an on-seam deg-6 vertex (one copy on this U->V lip, the
-    // matching copy on the glued V->U lip); where they disagree, a split triangle whose
-    // edge crosses the seam.
-    for(size_t j=0;j<segment.size();j++){
-      const Eisenstein& x(segment[j]), y(revsegment[j]);
-      if(x == y){
-        // On-seam deg-6 vertex. Its complete oriented ring is assembled by the
-        // SEAM STEP (seam_rings, fold Step 3) and installed wholesale after the
-        // scans -- the per-scan placement that used to live here mixed the two
-        // copies' frames and could not resolve arcs pinched into thin wedges.
-        // Identification of the two copies remains identify_nodes' job.
-        continue;
-      } else {
-        Eisenstein yp((y-xu0)*T+xu1); // y mapped through the gluing transform
-
-        // Connect untransformed x-side node to transformed y-side node.
-        auto itu = final_grid.find(x *omega_inv);
-        auto itv = final_grid.find(yp*omega_inv);
-        if(itu == final_grid.end() || itv == final_grid.end()) continue;
-
-        node_t cu = itu->second, cv = itv->second;
-        if(cu == cv) continue;
-
-        // Connect ONLY this segment's near side (cu), at the slot of the cross-edge's
-        // own direction dcu (cu's frame). cv gets its reciprocal cv->cu when the MATCHING
-        // V->U segment is scanned, as the near side in ITS frame -- so we never write cv
-        // in this foreign U->V frame (that corrupted single-copy cyclic order). The slot
-        // is per-direction, NOT i_omega: a deg-6 vertex can have several cross edges, and
-        // forcing them all into i_omega would overwrite each other.
-        Eisenstein dcu = (y - x) * omega_inv;          // cross-edge direction at cu
-        if(dcu.norm2() != 1) continue;
-        neighbours[cu][(6 - dcu.unit_angle()) % 6] = cv;
-      }
-    }
   }
 }
 
@@ -229,10 +154,8 @@ void Folding::connect_arc(vector<array<node_t,6>>& nb, Eisenstein p0, Eisenstein
   nb[b->second][i_omega+3] = a->second;
 }
 
-// One rotation: interior (in-sheet) edges only.  Seam-crossing arcs are the
-// seam step's (SeamStep::cross_arcs) and the cone holonomies' -- the raster
-// connect_cross is RETIRED from the pipeline (its index-paired draw_line
-// detection is invalid on slanted seams; kept compiled for old diagnostics).
+// One rotation: interior (in-sheet) edges only.  Seam-crossing arcs are handled
+// by the seam step (resolve_arc, seam_step.hh) and the cone holonomies.
 void Folding::connect(int i_omega, vector<array<node_t,6>>& neighbours)
 {
   if(!(debug_flags & DONT_CONNECT_POLYGON))
@@ -390,89 +313,6 @@ vector<int> Folding::identify_nodes_exact(const IDCounter<Eisenstein>& grid,
     for(auto t: c) same[t] = canonical;
   }
   return same;
-}
-
-// Assemble cone `cid`'s neighbour cycle directly CCW-ordered.
-//
-// A cone appears at one plane copy per wedge V_i -> U -> V_{i+1} along the
-// outline. We chain the wedges (each outgoing outline seam glues to its
-// label-reversed mate, which names the adjacent copy), bring every wedge into
-// one common frame at U=origin by composing transform_line's rotation across
-// each crossed seam, read each wedge's unit-distance neighbours from final_grid
-// restricted to that wedge's angular sector, and bin them by their common-frame
-// unit-direction. The angle bins are the CCW neighbour cycle; the cone's
-// deficit shows up as the empty direction. final_grid (not arc_coords) is read,
-// so this also picks up the Goldberg-Coxeter subdivision vertices.
-// JA Note: This looks more complicated than I think it needs to be - and it looks like it transforms the entire wedge?
-//          Also: it should only be used to connect the cones, not the on-seam deg 6 vertices.
-// RETIRED from fold(): superseded by assemble_corners() (the exact holonomy
-// walk). The unit-cell angle binning below mis-collects pinched arcs and
-// sliver wedges (bare final_grid lookups read the wrong sheet or nothing).
-// Kept only because older diagnostic tools still link it; do not add callers.
-vector<node_t> Folding::assemble_cone(node_t cid, const map<pair<node_t,node_t>,size_t>& seg_index) const
-{
-  const int n   = (int)outline.size();
-  const int deg = degrees[cid];
-
-  // First outline appearance (copy) of this cone -- start anywhere; the deficit
-  // gap falls out of the angle binning.
-  int i0 = -1;
-  for(int i = 0; i < n; i++){
-    auto it = final_grid.find(outline[i].first);
-    if(it != final_grid.end() && it->second == cid){ i0 = i; break; }
-  }
-  if(i0 < 0)
-    throw std::logic_error("assemble_cone: cone " + std::to_string(cid) + " not on the outline");
-
-  map<int,node_t> by_angle;          // common-frame unit-angle (0..5) -> neighbour id
-  Eisenstein rot(1,0);               // this wedge's frame -> common frame (unit Eisenstein)
-  std::set<int> visited;
-  int i = i0;
-  const size_t ncopies = node_pos[cid].size();
-
-  for(size_t step = 0; step < ncopies; step++){
-    if(visited.count(i)) break;      // chain closed
-    visited.insert(i);
-
-    Eisenstein p = outline[i].first;
-    Eisenstein a = outline[(i-1+n)%n].first - p;   // ray toward prev (incoming seam)
-    Eisenstein b = outline[(i+1)%n].first - p;     // ray toward next (outgoing seam)
-    Eisenstein incoming = reduce_dir(a);           // unit dir along the incoming seam
-
-    for(int k = 0; k < 6; k++){
-      Eisenstein d = Eisenstein::unit[k];
-      // Half-open: the incoming-seam neighbour belongs to the previous wedge, so
-      // each shared seam neighbour is binned once -- and the cone's opening cut
-      // (first wedge's incoming == last wedge's outgoing, 60 deg apart = the
-      // deficit) is not double-counted.
-      if(d == incoming) continue;
-      if(!in_wedge(a, b, d)) continue;             // wedge interior (handles > 180 deg)
-      auto it = final_grid.find(p + d);
-      if(it == final_grid.end()) continue;
-      if(it->second == cid) continue;              // skip an adjacent copy of U itself (not a neighbour)
-      Eisenstein cd = d * rot;                     // direction in the common frame
-      by_angle[cd.unit_angle()] = it->second;
-    }
-
-    // Advance across the outgoing seam to the adjacent copy, composing its glue.
-    node_t U = outline[i].second, V = outline[(i+1)%n].second;
-    auto mit = seg_index.find({V,U});              // label-reversed mate segment
-    if(mit == seg_index.end()) break;              // open (deficit) seam -- end of chain
-    size_t j = mit->second;
-    arccoord_t l1 = { outline[i].first,     outline[(i+1)%n].first };
-    arccoord_t l2 = { outline[j].first,     outline[(j+1)%n].first };
-    Eisenstein x0, x0p, w;
-    Unfolding::transform_line(l1, l2, x0, x0p, w);
-    rot = rot * w.complex_conj();                  // next wedge's frame -> common frame
-    i = (int)((j+1)%n);
-  }
-
-  vector<node_t> cycle;
-  for(const auto& kv : by_angle) cycle.push_back(kv.second);   // surface-CW (conjugated common frame)
-  if((int)cycle.size() != deg)
-    throw std::logic_error("assemble_cone: cone " + std::to_string(cid) + " collected "
-                           + std::to_string(cycle.size()) + " != degree " + std::to_string(deg));
-  return cycle;
 }
 
 Triangulation Folding::fold()

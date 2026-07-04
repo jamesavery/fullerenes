@@ -177,7 +177,32 @@ struct rat {
   long floor() const { return num >= 0 ? num/den : -((-num + den - 1)/den); }
   long ceil()  const { return -rat(-num, den).floor(); }
 };
-}  // anonymous: TU-local rational
+
+// The x-abscissa where the non-horizontal edge (A -> B) crosses the scanline
+// y = row, as an exact rational.  Precondition: A.second != B.second.
+inline rat edge_crossing_x(Eisenstein A, Eisenstein B, int row) {
+  const long den = B.second - A.second;
+  const long num = (long)A.first*den + (long)(row - A.second)*(B.first - A.first);
+  return rat(num, den);
+}
+
+// Odd crossing parity of the east-going ray from x through the collinear-free
+// outline `poly`, with half-open [ymin, ymax) edge ownership so a shared vertex
+// counts once.  1 for a strictly-interior point, 0 for exterior; the value on a
+// boundary point is not meaningful (callers screen those first).
+inline bool crossing_parity(const vector<Eisenstein>& poly, Eisenstein x) {
+  const int n = (int)poly.size();
+  int parity = 0;
+  for(int i=0;i<n;i++){
+    const Eisenstein A = poly[i], B = poly[(i+1)%n];
+    if(A.second == B.second) continue;                       // horizontal edge: no crossing
+    const int ylo = min(A.second, B.second), yhi = max(A.second, B.second);
+    if(x.second < ylo || x.second >= yhi) continue;          // half-open ownership [ymin, ymax)
+    if(rat((long)x.first, 1) < edge_crossing_x(A, B, x.second)) parity ^= 1;  // crossing strictly right of x
+  }
+  return parity;
+}
+}  // anonymous namespace: TU-local scan-conversion helpers
 
 // STANDARD even-odd scanline polygon fill (edge table + per-row crossing
 // pairing; Foley--van Dam sec. 3.6, Abrash's Black Book ch. 38-40 -- the same
@@ -240,9 +265,7 @@ polygon::scanline polygon::scanConvert() const {
       }
       const int ylo = min(A.second,B.second), yhi = max(A.second,B.second);
       if(row < ylo || row >= yhi) continue;             // half-open ownership [ymin, ymax)
-      const long den = B.second - A.second;
-      const long num = (long)A.first*den + (long)(row - A.second)*(B.first - A.first);
-      cross.push_back(rat(num, den));
+      cross.push_back(edge_crossing_x(A, B, row));
     }
     for(int i=0;i<n;i++){                               // strict local-max corners: boundary points
       const Eisenstein P = reduced_outline[i];
@@ -296,30 +319,16 @@ bool polygon::point_on_periphery(const Eisenstein& x) const
   return false;
 }
 
-// Strictly interior: odd crossing parity of the east-going ray, with half-open
-// [ymin, ymax) edge ownership so a shared vertex is counted exactly once.
-// Boundary points are excluded here -- that is point_on_periphery's job.
+// Strictly interior: odd east-ray crossing parity, and not on the boundary (a
+// boundary point has ill-defined parity, so it is screened out first).
 bool polygon::point_inside(const Eisenstein& x) const
 {
-  if(point_on_periphery(x)) return false;
-  const int n = reduced_outline.size();
-  int parity = 0;
-  for(int i=0;i<n;i++){
-    const Eisenstein s = reduced_outline[i], t = reduced_outline[(i+1)%n];
-    if(s.second == t.second) continue;
-    const int ylo = min(s.second, t.second), yhi = max(s.second, t.second);
-    if(x.second < ylo || x.second >= yhi) continue;          // half-open [ymin, ymax)
-    const long den = t.second - s.second;
-    const long num = (long)s.first*den + (long)(x.second - s.second)*(t.first - s.first);
-    // the edge crosses the ray strictly right of x iff num/den > x.first (den sign folded in)
-    if((den > 0 ? num - (long)x.first*den : (long)x.first*den - num) > 0) parity ^= 1;
-  }
-  return parity;
+  return !point_on_periphery(x) && crossing_parity(reduced_outline, x);
 }
 
 bool polygon::point_included(const Eisenstein& x) const   // inside or on the boundary
 {
-  return point_on_periphery(x) || point_inside(x);
+  return point_on_periphery(x) || crossing_parity(reduced_outline, x);
 }
 
 polygon polygon::operator*(Eisenstein x) const
