@@ -678,7 +678,6 @@ public:
   bool peak(int j,bool reduced=false) const;
   bool saddle(int j,bool reduced=false) const;
 
-  double winding_number(const Eisenstein& x) const;
   bool point_inside(const Eisenstein& x) const;
   bool point_on_periphery(const Eisenstein& x) const;
   bool point_included(const Eisenstein& x) const; // Inside or on periphery

@@ -1,11 +1,23 @@
+// unfold.cc -- namespaced copy of the production library's Unfolding method
+// definitions, from src/c++/unfold.cc.
+//
+// Started as a byte-faithful copy (only `namespace foldunfold` + local include
+// path). DIVERGED in straighten_lines: the outline O is a doubly-linked list and
+// UVindex holds stable list iterators instead of integer indices, fixing the
+// stale-anchor bugs of the production version (see doc 20-straighten). A
+// step-by-step trace hook (StraightenStep) was also added.
+
 #include "fullerenes/unfold.hh"
+
 #include <list>
 #include <iterator>
-/************************************************************/ 
-/************************************************************/ 
+
+
+/************************************************************/
+/************************************************************/
 /*                UNFOLDING IMPLEMENTATION                  */
-/************************************************************/ 
-/************************************************************/ 
+/************************************************************/
+/************************************************************/
 
 
 // This function unfolds a triangulation and lays it out on an equilateral
@@ -48,23 +60,23 @@ void Unfolding::unfold(const Triangulation& T, arc_t first_arc)
       node_t u = t[i], v = t[(i+1)%3];
       arc_to_tri_id[{u,v}] = U;
     }
-  }  
-  
+  }
+
   auto place_triangle = [&](arc_t uv, Eisenstein ux, Eisenstein vx) {
     node_t u=uv.first, v = uv.second,  w = T.next_on_face(u,v);
     if(w<0){
       cerr << tri_t{u,v} << " is not part of a triangle in " << T << endl;
       abort();
     }
-    
+
     Eisenstein wx = ux + (vx-ux).nextCCW();
 
     //    cout << "# Attempting to place " << vector<node_t>{{u,v,w}} << " at " << vector<Eisenstein>{{ux,vx,wx}} << endl;
     size_t uv_tri_id = arc_to_tri_id.at(arc_t{u,v});
-    
+
     if(!tri_done[uv_tri_id]){
 	tri_done[uv_tri_id] = true;
-	
+
 	arc_coords[{u,v}] = {ux,vx};
 	arc_coords[{v,w}] = {vx,wx};
 	arc_coords[{w,u}] = {wx,ux};
@@ -79,7 +91,7 @@ void Unfolding::unfold(const Triangulation& T, arc_t first_arc)
     }
   };
 
-  
+
   // 1. Place first triangle.
   // If no first arc is given, take first arc emanating from node 0
   if(first_arc==arc_t{0,0}) first_arc = {0,T.nbrs(0)[0]};
@@ -94,7 +106,7 @@ void Unfolding::unfold(const Triangulation& T, arc_t first_arc)
     arc_t uv = arc_queue.pop_front(); // Next placeable directed edge
     //arc_t uv = *arc_queue.begin(); arc_queue.erase(uv); // Next placeable directed edge
     //    cout << uv << endl;
-    
+
     node_t u(uv.first), v(uv.second), w(T.next_on_face(u,v));
 
     Eisenstein ux, vx;
@@ -102,7 +114,7 @@ void Unfolding::unfold(const Triangulation& T, arc_t first_arc)
 
     place_triangle(uv,ux,vx);
     // cout << "arcs"<<i << " = array(" << get_keys(arc_coords) << ");\n";
-    // cout << "arcpos"<<(i++) << " = array(" << get_values(arc_coords) << ");\n";    
+    // cout << "arcpos"<<(i++) << " = array(" << get_values(arc_coords) << ");\n";
   }
   if(arc_coords.size() != N*3){
     cerr << "Number of arcs placed is " << arc_coords.size() << " != " << (3*N) << ": Incomplete unfolding.\n";
@@ -122,7 +134,7 @@ map<arc_t,Unfolding::arccoord_t> Unfolding::unfold(const Triangulation& G, const
 
   // TODO: Use scanconverted polygon to test in constant time for whether a point is inside the polygon
   //    polygon::scanline S[3] = {outline.scanConvert(), (outline*CCW).scanConvert(), (outline*CW).scanConvert()};
-   
+
 
   // The idea is simply to fill out the polygon from known positions. I.e., start with one triangle placed
   // explicitly, then grow the unfolding from the perimeter, but only placing triangles that are on the interior
@@ -139,7 +151,7 @@ map<arc_t,Unfolding::arccoord_t> Unfolding::unfold(const Triangulation& G, const
 
   auto triangle_is_internal = [&](node_t u, node_t v) -> bool {
     //    printf("triangle_is_internal(%d,%d)",u,v);
-    Eisenstein xu, xv, xw, direction;      
+    Eisenstein xu, xv, xw, direction;
     tie(xv,xu) = arc_coords[{v,u}];      // Arc v->u has already been placed if u->v is in workset, giving us two coordinates
     direction = xv - xu;                 // Direction of arc u->v
     xw        = xu + direction.nextCW(); // The final coordinate of the triangle is found by turning one step CW
@@ -149,26 +161,26 @@ map<arc_t,Unfolding::arccoord_t> Unfolding::unfold(const Triangulation& G, const
     //    printf(" = %d\n",internal);
     return internal;
   };
-    
+
   auto arc_can_be_processed = [&](node_t u, node_t v) -> bool {
     return !seen[{u,v}] && triangle_is_internal(u,v);
   };
-    
+
   auto place_triangle = [&](const tri_t &T, const Eisenstein position[3]) {
 
     if(debug_flags & VERBOSE) cout << "Placing triangle " << T << " at " << vector<Eisenstein>{{position[0],position[1],position[2]}} << endl;
     for(int i=0;i<3;i++) seen[{T[i],T[(i+1)%3]}] = true;
-    
+
     for(int i=0;i<3;i++){
       node_t      u = T[i],         v = T[(i+1)%3];
-      Eisenstein xu = position[i], xv = position[(i+1)%3]; // Fix coordinates of each arc 
+      Eisenstein xu = position[i], xv = position[(i+1)%3]; // Fix coordinates of each arc
 
-      arc_coords[{u,v}] = {xu,xv}; // Fix coordinates of each arc 
+      arc_coords[{u,v}] = {xu,xv}; // Fix coordinates of each arc
 
       if(arc_can_be_processed(v,u)) workset.push({v,u});             // ...and stack reverse arc on workset if it is to be processed
     }
   };
-    
+
 
   // Now the algorithm becomes simply:
     // 1. Place the first triangle T0
@@ -180,18 +192,18 @@ map<arc_t,Unfolding::arccoord_t> Unfolding::unfold(const Triangulation& G, const
       tie(u,v) = workset.top(); workset.pop();
       if(arc_can_be_processed(u,v)){
 	node_t w = G.next(u,v);
-	
+
 	tie(xv,xu) = arc_coords[{v,u}]; // Arc v->u has already been placed if u->v is in workset
-	
+
 	Eisenstein direction = xv - xu; // Direction of arc u->v
-	assert(direction.norm2() == 1);		      
-	
+	assert(direction.norm2() == 1);
+
 	Eisenstein xuvw[3] = {xu, xv, xu + direction.nextCW()};
 	place_triangle({u,v,w}, xuvw);
       }
     }
     //    cout << "Done!\n";
-    return arc_coords;    
+    return arc_coords;
 }
 
 // Given the output of unfold(), this function efficiently computes the polygon outlining
@@ -201,19 +213,19 @@ vector< pair<Eisenstein,node_t> > Unfolding::get_outline(const map<arc_t,Unfoldi
   map<Eisenstein,node_t>    label;
   map<Eisenstein,Eisenstein> next;
 
-  // Collect the directed edges u->v whose positions do not coincide with the reverse edge v->u. 
-  // These form the outline of the polygon. 
+  // Collect the directed edges u->v whose positions do not coincide with the reverse edge v->u.
+  // These form the outline of the polygon.
   for(map<arc_t,arccoord_t>::const_iterator i(arc_coords.begin()); i!= arc_coords.end(); i++){
     const arc_t &uv(i->first), vu(uv.second,uv.first);
     const arccoord_t &uvpos(i->second), vupos(arc_coords.find(vu)->second);
 
     if(uvpos != make_pair(vupos.second,vupos.first)){
-      next[uvpos.first]   = uvpos.second; 
+      next[uvpos.first]   = uvpos.second;
       label[uvpos.first]  = uv.first;
     }
   }
-  
-  // Now we're ready to find a CW walk through the polygon outline coordinates 
+
+  // Now we're ready to find a CW walk through the polygon outline coordinates
   // and to assign the corresponding nodes in the triangulation graph as labels.
   vector< pair<Eisenstein,node_t> > outline(next.size());
   Eisenstein nextpos = next.begin()->first;
@@ -258,14 +270,12 @@ vector<pair<Eisenstein,node_t>> Unfolding::GCDreduce(const vector<pair<Eisenstei
 }
 
 namespace {
-  // @post  for every seam segment U->V on the boundary, succ[U*Ncones+V] is the label
-  //        W of the segment V->W that follows it WITHIN their common cactus cycle
-  //        (pred is the inverse); entries with no segment stay -1.
-  // @inv   stk holds the cones on the current open path; pos[c] is c's stack index.
   // Decompose the closed cone-sequence into its simple cycles (unique, since the cone
-  // graph is a cactus) by a stack walk: push cones; when the current cone is already on
-  // the stack, the run back to it is one cycle. This is the starshape proof's "successor
-  // in C_1", which differs from the outline order exactly at cut-vertices.
+  // graph is a cactus) by a stack walk: push cones; when the current cone is already
+  // on the stack, the run back to it is one cycle. succ/pred get the cyclic order
+  // WITHIN each cycle -- Knudsen Thm 5's "successor in C_1", which differs from the
+  // outline order exactly at cut-vertices. succ[U*Ncones+V]=W, or -1 if U->V is not a
+  // segment; pred is the inverse.
   void cone_cycle_links(const vector<int>& seq, int Ncones,
                         vector<int>& succ, vector<int>& pred){
     const int m = (int)seq.size();
@@ -287,149 +297,181 @@ namespace {
       } else { pos[c]=(int)stk.size(); stk.push_back(c); }
     }
   }
-
-  typedef list<pair<Eisenstein,node_t>>::iterator Onode_t;
-
-  // The developed cone-segment graph awaiting straightening: the outline O (cone copies,
-  // the eventual output), the cactus cycle structure (succ/pred), per-segment geometry
-  // (XUV = endpoints, XUv/XVu = the two boundary arms), a stable handle UVindex into O
-  // per segment, and the set of segments still to reduce.
-  struct ConeSegments {
-    list<pair<Eisenstein,node_t>>     O;
-    vector<int>                       succ, pred;
-    map<arc_t,Unfolding::arccoord_t>  XUV, XUv, XVu;
-    map<arc_t,Onode_t>                UVindex;
-    set<arc_t>                        workset;
-  };
-
-  // @pre    cones_first: every non-hexagon outline label is < Ncones
-  // @post   result.O are the cone copies in outline order; result.{succ,pred,XUV,XUv,
-  //         XVu,UVindex,workset} annotate each cone-to-cone seam segment.
-  // @throws std::logic_error when the cones-first pre-condition is violated.
-  // Develop the cone-only outline and its per-segment annotations (the starshape
-  // proof's graph G, carrying geometry); the reduction below consumes this.
-  ConeSegments develop_cone_segments(const vector<pair<Eisenstein,node_t>>& outline,
-                                     const vector<int>& degrees, int Ncones){
-    ConeSegments g;
-    g.succ.assign(Ncones*Ncones,-1);
-    g.pred.assign(Ncones*Ncones,-1);
-
-    // Cone copies in outline order, with a stable handle (Onode) and outline index
-    // (Oindex) for each -- the index locates the incident boundary arms below.
-    vector<int>     Oindex;
-    vector<Onode_t> Onode;
-    for(int i=0;i<(int)outline.size();i++)
-      if(degrees[outline[i].second] != 6){
-        if(outline[i].second >= Ncones)
-          throw std::logic_error("straighten_lines: cone label >= "+std::to_string(Ncones)+
-                                 " -- the Unfolding must be cones-first (sort_flat_last-relabelled)");
-        Oindex.push_back(i);
-        g.O.push_back(outline[i]);
-        Onode.push_back(std::prev(g.O.end()));
-      }
-
-    for(int i=0;i<(int)Onode.size();i++){
-      int j = (i+1)%(int)Onode.size();
-      int i1 = (Oindex[i]+1)%outline.size(), j1 = (Oindex[j]-1+outline.size())%outline.size();
-      arc_t UV(Onode[i]->second,Onode[j]->second);
-      g.workset.insert(UV);
-      Eisenstein Ux(Onode[i]->first), vx(outline[i1].first), Vx(Onode[j]->first), ux(outline[j1].first);
-      g.UVindex[UV] = Onode[i];
-      g.XUV[UV] = Unfolding::arccoord_t(Ux,Vx);
-      g.XUv[UV] = Unfolding::arccoord_t(Ux,vx);
-      g.XVu[UV] = Unfolding::arccoord_t(Vx,ux);
-    }
-
-    vector<int> seq; for(auto& n: Onode) seq.push_back(n->second);
-    cone_cycle_links(seq, Ncones, g.succ, g.pred);
-    return g;
-  }
-
-  // @inv    g.workset holds exactly the seam segments not yet straightened.
-  // @post   g.O is a simple cone-star polygon: straight cone-to-cone segments, the
-  //         hexagon detours removed.
-  // @throws std::logic_error when a reduction invariant is violated.
-  // Straighten every bend by the starshape reduction: retire finished leaf 2-cycles,
-  // then straighten one bend U->V->W onto a single segment U->W, where W is the CYCLE
-  // successor of U->V. The repositioning is transform_line; V survives in g.O.
-  void reduce_cone_star(ConeSegments& g, int Ncones){
-    while(!g.workset.empty()){
-      // Retire each 2-cycle {U->V, V->U} -- a finished leaf edge (cones stay in O).
-      for(node_t U=0;U<Ncones;U++)
-        for(node_t V=0;V<Ncones;V++)
-          if(g.succ[U*Ncones+V]==U){
-            g.succ[U*Ncones+V]=-1; g.pred[U*Ncones+V]=-1;
-            g.succ[V*Ncones+U]=-1; g.pred[V*Ncones+U]=-1;
-            g.workset.erase(arc_t(U,V)); g.workset.erase(arc_t(V,U));
-          }
-      if(g.workset.empty()) break;
-
-      arc_t UV(*g.workset.begin());
-      node_t U(UV.first), V(UV.second);
-      int Wi = g.succ[U*Ncones+V];
-      if(Wi<0) throw std::logic_error("straighten_lines: active segment has no cycle successor");
-      node_t W = (node_t)Wi;
-      if(U == W) throw std::logic_error("straighten_lines: 2-cycle survived leaf removal");
-
-      arc_t VW(V,W), UW(U,W);
-      Eisenstein x0, x0p, omega;
-      Unfolding::transform_line(g.XUv[VW], reverse(g.XVu[UV]), x0, x0p, omega);
-      Eisenstein Wxp = g.XUV[VW].second, Wx((Wxp-x0)*omega+x0p);
-
-      // Geometry of the new straight segment U->W and its arms.
-      Unfolding::arccoord_t Wuxp(g.XVu[VW]);
-      g.XUV[UW] = Unfolding::arccoord_t(g.XUV[UV].first, Wx);
-      g.XUv[UW] = g.XUv[UV];
-      g.XVu[UW] = Unfolding::arccoord_t((Wuxp.first-x0)*omega+x0p, (Wuxp.second-x0)*omega+x0p);
-
-      // Insert W right after U's copy (O(1); list handles stay valid).
-      Onode_t it_U = g.UVindex[UV];
-      g.O.insert(std::next(it_U), make_pair(Wx,W));
-      g.UVindex[UW] = it_U;
-
-      // ...T->U->V->W->Y... becomes ...T->U->W->Y... (V dropped from the cycle).
-      int Y = g.succ[V*Ncones+W];
-      int T = g.pred[U*Ncones+V];
-      if(Y<0 || T<0) throw std::logic_error("straighten_lines: cycle neighbour missing");
-      g.succ[U*Ncones+W]=Y;  g.pred[U*Ncones+W]=T;
-      g.pred[W*Ncones+Y]=U;  g.succ[T*Ncones+U]=W;
-      g.succ[U*Ncones+V]=-1; g.pred[U*Ncones+V]=-1;
-      g.succ[V*Ncones+W]=-1; g.pred[V*Ncones+W]=-1;
-      g.workset.erase(UV); g.workset.erase(VW);
-      g.workset.insert(UW);
-    }
-  }
 }
 
-// Reduce the cone outline to a simple "cone-star" polygon -- straight cone-to-cone seam
-// segments -- by the starshape proof's Phase-1 reduction (starshape.tex). The geometry
-// is in transform_line; the combinatorial core is taking, for each bend U->V, the CYCLE
-// successor V->W (the continuation of U->V around its cactus cycle).
-//
-// @pre    cones_first: every non-hexagon (cone) outline label is < 12
-// @post   result.outline is a simple polygon whose vertices are the cones
-// @throws std::logic_error when the cones-first pre-condition or a reduction invariant
-//         is violated.
-// TODO:   Preserve the graph; handle negative-curvature graphs.
-Unfolding Unfolding::straighten_lines() const
+// TODO: Preserve the graph!
+Unfolding Unfolding::straighten_lines(std::vector<StraightenStep>* trace) const
+// REQUIRES: cones-first labelling -- the (exactly 12, for a fullerene) non-hexagon
+//           cones are labelled 0..11, so they index the Ncones-wide segment tables
+//           directly. The Unfolding(Triangulation) constructor establishes this via
+//           sort_flat_last and stores cone_perm to recover the original labels.
+// TODO:     Work out how to do this for negative-curvature graphs.
 {
   const int Ncones = 12;   // a fullerene has exactly 12 pentagon (degree-5) cones
-  ConeSegments g = develop_cone_segments(outline, degrees, Ncones);
-  reduce_cone_star(g, Ncones);
-  // The straightened outline is in the cones-first labelling, so it shares this
-  // Unfolding's cone_perm; carry it forward for original-label recovery.
-  Unfolding S(vector<pair<Eisenstein,node_t>>(g.O.begin(), g.O.end()));
-  S.cone_perm = cone_perm;
+  // O is the straightened outline as a DOUBLY-LINKED LIST: inserting a cone after
+  // a given copy is O(1) and -- crucially -- invalidates no other iterator, so the
+  // handles stored in UVindex never go stale (no shift-maintenance, which was the
+  // source of the old stale-index bugs). Onode[] holds a handle to each cone in
+  // build order so the init arc loop can address consecutive cones.
+  typedef list<pair<Eisenstein,node_t>>::iterator Onode_t;
+  vector<int>                    Oindex;
+  list<pair<Eisenstein,node_t>>  O;
+  vector<Onode_t>                Onode;
+
+  for(int i=0;i<(int)outline.size();i++)	// Find non-hexagon node outline
+    if(degrees[outline[i].second] != 6){
+      if(outline[i].second >= Ncones)
+        throw std::runtime_error("straighten_lines: cone label >= 12 -- the Unfolding must be cones-first");
+      Oindex.push_back(i);
+      O.push_back(outline[i]);
+      Onode.push_back(std::prev(O.end()));
+    }
+
+  // Cone-segment cycle structure (Knudsen Thm 5 / doc 20-straighten). succ_cycle[U*Ncones+V]
+  // = W means the seam segment V->W follows U->V IN THEIR COMMON cactus cycle; -1 = inactive.
+  // This replaces the old bool matrix A, which recorded only WHETHER a segment V->W existed
+  // -- never WHICH one continues U->V. pred_cycle is its inverse.
+  vector<int> succ_cycle(Ncones*Ncones,-1), pred_cycle(Ncones*Ncones,-1);
+  set<arc_t> workset;
+
+  // Arc annotations. UVindex maps an arc to a stable handle at its U-copy.
+  map<arc_t,Onode_t>    UVindex;
+  map<arc_t,arccoord_t> XUV;
+  map<arc_t,arccoord_t> XUv;
+  map<arc_t,arccoord_t> XVu;
+
+  for(int i=0;i<(int)Onode.size();i++){
+    int j = (i+1)%(int)Onode.size();
+    int i1 = (Oindex[i]+1)%outline.size(), j1 = (Oindex[j]-1+outline.size())%outline.size();
+
+    arc_t UV(Onode[i]->second,Onode[j]->second);
+
+    workset.insert(UV);
+
+    Eisenstein Ux(Onode[i]->first), vx(outline[i1].first), Vx(Onode[j]->first), ux(outline[j1].first);
+
+    UVindex[UV]  = Onode[i];               // stable handle to U
+    XUV[UV] = arccoord_t(Ux,Vx);
+    XUv[UV] = arccoord_t(Ux,vx);
+    XVu[UV] = arccoord_t(Vx,ux);
+  }
+
+  // Successor of each segment WITHIN its cactus cycle (built once, maintained below).
+  { vector<int> seq; for(auto& n: Onode) seq.push_back(n->second);
+    cone_cycle_links(seq, Ncones, succ_cycle, pred_cycle); }
+
+  // Step-by-step trace recorder: snapshots O and the remaining workset.
+  auto record = [&](StraightenStep s){
+    s.O.assign(O.begin(), O.end()); s.active.assign(workset.begin(), workset.end());
+    trace->push_back(std::move(s));
+  };
+  if(trace){ StraightenStep s; s.kind="init"; record(s); }
+
+  // Now repeatedly eliminate arcs by the following rules:
+  while(!workset.empty()){
+
+    if(debug_flags & VERBOSE) fprintf(stderr,"Step 1\n");
+    if(debug_flags & VERBOSE) cerr << "workset = " << workset << ";\n";
+    //  1. If u->v and v->u are both in the digraph, u->v matches up with v->u as
+    //     desired, and we can remove the cycle u<->v from the digraph.
+    vector<arc_t> cancelled_round;
+    for(node_t U=0;U<Ncones;U++)
+      for(node_t V=0;V<Ncones;V++)
+	if(succ_cycle[U*Ncones+V]==U){      // {U->V, V->U} is a 2-cycle: a finished leaf edge
+	  if(debug_flags & VERBOSE) fprintf(stderr,"Found %d->%d and %d->%d, removing both\n",U,V,V,U);
+	  succ_cycle[U*Ncones+V]=-1; pred_cycle[U*Ncones+V]=-1;
+	  succ_cycle[V*Ncones+U]=-1; pred_cycle[V*Ncones+U]=-1;
+
+	  workset.erase(arc_t(U,V));
+	  workset.erase(arc_t(V,U));
+	  cancelled_round.push_back({U,V});
+	}
+    if(trace && !cancelled_round.empty()){ StraightenStep s; s.kind="step1"; s.cancelled=cancelled_round; record(s); }
+
+    if(debug_flags & VERBOSE) fprintf(stderr,"\nStep 2\n");
+    if(debug_flags & VERBOSE) cerr << "workset = " << workset << ";\n";
+
+    if(workset.empty()) break;   // Step 1 may have emptied the workset (all leaf arms cancelled)
+
+    // 2. Remaining workset segments are bends in cycles of length >2; straighten one.
+    // 2.1 Take the first active bend U->V; W is its CYCLE successor (Knudsen Thm 5),
+    //     i.e. the segment V->W that continues U->V around the same cactus cycle.
+    arc_t UV(*workset.begin());
+    node_t U(UV.first), V(UV.second);
+    int Wi = succ_cycle[U*Ncones+V];
+    if(Wi<0)
+      throw std::runtime_error("straighten_lines: active segment has no cycle successor (invariant violated)");
+    node_t W = (node_t)Wi;
+
+    // 2.2 Transform W
+    if(U != W){
+      arc_t VW(V,W);
+      if(debug_flags & VERBOSE) fprintf(stderr,"%d->%d->%d\n",U,V,W);
+      Eisenstein x0, x0p, omega;
+
+      transform_line(XUv[VW], reverse(XVu[UV]), x0, x0p, omega);
+      if(debug_flags & VERBOSE) cerr << "XUV = " << XUV[UV] << "; XWv = " << XUv[VW] << "; XUv = " << XVu[UV] << ";\n";
+      Eisenstein Wxp = XUV[VW].second,  Wx((Wxp-x0)*omega+x0p);
+      if(debug_flags & VERBOSE) cerr << "Wxp = " << Wxp << "; Wx = " << Wx << endl;
+
+
+      // 2.3 Create annotation for new U->W arc
+      arc_t UW(U,W);
+      arccoord_t Wuxp(XVu[VW]), Wux(arccoord_t((Wuxp.first-x0)*omega+x0p, (Wuxp.second-x0)*omega+x0p));
+      XUV[UW] = arccoord_t(XUV[UV].first,Wx);
+      XUv[UW] = XUv[UV];
+      XVu[UW] = Wux;
+
+      // 2.4 Insert W right after U's copy. list::insert is O(1) and invalidates no
+      //     other handle, so every UVindex iterator stays valid -- no maintenance.
+      Onode_t it_U = UVindex[UV];
+      O.insert(std::next(it_U), make_pair(Wx,W));
+      UVindex[UW] = it_U;                   // U's handle unchanged; register the new U->W arc
+
+      // 2.5 Reduce the cycle: ...T->U->V->W->Y... becomes ...T->U->W->Y..., dropping V
+      //     from the cycle (V survives in the output O). Maintain succ/pred locally.
+      int Y = succ_cycle[V*Ncones+W];       // segment after V->W
+      int T = pred_cycle[U*Ncones+V];       // segment T->U before U->V
+      if(Y<0 || T<0)
+        throw std::runtime_error("straighten_lines: cycle neighbour missing (invariant violated)");
+      succ_cycle[U*Ncones+W]=Y;  pred_cycle[U*Ncones+W]=T;
+      pred_cycle[W*Ncones+Y]=U;             // (W,Y)'s predecessor is now U
+      succ_cycle[T*Ncones+U]=W;             // (T,U) now continues to W
+      succ_cycle[U*Ncones+V]=-1; pred_cycle[U*Ncones+V]=-1;   // remove U->V
+      succ_cycle[V*Ncones+W]=-1; pred_cycle[V*Ncones+W]=-1;   // remove V->W
+      workset.erase(UV);
+      workset.erase(VW);
+
+      // 2.6 Add U->W to the workset
+      if(debug_flags & VERBOSE) fprintf(stderr,"%d->%d->%d  =>  %d->%d\n",U,V,W,U,W);
+      workset.insert(UW);
+
+      if(trace){ StraightenStep s; s.kind="step2"; s.U=U; s.V=V; s.W=W; s.Wx=Wx;
+                 s.ins=(int)std::distance(O.begin(), std::next(it_U)); record(s); }
+    } else {
+      // U->V->U: a 2-cycle, which Step 1 removes before Step 2 runs. Reaching here
+      // means cycle removal is broken -- fail loudly rather than silently drop arcs.
+      throw std::runtime_error("straighten_lines: reached U->V->U after Step 1 (a 2-cycle survived cycle removal)");
+    }
+  }
+
+  Unfolding S(vector<pair<Eisenstein,node_t>>(O.begin(), O.end()));
+  S.cone_perm = cone_perm;          // carry the cones-first permutation for label recovery
+  S.degrees   = degrees;            // keep the graph-derived degrees: the outline-only ctor
+                                    // recomputes them by a per-appearance point-inside count,
+                                    // which over-counts cones occurring at several cone-star
+                                    // corners (a deg-5 cone seen twice -> "degree 10"). fold()
+                                    // needs the true degrees to know which vertices are cones.
   return S;
 }
 
-string Unfolding::to_latex(int K, int L, int label_vertices,  bool draw_equilaterally, bool include_headers) const 
+string Unfolding::to_latex(int K, int L, int label_vertices,  bool draw_equilaterally, bool include_headers) const
 {
   string result;
   ostringstream latexfile(result);
 
   if(include_headers)
-    latexfile << 
+    latexfile <<
 "\\documentclass{standalone}\n\
 \\usepackage{tikz}\n\
 \\begin{document}\n\
@@ -481,7 +523,7 @@ string Unfolding::to_latex(int K, int L, int label_vertices,  bool draw_equilate
     gcmax = Eisenstein(coord2d(gcmax.first,gcmax.second+1));
   }
 
-  
+
   // Define bounds
   Eisenstein D(gcmax-gcmin);
   latexfile << "\\newcommand*{\\cols}{"<<D.first<<"}\n"
@@ -504,8 +546,8 @@ string Unfolding::to_latex(int K, int L, int label_vertices,  bool draw_equilate
   switch(label_vertices){
   case 0: break; // Don't label vertices at all.
   case 1:        // Only label non-hexagon vertices on polygon outline.
-    if(label_vertices == 1)	
-      for(int i=0;i<outline.size();i++) 
+    if(label_vertices == 1)
+      for(int i=0;i<outline.size();i++)
 	if(degrees[outline[i].second] != 6) {
 	const Eisenstein &IJ(outline_gc[i]-gcmin);
 
@@ -514,7 +556,7 @@ string Unfolding::to_latex(int K, int L, int label_vertices,  bool draw_equilate
       }
     break;
   case 2:        // Only label vertices on polygon outline.
-    if(label_vertices == 2)	
+    if(label_vertices == 2)
       for(int i=0;i<outline.size();i++){
 	const Eisenstein &IJ(outline_gc[i]-gcmin);
 
@@ -544,18 +586,18 @@ string Unfolding::to_latex(int K, int L, int label_vertices,  bool draw_equilate
   latexfile << "}\n"
 	    << "\t \\node[vertex] (\\name) at \\place {\\lbl};\n\n";
 
-  
+
   // Draw outline polygon
   latexfile << "\\begin{pgfonlayer}{bg}\n"
 	    << "\\draw[outline] (0.center) \\foreach \\i in {1,...,"<<(outline.size()-1)<<"}{ -- (\\i.center) } -- cycle;\n\n";
-  
+
   latexfile << "\\end{pgfonlayer}\n"
 	    << "\\egroup\n\n";
 
-  if(include_headers) 
+  if(include_headers)
     latexfile << "\\end{tikzpicture}\n"
 	      << "\\end{document}\n";
-  
+
   return latexfile.str();
 }
 
@@ -565,7 +607,7 @@ string Unfolding::to_latex(int K, int L, int label_vertices,  bool draw_equilate
 // {
 //   vector<arc_t> workset;
 
-//   return 
+//   return
 // }
 
 
@@ -592,7 +634,7 @@ unfolding_parent_state place_triangle(const Triangulation& G, const arc_t arc, c
     // 1: Neither u->w or v->w are on the boundary => u->v is replaced by u->w->v
     // 2: u->v->w is a boundary segment            => u->v->w is replaced by u->w
     // 3: u->v and v->w exist separately on the B  => u->v is replaced by u->w
-    
+
   }
   return Snext;
 }
@@ -604,7 +646,7 @@ void generate_unfolding_subtree(const Triangulation& G, const unfolding_parent_s
     return;
   } else	      // Otherwise, recursively proceed through each unproccessed arc on the outline:
     for(arc_t arc: S.arc_boundary) if(!S.arc_seen.at(arc)) {
-      unfolding_parent_state Snext = place_triangle(G,arc,S); 
+      unfolding_parent_state Snext = place_triangle(G,arc,S);
       generate_unfolding_subtree(G,Snext,arc_boundaries);
     }
 }

@@ -166,6 +166,54 @@ vector<Eisenstein> polygon::controlpoints() const {
   return points;
 }
 
+// A rational scanline abscissa num/den, den > 0. Exact comparisons by
+// cross-multiplication; outline coordinates are small, so long never overflows.
+namespace {
+struct rat {
+  long num, den;
+  rat(long n, long d) : num(d < 0 ? -n : n), den(d < 0 ? -d : d) {}
+  bool operator<(const rat& o)  const { return num*o.den <  o.num*den; }
+  bool operator<=(const rat& o) const { return num*o.den <= o.num*den; }
+  long floor() const { return num >= 0 ? num/den : -((-num + den - 1)/den); }
+  long ceil()  const { return -rat(-num, den).floor(); }
+};
+}  // anonymous: TU-local rational
+
+// STANDARD even-odd scanline polygon fill (edge table + per-row crossing
+// pairing; Foley--van Dam sec. 3.6, Abrash's Black Book ch. 38-40 -- the same
+// scan scan_triangle implements for triangles), with the standard half-open
+// vertex rule: a non-horizontal edge owns scanlines [ymin, ymax).  Valid for
+// ANY simple lattice polygon (any edge slope); restores the invariant
+//
+//     x in allpoints()  <=>  point_included(x)
+//
+// which the previous version broke by feeding the parity stage draw_line
+// PIXELS instead of edge crossings (multiple pixels per row on shallow
+// X-major edges corrupt the parity; the C20 star unfolding rotated by (0,1)
+// gained two exterior phantom grid points).
+//
+// Two deviations from the screen-fill version, both forced by the contract
+// "all lattice points inside OR ON the polygon":
+//   1. crossings are exact rationals (num/den, cross-multiplied compares)
+//      instead of an incremental integer DDA -- same numbers, exactness
+//      needed, fewer moving parts;
+//   2. CLOSED coverage instead of a fill convention (screen fills use
+//      top-left-style rules that deliberately drop boundary pixels): spans
+//      round ceil(lo)/floor(hi), and the two boundary point classes the
+//      parity stage cannot see -- horizontal edges and strict local-max
+//      corners -- enter as boundary intervals.  (Local minima fall out of
+//      the parity stage as degenerate intervals.)
+// Intervals merge at the RATIONAL level: touching intervals share a boundary
+// point, while strictly separated ones stay separate even when their integer
+// roundings touch -- a sub-unit exterior slit between star arms is never
+// bridged.  Oracle-tested in tests/test_seam_step.cc against an independent
+// exact inclusion predicate over full bounding boxes.
+//
+// (Considered and rejected: building this on scan_triangle over the
+// ear-clipped triangulation. Integer truncation per triangle loses sub-unit
+// continuity at INTERNAL chords -- a contiguous row splits into integer
+// spans that no longer reveal interior unit arcs crossing the chord --
+// correct as a point set, wrong for span consumers like connect_polygon.)
 polygon::scanline polygon::scanConvert() const {
   int minY=INT_MAX, maxY=INT_MIN;
   for(auto xy: reduced_outline) {
@@ -173,91 +221,103 @@ polygon::scanline polygon::scanConvert() const {
     minY = min(minY,y);
     maxY = max(maxY,y);
   }
-    
+
   scanline S;
   S.minY = minY;
   S.xs = vector<vector<int> >(maxY-minY+1);
 
-  for(int i=0;i<reduced_outline.size();i++){
-    auto edge_start = reduced_outline[i], edge_end = reduced_outline[(i+1)%reduced_outline.size()];
-    
-    vector<Eisenstein> segment = draw_line(edge_start,edge_end);
-    int x0 = segment[0].first, y0 = segment[0].second;
+  const int n = (int)reduced_outline.size();
+  for(int row=minY; row<=maxY; row++){
+    vector<rat> cross;                                  // even-odd crossings, paired after sorting
+    vector<pair<rat,rat>> spans;                        // closed rational intervals
 
-    // If peak or left-turning saddle include point twice.
-    if(peak(i,true) || (saddle(i,true) && turn_direction(i,true) == -1)) 
-      {
-	int y = y0-minY;
-	assert(y >= 0 && y<S.xs.size());
-	S.xs[y].push_back(x0);          
+    for(int i=0;i<n;i++){
+      const Eisenstein A = reduced_outline[i], B = reduced_outline[(i+1)%n];
+      if(A.second == B.second){                         // horizontal edge on this row: boundary
+        if(A.second == row)
+          spans.push_back({rat(min(A.first,B.first),1), rat(max(A.first,B.first),1)});
+        continue;
       }
+      const int ylo = min(A.second,B.second), yhi = max(A.second,B.second);
+      if(row < ylo || row >= yhi) continue;             // half-open ownership [ymin, ymax)
+      const long den = B.second - A.second;
+      const long num = (long)A.first*den + (long)(row - A.second)*(B.first - A.first);
+      cross.push_back(rat(num, den));
+    }
+    for(int i=0;i<n;i++){                               // strict local-max corners: boundary points
+      const Eisenstein P = reduced_outline[i];
+      if(P.second != row) continue;
+      const int yp = reduced_outline[(i+n-1)%n].second, yn = reduced_outline[(i+1)%n].second;
+      if(yp < row && yn < row) spans.push_back({rat(P.first,1), rat(P.first,1)});
+    }
 
-    // Add each edge segment x-position to corresponding y-position (not in order)
-    for(int j=1;j<segment.size();j++){
-      int x = segment[j].first, y = segment[j].second-minY;
-      assert(y >= 0 && y<S.xs.size());
-      S.xs[y].push_back(x);
+    if(cross.size() % 2)
+      throw std::logic_error("polygon::scanConvert: odd crossing count (non-simple outline?)");
+    sort(cross.begin(), cross.end());
+    for(size_t k=0;k+1<cross.size();k+=2) spans.push_back({cross[k], cross[k+1]});
+
+    sort(spans.begin(), spans.end(),
+         [](const pair<rat,rat>& a, const pair<rat,rat>& b){ return a.first < b.first; });
+    vector<int>& out = S.xs[row-minY];
+    for(size_t k=0;k<spans.size();){
+      rat lo = spans[k].first, hi = spans[k].second;
+      size_t j = k+1;
+      while(j<spans.size() && spans[j].first <= hi){    // rational touch/overlap only
+        if(hi < spans[j].second) hi = spans[j].second;
+        j++;
+      }
+      const long a0 = lo.ceil(), a1 = hi.floor();
+      if(a0 <= a1){ out.push_back((int)a0); out.push_back((int)a1); }
+      k = j;
     }
   }
-
-  // Finally, sort xs for each y-position
-  for(int y=0;y<S.xs.size();y++)
-    sort(S.xs[y].begin(),S.xs[y].end());
 
   return S;
 }
 
-//TODO: Efficient integer-based winding number -> exact instead of floating point
-double polygon::winding_number(const Eisenstein& x) const {
-  int x1, y1, x2, y2;
-  
-  vector<Eisenstein> Cp = reduced_outline-x;
+// Exact integer point-in-polygon, replacing the old floating-point atan2
+// winding number (which needed a 1e-10 tolerance and broke the exact-Eisenstein
+// invariant). Wedge-based crossing-parity predicate, validated as the reference
+// oracle in the fold-unfold seam-step tests. Operates on reduced_outline
+// (collinear-free, same polygon).
 
-  double wn = 0;
-  for(int i=0;i<Cp.size();i++){
-    tie(x1,y1) = Cp[i];
-    tie(x2,y2) = Cp[(i+1)%Cp.size()];
-    
-    //    double theta = atan2(x1,y1) - atan2(x0,y0);
-    double theta = atan2(x1*y2-x2*y1, x1*x2+y1*y2);
-    
-    wn += theta;
-  }
-  wn /= 2*M_PI;
-
-  //  printf("Winding number around (%d,%d) is %g\n",x.first,x.second,wn);    
-  return wn;
-}
-
-#define numerical_tolerance 1e-10
-
-bool polygon::point_inside(const Eisenstein& x) const 
+// On the boundary: exactly collinear with an edge (wedge == 0) and within its
+// bounding box.
+bool polygon::point_on_periphery(const Eisenstein& x) const
 {
-  return fabs(winding_number(x)) > numerical_tolerance;
-}
-
-bool polygon::point_on_periphery(const Eisenstein& x) const 
-{
-  int x1,y1,x2,y2;
-  vector<Eisenstein> Cp = reduced_outline-x;
-
-  //  cout << "Point " <<x << " is...\n";
-  for(int i=0;i<Cp.size();i++){
-    tie(x1,y1) = Cp[i];
-    tie(x2,y2) = Cp[(i+1)%Cp.size()];
- 
-    bool colinear = fabs(x1*y2-x2*y1) < numerical_tolerance;
-    bool included = (sgn(x1)*sgn(x2) <= 0) && (sgn(y1)*sgn(y2)<=0);
-
-
-    // printf("%s included in [%d,%d] -> [%d,%d] (colinear: %d, included:%d)\n",colinear && included? "indeed":"not", x1,y1,x2,y2,colinear,included);
-    
-    if(colinear && included) return true;
+  const int n = reduced_outline.size();
+  for(int i=0;i<n;i++){
+    const Eisenstein s = reduced_outline[i], t = reduced_outline[(i+1)%n];
+    if(wedge(t-s, x-s) == 0 &&
+       min(s.first, t.first)  <= x.first  && x.first  <= max(s.first, t.first) &&
+       min(s.second,t.second) <= x.second && x.second <= max(s.second,t.second))
+      return true;
   }
   return false;
 }
 
-bool polygon::point_included(const Eisenstein& x) const
+// Strictly interior: odd crossing parity of the east-going ray, with half-open
+// [ymin, ymax) edge ownership so a shared vertex is counted exactly once.
+// Boundary points are excluded here -- that is point_on_periphery's job.
+bool polygon::point_inside(const Eisenstein& x) const
+{
+  if(point_on_periphery(x)) return false;
+  const int n = reduced_outline.size();
+  int parity = 0;
+  for(int i=0;i<n;i++){
+    const Eisenstein s = reduced_outline[i], t = reduced_outline[(i+1)%n];
+    if(s.second == t.second) continue;
+    const int ylo = min(s.second, t.second), yhi = max(s.second, t.second);
+    if(x.second < ylo || x.second >= yhi) continue;          // half-open [ymin, ymax)
+    const long den = t.second - s.second;
+    const long num = (long)s.first*den + (long)(x.second - s.second)*(t.first - s.first);
+    // the edge crosses the ray strictly right of x iff num/den > x.first (den sign folded in)
+    if((den > 0 ? num - (long)x.first*den : (long)x.first*den - num) > 0) parity ^= 1;
+  }
+  return parity;
+}
+
+bool polygon::point_included(const Eisenstein& x) const   // inside or on the boundary
 {
   return point_on_periphery(x) || point_inside(x);
 }
