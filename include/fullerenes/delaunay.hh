@@ -197,7 +197,15 @@ struct DelaunayTriangulation {
   // --- Geometry ---
   Diamond diamond(int h) const;
   void recompute_face_angles(int f);
+  // Recompute he_angle for every face, then refresh the v_cone_angle cache.
+  // THE entry point for restoring angle coherence after a metric (length) change.
   void recompute_all_angles();
+  // Recompute he_angle for every face only (no cone-cache refresh) -- for hot
+  // callers that read just he_angle; pair with recompute_cone_angles when needed.
+  void recompute_all_face_angles();
+  // Refresh only the v_cone_angle cache from the current he_angle. Cone angle is
+  // flip-invariant, so flips do not need this; a length change does.
+  void recompute_cone_angles();
 
   // Total angle at vertex v = sum of incident corner angles. The Gaussian
   // curvature / angle defect is 2*pi - vertex_angle_sum(v); a flat vertex
@@ -226,6 +234,13 @@ struct DelaunayTriangulation {
   // claude-projects/delaunay/CORRECTNESS-PROOF.md).
   bool flip_edge(int h);
   int  lawson_sweep();
+  // Seeded core: restore Delaunay starting from a frontier of edges (one half-edge id
+  // per edge), propagating to each flip's rim. For a hot caller that changed only a
+  // local region of an otherwise-Delaunay mesh; reaches the same iDT the no-arg global
+  // sweep would. `in_stack` (sized nh/2) is the caller-owned stack-membership scratch;
+  // it is left all-false on normal return, so a hot loop reuses one buffer without
+  // re-zeroing. The no-arg lawson_sweep() seeds with all live edges and its own scratch.
+  int  lawson_sweep(const vector<int>& seed_edges, vector<bool>& in_stack);
   int  count_non_delaunay() const;
   int  flip_to_delaunay();
   bool is_delaunay() const;
@@ -273,11 +288,6 @@ struct DelaunayTriangulation {
   // cone angle 2*pi. Refreshes v_cone_angle at P and the three corners. Returns P.
   // The 1->3 sibling of the (internal) edge bisection.
   int  split_face(int h0, std::array<double,3> spokes);
-
-  // Ensure v_out[v] points to a live outgoing half-edge from v.
-  // Walks the CW ring at v if the current pointer is stale.  Leaves v_out[v]
-  // at -1 iff v has no incident live edge (i.e. v is dead).
-  void ensure_v_out(int v);
 
   // --- Full algorithm ---
   // Computes the unique intrinsic Delaunay triangulation of the input
