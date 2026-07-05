@@ -92,6 +92,67 @@ TEST(DCEL, Construction_C20) {
       EXPECT_NEAR(D.he_angle[h], M_PI / 3.0, 1e-14);
 }
 
+// Round-trip the .idt text serializer (to_ascii / from_ascii) on a genuine multi-edge
+// delta-complex, through a temp file. The reconstruction must preserve the metric + topology and
+// pass check_consistency (from_ascii throws otherwise), and its v_cone_angle cache must be coherent.
+TEST(DCEL, IdtRoundTrip) {
+  // C60 isomer #1264: DelaunayTriangulation::compute yields a 12-cone delta-complex WITH a
+  // multi-edge (two geodesics between one cone pair) -- exercises the non-simplicial path.
+  BuckyGen::buckygen_queue Q = BuckyGen::start(60, false, false);
+  Triangulation T;
+  int idx = 0;
+  while (BuckyGen::next_fullerene(Q, T)) { if (idx == 1264) break; idx++; }
+  BuckyGen::stop(Q);
+  DelaunayTriangulation D = DelaunayTriangulation::compute(T);
+  ASSERT_EQ(D.nv, 12);
+  ASSERT_TRUE(D.check_consistency());
+  ASSERT_FALSE(D.is_simplicial()) << "expected a multi-edge delta-complex for C60 #1264";
+
+  FILE* f = std::tmpfile();
+  ASSERT_NE(f, nullptr);
+  ASSERT_TRUE(DelaunayTriangulation::to_ascii(D, f));
+  std::rewind(f);
+  DelaunayTriangulation D2 = DelaunayTriangulation::from_ascii(f);   // validates via check_consistency
+  std::fclose(f);
+
+  EXPECT_EQ(D2.nv, D.nv);
+  EXPECT_FALSE(D2.is_simplicial()) << "the multi-edge must survive the round-trip";
+  EXPECT_TRUE(D2.check_consistency());
+
+  auto sorted_lengths = [](const DelaunayTriangulation& G) {
+    std::vector<double> L;
+    for (int h = 0; h < G.nh; h += 2) if (G.alive(h)) L.push_back(G.he_length[h]);
+    std::sort(L.begin(), L.end());
+    return L;
+  };
+  auto sorted_defects = [](const DelaunayTriangulation& G) {
+    std::vector<double> K;
+    for (int v = 0; v < G.nv; v++) K.push_back(2 * M_PI - G.vertex_angle_sum(v));
+    std::sort(K.begin(), K.end());
+    return K;
+  };
+  EXPECT_EQ(sorted_lengths(D2), sorted_lengths(D));   // exact double round-trip (%.17g)
+  std::vector<double> Ka = sorted_defects(D), Kb = sorted_defects(D2);
+  ASSERT_EQ(Ka.size(), Kb.size());
+  for (size_t i = 0; i < Ka.size(); i++) EXPECT_NEAR(Ka[i], Kb[i], 1e-12);
+
+  // v_cone_angle cache coherence: curvature() (reads the cache) == 2pi - vertex_angle_sum (direct).
+  std::vector<double> Kcache = D2.curvature();
+  for (int v = 0; v < D2.nv; v++)
+    EXPECT_NEAR(Kcache[v], 2 * M_PI - D2.vertex_angle_sum(v), 1e-12);
+}
+
+// A malformed .idt record is rejected, not loaded as a silently-wrong triangulation.
+TEST(DCEL, IdtRejectsMalformed) {
+  // An out-of-range origin vertex (o0=9 with nv=3) trips from_ascii's per-field range guard.
+  FILE* f = std::tmpfile();
+  ASSERT_NE(f, nullptr);
+  std::fprintf(f, "iDT-DCEL 1\n3 1 3\n3\n3\n3\n9 1 2 5 1.0\n1 2 4 1 1.0\n2 0 0 3 1.0\n");
+  std::rewind(f);
+  EXPECT_THROW(DelaunayTriangulation::from_ascii(f), std::runtime_error);
+  std::fclose(f);
+}
+
 // Test DCEL construction for C60.
 TEST(DCEL, Construction_C60) {
   Triangulation T = make_dual(60, 0);
