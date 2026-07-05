@@ -1,18 +1,53 @@
 #include "fullerenes/unfold.hh"
 #include <array>
-#include <queue>
+#include <numeric>
+#include <sstream>
+#include <stdexcept>
+
+// Primitive (unit) direction of a lattice vector: v divided by gcd(|x|,|y|).
+static Eisenstein reduce_dir(Eisenstein v){
+  int g = std::gcd(std::abs(v.first), std::abs(v.second));
+  return g ? Eisenstein(v.first/g, v.second/g) : v;
+}
+
+// Is direction d in the closed CCW angular sector from a to b? Unlike the
+// Sector helper, this handles sectors > 180 deg (a cone's interior can be up to
+// 300 deg): for a major sector (wedge(a,b) < 0) the interior is everything
+// except the minor gap CCW from b to a.
+static bool in_wedge(Eisenstein a, Eisenstein b, Eisenstein d){
+  long s = wedge(a, b);
+  if(s > 0) return wedge(a, d) >= 0 && wedge(d, b) >= 0;     // minor (<= 180 deg)
+  if(s < 0) return !(wedge(b, d) > 0 && wedge(d, a) > 0);    // major: not strictly in the gap
+  return true;                                               // a,b colinear (degenerate)
+}
 
 /*************************************************************/
 /*************************************************************/
-/*                 FOLDING IMPLEMENTATION                   */
+/*                 FOLDING IMPLEMENTATION                    */
 /*************************************************************/
 /*************************************************************/
-
+//
+// Restored pre-LLM polygon scan-conversion engine:
+//   - connect_polygon : scan-convert the outline interior in each of the 3
+//                       lattice edge-directions, drawing horizontal edges into
+//                       oriented neighbour slots.
+//   - connect_cross   : forward/backward raster of each seam segment; where the
+//                       two rasters disagree (a split triangle), connect the
+//                       edge across the seam via the gluing transform.
+//   - identify_nodes  : unchanged (intact pre-LLM algorithm).
+//
+// Orientation note: neighbours[u][d] is u's neighbour in Eisenstein unit-
+// direction d, so single-copy (deg-6) vertices come out CCW for free. Split
+// vertices (the 12 cones; on-seam deg-6 with gcd>1) appear at several plane
+// copies in different frames and are NOT yet correctly cyclically ordered --
+// pre-LLM leaned on a post-hoc orient flag that no longer exists. The direct-
+// oriented split-vertex assembly via the seam transforms is the next piece
+// (see ../claude-projects/fold-unfold/DESIGN.md §6).
 
 
 // connect_cross connects edges in split triangles
-// (for outline segments that do not align with Eisenstein grid)
-void Folding::connect_cross(int i_omega, set<edge_t> &edges, cross_info_t& cross_info)
+// (for outline segments that do not align with the Eisenstein grid).
+void Folding::connect_cross(int i_omega, vector<array<node_t,6>>& neighbours)
 {
   map<arc_t,arccoord_t> reverse_arc;
   Eisenstein xu, xv;
@@ -21,113 +56,102 @@ void Folding::connect_cross(int i_omega, set<edge_t> &edges, cross_info_t& cross
   Eisenstein omega     = Eisenstein::unit[i_omega];
   Eisenstein omega_inv = Eisenstein::unit[6-i_omega];
 
-  // Register reverse arcs
-  for(int i=0;i<outline.size();i++){
+  // Register reverse arcs (rotated coordinates of arc v->u, keyed by {v,u}).
+  for(size_t i=0;i<outline.size();i++){
     tie(xu,u) = outline[i];
     tie(xv,v) = outline[(i+1) % outline.size()];
 
-    reverse_arc[{v,u}] = {xu*omega, xv*omega}; // Rotated coordinates of arc v->u
+    reverse_arc[{v,u}] = {xu*omega, xv*omega};
   }
 
-  for(int i=0;i<outline.size();i++){
+  for(size_t i=0;i<outline.size();i++){
     tie(xu,u) = outline[i];
     tie(xv,v) = outline[(i+1) % outline.size()];
 
-    // First get the coordinates of arc u->v and the reverse v->u
+    // Coordinates of arc u->v and its glued mate v->u.
     arccoord_t Xuv = {xu*omega,xv*omega}, Xvu = reverse_arc[{u,v}];
 
-    // What the affine transform that takes the line segment Xuv into Xvu?
-    Eisenstein
-      xu0,			// Coord of u in u->v
-      xu1,			// Coord of u in v->u
-      T;			// Rotation transform
+    // Affine transform taking the line segment Xuv into Xvu.
+    Eisenstein xu0, xu1, T;
     Unfolding::transform_line(Xuv,Xvu, xu0,xu1, T);
 
-    // Alongside u->v, rasterize u->v line segment forwards and backwards
+    // Rasterize the u->v segment forwards and backwards.
     vector<Eisenstein> segment   (polygon::draw_line(xu*omega,xv*omega)),
                        revsegment(polygon::draw_line(xv*omega,xu*omega));
     reverse(revsegment.begin(),revsegment.end());
-
     if(segment.size() != revsegment.size()) continue;
 
-    // Go through the nodes of the line segments rasterized back and forth along u->v
-    for(int j=0;j<segment.size();j++){
+    // Forward rasterization rounds one way, backwards the other; where they
+    // disagree we have a split triangle whose edge crosses the seam.
+    for(size_t j=0;j<segment.size();j++){
       const Eisenstein& x(segment[j]), y(revsegment[j]);
-      // Forward rasterization rounds to the right, backwards to the left.
-      // So when x != y, we have a split triangle and an edge that needs to be connected across the boundary
       if(x != y){
-	Eisenstein xp((x-xu0)*T+xu1); // Rotate and translate from u->v to v->u coords
-	Eisenstein yp((y-xu0)*T+xu1); // Rotate and translate from u->v to v->u coords
+        Eisenstein yp((y-xu0)*T+xu1); // y mapped through the gluing transform
 
-	// Connect untransformed u to transformed v
-	Eisenstein pu = x*omega_inv, pv = yp*omega_inv;
-	auto itu = final_grid.find(pu), itv = final_grid.find(pv);
-	if(itu == final_grid.end() || itv == final_grid.end()) continue;
+        // Connect untransformed x-side node to transformed y-side node.
+        auto itu = final_grid.find(x *omega_inv);
+        auto itv = final_grid.find(yp*omega_inv);
+        if(itu == final_grid.end() || itv == final_grid.end()) continue;
 
-	node_t u = itu->second, v = itv->second;
-	if(u == v) continue;
-	if(debug_flags & WRITE_FILE) printf("Connect cross arc %d to %d \n",u,v);
+        node_t cu = itu->second, cv = itv->second;
+        if(cu == cv) continue;
 
-	// Direction from u to v at pu: in omega-rotated frame, edge goes x→y.
-	// Unrotate to get the absolute Eisenstein direction at pu.
-	Eisenstein d_u_to_v = (y - x) * omega_inv;
-	// Direction from v to u at pv: in omega-rotated frame on v's side,
-	// u is at xp, v at yp. Direction yp→xp = (x-y)*T. Unrotate.
-	Eisenstein d_v_to_u = (x - y) * T * omega_inv;
-
-	int dir_u = d_u_to_v.unit_angle();
-	int dir_v = d_v_to_u.unit_angle();
-
-	edge_t e(u, v);
-	// edge_t always has first < second. Map directions accordingly.
-	if(cross_info.find(e) == cross_info.end()){
-	  if(u <= v)
-	    cross_info[e] = {dir_u, dir_v, pu, pv};
-	  else
-	    cross_info[e] = {dir_v, dir_u, pv, pu};
-	}
-
-	edges.insert(e);
+        neighbours[cu][i_omega]   = cv;
+        neighbours[cv][i_omega+3] = cu;
       }
     }
   }
 }
 
-// connect_interior finds all edges where both endpoints are in the grid
-// by directly checking the 3 positive Eisenstein neighbor directions.
-void Folding::connect_interior(set<edge_t> &edges)
+// connect_polygon connects all interior edges of the outline polygon by exact
+// scan-conversion in direction i_omega.
+void Folding::connect_polygon(int i_omega, vector<array<node_t,6>>& neighbours)
 {
-  static const Eisenstein dirs[3] = {{1,0}, {0,1}, {-1,1}};
+  Eisenstein omega     = Eisenstein::unit[i_omega];
+  Eisenstein omega_inv = Eisenstein::unit[6-i_omega];
 
-  for(const auto& kv: final_grid){
-    const Eisenstein& p = kv.first;
-    node_t u = kv.second;
+  vector<Eisenstein> outline_coords;
+  outline_coords.reserve(outline.size());
+  for(const auto& o: outline) outline_coords.push_back(o.first*omega);
 
-    for(int d = 0; d < 3; d++){
-      auto it = final_grid.find(p + dirs[d]);
-      if(it != final_grid.end()){
-        node_t v = it->second;
-        if(u != v) edges.insert(edge_t(u,v));
+  polygon Prot(outline_coords);
+  polygon::scanline S(Prot.scanConvert());
+
+  for(size_t y=0;y<S.xs.size();y++){            // For each scanline..
+    for(size_t j=0;j<S.xs[y].size()/2;j++){     // ..go through each inner interval
+      int x_start = S.xs[y][2*j], x_end = S.xs[y][2*j+1];
+
+      for(int x=x_start;x<x_end;x++){
+        auto itu = final_grid.find(Eisenstein(x,  y+S.minY)*omega_inv);
+        auto itv = final_grid.find(Eisenstein(x+1,y+S.minY)*omega_inv);
+        if(itu == final_grid.end() || itv == final_grid.end()) continue;
+
+        node_t u = itu->second, v = itv->second;
+        neighbours[u][i_omega]   = v;
+        neighbours[v][i_omega+3] = u;
       }
     }
   }
 }
 
-// The whole outline is connected into a triangulation / cubic graph dual
-// by finding interior edges via direct neighbor lookup and cross-boundary
-// edges via line rasterization in each of the 3 Eisenstein directions.
-void Folding::connect(set<edge_t> &edges, cross_info_t& cross_info)
+// One rotation: interior edges + edges across the seam.
+void Folding::connect(int i_omega, vector<array<node_t,6>>& neighbours)
 {
-  if(!(debug_flags & DONT_CONNECT_POLYGON))  connect_interior(edges);
-  if(!(debug_flags & DONT_CONNECT_ACROSS)){
-    connect_cross(0, edges, cross_info);
-    connect_cross(1, edges, cross_info);
-    connect_cross(2, edges, cross_info);
-  }
+  if(!(debug_flags & DONT_CONNECT_POLYGON)) connect_polygon(i_omega, neighbours);
+  if(!(debug_flags & DONT_CONNECT_ACROSS))  connect_cross  (i_omega, neighbours);
 }
 
-// identify_nodes takes a polygon outline and a map from the eisenstein grid
-// to node id's where some of the (triangulation) graph nodes on the outline are
+// The whole outline is connected into a triangulation by drawing the horizontal
+// edges in each of the 3 lattice edge-directions (rotations 0, 1, 2).
+void Folding::connect(vector<array<node_t,6>>& neighbours)
+{
+  connect(0,neighbours);
+  connect(1,neighbours);
+  connect(2,neighbours);
+}
+
+// identify_nodes takes a polygon outline and a map from the Eisenstein grid
+// to node ids where some of the (triangulation) graph nodes on the outline are
 // split into two or more grid points: to fold up the polygon into a polyhedron,
 // we must identify which ones are the same.
 //
@@ -142,11 +166,10 @@ void Folding::connect(set<edge_t> &edges, cross_info_t& cross_info)
 //     Finally, we produce a canonical representation of each equivalence class:
 //     3. Compute connected components of G
 //     4. For each connected component, choose smallest id as canonical represention
-
+//
 // RESULT:
 //     A vector same_as such that for each original node id u, same_as[u] is the smallest
 //     node id in its equivalence class.
-
 vector<int> Folding::identify_nodes(const IDCounter<Eisenstein>& grid, const vector< pair<Eisenstein,node_t>>& outline) const
 {
   node_t u, v, U, V;
@@ -159,7 +182,8 @@ vector<int> Folding::identify_nodes(const IDCounter<Eisenstein>& grid, const vec
     Eisenstein omega     = Eisenstein::unit[i_omega],
                omega_inv = Eisenstein::unit[6-i_omega];
 
-    assert((omega * omega_inv == Eisenstein{1,0}));
+    if(omega * omega_inv != Eisenstein{1, 0})
+      throw std::logic_error("Folding::identify_nodes: omega * omega_inv != 1 -- Eisenstein::unit table corrupt");
 
     // Register reverse arcs
     for(int i=0;i<outline.size();i++){
@@ -225,161 +249,157 @@ vector<int> Folding::identify_nodes(const IDCounter<Eisenstein>& grid, const vec
 }
 
 
+// Assemble cone `cid`'s neighbour cycle directly CCW-ordered.
+//
+// A cone appears at one plane copy per wedge V_i -> U -> V_{i+1} along the
+// outline. We chain the wedges (each outgoing outline seam glues to its
+// label-reversed mate, which names the adjacent copy), bring every wedge into
+// one common frame at U=origin by composing transform_line's rotation across
+// each crossed seam, read each wedge's unit-distance neighbours from final_grid
+// restricted to that wedge's angular sector, and bin them by their common-frame
+// unit-direction. The angle bins are the CCW neighbour cycle; the cone's
+// deficit shows up as the empty direction. final_grid (not arc_coords) is read,
+// so this also picks up the Goldberg-Coxeter subdivision vertices.
+vector<node_t> Folding::assemble_cone(node_t cid, const map<pair<node_t,node_t>,size_t>& seg_index) const
+{
+  const int n   = (int)outline.size();
+  const int deg = degrees[cid];
+
+  // First outline appearance (copy) of this cone -- start anywhere; the deficit
+  // gap falls out of the angle binning.
+  int i0 = -1;
+  for(int i = 0; i < n; i++){
+    auto it = final_grid.find(outline[i].first);
+    if(it != final_grid.end() && it->second == cid){ i0 = i; break; }
+  }
+  if(i0 < 0)
+    throw std::logic_error("assemble_cone: cone " + std::to_string(cid) + " not on the outline");
+
+  map<int,node_t> by_angle;          // common-frame unit-angle (0..5) -> neighbour id
+  Eisenstein rot(1,0);               // this wedge's frame -> common frame (unit Eisenstein)
+  std::set<int> visited;
+  int i = i0;
+  const size_t ncopies = node_pos[cid].size();
+
+  for(size_t step = 0; step < ncopies; step++){
+    if(visited.count(i)) break;      // chain closed
+    visited.insert(i);
+
+    Eisenstein p = outline[i].first;
+    Eisenstein a = outline[(i-1+n)%n].first - p;   // ray toward prev (incoming seam)
+    Eisenstein b = outline[(i+1)%n].first - p;     // ray toward next (outgoing seam)
+    Eisenstein incoming = reduce_dir(a);           // unit dir along the incoming seam
+
+    for(int k = 0; k < 6; k++){
+      Eisenstein d = Eisenstein::unit[k];
+      // Half-open: the incoming-seam neighbour belongs to the previous wedge, so
+      // each shared seam neighbour is binned once -- and the cone's opening cut
+      // (first wedge's incoming == last wedge's outgoing, 60 deg apart = the
+      // deficit) is not double-counted.
+      if(d == incoming) continue;
+      if(!in_wedge(a, b, d)) continue;             // wedge interior (handles > 180 deg)
+      auto it = final_grid.find(p + d);
+      if(it == final_grid.end()) continue;
+      if(it->second == cid) continue;              // skip an adjacent copy of U itself (not a neighbour)
+      Eisenstein cd = d * rot;                     // direction in the common frame
+      by_angle[cd.unit_angle()] = it->second;
+    }
+
+    // Advance across the outgoing seam to the adjacent copy, composing its glue.
+    node_t U = outline[i].second, V = outline[(i+1)%n].second;
+    auto mit = seg_index.find({V,U});              // label-reversed mate segment
+    if(mit == seg_index.end()) break;              // open (deficit) seam -- end of chain
+    size_t j = mit->second;
+    arccoord_t l1 = { outline[i].first,     outline[(i+1)%n].first };
+    arccoord_t l2 = { outline[j].first,     outline[(j+1)%n].first };
+    Eisenstein x0, x0p, w;
+    Unfolding::transform_line(l1, l2, x0, x0p, w);
+    rot = rot * w.complex_conj();                  // next wedge's frame -> common frame
+    i = (int)((j+1)%n);
+  }
+
+  vector<node_t> cycle;
+  for(const auto& kv : by_angle) cycle.push_back(kv.second);   // CCW by unit-angle
+  if((int)cycle.size() != deg)
+    throw std::logic_error("assemble_cone: cone " + std::to_string(cid) + " collected "
+                           + std::to_string(cycle.size()) + " != degree " + std::to_string(deg));
+  return cycle;
+}
+
 Triangulation Folding::fold()
 {
   node_t N = node_pos.size();
-  set<edge_t> edge_set;
-  cross_info_t cross_info;
-  connect(edge_set, cross_info);
 
-  // Step 1: Build per-position direction map.
-  // pos_nb[p][d] = the compacted node at grid position p + unit[d], or -1.
-  map<Eisenstein, array<node_t, 6>> pos_nb;
-  for(const auto& [p, u] : final_grid){
-    array<node_t, 6> dirs;
-    dirs.fill(-1);
-    for(int d = 0; d < 6; d++){
-      auto it = final_grid.find(p + Eisenstein::unit[d]);
-      if(it != final_grid.end() && it->second != u)
-        dirs[d] = it->second;
-    }
-    pos_nb[p] = dirs;
-  }
+  // Base scan-conversion: oriented slots neighbours[u][d] = u's neighbour in
+  // unit-direction d. Correct for single-copy nodes (and, for now, on-seam deg-6).
+  vector<array<node_t,6>> neighbours(N);
+  for(auto& a: neighbours) a.fill(-1);
+  connect(neighbours);
 
-  // Step 2: Compute rotation from each grid position to its node's canonical frame.
-  // The rotation comes from the boundary identification transform T.
-  // Re-run the identification loop (same as identify_nodes) to extract rotations.
-  map<Eisenstein, int> pos_rotation;
-  for(const auto& [p, u] : final_grid)
-    pos_rotation[p] = 0;
+  // Outline segment (srcLabel,tgtLabel) -> outline index, for the cone wedge chain.
+  map<pair<node_t,node_t>,size_t> seg_index;
+  for(size_t s = 0; s < outline.size(); s++)
+    seg_index[{outline[s].second, outline[(s+1)%outline.size()].second}] = s;
 
-  // Build adjacency list for position identifications: pos -> [(other_pos, T_angle)]
-  // where T_angle is the rotation from pos's frame to other_pos's frame.
-  map<Eisenstein, vector<pair<Eisenstein, int>>> id_adj;
-
-  for(int i_omega = 0; i_omega < 3; i_omega++){
-    Eisenstein omega     = Eisenstein::unit[i_omega];
-    Eisenstein omega_inv = Eisenstein::unit[6-i_omega];
-
-    map<arc_t, arccoord_t> reverse_arc;
-    for(size_t i = 0; i < outline.size(); i++){
-      auto [xu, u] = outline[i];
-      auto [xv, v] = outline[(i+1) % outline.size()];
-      reverse_arc[{v,u}] = {xu*omega, xv*omega};
-    }
-
-    for(size_t i = 0; i < outline.size(); i++){
-      auto [xu, u] = outline[i];
-      auto [xv, v] = outline[(i+1) % outline.size()];
-
-      arccoord_t XUV(xu*omega, xv*omega), XVU(reverse_arc[{u,v}]);
-      Eisenstein x0, x0p, T;
-      Unfolding::transform_line(XUV, XVU, x0, x0p, T);
-
-      if(!T.isUnit()) continue;
-      int T_angle = T.unit_angle();
-
-      auto segment    = polygon::draw_line(xu*omega, xv*omega);
-      auto revsegment = polygon::draw_line(xv*omega, xu*omega);
-      reverse(revsegment.begin(), revsegment.end());
-
-      if(segment.size() != revsegment.size()) continue;
-
-      for(size_t j = 0; j < segment.size(); j++){
-        if(segment[j] == revsegment[j]){
-          Eisenstein xp = (segment[j] - x0) * T + x0p;
-          Eisenstein p1 = segment[j] * omega_inv;
-          Eisenstein p2 = xp * omega_inv;
-
-          if(p1 != p2 && final_grid.count(p1) && final_grid.count(p2) &&
-             final_grid.at(p1) == final_grid.at(p2)){
-            // p1 and p2 are identified copies of the same node.
-            // Direction d at p1 corresponds to direction (d + T_angle) % 6 at p2.
-            id_adj[p1].push_back({p2, T_angle});
-            id_adj[p2].push_back({p1, (6 - T_angle) % 6});
-          }
-        }
-      }
-    }
-  }
-
-  // BFS from each canonical position to propagate rotations.
+  // Assemble every node that lies on the outline (all cones, and on-seam deg-6
+  // -- i.e. cones OR multi-copy); only strictly-interior single-copy deg-6 use
+  // the scan-conversion slots in CCW order.
+  Graph nbr(N, GRAPH_DMAX);
   for(node_t u = 0; u < N; u++){
-    if(node_pos[u].size() <= 1) continue;
-
-    const Eisenstein& p0 = node_pos[u][0];
-    pos_rotation[p0] = 0;
-
-    queue<Eisenstein> bfs;
-    bfs.push(p0);
-    set<Eisenstein> visited;
-    visited.insert(p0);
-
-    while(!bfs.empty()){
-      Eisenstein p = bfs.front(); bfs.pop();
-      int rot_p = pos_rotation[p];
-
-      for(auto& [q, T_angle] : id_adj[p]){
-        if(visited.count(q)) continue;
-        if(final_grid.at(q) != u) continue;
-
-        // Direction d at p corresponds to direction (d + T_angle) at q.
-        // pos_rotation maps to canonical frame: d_canonical = (d + pos_rotation[p]) % 6.
-        // From q: d_canonical = (d_q + pos_rotation[q]) % 6.
-        // d_q = d_p + T_angle, so: (d_p + T_angle + pos_rotation[q]) = (d_p + rot_p)
-        // => pos_rotation[q] = rot_p - T_angle
-        pos_rotation[q] = (rot_p - T_angle + 6) % 6;
-        visited.insert(q);
-        bfs.push(q);
-      }
+    if(degrees[u] != 6 || node_pos[u].size() > 1){
+      for(node_t v : assemble_cone(u, seg_index)) nbr.push_back(u, v);
+    } else {
+      for(int d = 0; d < 6; d++)
+        if(neighbours[u][d] != -1) nbr.push_back(u, neighbours[u][d]);
     }
   }
 
-  // Step 3: Build unified per-node direction map using rotations.
-  vector<array<node_t, 6>> dir_nb(N);
-  for(auto& a : dir_nb) a.fill(-1);
-
-  for(node_t u = 0; u < N; u++){
-    for(const auto& p : node_pos[u]){
-      int rot = pos_rotation[p];
-      const auto& nb = pos_nb[p];
-      for(int d = 0; d < 6; d++){
-        if(nb[d] < 0) continue;
-        int d_canonical = (d + rot) % 6;
-        if(dir_nb[u][d_canonical] == -1)
-          dir_nb[u][d_canonical] = nb[d];
-      }
-    }
-  }
-
-  // Step 4: Add cross-boundary directions to dir_nb from cross_info.
-  // cross_info maps each cross-boundary edge to (dir_first, dir_second, pos_first, pos_second)
-  // where the directions are in each position's local Eisenstein frame.
-  // Rotate them to the canonical frame using pos_rotation.
-  for(const auto& [e, info] : cross_info){
-    auto [dir_first_raw, dir_second_raw, pos_f, pos_s] = info;
-    node_t u = e.first, v = e.second;
-
-    int dir_uv = (dir_first_raw  + pos_rotation[pos_f]) % 6;
-    int dir_vu = (dir_second_raw + pos_rotation[pos_s]) % 6;
-
-    dir_nb[u][dir_uv] = v;
-    dir_nb[v][dir_vu] = u;
-  }
-
-  // Step 5: Build neighbour lists directly from dir_nb in CW order.
-  // Eisenstein directions 0-5 go CCW, so scanning 5→4→3→2→1→0 gives CW order,
-  // which is what Triangulation's next_on_face (= prev) convention requires.
-  Graph neighbours(N, 6);  // Triangulations have max degree 6
-  for(node_t u = 0; u < N; u++){
-    for(int d = 5; d >= 0; d--){
-      if(dir_nb[u][d] >= 0)
-        neighbours.push_back(u, dir_nb[u][d]);
-    }
-  }
-
-  Triangulation T(neighbours);
+  Triangulation T(nbr);
+  restore_original_labels(T);
   return T;
+}
+
+// Build the compacted-id -> original-label permutation and apply it to the folded
+// graph and the Folding's id-keyed state. A tracked original (its class's canonical
+// grid id < N_orig) is restored to its original id cone_perm.inverse()[canonical];
+// every other vertex takes one of the remaining ids of [0,N). This is a bijection of
+// [0,N) for ANY partial subset of originals present in the result, which is the usual
+// case after a transform (the result keeps only some pre-transform vertices). A
+// present original whose original id is out of the result's range (a shrinking
+// transform) cannot keep its id and is treated as untracked.
+void Folding::restore_original_labels(Triangulation& T)
+{
+  const node_t N = (node_t)node_pos.size();
+  // cone_perm covers the tracked range (size >= N_orig): for a cone-star outline it
+  // is the dense [0,Vmax] permutation, larger than N_orig=Ncones. Index its inverse
+  // only at canonical < N_orig. Empty => no relabel known => identity restore.
+  const bool have_perm = (node_t)cone_perm.size() >= N_orig && N_orig > 0;
+  const Permutation cone_inv = have_perm ? cone_perm.inverse()
+                                         : Permutation::identity(N_orig);
+
+  Permutation relabel(N);
+  vector<bool>   used(N, false);
+  vector<node_t> untracked;                  // classes that take a complement id
+  for(const auto& [canonical, c] : compact){
+    const node_t orig = (canonical < N_orig) ? cone_inv[canonical] : node_t(-1);
+    if(orig >= 0 && orig < N){ relabel[c] = orig; used[orig] = true; }  // present tracked original
+    else untracked.push_back(c);
+  }
+  node_t next = 0;                           // fill the complement [0,N) \ used in order
+  for(node_t c : untracked){
+    while(used[next]) ++next;                // a free id always remains: |untracked| == #unused
+    relabel[c] = next; used[next] = true;
+  }
+
+  // One isomorphism across every id-keyed view so the whole Folding shares the
+  // original-label id space (fold() is single-shot).
+  T.apply_permutation(relabel);
+  for(auto& kv : final_grid) kv.second = relabel[kv.second];
+  vector<vector<Eisenstein>> np(N);
+  vector<int>                dg(N);
+  for(node_t c = 0; c < N; c++){ np[relabel[c]] = std::move(node_pos[c]); dg[relabel[c]] = degrees[c]; }
+  node_pos = std::move(np);
+  degrees  = std::move(dg);
 }
 
 vector<node_t> Folding::outline_nodes() const
@@ -402,8 +422,13 @@ vector<node_t> Folding::outline_nodes() const
     int stored_up = new_nodenames[u];
 
     if(stored_up != -1 && same_nodes[stored_up] != same_nodes[outline_newnames[i]]){
-      fprintf(stderr,"outline[%d] = {{%d,%d},%d} -> u = %d. stored_up = %d, outline_newnames[%d] = %d\n",i,outline[i].first.first,outline[i].first.second,outline[i].second,u,stored_up,i,outline_newnames[i]);
-      abort();
+      std::ostringstream msg;
+      msg << "Folding::outline_nodes: same-node disagreement at outline["
+          << i << "] = {{" << outline[i].first.first << ","
+          << outline[i].first.second << "}," << outline[i].second
+          << "} -> u = " << u << ". stored_up = " << stored_up
+          << ", outline_newnames[" << i << "] = " << outline_newnames[i];
+      throw std::logic_error(msg.str());
     }
     new_nodenames[u] = same_nodes[outline_newnames[i]];
   }
