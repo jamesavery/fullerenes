@@ -5,6 +5,7 @@
 #include "geometry.hh"
 
 #include <array>
+#include <cstdio>       // FILE* for the .idt serialization (to_ascii / from_ascii)
 #include <functional>
 
 
@@ -462,6 +463,24 @@ struct DelaunayTriangulation {
 
   // --- Validation ---
   bool check_consistency() const;
+
+  // --- Serialization (.idt) ---
+  // Text round-trip of the intrinsic Delaunay delta-complex (the ".idt" format, magic
+  // "iDT-DCEL 1"). ALIVE-only and half-edge based, so it is faithful to the multi-edges,
+  // self-loops and self-adjacent faces of a non-simplicial iDT that a vertex-pair adjacency
+  // cannot express -- and it stays compact even after remove_flat_vertices leaves the arrays
+  // full of dead slots (compact_vertices shrinks only nv). Only the topology + edge lengths are
+  // stored, at full double precision; faces, v_out and angles are rebuilt on read. Format spec
+  // and field layout are in delaunay.cc.
+  //
+  // @pre  D is compacted: every vertex index in [0, nv) is live (throws otherwise).
+  // @post returns ferror(file) == 0.
+  static bool to_ascii(const DelaunayTriangulation& D, FILE* file);
+
+  // @post the result passes check_consistency(); a malformed stream is rejected, never returned
+  //       as a silently-wrong triangulation.
+  // @throws std::runtime_error naming the fault on malformed input.
+  static DelaunayTriangulation from_ascii(FILE* file);
 };
 
 

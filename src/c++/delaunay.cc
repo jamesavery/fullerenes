@@ -1519,3 +1519,139 @@ bool DelaunayTriangulation::check_consistency() const
   return true;
 }
 
+// ============================================================================
+// Serialization -- the ".idt" text format
+// ============================================================================
+//
+// Format (text, versioned):
+//   iDT-DCEL 1
+//   <nv> <nf> <ne>
+//   <v_orig_degree[v]>              (nv lines)
+//   <o0> <o1> <n0> <n1> <length>    (ne lines)
+//
+// ALIVE elements only, reindexed dense (nh/nf keep dead slots after remove_flat_vertices +
+// compact_vertices, which shrinks only nv). Twin convention: half-edges 2k and 2k+1 are twins.
+// An edge line gives the two half-edges' origin vertices (o0 = origin(2k), o1 = origin(2k+1) =
+// dest(2k)), their he_next successors (n0, n1 as reindexed half-edge ids), and the shared length.
+// Faces (he_face / f_he), v_out and angles are derived on read, so only the topology + metric is
+// stored, at full double precision (%.17g = DBL_DECIMAL_DIG). The intrinsic geometry round-trips
+// exactly. The format is faithful to a non-simplicial delta-complex (multi-edges / self-loops).
+
+bool DelaunayTriangulation::to_ascii(const DelaunayTriangulation& D, FILE* file)
+{
+  for (int v = 0; v < D.nv; v++)
+    if (D.v_out[v] < 0)
+      throw std::runtime_error("DelaunayTriangulation::to_ascii: vertex " + std::to_string(v)
+                               + " is dead (non-compacted DCEL; compact_vertices first)");
+
+  // old edge (h>>1) -> dense new edge index, assigned in ascending old order; -1 for dead.
+  std::vector<int> new_edge(D.nh / 2, -1);
+  int ne = 0;
+  for (int h = 0; h < D.nh; h += 2)
+    if (D.alive(h)) new_edge[h >> 1] = ne++;
+  auto new_he = [&](int h) { return 2 * new_edge[h >> 1] + (h & 1); };
+
+  int nf_alive = 0;
+  for (int f = 0; f < D.nf; f++)
+    if (D.f_he[f] >= 0) nf_alive++;
+
+  std::fprintf(file, "iDT-DCEL 1\n%d %d %d\n", D.nv, nf_alive, ne);
+  for (int v = 0; v < D.nv; v++)
+    std::fprintf(file, "%d\n", D.v_orig_degree[v]);
+  for (int h = 0; h < D.nh; h += 2)
+    if (D.alive(h))
+      std::fprintf(file, "%d %d %d %d %.17g\n", D.he_origin[h], D.he_origin[h + 1],
+                   new_he(D.he_next[h]), new_he(D.he_next[h + 1]), D.he_length[h]);
+  return std::ferror(file) == 0;
+}
+
+DelaunayTriangulation DelaunayTriangulation::from_ascii(FILE* file)
+{
+  char magic[16];
+  int version = 0;
+  if (std::fscanf(file, "%15s %d", magic, &version) != 2 || std::string(magic) != "iDT-DCEL")
+    throw std::runtime_error("DelaunayTriangulation::from_ascii: bad header (expected 'iDT-DCEL <version>')");
+  if (version != 1)
+    throw std::runtime_error("DelaunayTriangulation::from_ascii: unsupported version " + std::to_string(version));
+
+  int nv = 0, nf = 0, ne = 0;
+  // ne is bounded so nh = 2*ne cannot overflow int (it is then used as a vector size).
+  if (std::fscanf(file, "%d %d %d", &nv, &nf, &ne) != 3 || nv < 0 || nf < 0 || ne < 0 || ne > INT_MAX / 2)
+    throw std::runtime_error("DelaunayTriangulation::from_ascii: bad counts line");
+
+  DelaunayTriangulation D;
+  D.nv = nv;
+  D.v_out.assign(nv, -1);
+  D.v_cone_angle.assign(nv, 0.0);
+  D.v_orig_degree.resize(nv);
+  for (int v = 0; v < nv; v++)
+    if (std::fscanf(file, "%d", &D.v_orig_degree[v]) != 1 || D.v_orig_degree[v] < 0)
+      throw std::runtime_error("DelaunayTriangulation::from_ascii: bad vertex table (truncated or "
+                               "negative degree) at vertex " + std::to_string(v));
+
+  const int nh = 2 * ne;
+  D.nh = nh;
+  D.he_origin.assign(nh, -1);
+  D.he_next.assign(nh, -1);
+  D.he_face.assign(nh, -1);
+  D.he_length.assign(nh, 0.0);
+  D.he_angle.assign(nh, 0.0);
+  auto in_verts = [&](int x) { return x >= 0 && x < nv; };
+  auto in_hes   = [&](int x) { return x >= 0 && x < nh; };
+  for (int k = 0; k < ne; k++) {
+    int o0, o1, n0, n1;
+    double L;
+    if (std::fscanf(file, "%d %d %d %d %lf", &o0, &o1, &n0, &n1, &L) != 5)
+      throw std::runtime_error("DelaunayTriangulation::from_ascii: truncated edge table at edge " + std::to_string(k));
+    if (!in_verts(o0) || !in_verts(o1) || !in_hes(n0) || !in_hes(n1) || !(L > 0))
+      throw std::runtime_error("DelaunayTriangulation::from_ascii: out-of-range field at edge " + std::to_string(k));
+    D.he_origin[2 * k] = o0;  D.he_origin[2 * k + 1] = o1;
+    D.he_next[2 * k]   = n0;  D.he_next[2 * k + 1]   = n1;
+    D.he_length[2 * k] = D.he_length[2 * k + 1] = L;
+  }
+
+  // Faces: each he_next cycle is one face. Assign he_face + a representative f_he per cycle.
+  D.f_he.clear();
+  for (int h = 0; h < nh; h++) {
+    if (D.he_face[h] >= 0) continue;
+    const int f = (int)D.f_he.size();
+    D.f_he.push_back(h);
+    int g = h, steps = 0;
+    do {
+      D.he_face[g] = f;
+      g = D.he_next[g];
+      if (++steps > nh)
+        throw std::runtime_error("DelaunayTriangulation::from_ascii: he_next cycle from half-edge "
+                                 + std::to_string(h) + " did not close");
+    } while (g != h);
+  }
+  D.nf = (int)D.f_he.size();
+  if (D.nf != nf)
+    throw std::runtime_error("DelaunayTriangulation::from_ascii: derived " + std::to_string(D.nf)
+                             + " faces but header declared " + std::to_string(nf));
+
+  // v_out: any outgoing half-edge per vertex (the cw ring from it covers the fan).
+  for (int h = 0; h < nh; h++)
+    if (D.v_out[D.he_origin[h]] < 0) D.v_out[D.he_origin[h]] = h;
+
+  // An isolated declared vertex (no incident edge) would keep v_out == -1, so recompute_cone_angles
+  // leaves its v_cone_angle at 0 and curvature()/is_flat() silently misreport it. Fail loud.
+  for (int v = 0; v < nv; v++)
+    if (D.v_out[v] < 0)
+      throw std::runtime_error("DelaunayTriangulation::from_ascii: vertex " + std::to_string(v)
+                               + " has no incident edge (isolated / malformed input)");
+
+  D.recompute_all_angles();   // he_angle from the law of cosines, THEN refresh v_cone_angle
+
+  // Full structural + metric validation: triangular faces (he_next^3 == h), origin chaining
+  // (dest(h) == origin(next(h))), positive twin-consistent lengths, and the triangle inequality per
+  // face (which also rejects a +inf length that slips past the per-field L>0 guard). Without this a
+  // malformed stream -- a non-triangular he_next permutation whose cycle count happens to match nf,
+  // a +inf length, a broken chain -- would load as a silently-wrong triangulation.
+  if (!D.check_consistency())
+    throw std::runtime_error("DelaunayTriangulation::from_ascii: reconstructed DCEL failed "
+                             "check_consistency (non-triangular face, broken chaining, or a length / "
+                             "triangle-inequality violation)");
+  return D;
+}
+
