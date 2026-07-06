@@ -213,6 +213,54 @@ void register_fullerene_dual(py::module_& m) {
         "status:int, status_str). A degenerate (drum-cap) status with coplanar "
         "positions is the doubly-covered-polygon case.");
 
+    cls.def("alexandrov_trajectory",
+        [](PyFD& w) {
+            // The Bobenko-Izmestiev homotopy trajectory toward κ=0: one entry per
+            // continuation/Newton step, each the FULL generalized-convex-polytope
+            // (GCP) state — apex at the origin, the 12 cones at |p_v|=r_v, the
+            // per-cone angle defect κ_v, and the triangular faces of T (which
+            // change at edge flips).  Drives the GCP-pyramid-deformation animation.
+            // Same vertex indexing as alexandrov_polytope (cones first); cone_spiral
+            // maps a trajectory vertex index to its original spiral dual index.
+            Triangulation T(w.view());
+            std::vector<int> pi = T.sort_flat_last();           // pi[u_old] = u_new
+            AlexandrovSolver solver;
+            solver.D = DelaunayTriangulation::compute(T);
+            solver.record_trajectory = true;
+            solver.solve();
+
+            std::vector<int> orig(T.N);
+            for (int u = 0; u < T.N; u++) orig[pi[u]] = u;
+            py::list cone_spiral;
+            for (int k = 0; k < T.N; k++) cone_spiral.append(orig[k]);
+
+            py::list steps;
+            for (const auto& e : solver.trajectory) {
+                py::list pos, kappa, faces;
+                for (const auto& p : e.positions) pos.append(py::make_tuple(p[0], p[1], p[2]));
+                for (double k : e.kappa) kappa.append(k);
+                for (const auto& f : e.faces) faces.append(py::make_tuple(f[0], f[1], f[2]));
+                py::dict d;
+                d["phase"]     = std::string(1, e.phase);
+                d["step"]      = e.step;
+                d["t"]         = e.t;
+                d["kappa_max"] = e.kappa_max;
+                d["kappa"]     = kappa;
+                d["positions"] = pos;
+                d["faces"]     = faces;
+                steps.append(d);
+            }
+            return py::make_tuple(steps, cone_spiral, (int)solver.stats_status,
+                                  std::string(AlexandrovSolver::status_str(solver.stats_status)));
+        },
+        "The Bobenko-Izmestiev homotopy trajectory toward κ=0: (steps, cone_spiral, "
+        "status:int, status_str), where steps is a list of per-step dicts "
+        "{phase:'T'|'P'|'N', step:int, t:float, kappa_max:float, kappa:list[12], "
+        "positions:list[12] (x,y,z; apex at origin; empty if Gram-BFS failed at high "
+        "kappa), faces:list[(i,j,k)] (triangles of T at that step)}. Drives the "
+        "GCP-pyramid-deformation animation; t runs 1->0 over continuation, then 0 in "
+        "Newton polish.");
+
     cls.def("end_of_the_line",
         [](PyFD& w, int u0, int axis, int a, int b) {
             require_node(w, u0); require_axis(w, u0, axis);
