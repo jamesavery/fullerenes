@@ -16,6 +16,7 @@
 
 #include "fullerenes/delaunay.hh"
 #include "fullerenes/geometry.hh"
+#include <array>
 #include <vector>
 
 struct AlexandrovSolver {
@@ -192,6 +193,32 @@ struct AlexandrovSolver {
   };
   std::vector<DiagEntry> diag_trace;
 
+  // Per-step homotopy trajectory, for visualizing the B-I continuation
+  // (opt-in via record_trajectory; off by default = zero cost).  One entry per
+  // accepted-or-rejected continuation/Newton step, capturing the FULL
+  // generalized-convex-polytope (GCP) state needed to draw the deforming
+  // pyramids: the reconstructed cone positions (apex at the origin, |p_v| = r_v),
+  // the per-cone angle defect κ_v at the radial edge a−v (→ 0 as the pyramids
+  // close into a polytope), and the triangular faces of T (which change at edge
+  // flips, so each entry is self-contained).  positions is empty for that step
+  // iff Gram-BFS reconstruction failed (κ too high / degenerate iterate).
+  bool record_trajectory = false;
+  struct TrajEntry {
+    char   phase;                          // 'T'/'P' continuation, 'N' Newton polish
+    int    step;
+    double t;                              // homotopy parameter (0 in Newton)
+    double kappa_max;                      // max|κ|
+    std::vector<double> kappa;             // per-cone angle defect κ_v
+    std::vector<coord3d> positions;        // reconstructed cones (apex at origin)
+    std::vector<std::array<int,3>> faces;  // triangular faces of T at this step
+    std::vector<std::array<double,3>> face_len;  // base edge lengths of faces[f], in its
+                                           // vertex order (ℓ_01, ℓ_12, ℓ_20) — the metric,
+                                           // needed to build each rigid pyramid exactly
+                                           // (Gram-BFS distorts cotree edges, so |pᵢ−pⱼ|
+                                           // is unreliable; the radii rᵥ=|pᵥ| are exact).
+  };
+  std::vector<TrajEntry> trajectory;
+
   // Returns the 3D coordinates of the n cone points.  ALWAYS returns
   // positions when reconstruction is possible — even on failed
   // validation — so that failure cases can be visualized and debugged.
@@ -240,7 +267,7 @@ struct AlexandrovSolver {
                    const std::vector<double>& r);
 
   // Eigenvalues of J = ∂κ/∂r at (T, r), sorted ascending.
-  // Empty on LAPACK failure.
+  // Empty on eigensolver failure.
   static std::vector<double> jacobian_eigvals(const DelaunayTriangulation& T,
                                                const std::vector<double>& r);
 

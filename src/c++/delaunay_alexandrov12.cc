@@ -34,32 +34,102 @@
 
 using namespace std;
 
-extern "C" {
-  void dgesv_(const int* n, const int* nrhs, double* A, const int* lda,
-              int* ipiv, double* b, const int* ldb, int* info);
-  void dsyev_(const char* jobz, const char* uplo, const int* n,
-              double* A, const int* lda, double* w,
-              double* work, const int* lwork, int* info);
-}
+// All dense linear algebra in this solver is in-house (cyclic Jacobi +
+// partial-pivot LU) — deliberately NOT BLAS/LAPACK.  The systems are tiny
+// (n = #cone points: 12 for fullerene duals, 20..60 for the cubic-metric
+// variant), and at least one deployed OpenBLAS (0.3.20 DYNAMIC_ARCH
+// selecting Cooperlake AVX-512 kernels) silently returns WRONG dgesv
+// solutions (info = 0, residual ~1e-2) for n ≳ 60 and wrong dgemm products
+// at n ≥ 128.  Do not "optimize" these back to LAPACK calls: at these
+// sizes the in-house routines are fast enough, and their correctness does
+// not depend on which BLAS the host has installed.
 
 namespace {
 
+// Cyclic Jacobi eigendecomposition of a symmetric matrix (flat row-major
+// A, consumed).  Eigenvalues ascending in lam; if V_out is non-null, row m
+// of *V_out is the unit eigenvector paired with lam[m].  The sweep budget
+// is a guard, not a knob: cyclic Jacobi converges quadratically once the
+// off-diagonal is small, so a trip means non-symmetric input (caller bug).
+static bool jacobi_eig(std::vector<double> A, int n, std::vector<double>& lam,
+                       std::vector<double>* V_out)
+{
+  constexpr int MAX_SWEEPS = 60;
+
+  std::vector<double> V;
+  if (V_out) {
+    V.assign(size_t(n) * n, 0.0);
+    for (int i = 0; i < n; i++) V[size_t(i) * n + i] = 1.0;
+  }
+
+  double anorm = 0;
+  for (size_t x = 0; x < A.size(); x++) anorm = std::max(anorm, std::fabs(A[x]));
+  const double tol = 1e-15 * std::max(anorm, 1e-300);
+
+  auto at = [&](int i, int j) -> double& { return A[size_t(i) * n + j]; };
+
+  for (int sweep = 0; sweep < MAX_SWEEPS; sweep++) {
+    double off = 0;
+    for (int p = 0; p < n; p++)
+      for (int q = p + 1; q < n; q++) off = std::max(off, std::fabs(at(p, q)));
+    if (off <= tol) break;
+    if (sweep == MAX_SWEEPS - 1) return false;   // guard trip = bug
+
+    for (int p = 0; p < n; p++)
+      for (int q = p + 1; q < n; q++) {
+        double apq = at(p, q);
+        if (std::fabs(apq) <= tol) continue;
+        double theta = (at(q, q) - at(p, p)) / (2 * apq);
+        double t = (theta >= 0 ? 1.0 : -1.0) /
+                   (std::fabs(theta) + std::sqrt(theta * theta + 1));
+        double c = 1.0 / std::sqrt(t * t + 1), s = t * c;
+
+        for (int i = 0; i < n; i++) {      // rotate rows/cols p,q of A
+          double aip = at(i, p), aiq = at(i, q);
+          at(i, p) = c * aip - s * aiq;
+          at(i, q) = s * aip + c * aiq;
+        }
+        for (int i = 0; i < n; i++) {
+          double api = at(p, i), aqi = at(q, i);
+          at(p, i) = c * api - s * aqi;
+          at(q, i) = s * api + c * aqi;
+        }
+        if (V_out)
+          for (int i = 0; i < n; i++) {    // accumulate: V row = eigvecᵀ
+            double vpi = V[size_t(p) * n + i], vqi = V[size_t(q) * n + i];
+            V[size_t(p) * n + i] = c * vpi - s * vqi;
+            V[size_t(q) * n + i] = s * vpi + c * vqi;
+          }
+      }
+  }
+
+  // Sort ascending, permuting eigenvector rows along.
+  std::vector<int> order(n);
+  for (int i = 0; i < n; i++) order[i] = i;
+  std::sort(order.begin(), order.end(),
+            [&](int x, int y) { return at(x, x) < at(y, y); });
+  lam.assign(n, 0);
+  for (int m = 0; m < n; m++) lam[m] = at(order[m], order[m]);
+  if (V_out) {
+    V_out->assign(size_t(n) * n, 0.0);
+    for (int m = 0; m < n; m++)
+      for (int i = 0; i < n; i++)
+        (*V_out)[size_t(m) * n + i] = V[size_t(order[m]) * n + i];
+  }
+  return true;
+}
+
 // Full symmetric eigenvalue decomposition of a 12×12-ish matrix.
-// Returns eigenvalues sorted ascending.  On LAPACK failure, returns empty.
+// Returns eigenvalues sorted ascending; empty on eigensolver failure.
 // Used by both PALC step tracing and Newton polish tracing.
 static std::vector<double> sym_eigvals(const matrix<double>& A) {
   int n = A.m;
   std::vector<double> Af(n*n);
   for (int i = 0; i < n; i++)
     for (int j = 0; j < n; j++)
-      Af[j*n + i] = 0.5 * (A(i,j) + A(j,i));
-  std::vector<double> w(n), work(1);
-  int lwork = -1, info;
-  dsyev_("N", "U", &n, Af.data(), &n, w.data(), work.data(), &lwork, &info);
-  if (info != 0) return {};
-  lwork = (int)work[0]; work.assign(lwork, 0.0);
-  dsyev_("N", "U", &n, Af.data(), &n, w.data(), work.data(), &lwork, &info);
-  if (info != 0) return {};
+      Af[size_t(i)*n + j] = 0.5 * (A(i,j) + A(j,i));
+  std::vector<double> w;
+  if (!jacobi_eig(std::move(Af), n, w, nullptr)) return {};
   return w;
 }
 
@@ -415,35 +485,51 @@ double energy(const V& v) { return 0.5 * sum_sq(v); }
 
 // LU-with-sign solve: returns (x, det_sign) on success.
 // det_sign ∈ {−1, +1} is sign(det A), computed as the product of:
-//   (−1)^{# row swaps from ipiv}  ×  product of signs of diag(U).
-// Failures are tagged: Singular for a zero pivot, LapackError for bad info.
+//   (−1)^{# row swaps}  ×  product of signs of diag(U).
+// In-house partial-pivot LU with the RHS eliminated in lockstep (see the
+// no-BLAS note at the top of this file).  Singular = an exact zero pivot;
+// LapackError is retained in the enum for interface stability but is no
+// longer produced.
 struct LuSolved { V x; int det_sign; };
 enum class LuFail { Singular, LapackError };
 
 std::expected<LuSolved, LuFail>
 solve_with_sign(const matrix<double>& A, const V& b) {
   int n = A.m;
-  vector<double> Af(n*n);
-  V x(b);
+  vector<double> M(size_t(n)*n);              // row-major working copy
   for (int i = 0; i < n; i++)
     for (int j = 0; j < n; j++)
-      Af[j*n + i] = A(i, j);
-  vector<int> ipiv(n);
-  int nrhs = 1, info;
-  dgesv_(&n, &nrhs, Af.data(), &n, ipiv.data(), x.data(), &n, &info);
-  if (info < 0) return std::unexpected(LuFail::LapackError);
-  if (info > 0) return std::unexpected(LuFail::Singular);
+      M[size_t(i)*n + j] = A(i, j);
+  V x(b);
   int sign = 1;
-  for (int i = 0; i < n; i++) {
-    if (ipiv[i] != i + 1) sign = -sign;       // row swap parity
-    double d = Af[i*n + i];                   // diagonal of U
-    if (d < 0)       sign = -sign;
-    else if (d == 0) return std::unexpected(LuFail::Singular);
+  for (int c = 0; c < n; c++) {
+    int p = c;
+    for (int q = c+1; q < n; q++)
+      if (fabs(M[size_t(q)*n + c]) > fabs(M[size_t(p)*n + c])) p = q;
+    double piv = M[size_t(p)*n + c];
+    if (piv == 0) return std::unexpected(LuFail::Singular);
+    if (p != c) {
+      for (int j = c; j < n; j++) swap(M[size_t(c)*n + j], M[size_t(p)*n + j]);
+      swap(x[c], x[p]);
+      sign = -sign;                            // row swap parity
+    }
+    if (M[size_t(c)*n + c] < 0) sign = -sign;  // sign of diag(U)
+    for (int q = c+1; q < n; q++) {
+      double m = M[size_t(q)*n + c] / M[size_t(c)*n + c];
+      if (m == 0) continue;
+      for (int j = c+1; j < n; j++) M[size_t(q)*n + j] -= m * M[size_t(c)*n + j];
+      x[q] -= m * x[c];
+    }
+  }
+  for (int c = n-1; c >= 0; c--) {             // back substitution
+    double s = x[c];
+    for (int j = c+1; j < n; j++) s -= M[size_t(c)*n + j] * x[j];
+    x[c] = s / M[size_t(c)*n + c];
   }
   return LuSolved{std::move(x), sign};
 }
 
-// Solve A·x = b via LAPACK.  Returns zero vector on failure.
+// Solve A·x = b.  Returns zero vector on failure.
 // (Backward-compat wrapper around solve_with_sign that discards the sign.)
 V solve(const matrix<double>& A, const V& b) {
   auto r = solve_with_sign(A, b);
@@ -547,8 +633,8 @@ std::pair<V, double> split(const V& x) {
 namespace SymEigen {
 
 // Symmetric eigendecomposition: J = Q·diag(λ)·Qᵀ.
-// Q has eigenvectors as columns (column-major); λ ascending.
-// Empty on LAPACK failure.
+// Q has eigenvectors as columns; λ ascending.
+// Empty on eigensolver failure.
 struct Decomp {
   matrix<double> Q;
   V              lambda;
@@ -557,25 +643,17 @@ struct Decomp {
 Decomp decompose(const matrix<double>& A) {
   int n = A.m;
   std::vector<double> Af(n * n);
-  for (int i = 0; i < n; i++)                       // column-major + symmetrize
+  for (int i = 0; i < n; i++)                       // symmetrize (row-major)
     for (int j = 0; j < n; j++)
-      Af[j * n + i] = 0.5 * (A(i, j) + A(j, i));
-  V lambda(n);
-  // dsyev with JOBZ='V' needs LWORK ≥ max(1, 1 + 6n + 2n²) for the
-  // optimum, but any larger value works.  For our typical n=12 the
-  // requirement is ≤ 361; we allocate generously and skip the
-  // workspace-query call entirely.  This saves one dsyev invocation
-  // per decomposition — a measurable speedup at small n.
-  int lwork = std::max(64, 1 + 6 * n + 2 * n * n);
-  std::vector<double> work(lwork);
-  int info = 0;
-  dsyev_("V", "U", &n, Af.data(), &n, lambda.data(),
-         work.data(), &lwork, &info);
-  if (info != 0) return Decomp{matrix<double>(0, 0, 0.0), {}};
+      Af[size_t(i) * n + j] = 0.5 * (A(i, j) + A(j, i));
+  V lambda;
+  std::vector<double> Vrows;                        // row m = eigvec m
+  if (!jacobi_eig(std::move(Af), n, lambda, &Vrows))
+    return Decomp{matrix<double>(0, 0, 0.0), {}};
   matrix<double> Q(n, n, 0.0);
   for (int i = 0; i < n; i++)
     for (int j = 0; j < n; j++)
-      Q(j, i) = Af[i * n + j];                      // eigvec i is column i
+      Q(j, i) = Vrows[size_t(i) * n + j];           // eigvec i is column i
   return {std::move(Q), std::move(lambda)};
 }
 
@@ -793,6 +871,28 @@ static AlexandrovSolver::DiagEntry make_diag(
   auto sol = LinAlg::solve_with_sign(J, dummy);
   e.det_J_sign = sol ? sol->det_sign : 0;
 
+  return e;
+}
+
+// Pack one per-step homotopy-trajectory entry for visualization (gated by
+// AlexandrovSolver::record_trajectory at the call site).  Reconstructs the GCP
+// cone positions (apex at origin) and lists the triangular faces of T, so the
+// deforming pyramids and the flipping base triangulation can be drawn directly.
+static AlexandrovSolver::TrajEntry make_traj(
+    char phase, int step, double t,
+    const DelaunayTriangulation& T, const V& r, const V& kappa) {
+  AlexandrovSolver::TrajEntry e;
+  e.phase = phase; e.step = step; e.t = t;
+  e.kappa_max = LinAlg::max_abs(kappa);
+  e.kappa = kappa;
+  e.positions = Reconstruct::from_radii(T, r);   // empty/NaN if Gram-BFS fails
+  for (int f = 0; f < T.nf; f++) {
+    int h = T.f_he[f];
+    if (h < 0 || !T.alive(h)) continue;          // dead face slot
+    int h1 = T.he_next[h], h2 = T.he_next[h1];
+    e.faces.push_back({T.he_origin[h], T.he_origin[h1], T.he_origin[h2]});
+    e.face_len.push_back({T.he_length[h], T.he_length[h1], T.he_length[h2]});
+  }
   return e;
 }
 
@@ -1302,7 +1402,8 @@ TrackResult continuation_loop(DelaunayTriangulation& T, V r, const V& kappa1,
                               const StepFn& step, char phase,
                               const ContinuationParams& p,
                               vector<AlexandrovSolver::TraceEntry>* trace,
-                              vector<AlexandrovSolver::DiagEntry>* diag) {
+                              vector<AlexandrovSolver::DiagEntry>* diag,
+                              vector<AlexandrovSolver::TrajEntry>* traj) {
   double t = 1.0, h = p.h_init;
   vector<pair<double, V>> history;
   PALCStats stats;
@@ -1329,6 +1430,8 @@ TrackResult continuation_loop(DelaunayTriangulation& T, V r, const V& kappa1,
       diag->push_back(make_diag(phase, step_i, t, h, result.nit,
                                   T, r, GCP::kappa(T, r), Jd, stats.flips));
     }
+    if (traj)
+      traj->push_back(make_traj(phase, step_i, t, T, r, GCP::kappa(T, r)));
     stats.steps++;
     stats.newton_total += max(result.nit, 0);
   }
@@ -1341,6 +1444,7 @@ TrackResult palc_track(DelaunayTriangulation& T, V r, const V& kappa1,
                         double t_target, double ds_init,
                         vector<AlexandrovSolver::TraceEntry>* trace,
                         vector<AlexandrovSolver::DiagEntry>* diag,
+                        vector<AlexandrovSolver::TrajEntry>* traj = nullptr,
                         double interior_margin_coeff = 0.0,
                         double stochastic_eps = 0.0,
                         uint32_t stochastic_seed = 1,
@@ -1363,7 +1467,7 @@ TrackResult palc_track(DelaunayTriangulation& T, V r, const V& kappa1,
                        .stochastic_seed = stochastic_seed,
                        .batch_multiflip_threshold = batch_multiflip_threshold,
                        .gauge_snap = gauge_snap};
-  return continuation_loop(T, std::move(r), kappa1, kernel, 'P', p, trace, diag);
+  return continuation_loop(T, std::move(r), kappa1, kernel, 'P', p, trace, diag, traj);
 }
 
 // Natural t-continuation (the default). Scale-invariant; the path is monotone,
@@ -1372,12 +1476,13 @@ TrackResult natural_track(DelaunayTriangulation& T, V r, const V& kappa1,
                           double t_target, double dt_init,
                           vector<AlexandrovSolver::TraceEntry>* trace,
                           vector<AlexandrovSolver::DiagEntry>* diag,
+                          vector<AlexandrovSolver::TrajEntry>* traj = nullptr,
                           double interior_margin_coeff = 0.0) {
   ContinuationParams p{.t_target = t_target, .h_init = dt_init,
                        .h_min = DT_MIN, .h_max = DT_MAX,
                        .clamp_to_target = true,
                        .interior_margin_coeff = interior_margin_coeff};
-  return continuation_loop(T, std::move(r), kappa1, natural_step, 'T', p, trace, diag);
+  return continuation_loop(T, std::move(r), kappa1, natural_step, 'T', p, trace, diag, traj);
 }
 
 // Polynomial extrapolation: given (t_i, r_i) pairs approaching t=0,
@@ -1421,6 +1526,7 @@ pair<bool, double> polish(DelaunayTriangulation& T, V& r,
                            double tol = 1e-10, int max_iter = 50,
                            std::vector<AlexandrovSolver::TraceEntry>* out_trace = nullptr,
                            std::vector<AlexandrovSolver::DiagEntry>* out_diag = nullptr,
+                           std::vector<AlexandrovSolver::TrajEntry>* out_traj = nullptr,
                            int* flips_cum = nullptr,
                            bool gauge_snap = false,
                            bool gauge_project = false,
@@ -1497,6 +1603,8 @@ pair<bool, double> polish(DelaunayTriangulation& T, V& r,
       out_diag->push_back(make_diag('N', iter, 0.0, Delta, ok ? 1 : 0,
                                       T, r, GCP::kappa(T, r), Jd, flips_local));
     }
+    if (out_traj)
+      out_traj->push_back(make_traj('N', iter, 0.0, T, r, GCP::kappa(T, r)));
   }
   if (flips_cum) *flips_cum = flips_local;
   return {false, max_abs(GCP::kappa(T, r))};
@@ -1643,6 +1751,7 @@ vector<coord3d> AlexandrovSolver::solve() {
   stats_steps = stats_flips = stats_newton_total = 0;
   trace.clear();
   diag_trace.clear();
+  trajectory.clear();
   stats_status = ValidationStatus::FAIL_KAPPA_NOT_CONVERGED;
 
   // 1. Initialize: uniform radii (or caller-provided override).
@@ -1660,6 +1769,7 @@ vector<coord3d> AlexandrovSolver::solve() {
     track = PALC::natural_track(D, r, kappa1, /*t_target=*/0.1, /*dt_init=*/0.05,
                                  trace_jacobian ? &trace : nullptr,
                                  record_diag ? &diag_trace : nullptr,
+                                 record_trajectory ? &trajectory : nullptr,
                                  palc_interior_margin);
   } else {
     // Legacy pseudo-arclength continuation (kept for comparison).
@@ -1669,6 +1779,7 @@ vector<coord3d> AlexandrovSolver::solve() {
     track = PALC::palc_track(D, r, kappa1, /*t_target=*/0.1, /*ds_init=*/0.1,
                               trace_jacobian ? &trace : nullptr,
                               record_diag ? &diag_trace : nullptr,
+                              record_trajectory ? &trajectory : nullptr,
                               palc_interior_margin,
                               stochastic_perturbation_eps,
                               stochastic_seed,
@@ -1698,6 +1809,7 @@ vector<coord3d> AlexandrovSolver::solve() {
   auto [ok, mk] = Newton::polish(D, r, 1e-10, 50,
                                    trace_jacobian ? &trace : nullptr,
                                    record_diag ? &diag_trace : nullptr,
+                                   record_trajectory ? &trajectory : nullptr,
                                    record_diag ? &polish_flips : nullptr,
                                    palc_gauge_snap,
                                    palc_gauge_project,
