@@ -19,7 +19,7 @@
 #include "fullerenes/spiral.hh"
 #include "fullerenes/eisenstein.hh"
 #include "fullerenes/delaunay.hh"
-#include "fullerenes/delaunay_alexandrov12.hh"
+#include "fullerenes/delaunay_alexandrov.hh"
 
 #include <stdexcept>
 
@@ -236,10 +236,11 @@ void register_fullerene_dual(py::module_& m) {
 
             py::list steps;
             for (const auto& e : solver.trajectory) {
-                py::list pos, kappa, faces;
+                py::list pos, kappa, faces, face_len;
                 for (const auto& p : e.positions) pos.append(py::make_tuple(p[0], p[1], p[2]));
                 for (double k : e.kappa) kappa.append(k);
                 for (const auto& f : e.faces) faces.append(py::make_tuple(f[0], f[1], f[2]));
+                for (const auto& l : e.face_len) face_len.append(py::make_tuple(l[0], l[1], l[2]));
                 py::dict d;
                 d["phase"]     = std::string(1, e.phase);
                 d["step"]      = e.step;
@@ -248,6 +249,7 @@ void register_fullerene_dual(py::module_& m) {
                 d["kappa"]     = kappa;
                 d["positions"] = pos;
                 d["faces"]     = faces;
+                d["face_len"]  = face_len;
                 steps.append(d);
             }
             return py::make_tuple(steps, cone_spiral, (int)solver.stats_status,

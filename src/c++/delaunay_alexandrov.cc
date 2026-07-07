@@ -1,137 +1,52 @@
-// Bobenko-Izmestiev algorithm for the Alexandrov embedding of a
-// polyhedral metric on S² with 12 cone points (fullerene iDT).
+// Alexandrov embeddings of fullerene metrics (Bobenko-Izmestiev).
 //
-// Given an intrinsic Delaunay triangulation T with geodesic edge lengths,
-// find the unique convex polyhedron P ⊂ R³ whose boundary is isometric to T.
+// Given an intrinsic Delaunay triangulation T of a polyhedral metric on S²
+// with geodesic edge lengths, find the unique convex polyhedron P ⊂ R³
+// whose boundary is isometric to T.  Two metrics are provided:
 //
-// The algorithm parameterizes P by the radii r = (|a−v_i|), where a is an
+//   AlexandrovSolver   — any cone iDT (the fullerene dual's 12-cone metric
+//                        in production use; the solver is n-generic).
+//   AlexandrovIDTCubic — the CUBIC polyhedral metric (flat regular unit
+//                        pentagons/hexagons; 20..60 cones), a thin wrapper
+//                        that builds the kis metric and feeds the solver.
+//
+// The solver parameterizes P by the radii r = (|a−v_i|), where a is an
 // interior apex point.  The curvature κ_i = 2π − ω_i (angle deficit at
 // the radial edge a−v_i) satisfies κ = 0 iff the GCP is a genuine polytope.
-//
 // We trace the homotopy κ(r) = t·κ₁ from (t=1, large R) to (t→0, r*)
-// using pseudo-arc-length continuation (PALC), then extrapolate and polish.
+// using natural / pseudo-arc-length continuation, then extrapolate and polish.
 //
 // Layers:
 //   GCP          — observables: κ(T,r), J(T,r), θ(T,r,h)
-//   LinAlg       — vector arithmetic, linear solvers
+//   LinAlg       — bordered solves atop fullerenes/dense_linalg.hh
 //   TrustRegion  — LM subproblem solver, accept/reject rule
 //   Topology     — weighted Delaunay flip maintenance
-//   PALC         — predictor-corrector arc-length continuation
+//   PALC         — predictor-corrector continuation
 //   Newton       — trust-region Newton polish for κ(r)=0
 //   Reconstruct  — BFS vertex placement from Gram matrix entries
-//   AlexandrovSolver — the 5-step algorithm
+//   AlexandrovSolver / AlexandrovIDTCubic — the public entry points
 
-#include "fullerenes/delaunay_alexandrov12.hh"
+#include "fullerenes/delaunay_alexandrov.hh"
+#include "fullerenes/dense_linalg.hh"
 #include "fullerenes/matrix.hh"
 #include <cstdio>
 #include <cmath>
 #include <map>
 #include <random>
 #include <set>
+#include <stdexcept>
+#include <string>
 #include <vector>
 #include <algorithm>
 #include <expected>
 
 using namespace std;
 
-// All dense linear algebra in this solver is in-house (cyclic Jacobi +
-// partial-pivot LU) — deliberately NOT BLAS/LAPACK.  The systems are tiny
-// (n = #cone points: 12 for fullerene duals, 20..60 for the cubic-metric
-// variant), and at least one deployed OpenBLAS (0.3.20 DYNAMIC_ARCH
-// selecting Cooperlake AVX-512 kernels) silently returns WRONG dgesv
-// solutions (info = 0, residual ~1e-2) for n ≳ 60 and wrong dgemm products
-// at n ≥ 128.  Do not "optimize" these back to LAPACK calls: at these
-// sizes the in-house routines are fast enough, and their correctness does
-// not depend on which BLAS the host has installed.
+// All dense linear algebra goes through fullerenes/dense_linalg.hh —
+// deliberately NOT BLAS/LAPACK (see the constraint note there: at least
+// one deployed OpenBLAS silently corrupts dgesv from n ≳ 60).
 
 namespace {
-
-// Cyclic Jacobi eigendecomposition of a symmetric matrix (flat row-major
-// A, consumed).  Eigenvalues ascending in lam; if V_out is non-null, row m
-// of *V_out is the unit eigenvector paired with lam[m].  The sweep budget
-// is a guard, not a knob: cyclic Jacobi converges quadratically once the
-// off-diagonal is small, so a trip means non-symmetric input (caller bug).
-static bool jacobi_eig(std::vector<double> A, int n, std::vector<double>& lam,
-                       std::vector<double>* V_out)
-{
-  constexpr int MAX_SWEEPS = 60;
-
-  std::vector<double> V;
-  if (V_out) {
-    V.assign(size_t(n) * n, 0.0);
-    for (int i = 0; i < n; i++) V[size_t(i) * n + i] = 1.0;
-  }
-
-  double anorm = 0;
-  for (size_t x = 0; x < A.size(); x++) anorm = std::max(anorm, std::fabs(A[x]));
-  const double tol = 1e-15 * std::max(anorm, 1e-300);
-
-  auto at = [&](int i, int j) -> double& { return A[size_t(i) * n + j]; };
-
-  for (int sweep = 0; sweep < MAX_SWEEPS; sweep++) {
-    double off = 0;
-    for (int p = 0; p < n; p++)
-      for (int q = p + 1; q < n; q++) off = std::max(off, std::fabs(at(p, q)));
-    if (off <= tol) break;
-    if (sweep == MAX_SWEEPS - 1) return false;   // guard trip = bug
-
-    for (int p = 0; p < n; p++)
-      for (int q = p + 1; q < n; q++) {
-        double apq = at(p, q);
-        if (std::fabs(apq) <= tol) continue;
-        double theta = (at(q, q) - at(p, p)) / (2 * apq);
-        double t = (theta >= 0 ? 1.0 : -1.0) /
-                   (std::fabs(theta) + std::sqrt(theta * theta + 1));
-        double c = 1.0 / std::sqrt(t * t + 1), s = t * c;
-
-        for (int i = 0; i < n; i++) {      // rotate rows/cols p,q of A
-          double aip = at(i, p), aiq = at(i, q);
-          at(i, p) = c * aip - s * aiq;
-          at(i, q) = s * aip + c * aiq;
-        }
-        for (int i = 0; i < n; i++) {
-          double api = at(p, i), aqi = at(q, i);
-          at(p, i) = c * api - s * aqi;
-          at(q, i) = s * api + c * aqi;
-        }
-        if (V_out)
-          for (int i = 0; i < n; i++) {    // accumulate: V row = eigvecᵀ
-            double vpi = V[size_t(p) * n + i], vqi = V[size_t(q) * n + i];
-            V[size_t(p) * n + i] = c * vpi - s * vqi;
-            V[size_t(q) * n + i] = s * vpi + c * vqi;
-          }
-      }
-  }
-
-  // Sort ascending, permuting eigenvector rows along.
-  std::vector<int> order(n);
-  for (int i = 0; i < n; i++) order[i] = i;
-  std::sort(order.begin(), order.end(),
-            [&](int x, int y) { return at(x, x) < at(y, y); });
-  lam.assign(n, 0);
-  for (int m = 0; m < n; m++) lam[m] = at(order[m], order[m]);
-  if (V_out) {
-    V_out->assign(size_t(n) * n, 0.0);
-    for (int m = 0; m < n; m++)
-      for (int i = 0; i < n; i++)
-        (*V_out)[size_t(m) * n + i] = V[size_t(order[m]) * n + i];
-  }
-  return true;
-}
-
-// Full symmetric eigenvalue decomposition of a 12×12-ish matrix.
-// Returns eigenvalues sorted ascending; empty on eigensolver failure.
-// Used by both PALC step tracing and Newton polish tracing.
-static std::vector<double> sym_eigvals(const matrix<double>& A) {
-  int n = A.m;
-  std::vector<double> Af(n*n);
-  for (int i = 0; i < n; i++)
-    for (int j = 0; j < n; j++)
-      Af[size_t(i)*n + j] = 0.5 * (A(i,j) + A(j,i));
-  std::vector<double> w;
-  if (!jacobi_eig(std::move(Af), n, w, nullptr)) return {};
-  return w;
-}
 
 // Forward declaration for Reconstruct::from_radii — used by Gauge::snap
 // before Reconstruct is defined.  Implementation in Layer 6b below.
@@ -461,80 +376,19 @@ matrix<double> jacobian(const DelaunayTriangulation& T, const vector<double>& r)
 // Layer 2: Linear algebra
 // ============================================================================
 
-namespace LinAlg {
+// The linear-algebra primitives — vector reductions, the cyclic-Jacobi
+// eigensolver, the LU with determinant sign, and the truncated
+// pseudoinverse — live in fullerenes/dense_linalg.hh (namespace LinAlg);
+// the vector arithmetic operators come from auxiliary.hh's global
+// templates.  BorderedLA adds only the solver's PALC-shaped
+// bordered-system compositions on top.
+namespace BorderedLA {
 
-// --- Vector arithmetic ---
-using V = vector<double>;
-
-V operator+(const V& a, const V& b)   { V c(a.size()); for (size_t i=0;i<a.size();i++) c[i]=a[i]+b[i]; return c; }
-V operator-(const V& a, const V& b)   { V c(a.size()); for (size_t i=0;i<a.size();i++) c[i]=a[i]-b[i]; return c; }
-V operator*(const V& a, double s)     { V c(a.size()); for (size_t i=0;i<a.size();i++) c[i]=a[i]*s;     return c; }
-V operator*(double s, const V& a)     { return a * s; }
-V operator-(const V& a)               { return a * (-1.0); }
-
-double dot(const V& a, const V& b) { double s=0; for (size_t i=0;i<a.size();i++) s+=a[i]*b[i]; return s; }
-double norm(const V& v)            { return sqrt(dot(v, v)); }
-double max_abs(const V& v)         { double m=0; for (double x:v) { if (!(x==x)) return HUGE_VAL; m=max(m,fabs(x)); } return m; }
-double sum_sq(const V& v)          { return dot(v, v); }
-bool   is_valid(const V& v)        { double n=sum_sq(v); return isfinite(n) && n > 1e-30; }
-
-// Residual energy E = ½||v||²
-double energy(const V& v) { return 0.5 * sum_sq(v); }
-
-// --- Linear solvers ---
-
-// LU-with-sign solve: returns (x, det_sign) on success.
-// det_sign ∈ {−1, +1} is sign(det A), computed as the product of:
-//   (−1)^{# row swaps}  ×  product of signs of diag(U).
-// In-house partial-pivot LU with the RHS eliminated in lockstep (see the
-// no-BLAS note at the top of this file).  Singular = an exact zero pivot;
-// LapackError is retained in the enum for interface stability but is no
-// longer produced.
-struct LuSolved { V x; int det_sign; };
-enum class LuFail { Singular, LapackError };
-
-std::expected<LuSolved, LuFail>
-solve_with_sign(const matrix<double>& A, const V& b) {
-  int n = A.m;
-  vector<double> M(size_t(n)*n);              // row-major working copy
-  for (int i = 0; i < n; i++)
-    for (int j = 0; j < n; j++)
-      M[size_t(i)*n + j] = A(i, j);
-  V x(b);
-  int sign = 1;
-  for (int c = 0; c < n; c++) {
-    int p = c;
-    for (int q = c+1; q < n; q++)
-      if (fabs(M[size_t(q)*n + c]) > fabs(M[size_t(p)*n + c])) p = q;
-    double piv = M[size_t(p)*n + c];
-    if (piv == 0) return std::unexpected(LuFail::Singular);
-    if (p != c) {
-      for (int j = c; j < n; j++) swap(M[size_t(c)*n + j], M[size_t(p)*n + j]);
-      swap(x[c], x[p]);
-      sign = -sign;                            // row swap parity
-    }
-    if (M[size_t(c)*n + c] < 0) sign = -sign;  // sign of diag(U)
-    for (int q = c+1; q < n; q++) {
-      double m = M[size_t(q)*n + c] / M[size_t(c)*n + c];
-      if (m == 0) continue;
-      for (int j = c+1; j < n; j++) M[size_t(q)*n + j] -= m * M[size_t(c)*n + j];
-      x[q] -= m * x[c];
-    }
-  }
-  for (int c = n-1; c >= 0; c--) {             // back substitution
-    double s = x[c];
-    for (int j = c+1; j < n; j++) s -= M[size_t(c)*n + j] * x[j];
-    x[c] = s / M[size_t(c)*n + c];
-  }
-  return LuSolved{std::move(x), sign};
-}
-
-// Solve A·x = b.  Returns zero vector on failure.
-// (Backward-compat wrapper around solve_with_sign that discards the sign.)
-V solve(const matrix<double>& A, const V& b) {
-  auto r = solve_with_sign(A, b);
-  return r ? std::move(r->x) : V(A.m, 0.0);
-}
+using namespace ::LinAlg;
+using ::LinAlg::SymEigen::decompose;
+using ::LinAlg::SymEigen::apply;
+using ::LinAlg::SymEigen::signature;
+using ::LinAlg::SymEigen::Signature;
 
 // Pseudo-arc-length bordered system, treated as a first-class object:
 //
@@ -554,7 +408,7 @@ struct Bordered {
   struct Solution { V dr; double dt; int det_sign; };
 
   // Pre: J is n×n; kappa1, r_dot are n-vectors; neg_F is n-vector; g is scalar.
-  // Post on success: B · [dr; dt] = [neg_F; g] within LAPACK precision,
+  // Post on success: B · [dr; dt] = [neg_F; g] within working precision,
   //                  and det_sign ∈ {−1, +1} is sign(det B).
   // Post on failure: LuFail::Singular if J near-singular or denominator near 0.
   std::expected<Solution, LuFail> solve(const V& neg_F, double g) const {
@@ -571,45 +425,6 @@ struct Bordered {
   }
 };
 
-// Solve (A + λI)·x = b.
-V solve_shifted(const matrix<double>& A, const V& b, double lambda) {
-  matrix<double> Al = A;
-  for (int i = 0; i < A.m; i++) Al(i,i) += lambda;
-  return solve(Al, b);
-}
-
-// --- Block constructors / destructors for the bordered system ---
-// These are the named primitives that turn the corrector's imperative
-// matrix-and-vector assembly into a sequence of pure functions.
-
-// Bordered matrix:    [ J     c ]    (n+1) × (n+1)
-//                     [ rᵀ    t ]
-matrix<double> bordered(const matrix<double>& J,
-                         const V& c, const V& r, double t) {
-  int n = J.m;
-  matrix<double> B(n + 1, n + 1, 0.0);
-  for (int i = 0; i < n; i++) {
-    for (int j = 0; j < n; j++) B(i, j) = J(i, j);
-    B(i, n) = c[i];
-    B(n, i) = r[i];
-  }
-  B(n, n) = t;
-  return B;
-}
-
-// Concatenate vector and scalar:  [v₀, …, v_{n-1}, s]
-V concat(const V& v, double s) {
-  V out = v;
-  out.push_back(s);
-  return out;
-}
-
-// Inverse of concat: split [x₀, …, x_{n-1}, x_n] ↦ ([x₀, …, x_{n-1}], x_n)
-std::pair<V, double> split(const V& x) {
-  V head(x.begin(), x.end() - 1);
-  return {std::move(head), x.back()};
-}
-
 // --- Symmetric truncated-pseudoinverse solve ---
 //
 // J is the Hessian of the BI total scalar curvature H, hence symmetric.
@@ -622,7 +437,7 @@ std::pair<V, double> split(const V& x) {
 // bordering algorithm rather than directly factoring the (non-symmetric)
 // 13×13 B.  This has three benefits:
 //
-//   1. Half the work: one 12×12 dsyev cached, applied twice.
+//   1. Half the work: one n×n eigendecomposition cached, applied twice.
 //   2. The bordered solution exactly satisfies the arc-length constraint
 //      and lies in image(J) = ker(J)^⊥ — the gauge-orthogonal subspace.
 //      Residual is confined to ker(J), the translation gauge of κ, where
@@ -630,90 +445,9 @@ std::pair<V, double> split(const V& x) {
 //   3. The eigenvalues yield the Lorentzian signature directly, giving
 //      a per-step diagnostic that distinguishes the BI failure classes
 //      (drum-cap, soft-kernel, fold) empirically.
-namespace SymEigen {
-
-// Symmetric eigendecomposition: J = Q·diag(λ)·Qᵀ.
-// Q has eigenvectors as columns; λ ascending.
-// Empty on eigensolver failure.
-struct Decomp {
-  matrix<double> Q;
-  V              lambda;
-};
-
-Decomp decompose(const matrix<double>& A) {
-  int n = A.m;
-  std::vector<double> Af(n * n);
-  for (int i = 0; i < n; i++)                       // symmetrize (row-major)
-    for (int j = 0; j < n; j++)
-      Af[size_t(i) * n + j] = 0.5 * (A(i, j) + A(j, i));
-  V lambda;
-  std::vector<double> Vrows;                        // row m = eigvec m
-  if (!jacobi_eig(std::move(Af), n, lambda, &Vrows))
-    return Decomp{matrix<double>(0, 0, 0.0), {}};
-  matrix<double> Q(n, n, 0.0);
-  for (int i = 0; i < n; i++)
-    for (int j = 0; j < n; j++)
-      Q(j, i) = Vrows[size_t(i) * n + j];           // eigvec i is column i
-  return {std::move(Q), std::move(lambda)};
-}
-
-// Lorentzian signature of a symmetric operator at a given numerical
-// "zero" tolerance:  (#λ > tol, #λ < -tol, #|λ| ≤ tol).
-struct Signature { int pos, neg, zero; };
-
-Signature signature(const V& lambda, double tol) {
-  Signature s{0, 0, 0};
-  for (double l : lambda) {
-    if      (l >  tol) s.pos++;
-    else if (l < -tol) s.neg++;
-    else               s.zero++;
-  }
-  return s;
-}
-
-// Apply truncated pseudoinverse to a vector:
-//   x = Σ_{|λᵢ|>cutoff} (qᵢᵀ b / λᵢ) qᵢ
-// Returns rank = #non-truncated modes; lambda_min_kept = smallest |λ|
-// among those modes (0 if all truncated).
-struct ApplyResult { V x; int rank; double lambda_min_kept; };
-
-ApplyResult apply(const Decomp& d, const V& b, double cutoff) {
-  int n = (int)d.lambda.size();
-  V   x(n, 0.0);
-  int rank = 0;
-  double lam_min = 0;
-  for (int i = 0; i < n; i++) {
-    double l = d.lambda[i];
-    if (std::fabs(l) <= cutoff) continue;
-    rank++;
-    if (lam_min == 0 || std::fabs(l) < lam_min) lam_min = std::fabs(l);
-    double bq = 0;
-    for (int j = 0; j < n; j++) bq += d.Q(j, i) * b[j];
-    double coeff = bq / l;
-    for (int j = 0; j < n; j++) x[j] += coeff * d.Q(j, i);
-  }
-  return {std::move(x), rank, lam_min};
-}
-
-struct Solution {
-  V         x;
-  int       rank          = 0;
-  double    lambda_abs_min = 0;
-  double    lambda_abs_max = 0;
-  Signature sig            = {0, 0, 0};
-};
-
-// Standalone symmetric pseudoinverse solve: x = J⁺·b for symmetric J.
-Solution solve(const matrix<double>& A, const V& b, double rcond) {
-  auto d = decompose(A);
-  if (d.lambda.empty()) return {};
-  double lam_max = 0;
-  for (double l : d.lambda) lam_max = std::max(lam_max, std::fabs(l));
-  double cutoff = rcond * lam_max;
-  auto   r      = apply(d, b, cutoff);
-  return {std::move(r.x), r.rank, r.lambda_min_kept, lam_max,
-          signature(d.lambda, cutoff)};
-}
+//
+// decompose/apply/signature are dense_linalg primitives; only the
+// PALC-shaped bordered composition lives here.
 
 // Bordered solve via bordering algorithm + ONE symmetric eigendecomp of J.
 //
@@ -747,9 +481,9 @@ BorderedSolution bordered_solve(const matrix<double>& J, const V& kappa1,
   double cutoff = rcond * lam_max;
   auto   r1     = apply(d, neg_F, cutoff);
   auto   r2     = apply(d, kappa1, cutoff);
-  double den    = tau_t + LinAlg::dot(tau_r, r2.x);
+  double den    = tau_t + dot(tau_r, r2.x);
   if (std::fabs(den) < 1e-30) return {};
-  double dt     = (g - LinAlg::dot(tau_r, r1.x)) / den;
+  double dt     = (g - dot(tau_r, r1.x)) / den;
   V      dr     = r1.x;
   for (size_t i = 0; i < dr.size(); i++) dr[i] += r2.x[i] * dt;
   // r1.rank == r2.rank since both share (Q, λ, cutoff); take r1's.
@@ -758,8 +492,6 @@ BorderedSolution bordered_solve(const matrix<double>& J, const V& kappa1,
           signature(d.lambda, cutoff)};
 }
 
-}  // namespace SymEigen
-
 // Predicate: TSVD-solve outcome is acceptable.
 // Up to 3 truncations is the gauge regime; more indicates non-gauge
 // collapse and the caller should treat as failure.
@@ -767,17 +499,7 @@ bool tsvd_ok(int rank, int n) {
   return rank >= n - 3;
 }
 
-// Matrix-vector product A·v (for predicted reduction).
-V matvec(const matrix<double>& A, const V& v) {
-  int n = A.m;
-  V r(n, 0.0);
-  for (int i = 0; i < n; i++)
-    for (int j = 0; j < n; j++)
-      r[i] += A(i,j) * v[j];
-  return r;
-}
-
-} // namespace LinAlg
+} // namespace BorderedLA
 
 // Bring vector ops into scope for readability
 using LinAlg::V;
@@ -789,7 +511,7 @@ static AlexandrovSolver::TraceEntry make_trace(
     char phase, int step, double t, double ds, int nit,
     const V& kappa, const matrix<double>& J) {
   return {phase, step, t, ds, nit,
-          LinAlg::max_abs(kappa), LinAlg::norm(kappa), sym_eigvals(J)};
+          LinAlg::max_abs(kappa), LinAlg::norm(kappa), LinAlg::sym_eigvals(J)};
 }
 
 // Pyramid height squared at half-edge h.  Inlined replica of the
@@ -1019,7 +741,7 @@ int needs_flip(const DelaunayTriangulation& T, const vector<double>& r,
 
 // Flip until needs_flip(T, r, margin) returns -1 (or 20 iter cap).
 // Returns number of flips performed.
-int flip_to_delaunay(DelaunayTriangulation& T, const vector<double>& r,
+int flip_to_weighted_delaunay(DelaunayTriangulation& T, const vector<double>& r,
                       double margin = -1e-10) {
   int total = 0;
   for (int iter = 0; iter < 20; iter++) {
@@ -1196,9 +918,9 @@ int correct(const DelaunayTriangulation& T, double& t, V& r,
 
     if (use_tsvd) {
       // Symmetric pseudoinverse on J + bordering algorithm.
-      auto sol = LinAlg::SymEigen::bordered_solve(
+      auto sol = BorderedLA::bordered_solve(
                     J, kappa1_eff, tau0.r_dot, tau0.t_dot, -F, g, rcond);
-      if (sol.dr.empty() || !LinAlg::tsvd_ok(sol.rank, J.m)) return -1;
+      if (sol.dr.empty() || !BorderedLA::tsvd_ok(sol.rank, J.m)) return -1;
       // Step-norm termination: TSVD truncates 2–3 directions where κ
       // is invariant, so the corrector cannot drive |F| to zero there
       // — there is an irreducible kernel residual at O(rcond·σ_max).
@@ -1210,7 +932,7 @@ int correct(const DelaunayTriangulation& T, double& t, V& r,
       t += sol.dt;
       r  = r + sol.dr;
     } else {
-      LinAlg::Bordered B{J, kappa1_eff, tau0.r_dot, tau0.t_dot};
+      BorderedLA::Bordered B{J, kappa1_eff, tau0.r_dot, tau0.t_dot};
       auto sol = B.solve(-F, g);
       if (!sol) return -1;
       t += sol->dt;
@@ -1364,12 +1086,12 @@ void on_accept(DelaunayTriangulation& T, V& r, PALCStats& stats,
                const ContinuationParams& p, std::mt19937& rng) {
   double margin = (p.interior_margin_coeff > 0) ? p.interior_margin_coeff * t
                                                 : -1e-10;
-  stats.flips += Topology::flip_to_delaunay(T, r, margin);
+  stats.flips += Topology::flip_to_weighted_delaunay(T, r, margin);
   if (p.batch_multiflip_threshold > 0) {
     int bf = Topology::batch_multi_flip(T, r, p.batch_multiflip_threshold);
     if (bf > 0) {
       stats.flips += bf;
-      stats.flips += Topology::flip_to_delaunay(T, r, margin);
+      stats.flips += Topology::flip_to_weighted_delaunay(T, r, margin);
     }
   }
   if (p.stochastic_eps > 0) {
@@ -1558,7 +1280,7 @@ pair<bool, double> polish(DelaunayTriangulation& T, V& r,
       // Symmetric pseudoinverse: J = Q diag(λ) Qᵀ, J⁺ truncates the
       // soft kernel, Δr = -J⁺·κ is the gauge-orthogonal min-norm step.
       auto sol = LinAlg::SymEigen::solve(J, -kappa, rcond);
-      if (sol.x.empty() || !LinAlg::tsvd_ok(sol.rank, J.m)) {
+      if (sol.x.empty() || !BorderedLA::tsvd_ok(sol.rank, J.m)) {
         rejects++;
         if (out_trace)
           out_trace->push_back(make_trace('N', iter, 0.0, Delta, 0, kappa, J));
@@ -1593,7 +1315,7 @@ pair<bool, double> polish(DelaunayTriangulation& T, V& r,
       out_trace->push_back(make_trace('N', iter, 0.0, Delta, ok ? 1 : 0, kappa, J));
     if (ok) {
       r = r_trial;
-      flips_local += Topology::flip_to_delaunay(T, r);
+      flips_local += Topology::flip_to_weighted_delaunay(T, r);
       if (gauge_snap) Gauge::snap(T, r);
       rejects = 0;
     } else rejects++;
@@ -2002,9 +1724,14 @@ double AlexandrovSolver::H(const DelaunayTriangulation& T,
   return GCP::H(T, r);
 }
 
+matrix<double> AlexandrovSolver::jacobian(const DelaunayTriangulation& T,
+                                            const vector<double>& r) {
+  return GCP::jacobian(T, r);
+}
+
 vector<double> AlexandrovSolver::jacobian_eigvals(const DelaunayTriangulation& T,
                                                     const vector<double>& r) {
-  return sym_eigvals(GCP::jacobian(T, r));
+  return LinAlg::sym_eigvals(GCP::jacobian(T, r));
 }
 
 int AlexandrovSolver::jacobian_det_sign(const DelaunayTriangulation& T,
@@ -2061,21 +1788,12 @@ CanonicalTesselation AlexandrovSolver::polytope_tesselation(
 
 bool AlexandrovSolver::is_simplicial(const DelaunayTriangulation& T) {
   // Per invariant I-1 (CLAUDE.md): any non-simple feature in T contradicts
-  // an isometric R³ embedding for a non-degenerate polytope.
-  // Self-loops: any half-edge with origin == dest.
-  // Multi-edges: two distinct edges with the same vertex pair.
-  // Bigons: a face whose boundary has only 2 distinct edges (he_face[h] ==
-  //   he_face[h^1] for some pair).
-  std::map<std::pair<int,int>, int> pair_count;
-  for (int h = 0; h < T.nh; h += 2) {
-    if (!T.alive(h)) continue;
-    int u = T.he_origin[h], v = T.dest(h);
-    if (u == v) return false;                                 // self-loop
-    if (T.he_face[h] == T.he_face[h ^ 1]) return false;       // bigon
-    auto key = std::make_pair(std::min(u, v), std::max(u, v));
-    if (++pair_count[key] > 1) return false;                  // multi-edge
-  }
-  return true;
+  // an isometric R³ embedding for a non-degenerate polytope.  Delegates to
+  // the DCEL's own predicate (arc-map injectivity).  That predicate also
+  // subsumes the same-face-both-sides ("bigon") test on well-formed
+  // triangulated complexes: a triangle containing both h and h^1 forces
+  // its third half-edge to be a self-loop, which injectivity rejects.
+  return T.is_simplicial();
 }
 
 bool AlexandrovSolver::is_simple_polygonal(const CanonicalTesselation& tess) {
@@ -2276,4 +1994,160 @@ bool AlexandrovSolver::has_self_intersection(const DelaunayTriangulation& T,
     }
   }
   return false;
+}
+
+// ============================================================================
+// AlexandrovIDTCubic: the cubic polyhedral metric
+// ============================================================================
+
+// The face left of arc a->b is (a, b, target(next(find_arc(a, b)))) --
+// spelled with the lib's named arc navigation throughout.  Same convention
+// as delaunay.cc's build_topology and triangulation.hh's CubicPair.
+AlexandrovIDTCubic::KisMetric AlexandrovIDTCubic::kis_metric(const Triangulation& T)
+{
+  KisMetric M;
+  M.Nv = T.N;
+  M.fdeg.resize(M.Nv);
+
+  auto face_left_of = [&T](node_t a, node_t b) -> tri_t {
+    return {a, b, T.target(T.next(T.find_arc(a, b)))};
+  };
+
+  IDCounter<tri_t> tid;
+  for (node_t u = 0; u < T.N; u++) {
+    const int deg = T.degree(u);
+    M.fdeg[u] = deg;
+    if (deg != 5 && deg != 6)
+      throw logic_error("AlexandrovIDTCubic: dual vertex " + to_string(u) +
+                        " has degree " + to_string(deg) +
+                        " (input is not a fullerene dual)");
+    for (node_t v : T[u]) {
+      tri_t f = face_left_of(u, v);
+      if (u < f[1] && u < f[2]) {          // registered once, at min corner
+        tid.insert(f.sorted());
+        M.triangle.push_back(f);
+      }
+    }
+  }
+  const int ntri = M.triangle.size();  // = 2*Nv - 4
+
+  auto lookup = [&tid](const tri_t& t) -> int {
+    size_t id = tid(t.sorted());
+    if (id == (size_t)-1)
+      throw logic_error("AlexandrovIDTCubic::kis_metric: unregistered triangle");
+    return (int)id;
+  };
+
+  // Adjacency of the kis complex, CCW rings built directly (orientation
+  // invariant: never orient after the fact).
+  vector<vector<node_t>> kis(M.Nv + ntri);
+  // Around face center u: the incident triangle barycenters, in u's ring order.
+  for (node_t u = 0; u < T.N; u++)
+    for (node_t v : T[u])
+      kis[u].push_back(M.Nv + lookup(face_left_of(u, v)));
+  // Around the barycenter of (u,v,w) (CCW): interleave corners with the
+  // across-edge barycenters, [u, across(u,v), v, across(v,w), w, across(w,u)],
+  // which is CCW around the barycenter when (u,v,w) is CCW.  across(a,b) is
+  // the face on the other side of edge {a,b}: the face left of arc b->a.
+  for (int t = 0; t < ntri; t++) {
+    const tri_t& f = M.triangle[t];
+    for (int j = 0; j < 3; j++) {
+      node_t a = f[j], b = f[(j + 1) % 3];
+      kis[M.Nv + t].push_back(a);
+      kis[M.Nv + t].push_back(M.Nv + lookup(face_left_of(b, a)));
+    }
+  }
+  M.K = Triangulation(Graph(Spanify::OwnedDenseGraph<node_t>(kis)));
+  return M;
+}
+
+DelaunayTriangulation::EdgeLengthFn AlexandrovIDTCubic::KisMetric::edge_length_fn() const
+{
+  return [Nv = Nv, fdeg = fdeg](node_t a, node_t b) -> double {
+    const bool fa = a < Nv, fb = b < Nv;
+    if (fa && fb)
+      throw logic_error("AlexandrovIDTCubic: two face centers cannot be adjacent");
+    if (!fa && !fb) return 1.0;                // cubic edge (barycenter-barycenter)
+    return fdeg[fa ? a : b] == 5 ? R5 : 1.0;   // pentagon / hexagon spoke
+  };
+}
+
+void AlexandrovIDTCubic::build(const Triangulation& T)
+{
+  KisMetric M = kis_metric(T);
+
+  vector<int> new_to_old;
+  DelaunayTriangulation D = DelaunayTriangulation::compute(
+      M.K, M.edge_length_fn(), FLAT_TOL, &new_to_old);
+
+  cone_triangle.clear();
+  cone_npent.clear();
+  double total = 0;
+  for (int i = 0; i < D.nv; i++) {
+    const int old = new_to_old[i];
+    if (old < M.Nv)
+      throw logic_error("AlexandrovIDTCubic: face center " + to_string(old) +
+                        " survived flat removal");
+    const tri_t& f = M.triangle[old - M.Nv];
+    int k = 0;
+    for (int j = 0; j < 3; j++) k += (M.fdeg[f[j]] == 5);
+    const double kappa = 2 * M_PI - D.v_cone_angle[i];
+    if (k < 1 || fabs(kappa - k * M_PI / 15) > KAPPA_TOL)
+      throw logic_error("AlexandrovIDTCubic: cone " + to_string(i) +
+                        " has kappa = " + to_string(kappa) + ", expected " +
+                        to_string(k) + "*pi/15");
+    total += kappa;
+    cone_triangle.push_back(f);
+    cone_npent.push_back(k);
+  }
+  if (fabs(total - 4 * M_PI) > TOTAL_KAPPA_TOL)
+    throw logic_error("AlexandrovIDTCubic: total curvature " +
+                      to_string(total) + " != 4*pi");
+
+  solver.D = std::move(D);
+}
+
+std::vector<coord3d> AlexandrovIDTCubic::solve(const Triangulation& T)
+{
+  build(T);
+  return solver.solve();
+}
+
+AlexandrovSolver::AlexandrovPolytope
+AlexandrovIDTCubic::solve_polytope(const Triangulation& T)
+{
+  build(T);
+  return solver.solve_polytope();   // default labels = cone index (identity)
+}
+
+AlexandrovIDTCubic::FlatFaceCensus
+AlexandrovIDTCubic::flat_face_census(const Triangulation& T,
+                                     const CanonicalTesselation& tess) const
+{
+  // Cells as sorted cone-label sets.
+  set<vector<int>> cells;
+  for (const auto& cell : tess.cells) {
+    vector<int> vs;
+    for (const auto& [label, len2] : cell) vs.push_back(label);
+    sort(vs.begin(), vs.end());
+    cells.insert(vs);
+  }
+
+  // Cone ring of each face u: invert cone_triangle once.  Rings come out
+  // ascending because cone indices are pushed in increasing order.
+  vector<vector<int>> ring(T.N);
+  for (int i = 0; i < (int)cone_triangle.size(); i++)
+    for (int j = 0; j < 3; j++) ring[cone_triangle[i][j]].push_back(i);
+
+  FlatFaceCensus census;
+  census.n_cells = tess.n_cells();
+  for (node_t u = 0; u < T.N; u++) {
+    const bool is_pent = (T.degree(u) == 5);
+    if (!is_pent) census.n_hex++;
+    const bool flat = ((int)ring[u].size() == T.degree(u)) &&
+                      cells.count(ring[u]);
+    if (is_pent) census.pent_flat += flat;
+    else         census.hex_flat  += flat;
+  }
+  return census;
 }

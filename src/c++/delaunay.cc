@@ -1121,7 +1121,8 @@ DelaunayTriangulation DelaunayTriangulation::compute(const Triangulation& T)
 
 DelaunayTriangulation DelaunayTriangulation::compute(const Triangulation& T,
                                                      const EdgeLengthFn& length,
-                                                     double flat_tol)
+                                                     double flat_tol,
+                                                     std::vector<int>* new_to_old)
 {
   // Prescribed-metric iDT. Unlike the equilateral compute(T), we do NOT
   // sort_flat_last() (that classifies flatness by degree, which is wrong for
@@ -1131,7 +1132,11 @@ DelaunayTriangulation DelaunayTriangulation::compute(const Triangulation& T,
   // so no pre-sort is needed.
   DelaunayTriangulation D = from_intrinsic_metric(T, length);
   D.remove_flat_vertices(flat_tol);
-  D.compact_vertices();  // cones are scattered (no flat-last sort); compact to nv=cones
+  // Cones are scattered (no flat-last sort); compact to nv = cones.  The
+  // surviving-cone labels in T's numbering are reported through new_to_old
+  // when requested (callers that annotate cones, e.g. AlexandrovIDTCubic).
+  std::vector<int> n2o = D.compact_vertices();
+  if (new_to_old) *new_to_old = std::move(n2o);
   return D;
 }
 

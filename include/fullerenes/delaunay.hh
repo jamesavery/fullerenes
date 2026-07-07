@@ -304,9 +304,12 @@ struct DelaunayTriangulation {
   // ready for AlexandrovSolver. Equivalent to compute(T) when length == 1.
   // flat_tol sets the cone/flat threshold (see is_flat): 1e-6 for an exact
   // metric, ~1e-2 for a numerically solved one.
+  // If new_to_old is non-null it receives compact_vertices()' map: the
+  // original T-label of each surviving cone vertex 0..nv-1.
   static DelaunayTriangulation compute(const Triangulation& T,
                                        const EdgeLengthFn& length,
-                                       double flat_tol = 1e-6);
+                                       double flat_tol = 1e-6,
+                                       std::vector<int>* new_to_old = nullptr);
 
   // --- Surface metric (intrinsic; promoted from the delta-complex project) ---
   // Per-cone-pair geodesic distances and geodesics on the metric delta-complex,
