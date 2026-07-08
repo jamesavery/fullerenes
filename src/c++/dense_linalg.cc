@@ -23,9 +23,12 @@ bool jacobi_eig(std::vector<double> A, int n, std::vector<double>& lam,
 {
   constexpr int MAX_SWEEPS = 60;
 
-  std::vector<double> V(size_t(n) * n, 0.0);
+  // Eigenvector accumulator (row m = eigvec m); only when requested.
+  // Named Vacc, NOT V: LinAlg::V is the vector type alias in this scope.
+  std::vector<double> Vacc;
   if (V_out) {
-    for (int i = 0; i < n; i++) V[size_t(i) * n + i] = 1.0;
+    Vacc.assign(size_t(n) * n, 0.0);
+    for (int i = 0; i < n; i++) Vacc[size_t(i) * n + i] = 1.0;
   }
 
   double anorm = 0;
@@ -61,10 +64,10 @@ bool jacobi_eig(std::vector<double> A, int n, std::vector<double>& lam,
           at(q, i) = s * api + c * aqi;
         }
         if (V_out)
-          for (int i = 0; i < n; i++) {    // accumulate: V row = eigvecᵀ
-            double vpi = V[size_t(p) * n + i], vqi = V[size_t(q) * n + i];
-            V[size_t(p) * n + i] = c * vpi - s * vqi;
-            V[size_t(q) * n + i] = s * vpi + c * vqi;
+          for (int i = 0; i < n; i++) {    // accumulate: Vacc row = eigvecᵀ
+            double vpi = Vacc[size_t(p) * n + i], vqi = Vacc[size_t(q) * n + i];
+            Vacc[size_t(p) * n + i] = c * vpi - s * vqi;
+            Vacc[size_t(q) * n + i] = s * vpi + c * vqi;
           }
       }
   }
@@ -80,7 +83,7 @@ bool jacobi_eig(std::vector<double> A, int n, std::vector<double>& lam,
     V_out->assign(size_t(n) * n, 0.0);
     for (int m = 0; m < n; m++)
       for (int i = 0; i < n; i++)
-        (*V_out)[size_t(m) * n + i] = V[size_t(order[m]) * n + i];
+        (*V_out)[size_t(m) * n + i] = Vacc[size_t(order[m]) * n + i];
   }
   return true;
 }

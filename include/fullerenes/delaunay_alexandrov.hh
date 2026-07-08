@@ -34,7 +34,7 @@ struct AlexandrovSolver {
   // as valid Alexandrov-polytope coordinates.
   enum class ValidationStatus {
     OK,                          // valid output: simple, well-formed, convex
-    FAIL_KAPPA_NOT_CONVERGED,    // |κ| > 0.01: PALC + Newton didn't reach κ = 0
+    FAIL_KAPPA_NOT_CONVERGED,    // |κ| > 0.01: continuation + Newton didn't reach κ = 0
     FAIL_NOT_SIMPLE,             // T̄(0) has multi-edges in cells, or F < 3
     FAIL_RECONSTRUCT,            // Gram-BFS yielded NaN (negative perp²)
     FAIL_VOLUME_DEGENERATE,      // vol_norm < 0.01 (drum-cap or near-flat)
@@ -45,14 +45,38 @@ struct AlexandrovSolver {
 
   DelaunayTriangulation D;
   std::vector<double> r;
-  // Optional override of the initial radii for PALC.  When non-empty
-  // and of size D.nv, solve() uses this in place of the default
-  // PALC::initial_radii(D) (= 2·R_max·1).  Used by the symmetry-
-  // breaking perturbation experiments and by warm-start callers.
+  // Optional override of the initial radii.  When non-empty and of size
+  // D.nv, solve() uses this in place of the default initial_radii(D)
+  // (= 2·R_max·1).  Used by warm-start callers and the symmetry-breaking
+  // perturbation experiments.
   std::vector<double> r_init_override;
+
+  // Continuation method for the BI homotopy κ(r)=t·κ₁.
+  //   NATURAL — t-parameterized continuation (BI eq. 38, dr/dt=J⁻¹κ₁).
+  //             The path is monotone in t (BI Thm 5: J non-degenerate,
+  //             constant Lorentzian signature for 0<κᵢ<δᵢ), so no arclength
+  //             is needed; scale-invariant by construction. This is the
+  //             default.
+  //   PALC    — pseudo-arclength continuation (legacy; arclength ds²=dt²+‖dr‖²
+  //             is scale-dependent). Kept for comparison/benchmarking.
+  enum class Continuation { NATURAL, PALC };
+  Continuation continuation = Continuation::NATURAL;
+
+  bool verbose = false;
+
+  // ==== Legacy PALC-era experiment knobs (Directions 1–6) ==============
+  // Retained for the experiment drivers that sweep them (margin_sweep,
+  // stochastic_sweep, batch_multiflip_sweep, deflate_solve, perturb_solve,
+  // probe_jacobian, scan_full_range).  All default off; new code should
+  // not reach for these.  Candidates for removal at the next API break.
+  // Scope: stochastic_*, batch-multiflip, and deflation act on the PALC
+  // path ONLY; palc_interior_margin acts on both continuation paths;
+  // palc_gauge_* and palc_tsvd* act on the Newton polish as well, so they
+  // are live under NATURAL continuation too, despite the palc_ prefix.
+
   // Coefficient for the strict-interior margin schedule applied during
-  // PALC: at homotopy parameter t ∈ (0, 1], iterates are kept in P(M)
-  // with safety distance c·t from ∂P(M) on the (ConcQuadr) and
+  // continuation: at homotopy parameter t ∈ (0, 1], iterates are kept in
+  // P(M) with safety distance c·t from ∂P(M) on the (ConcQuadr) and
   // (CloGeod) sides.  At t = 0 (Newton polish), margin → 0 reproduces
   // the closure check.  c = 0 disables margin enforcement (pre-#28
   // behaviour).  Tunable for experimentation.
@@ -65,11 +89,11 @@ struct AlexandrovSolver {
   double stochastic_perturbation_eps = 0.0;
   uint32_t stochastic_seed = 1;
   // Synchronized batch multi-flip experiment (Direction 2): after each
-  // accepted PALC step (post the standard flip_to_delaunay phase),
+  // accepted PALC step (post the standard weighted-Delaunay flip phase),
   // perform a batch flip of all alive non-bigon edges with
   // θ_e > π − batch_multiflip_threshold, all in one pass without
-  // re-evaluating θ between flips.  Then a final flip_to_delaunay
-  // cleans up.  Threshold = 0 disables.
+  // re-evaluating θ between flips.  Then a final flip pass cleans up.
+  // Threshold = 0 disables.
   double palc_batch_multiflip_threshold = 0.0;
   // Deflated homotopy (Direction 4): if r_deflate_target.size() == D.nv
   // and deflate_strength > 0, augment the PALC residual with a repulsive
@@ -83,18 +107,6 @@ struct AlexandrovSolver {
   // is empty or strength = 0.
   std::vector<double> r_deflate_target;
   double deflate_strength = 0.0;
-
-  // Continuation method for the BI homotopy κ(r)=t·κ₁.
-  //   NATURAL — t-parameterized continuation (BI eq. 38, dr/dt=J⁻¹κ₁).
-  //             The path is monotone in t (BI Thm 5: J non-degenerate,
-  //             constant Lorentzian signature for 0<κᵢ<δᵢ), so no arclength
-  //             is needed; scale-invariant by construction. This is the
-  //             default.
-  //   PALC    — pseudo-arclength continuation (legacy; arclength ds²=dt²+‖dr‖²
-  //             is scale-dependent). Kept for comparison/benchmarking.
-  enum class Continuation { NATURAL, PALC };
-  Continuation continuation = Continuation::NATURAL;
-
   // Translation-gauge fixing (Direction 5).  Two forms, both opt-in.
   //
   // (a) palc_gauge_snap (state-snap):  After each accepted PALC step
@@ -106,10 +118,9 @@ struct AlexandrovSolver {
   //     (~3% at C100).  Use only on cases known to need it.
   //
   // (b) palc_gauge_project (step-projection):  Less invasive form.
-  //     At each PALC corrector iteration and each Newton-polish
-  //     trust-region iteration, build the 12×3 gauge basis Q from
-  //     p̂_v = p_v / r_v (current Gram-BFS positions, apex at
-  //     origin), QR-orthonormalize, and project Newton's update
+  //     At each Newton-polish trust-region iteration, build the n×3
+  //     gauge basis Q from p̂_v = p_v / r_v (current Gram-BFS positions,
+  //     apex at origin), QR-orthonormalize, and project Newton's update
   //     Δr ← (I − QQᵀ)Δr before applying.  Removes the gauge
   //     component of each step without modifying r in place.
   //
@@ -131,7 +142,7 @@ struct AlexandrovSolver {
   // mathematical specification, validation plan, and empirical results.
   bool   palc_tsvd       = false;
   double palc_tsvd_rcond = 5e-3;
-  bool verbose = false;
+  // ==== end legacy experiment knobs ====================================
   bool trace_jacobian = false;       // record per-step spectrum of J
   int stats_steps = 0, stats_flips = 0, stats_newton_total = 0;
   double stats_final_kappa = 0;
@@ -235,15 +246,27 @@ struct AlexandrovSolver {
   // triangulation after edge flips is left in D.  Empty result only
   // when the Gram-BFS reconstruction itself yields NaN, in which case
   // stats_status == FAIL_RECONSTRUCT.
+  // @anchor alexandrov-solve
+  // @pre  D is a valid cone iDT: well-formed DCEL, every live vertex has
+  //       cone angle < 2π (strictly positive curvature), lengths > 0
+  // @post stats_status is one of the ValidationStatus outcomes; on OK the
+  //       result is the unique (up to rigid motion) convex polytope
+  //       isometric to D's metric, with |result[v] − apex| == r[v]
+  // @post result.size() == D.nv, or empty iff
+  //       stats_status == FAIL_RECONSTRUCT
   std::vector<coord3d> solve();
 
   // Full polytope output: vertex positions + 1-/2-skeleton.  Bundles
   //   - solve()                                            (12 cone-point positions)
   //   - polytope_tesselation(D, r, vertex_labels)         (T̄(0): polygonal 2-faces)
   // into one struct so callers receive the complete Alexandrov polytope.
-  // Empty positions on failure (PALC didn't converge or post-convergence
-  // invariants violated; see stats_*).  `vertex_labels[k]` is the external
-  // label for DCEL vertex k; defaults to identity (k → k).
+  // Empty positions on failure (continuation didn't converge or
+  // post-convergence invariants violated; see stats_*).  `vertex_labels[k]`
+  // is the external label for DCEL vertex k; defaults to identity (k → k).
+  // @anchor alexandrov-solve-polytope
+  // @pre  as alexandrov-solve; vertex_labels empty or of size D.nv
+  // @post result.status == stats_status; on ok() the tesselation's cells
+  //       are the polytope's flat polygonal 2-faces in external labels
   struct AlexandrovPolytope {
     std::vector<coord3d> positions;       // V(P): 12 cone-point positions in R³.
                                            // Always populated when reconstruction
@@ -265,32 +288,49 @@ struct AlexandrovSolver {
   // ------ Diagnostic accessors (exposed for verification / unit tests) ------
 
   // κ(T, r): per-vertex angle deficit at the radial edge a−v.
+  // @anchor gcp-kappa
+  // @pre  r.size() == T.nv with r > 0 componentwise
+  // @post result.size() == T.nv; result[v] is NaN iff some pyramid at v
+  //       fails to close (r outside F(T))
   static std::vector<double> kappa(const DelaunayTriangulation& T,
                                     const std::vector<double>& r);
 
   // BI total scalar curvature H(T, r) = Σ_v r_v κ_v + Σ_e ℓ_e (π − θ_e).
   // ∂H/∂r_v = κ_v(r) (BI 2008, Proposition 5, eq. 13).  Hessian is
   // Lorentzian (signature (1, n−1)) by BI Theorem 4 + Lemma 3.4.
+  // @anchor gcp-H
+  // @pre  as gcp-kappa
   static double H(const DelaunayTriangulation& T,
                    const std::vector<double>& r);
 
   // J = ∂κ/∂r at (T, r): the dense symmetric B-I Jacobian (Hessian of H).
   // Exported so external solvers (e.g. the Nv-vertex generalization) can
   // build on the same Jacobian instead of re-deriving it.
+  // @anchor gcp-jacobian
+  // @pre  as gcp-kappa
+  // @post result is T.nv × T.nv and symmetric up to roundoff; entries are
+  //       NaN where the pyramid geometry is degenerate
   static matrix<double> jacobian(const DelaunayTriangulation& T,
                                   const std::vector<double>& r);
 
   // Eigenvalues of J = ∂κ/∂r at (T, r), sorted ascending.
   // Empty on eigensolver failure.
+  // @anchor gcp-jacobian-eigvals
+  // @pre  as gcp-kappa
   static std::vector<double> jacobian_eigvals(const DelaunayTriangulation& T,
                                                const std::vector<double>& r);
 
   // sign(det J(T, r)), computed via LU pivot product.  Returns 0 on
-  // numerical singularity or LAPACK failure.  Used as a fold detector.
+  // numerical singularity.  Used as a fold detector.
+  // @anchor gcp-jacobian-det-sign
+  // @pre  as gcp-kappa
+  // @post result ∈ {−1, 0, +1}
   static int jacobian_det_sign(const DelaunayTriangulation& T,
                                 const std::vector<double>& r);
 
   // Feasibility predicate: r ∈ F(T) iff every incident pyramid closes.
+  // @anchor gcp-feasible
+  // @pre  r.size() == T.nv
   static bool feasible(const DelaunayTriangulation& T,
                         const std::vector<double>& r);
 
@@ -300,6 +340,8 @@ struct AlexandrovSolver {
   // adjacent faces.  At κ=0, equals the polytope's interior dihedral at e.
   // For a non-bigon edge this is well-defined; for bigon edges (h and h^1
   // in the same face) the result is not geometrically meaningful.
+  // @anchor gcp-theta
+  // @pre  h is a live half-edge of T; r as in gcp-kappa
   static double theta(const DelaunayTriangulation& T,
                        const std::vector<double>& r, int h);
 
@@ -307,6 +349,9 @@ struct AlexandrovSolver {
   // GCP dihedral at edge h.  At κ=0 the inessential edges are precisely the
   // diagonals of flat 2-faces of the polytope (B-I lines 798–820).
   // Both halves of an edge are set consistently.  ε defaults to 1e-7 (rad).
+  // @anchor bi-inessential-edges
+  // @pre  as gcp-kappa
+  // @post result.size() == T.nh; result[h] == result[h^1]
   static std::vector<bool> inessential_edges(const DelaunayTriangulation& T,
                                               const std::vector<double>& r,
                                               double eps = 1e-7);
@@ -319,6 +364,8 @@ struct AlexandrovSolver {
   //
   // `vertex_labels[k]` maps DCEL vertex k to an external label (typically
   // the cone point's index in the input dual triangulation).
+  // @anchor bi-polytope-tesselation
+  // @pre  (T, r) at κ ≈ 0 (a converged solve); vertex_labels.size() == T.nv
   static CanonicalTesselation polytope_tesselation(
       const DelaunayTriangulation& T,
       const std::vector<double>& r,
@@ -330,13 +377,15 @@ struct AlexandrovSolver {
   // True iff T contains no multi-edges, self-loops, or bigons — the only
   // T-shape compatible with a non-degenerate Alexandrov polytope.  Per
   // invariant I-1, any T(0) for a fullerene metric MUST be simplicial; a
-  // failure here indicates PALC misconvergence or incomplete flip mechanics.
-  // O(nh) on the DCEL.
+  // failure here indicates misconvergence or incomplete flip mechanics.
+  // Delegates to DelaunayTriangulation::is_simplicial.
+  // @anchor bi-is-simplicial
   static bool is_simplicial(const DelaunayTriangulation& T);
 
   // True iff every polygon in `tess` has ≥ 3 distinct vertex labels and no
   // repeated label on its boundary.  Combined with `is_simplicial(T)` this
   // certifies T̄ is a simple polygonal tesselation.
+  // @anchor bi-is-simple-polygonal
   static bool is_simple_polygonal(const CanonicalTesselation& tess);
 
   // ------ Reconstructed-polytope geometric checks ------
@@ -354,7 +403,9 @@ struct AlexandrovSolver {
   //       for nanotubes, oblate polytopes, irregular shapes.  For T̄(0)-
   //       collapsed flat faces, all triangles within a face share a plane
   //       so the per-triangle check is correct.
-  // O(V·F) + O(F) on V=12, F≤20.
+  // O(V·F) + O(F).
+  // @anchor bi-is-convex
+  // @pre  pos.size() == T.nv
   static bool is_convex(const DelaunayTriangulation& T,
                           const std::vector<coord3d>& pos,
                           double tol = 1e-3);
@@ -370,6 +421,8 @@ struct AlexandrovSolver {
   // checks are not independent on healthy outputs; but the gate must be
   // enforced anyway so that any failure mode is reported under its
   // correct label.
+  // @anchor bi-has-self-intersection
+  // @pre  pos.size() == T.nv
   static bool has_self_intersection(const DelaunayTriangulation& T,
                                       const std::vector<coord3d>& pos,
                                       double tol = 1e-6);

@@ -32,6 +32,7 @@
 #include <cstdio>
 #include <cmath>
 #include <map>
+#include <numeric>
 #include <random>
 #include <set>
 #include <stdexcept>
@@ -175,36 +176,50 @@ double phi(const vector<double>& r, double L, int i, int j) {
   return acos(clamp(cs, -1.0, 1.0));
 }
 
-// Dihedral angle α at base edge h in the pyramid over face(h).
+// Development of the pyramid over face(h) into the base plane.
 //
 // The pyramid has apex a and base triangle (u,v,w) with |a-u|=r_u, etc.
-// Develop the base into the plane: u at origin, v on the x-axis.
-// Project a onto this plane: p = (px, py) satisfies |p-u|²+h²=r_u², etc.
-// Then α = atan2(h, py), where h is the pyramid height and py is the
-// signed distance from the projection to edge uv (the x-axis).
-double alpha(const DelaunayTriangulation& T, const vector<double>& r, int h) {
+// Develop the base into the plane: u at origin, v on the x-axis, so
+// w = (wx, wy); project a onto this plane: p = (px, py) satisfies
+// |p-u|²+h²=r_u², |p-v|²+h²=r_v², |p-w|²+h²=r_w², with h_sq the squared
+// pyramid height.  base_ok = false iff the base triangle inequality
+// fails (wy_sq < −1e-10·lwu²); h_sq < 0 (beyond the callers' guards)
+// means the pyramid fails to close (Cayley-Menger violation).
+// Single source for alpha() and the min-h² diagnostic (pyramid_h_sq_at).
+struct PyramidDev { double wy, py, h_sq; bool base_ok; };
+
+PyramidDev develop_pyramid(const DelaunayTriangulation& T,
+                            const vector<double>& r, int h) {
   int u = T.he_origin[h], v = T.he_origin[T.he_next[h]], w = T.he_origin[T.prev(h)];
   double luv = T.he_length[h], lvw = T.he_length[T.he_next[h]], lwu = T.he_length[T.prev(h)];
 
-  // w in the base plane (u at origin, v at (luv,0)):  w = (wx, wy)
   double wx = (luv*luv + lwu*lwu - lvw*lvw) / (2*luv);  // cosine rule
   double wy_sq = lwu*lwu - wx*wx;
-  if (wy_sq < -1e-10 * lwu*lwu) return NAN;  // triangle inequality violation
+  if (wy_sq < -1e-10 * lwu*lwu) return {0, 0, 0, false};
   double wy = sqrt(max(0.0, wy_sq));
 
-  // Apex projection p = (px, py):  |p-u|²+h²=r_u², |p-v|²+h²=r_v², |p-w|²+h²=r_w²
   double px = (r[u]*r[u] - r[v]*r[v] + luv*luv) / (2*luv);
   double py = (wy > 1e-15) ? (r[u]*r[u] - r[w]*r[w] + wx*wx + wy*wy - 2*px*wx) / (2*wy) : 0;
   double h_sq = r[u]*r[u] - px*px - py*py;
-  if (h_sq < -1e-10 * r[u]*r[u]) return NAN;  // pyramid doesn't close
-  double height = sqrt(max(0.0, h_sq));
+  return {wy, py, h_sq, true};
+}
 
-  return atan2(height, py);
+// Dihedral angle α at base edge h in the pyramid over face(h):
+// α = atan2(h, py) in the development above, where h is the pyramid
+// height and py the signed distance from the apex projection to edge uv.
+double alpha(const DelaunayTriangulation& T, const vector<double>& r, int h) {
+  auto d = develop_pyramid(T, r, h);
+  if (!d.base_ok) return NAN;                    // triangle inequality violation
+  int u = T.he_origin[h];
+  if (d.h_sq < -1e-10 * r[u]*r[u]) return NAN;   // pyramid doesn't close
+  double height = sqrt(max(0.0, d.h_sq));
+
+  return atan2(height, d.py);
 }
 
 // Total dihedral angle θ at edge h: sum of α from both adjacent pyramids.
 double theta(const DelaunayTriangulation& T, const vector<double>& r, int h) {
-  return alpha(T, r, h) + alpha(T, r, h ^ 1);
+  return alpha(T, r, h) + alpha(T, r, T.twin(h));
 }
 
 // Curvature κ_v = 2π − ω_v, where ω_v is the total solid angle around
@@ -218,16 +233,14 @@ double theta(const DelaunayTriangulation& T, const vector<double>& r, int h) {
 double curvature_at(const DelaunayTriangulation& T, const vector<double>& r, int v) {
   if (T.v_out[v] < 0) return 0;
   double omega = 0;
-  int h0 = T.v_out[v], h = h0;
-  do {
+  for (int h : T.incident(v)) {
     double rho_vj = rho(r, T.he_length[h], v, T.dest(h));
     double rho_vk = rho(r, T.he_length[T.prev(h)], v, T.dest(T.he_next[h]));
     double sj = sin(rho_vj), sk = sin(rho_vk);
     if (sj < 1e-15 || sk < 1e-15) { omega = NAN; break; }
     double cos_omega = (cos(T.he_angle[h]) - cos(rho_vj)*cos(rho_vk)) / (sj*sk);
     omega += acos(clamp(cos_omega, -1.0, 1.0));
-    h = T.cw(h);
-  } while (h != h0);
+  }
   return 2*M_PI - omega;
 }
 
@@ -329,7 +342,7 @@ double J_edge(const DelaunayTriangulation& T, const vector<double>& r, int h) {
   double rho_e  = rho(r, L, i, j);
   double rho_me = rho(r, L, j, i);
   double alpha_e  = alpha(T, r, h);
-  double alpha_me = alpha(T, r, h ^ 1);
+  double alpha_me = alpha(T, r, T.twin(h));
 
   double sr = sin(rho_e), srm = sin(rho_me);
   double sa = sin(alpha_e), sam = sin(alpha_me);
@@ -358,13 +371,11 @@ matrix<double> jacobian(const DelaunayTriangulation& T, const vector<double>& r)
   for (int i = 0; i < n; i++) {
     if (T.v_out[i] < 0) continue;
     double diag = 0;
-    int h0 = T.v_out[i], h = h0;
-    do {
+    for (int h : T.incident(i)) {
       double Je = J_edge(T, r, h);
       double phi_e = phi(r, T.he_length[h], i, T.dest(h));
       diag -= cos(phi_e) * Je;
-      h = T.cw(h);
-    } while (h != h0);
+    }
     J(i, i) = diag;
   }
   return J;
@@ -414,10 +425,13 @@ struct Bordered {
   std::expected<Solution, LuFail> solve(const V& neg_F, double g) const {
     auto z1 = solve_with_sign(J, neg_F);
     if (!z1) return std::unexpected(z1.error());
+    
     auto z2 = solve_with_sign(J, kappa1);
     if (!z2) return std::unexpected(z2.error());
+
     double den = t_dot + dot(r_dot, z2->x);
     if (fabs(den) < 1e-30) return std::unexpected(LuFail::Singular);
+    
     double dt = (g - dot(r_dot, z1->x)) / den;
     V      dr = z1->x + z2->x * dt;
     int sign_den = (den > 0) - (den < 0);   // {−1, +1}
@@ -514,27 +528,24 @@ static AlexandrovSolver::TraceEntry make_trace(
           LinAlg::max_abs(kappa), LinAlg::norm(kappa), LinAlg::sym_eigvals(J)};
 }
 
-// Pyramid height squared at half-edge h.  Inlined replica of the
-// computation inside GCP::alpha — exposes h_sq as a diagnostic without
-// changing alpha's public contract.  Negative result means the pyramid
-// fails to close (Cayley-Menger violation).
+// Pyramid height squared at half-edge h, via GCP::develop_pyramid.
+// Negative result means the pyramid fails to close (Cayley-Menger
+// violation); −1 when the base triangle itself is degenerate.
 static double pyramid_h_sq_at(const DelaunayTriangulation& T,
                                 const V& r, int h) {
-  int u = T.he_origin[h];
-  int v = T.he_origin[T.he_next[h]];
-  int w = T.he_origin[T.prev(h)];
-  double luv = T.he_length[h];
-  double lvw = T.he_length[T.he_next[h]];
-  double lwu = T.he_length[T.prev(h)];
-  double wx = (luv*luv + lwu*lwu - lvw*lvw) / (2*luv);
-  double wy_sq = lwu*lwu - wx*wx;
-  if (wy_sq < -1e-10 * lwu*lwu) return -1.0;
-  double wy = std::sqrt(std::max(0.0, wy_sq));
-  double px = (r[u]*r[u] - r[v]*r[v] + luv*luv) / (2*luv);
-  double py = (wy > 1e-15)
-                ? (r[u]*r[u] - r[w]*r[w] + wx*wx + wy*wy - 2*px*wx) / (2*wy)
-                : 0;
-  return r[u]*r[u] - px*px - py*py;
+  auto d = GCP::develop_pyramid(T, r, h);
+  return d.base_ok ? d.h_sq : -1.0;
+}
+
+// Mean edge length ⟨ℓ⟩ over alive edges — the length scale used by the
+// volume normalisation and the convexity tolerance.  1 on an edgeless T.
+static double mean_edge_length(const DelaunayTriangulation& T) {
+  double sum_l = 0; int n_e = 0;
+  for (int h = 0; h < T.nh; h += 2) {
+    if (!T.alive(h)) continue;
+    sum_l += T.he_length[h]; n_e++;
+  }
+  return (n_e > 0) ? sum_l / n_e : 1.0;
 }
 
 // Pack one PALC- or Newton-step trajectory-diagnostic record.  Cheap to
@@ -903,7 +914,6 @@ int correct(const DelaunayTriangulation& T, double& t, V& r,
             double t0, const V& r0, double ds,
             int max_iter, double tol,
             const Deflation* defl = nullptr,
-            bool /*gauge_project*/ = false,
             bool use_tsvd = false,
             double rcond = 5e-3) {
   for (int nit = 0; nit < max_iter; nit++) {
@@ -974,7 +984,6 @@ StepResult palc_step(const DelaunayTriangulation& T,
                       double t0, const V& r0, const V& kappa1,
                       const matrix<double>& J, double ds,
                       const Deflation* defl = nullptr,
-                      bool gauge_project = false,
                       bool use_tsvd = false,
                       double rcond = 5e-3) {
   // Tangent on the deflated curve uses J_def and κ₁_eff.
@@ -989,7 +998,7 @@ StepResult palc_step(const DelaunayTriangulation& T,
   double tc = tp; V rc = rp;
   int nit = correct(T, tc, rc, kappa1, tau, t0, r0, ds,
                      CORRECTOR_MAX_ITER, CORRECTOR_TOL, defl,
-                     gauge_project, use_tsvd, rcond);
+                     use_tsvd, rcond);
   return {nit, tc, std::move(rc)};
 }
 
@@ -1173,13 +1182,12 @@ TrackResult palc_track(DelaunayTriangulation& T, V r, const V& kappa1,
                         double batch_multiflip_threshold = 0.0,
                         const Deflation* deflation = nullptr,
                         bool gauge_snap = false,
-                        bool gauge_project = false,
                         bool use_tsvd = false,
                         double rcond = 5e-3) {
   auto kernel = [&](const DelaunayTriangulation& T_, double t_, const V& r_,
                     const V& k1_, const matrix<double>& J_, double ds_) {
     return palc_step(T_, t_, r_, k1_, J_, ds_, deflation,
-                     gauge_project, use_tsvd, rcond);
+                     use_tsvd, rcond);
   };
   ContinuationParams p{.t_target = t_target, .h_init = ds_init,
                        .h_min = DS_MIN, .h_max = DS_MAX,
@@ -1466,9 +1474,137 @@ const char* AlexandrovSolver::status_str(ValidationStatus s) {
   return "UNKNOWN";
 }
 
+// Validation gate: a returned polytope must satisfy three named
+// properties, ALL required for valid output.  Fills S's stats_*
+// diagnostics and returns the verdict; called by solve() after
+// κ-convergence and reconstruction have already succeeded.
+//
+//   SIMPLICITY    — T̄(0) is a simple polygonal tesselation: every
+//                   polygon has ≥ 3 distinct vertex labels and no
+//                   repeated label.  At κ = 0 the inessential
+//                   collapse reduces T(0) (which may carry redundant
+//                   multi-edges per refined I-1) to T̄(0); simplicity
+//                   is enforced on T̄(0).  Plus F ≥ 3 (no drum-cap,
+//                   which would force all V = 12 vertices coplanar by
+//                   Euler).
+//
+//   WELL-FORMEDNESS — reconstruct() returns a closed manifold, the
+//                     polytope has non-degenerate volume
+//                     (vol_norm > 0.01, well below the 0.12 healthy
+//                     floor and well above the ~1e-6 degenerate
+//                     ceiling observed across 1.03M scan), and no two
+//                     non-adjacent triangles intersect in 3D.
+//
+//   CONVEXITY     — every non-face vertex sits on the inside of every
+//                   face plane (Alexandrov's theorem requires this).
+//                   Outward normal taken from the half-edge CCW
+//                   convention; defensive precondition rejects
+//                   inverted-volume positions.
+static AlexandrovSolver::ValidationStatus validate_polytope(
+    AlexandrovSolver& S, const vector<coord3d>& pos) {
+  using VS = AlexandrovSolver::ValidationStatus;
+  const DelaunayTriangulation& D = S.D;
+
+  // ── SIMPLICITY ──────────────────────────────────────────────────────
+  //   T̄(0) must be a simple polygonal tesselation with F ≥ 3.
+  //   inessential_eps stays at the strict default (1e-7).  Loosening it
+  //   risks falsely collapsing borderline simple edges with |θ − π|
+  //   slightly above 1e-7 but well below "almost flat", which can fold
+  //   a non-degenerate polytope into a drum-cap.  Multi-edges that
+  //   legitimately collapsed to one polytope edge typically reach
+  //   |θ − π| ≲ 1e-7 once Newton converges; if the continuation stalls
+  //   before that (κ residual > tol), the F ≥ 3 check catches the
+  //   resulting degeneracy.
+  S.stats_t0_simplicial = AlexandrovSolver::is_simplicial(D);  // diagnostic only
+  vector<int> labels(D.nv);
+  std::iota(labels.begin(), labels.end(), 0);
+  auto tbar = AlexandrovSolver::polytope_tesselation(D, S.r, labels);
+  S.stats_tbar_n_cells = tbar.n_cells();
+  S.stats_tbar_simple_polygonal = AlexandrovSolver::is_simple_polygonal(tbar);
+
+  bool simple = S.stats_tbar_simple_polygonal && S.stats_tbar_n_cells >= 3;
+  if (!simple) {
+    if (S.verbose)
+      printf("  VALIDATION (simplicity) failed: T̄(0) simple_polygonal=%d, "
+             "n_cells=%d (need F≥3), T(0) simplicial=%d (diagnostic).\n",
+             S.stats_tbar_simple_polygonal, S.stats_tbar_n_cells,
+             S.stats_t0_simplicial);
+    return VS::FAIL_NOT_SIMPLE;
+  }
+
+  // Compute volume_norm = |V| / ⟨ℓ⟩³ for the well-formedness gate and
+  // diagnostic stat.
+  double vol6 = 0;
+  for (int f = 0; f < D.nf; f++) {
+    if (D.f_he[f] < 0) continue;
+    int ha = D.f_he[f];
+    int hb = D.he_next[ha];
+    int hc = D.he_next[hb];
+    vol6 += pos[D.he_origin[ha]].dot(
+              pos[D.he_origin[hb]].cross(pos[D.he_origin[hc]]));
+  }
+  double volume = std::abs(vol6) / 6.0;
+  double mean_l = mean_edge_length(D);
+  S.stats_volume_norm = volume / (mean_l * mean_l * mean_l);
+
+  // ── WELL-FORMEDNESS ─────────────────────────────────────────────────
+  //   Non-degenerate volume AND embedded surface (no 3D self-intersection).
+  //   Both are central definitional requirements for a valid polytope.
+  //   - Volume: empirical 1.03M scan shows a clean ~5-orders-of-magnitude
+  //     gap between healthy polytopes (vol_norm ≥ 0.12, median 1.01) and
+  //     degenerate ones (vol_norm ≤ 1e-6, includes drum-caps and
+  //     Newton-stalled cases).  vol_norm > 0.01 sits in the empty gap.
+  //   - Self-intersection: two non-adjacent triangles crossing in 3D
+  //     means the surface is not embedded — it's not a valid polytope
+  //     at all.  Convexity does imply non-self-intersection, so on
+  //     convex outputs the test is informationally subsumed; but this
+  //     does NOT make the test optional.  It is part of the definition
+  //     of "well-formed polytope" and must be enforced independently
+  //     so that any failure (numerical or otherwise) is flagged with
+  //     its true cause rather than swept into a different bucket.
+  constexpr double VOLUME_NORM_DEGENERATE = 0.01;
+  bool well_formed_volume = std::isfinite(S.stats_volume_norm) &&
+                              S.stats_volume_norm >= VOLUME_NORM_DEGENERATE;
+  S.stats_polytope_no_self_intersect =
+      !AlexandrovSolver::has_self_intersection(D, pos);
+  // Volume gate first, then self-intersection gate.  Order is the order
+  // of stats_status when multiple fail.
+  if (!well_formed_volume) {
+    if (S.verbose)
+      printf("  VALIDATION (well-formedness/volume) failed: vol_norm=%.3e "
+             "(threshold %.2e).\n",
+             S.stats_volume_norm, VOLUME_NORM_DEGENERATE);
+    return VS::FAIL_VOLUME_DEGENERATE;
+  }
+  if (!S.stats_polytope_no_self_intersect) {
+    if (S.verbose)
+      printf("  VALIDATION (well-formedness/self-intersection) failed: "
+             "two non-adjacent triangles cross in 3D.\n");
+    return VS::FAIL_SELF_INTERSECTING;
+  }
+
+  // ── CONVEXITY ───────────────────────────────────────────────────────
+  //   Every non-face vertex on the inside of every face plane.
+  //   Alexandrov's theorem requires the polytope to be convex; failure
+  //   here indicates the reconstruction landed in a geometrically
+  //   non-convex configuration.  Outward normal taken from the half-
+  //   edge CCW convention; defensive precondition inside is_convex
+  //   verifies signed volume is strictly positive.
+  S.stats_polytope_convex = AlexandrovSolver::is_convex(D, pos);
+  if (!S.stats_polytope_convex) {
+    if (S.verbose)
+      printf("  VALIDATION (convexity) failed: some vertex sticks out "
+             "beyond a face plane.\n");
+    return VS::FAIL_NOT_CONVEX;
+  }
+
+  return VS::OK;
+}
+
 // The 5-step B-I algorithm: initial radii → continuation (κ(r)=t·κ₁, t:1→0)
-// → endgame extrapolation → Newton polish → reconstruct. `continuation`
-// selects the t-parameterized (default) or legacy PALC homotopy.
+// → endgame extrapolation → Newton polish → reconstruct → validate.
+// `continuation` selects the t-parameterized (default) or legacy PALC
+// homotopy.
 vector<coord3d> AlexandrovSolver::solve() {
   stats_steps = stats_flips = stats_newton_total = 0;
   trace.clear();
@@ -1508,7 +1644,6 @@ vector<coord3d> AlexandrovSolver::solve() {
                               palc_batch_multiflip_threshold,
                               defl.active(D.nv) ? &defl : nullptr,
                               palc_gauge_snap,
-                              palc_gauge_project,
                               palc_tsvd,
                               palc_tsvd_rcond);
   }
@@ -1532,12 +1667,12 @@ vector<coord3d> AlexandrovSolver::solve() {
                                    trace_jacobian ? &trace : nullptr,
                                    record_diag ? &diag_trace : nullptr,
                                    record_trajectory ? &trajectory : nullptr,
-                                   record_diag ? &polish_flips : nullptr,
+                                   &polish_flips,
                                    palc_gauge_snap,
                                    palc_gauge_project,
                                    palc_tsvd,
                                    palc_tsvd_rcond);
-  if (record_diag) stats_flips = polish_flips;
+  stats_flips = polish_flips;
   stats_final_kappa = mk;
 
   if (verbose)
@@ -1561,135 +1696,8 @@ vector<coord3d> AlexandrovSolver::solve() {
     return pos;   // failed-but-inspectable positions
   }
 
-  // 5–9. Validation: a returned polytope must satisfy three named properties,
-  // ALL of which are required for valid output:
-  //
-  //   SIMPLICITY    — T̄(0) is a simple polygonal tesselation: every
-  //                   polygon has ≥ 3 distinct vertex labels and no
-  //                   repeated label.  At κ = 0 the inessential
-  //                   collapse reduces T(0) (which may carry redundant
-  //                   multi-edges per refined I-1) to T̄(0); simplicity
-  //                   is enforced on T̄(0).  Plus F ≥ 3 (no drum-cap,
-  //                   which would force all V = 12 vertices coplanar by
-  //                   Euler).
-  //
-  //   WELL-FORMEDNESS — reconstruct() returns a closed manifold, the
-  //                     polytope has non-degenerate volume
-  //                     (vol_norm > 0.01, well below the 0.12 healthy
-  //                     floor and well above the ~1e-6 degenerate
-  //                     ceiling observed across 1.03M scan), and no two
-  //                     non-adjacent triangles intersect in 3D.
-  //
-  //   CONVEXITY     — every non-face vertex sits on the inside of every
-  //                   face plane (Alexandrov's theorem requires this).
-  //                   Outward normal taken from the half-edge CCW
-  //                   convention; defensive precondition rejects
-  //                   inverted-volume positions.
-  //
-  // ── SIMPLICITY ──────────────────────────────────────────────────────
-  //   T̄(0) must be a simple polygonal tesselation with F ≥ 3.
-  //   inessential_eps stays at the strict default (1e-7).  Loosening it
-  //   risks falsely collapsing borderline simple edges with |θ − π|
-  //   slightly above 1e-7 but well below "almost flat", which can fold
-  //   a non-degenerate polytope into a drum-cap.  Multi-edges that
-  //   legitimately collapsed to one polytope edge typically reach
-  //   |θ − π| ≲ 1e-7 once Newton converges; if PALC stalls before that
-  //   (κ residual > tol), the F ≥ 3 check catches the resulting
-  //   degeneracy.
-  stats_t0_simplicial = is_simplicial(D);   // diagnostic only
-  vector<int> labels(D.nv);
-  for (int v = 0; v < D.nv; v++) labels[v] = v;
-  auto tbar = polytope_tesselation(D, r, labels);
-  stats_tbar_n_cells = tbar.n_cells();
-  stats_tbar_simple_polygonal = is_simple_polygonal(tbar);
-
-  bool simple = stats_tbar_simple_polygonal && stats_tbar_n_cells >= 3;
-  if (!simple) {
-    stats_status = ValidationStatus::FAIL_NOT_SIMPLE;
-    if (verbose)
-      printf("  VALIDATION (simplicity) failed: T̄(0) simple_polygonal=%d, "
-             "n_cells=%d (need F≥3), T(0) simplicial=%d (diagnostic).\n",
-             stats_tbar_simple_polygonal, stats_tbar_n_cells,
-             stats_t0_simplicial);
-    return pos;
-  }
-
-  // Compute volume_norm = |V| / ⟨ℓ⟩³ for the well-formedness gate and
-  // diagnostic stat.  (Reconstruction was performed up-front, before
-  // the kappa-convergence gate, so pos is already populated.)
-  double vol6 = 0;
-  for (int f = 0; f < D.nf; f++) {
-    if (D.f_he[f] < 0) continue;
-    int ha = D.f_he[f];
-    int hb = D.he_next[ha];
-    int hc = D.he_next[hb];
-    vol6 += pos[D.he_origin[ha]].dot(
-              pos[D.he_origin[hb]].cross(pos[D.he_origin[hc]]));
-  }
-  double volume = std::abs(vol6) / 6.0;
-  double sum_l = 0; int n_e = 0;
-  for (int h = 0; h < D.nh; h += 2) {
-    if (!D.alive(h)) continue;
-    sum_l += D.he_length[h];
-    n_e++;
-  }
-  double mean_l = (n_e > 0) ? sum_l / n_e : 1.0;
-  stats_volume_norm = volume / (mean_l * mean_l * mean_l);
-
-  // ── WELL-FORMEDNESS ─────────────────────────────────────────────────
-  //   Non-degenerate volume AND embedded surface (no 3D self-intersection).
-  //   Both are central definitional requirements for a valid polytope.
-  //   - Volume: empirical 1.03M scan shows a clean ~5-orders-of-magnitude
-  //     gap between healthy polytopes (vol_norm ≥ 0.12, median 1.01) and
-  //     degenerate ones (vol_norm ≤ 1e-6, includes drum-caps and
-  //     Newton-stalled cases).  vol_norm > 0.01 sits in the empty gap.
-  //   - Self-intersection: two non-adjacent triangles crossing in 3D
-  //     means the surface is not embedded — it's not a valid polytope
-  //     at all.  Convexity does imply non-self-intersection, so on
-  //     convex outputs the test is informationally subsumed; but this
-  //     does NOT make the test optional.  It is part of the definition
-  //     of "well-formed polytope" and must be enforced independently
-  //     so that any failure (numerical or otherwise) is flagged with
-  //     its true cause rather than swept into a different bucket.
-  constexpr double VOLUME_NORM_DEGENERATE = 0.01;
-  bool well_formed_volume = std::isfinite(stats_volume_norm) &&
-                              stats_volume_norm >= VOLUME_NORM_DEGENERATE;
-  stats_polytope_no_self_intersect = !has_self_intersection(D, pos);
-  // Volume gate first, then self-intersection gate.  Order is the order
-  // of stats_status when multiple fail.
-  if (!well_formed_volume) {
-    stats_status = ValidationStatus::FAIL_VOLUME_DEGENERATE;
-    if (verbose)
-      printf("  VALIDATION (well-formedness/volume) failed: vol_norm=%.3e "
-             "(threshold %.2e).\n",
-             stats_volume_norm, VOLUME_NORM_DEGENERATE);
-    return pos;
-  }
-  if (!stats_polytope_no_self_intersect) {
-    stats_status = ValidationStatus::FAIL_SELF_INTERSECTING;
-    if (verbose)
-      printf("  VALIDATION (well-formedness/self-intersection) failed: "
-             "two non-adjacent triangles cross in 3D.\n");
-    return pos;
-  }
-
-  // ── CONVEXITY ───────────────────────────────────────────────────────
-  //   Every non-face vertex on the inside of every face plane.
-  //   Alexandrov's theorem requires the polytope to be convex; failure
-  //   here indicates the reconstruction landed in a geometrically
-  //   non-convex configuration.  Outward normal taken from the half-
-  //   edge CCW convention; defensive precondition inside is_convex
-  //   verifies signed volume is strictly positive.
-  stats_polytope_convex = is_convex(D, pos);
-  if (!stats_polytope_convex) {
-    stats_status = ValidationStatus::FAIL_NOT_CONVEX;
-    if (verbose)
-      printf("  VALIDATION (convexity) failed: some vertex sticks out "
-             "beyond a face plane.\n");
-    return pos;
-  }
-
-  stats_status = ValidationStatus::OK;
+  // 5. Validation: the three-property gate (see validate_polytope above).
+  stats_status = validate_polytope(*this, pos);
   return pos;
 }
 
@@ -1708,7 +1716,7 @@ AlexandrovSolver::solve_polytope(const vector<int>& vertex_labels) {
   vector<int> labels = vertex_labels;
   if (labels.empty()) {
     labels.resize(D.nv);
-    for (int v = 0; v < D.nv; v++) labels[v] = v;
+    std::iota(labels.begin(), labels.end(), 0);
   }
   out.tesselation = polytope_tesselation(D, r, labels);
   return out;
@@ -1813,14 +1821,8 @@ bool AlexandrovSolver::is_convex(const DelaunayTriangulation& T,
                                    double tol) {
   if ((int)pos.size() != T.nv) return false;
 
-  // Mean edge length, for relative tolerance.
-  double sum_l = 0; int n_e = 0;
-  for (int h = 0; h < T.nh; h += 2) {
-    if (!T.alive(h)) continue;
-    sum_l += T.he_length[h]; n_e++;
-  }
-  double mean_l = (n_e > 0) ? sum_l / n_e : 1.0;
-  double abs_tol = tol * mean_l;
+  double mean_l  = mean_edge_length(T);
+  double abs_tol = tol * mean_l;   // relative tolerance
 
   // Defensive precondition: signed volume from the CCW half-edge convention
   // must be strictly positive.  The vertex test below uses (b−a) × (c−a)

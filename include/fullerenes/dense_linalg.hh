@@ -43,6 +43,10 @@ double energy(const V& v);
 // of *V_out is the unit eigenvector paired with lam[m].  The sweep budget
 // is a guard, not a knob: cyclic Jacobi converges quadratically once the
 // off-diagonal is small, so a trip means non-symmetric input (caller bug).
+// The bool IS the two-outcome encoding (true = converged, false = guard
+// trip); callers symmetrize their input, so false cannot occur through
+// sym_eigvals/SymEigen::decompose — they translate it to their empty-
+// result outcome rather than propagate an exception.
 bool jacobi_eig(std::vector<double> A, int n, std::vector<double>& lam,
                 std::vector<double>* V_out);
 
