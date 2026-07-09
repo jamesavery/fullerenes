@@ -14,14 +14,15 @@
 // interior apex point.  The curvature κ_i = 2π − ω_i (angle deficit at
 // the radial edge a−v_i) satisfies κ = 0 iff the GCP is a genuine polytope.
 // We trace the homotopy κ(r) = t·κ₁ from (t=1, large R) to (t→0, r*)
-// using natural / pseudo-arc-length continuation, then extrapolate and polish.
+// by natural t-continuation (BI eq. 38), then extrapolate and polish.
+// (The legacy pseudo-arc-length path and its experiment apparatus live in
+// attic/delaunay_alexandrov_palc.cc.attic.)
 //
 // Layers:
 //   GCP          — observables: κ(T,r), J(T,r), θ(T,r,h)
-//   LinAlg       — bordered solves atop fullerenes/dense_linalg.hh
 //   TrustRegion  — LM subproblem solver, accept/reject rule
 //   Topology     — weighted Delaunay flip maintenance
-//   PALC         — predictor-corrector continuation
+//   Continuation — natural-t predictor-corrector homotopy tracking
 //   Newton       — trust-region Newton polish for κ(r)=0
 //   Reconstruct  — BFS vertex placement from Gram matrix entries
 //   AlexandrovSolver / AlexandrovIDTCubic — the public entry points
@@ -33,13 +34,11 @@
 #include <cmath>
 #include <map>
 #include <numeric>
-#include <random>
 #include <set>
 #include <stdexcept>
 #include <string>
 #include <vector>
 #include <algorithm>
-#include <expected>
 
 using namespace std;
 
@@ -49,107 +48,12 @@ using namespace std;
 
 namespace {
 
-// Forward declaration for Reconstruct::from_radii — used by Gauge::snap
+// Forward declaration for Reconstruct::from_radii — used by make_traj
 // before Reconstruct is defined.  Implementation in Layer 6b below.
 namespace Reconstruct {
   std::vector<coord3d> from_radii(const DelaunayTriangulation& T,
                                    const std::vector<double>& r);
 }
-namespace GCP {
-  std::vector<double> feasible_step(const DelaunayTriangulation& T,
-                                     const std::vector<double>& r_from,
-                                     const std::vector<double>& delta,
-                                     bool* clipped);
-}
-
-// ============================================================================
-// Translation-gauge fixing.
-//
-// At any solution r* of κ(r) = 0, dκ/dr has a 3-D kernel from translating
-// the apex of the B-I star-pyramid construction (apex shift α gives
-// δr_v = −α · p̂_v).  Off-manifold this becomes a "soft kernel" that
-// makes Newton ill-conditioned.  Centroid-snap factors out the gauge by
-// canonicalising r to the apex-at-centroid representative of its
-// translation orbit at each step:
-//   1. reconstruct positions p_v from current r via Gram-BFS,
-//   2. compute centroid c = (1/n) Σ p_v,
-//   3. propose r' with r'_v = ‖p_v − c‖,
-//   4. apply r ← r + GCP::feasible_step(T, r, r' − r) to keep r ∈ F(T).
-// Step (4) is essential: at off-manifold iterates the reconstructed
-// positions are a B-I generalized polytope (not a real polytope), so
-// the proposed r' may itself violate pyramid closure.  Clipping via
-// feasible_step keeps the iterate inside F(T).
-// Idempotent at κ = 0; no-op if Gram-BFS fails.
-// ============================================================================
-namespace Gauge {
-
-// Returns true if r was updated; false if Gram-BFS failed (r unchanged).
-bool snap(const DelaunayTriangulation& T, std::vector<double>& r) {
-  auto pos = Reconstruct::from_radii(T, r);
-  if ((int)pos.size() != T.nv) return false;
-  for (const auto& p : pos) {
-    if (std::isnan(p[0]) || std::isnan(p[1]) || std::isnan(p[2])) return false;
-  }
-  coord3d c(0, 0, 0);
-  for (const auto& p : pos) c = c + p;
-  c = c * (1.0 / pos.size());
-  std::vector<double> delta(T.nv);
-  for (int v = 0; v < T.nv; v++) delta[v] = (pos[v] - c).norm() - r[v];
-  // Clip the gauge-snap update to F(T).  At large-κ iterates the snap
-  // can push r outside F(T) and the next pyramid closure check will
-  // produce NaN.
-  auto clipped_delta = GCP::feasible_step(T, r, delta, nullptr);
-  for (int v = 0; v < T.nv; v++) r[v] += clipped_delta[v];
-  return true;
-}
-
-// Build the 3-D gauge basis Q (12×3 orthonormal columns) at the current
-// iterate r.  The k-th gauge mode in r-space is δr^{(k)}_v = −ê_k · p̂_v
-// with p̂_v = p_v / r_v (apex at origin), the change in r induced by
-// translating the apex by ê_k.  Returns Q as 3 row vectors of length n,
-// or empty if Gram-BFS fails / basis is rank-deficient.
-std::vector<std::vector<double>> basis(const DelaunayTriangulation& T,
-                                         const std::vector<double>& r) {
-  auto pos = Reconstruct::from_radii(T, r);
-  if ((int)pos.size() != T.nv) return {};
-  for (const auto& p : pos)
-    if (std::isnan(p[0]) || std::isnan(p[1]) || std::isnan(p[2])) return {};
-
-  int n = T.nv;
-  std::vector<std::vector<double>> Q(3, std::vector<double>(n));
-  for (int v = 0; v < n; v++) {
-    double inv_r = (r[v] > 1e-15) ? 1.0 / r[v] : 0.0;
-    for (int k = 0; k < 3; k++)
-      Q[k][v] = -pos[v][k] * inv_r;
-  }
-  // Modified Gram-Schmidt
-  for (int k = 0; k < 3; k++) {
-    for (int j = 0; j < k; j++) {
-      double dot = 0;
-      for (int v = 0; v < n; v++) dot += Q[k][v] * Q[j][v];
-      for (int v = 0; v < n; v++) Q[k][v] -= dot * Q[j][v];
-    }
-    double norm2 = 0;
-    for (int v = 0; v < n; v++) norm2 += Q[k][v] * Q[k][v];
-    double norm = std::sqrt(norm2);
-    if (norm < 1e-12) return {};   // basis rank-deficient
-    for (int v = 0; v < n; v++) Q[k][v] /= norm;
-  }
-  return Q;
-}
-
-// Project step Δr onto gauge-orthogonal subspace: Δr ← Δr − Q Qᵀ Δr.
-// No-op if Q is empty.
-void project_step(std::vector<double>& delta,
-                   const std::vector<std::vector<double>>& Q) {
-  for (const auto& q : Q) {
-    double dot = 0;
-    for (size_t i = 0; i < delta.size(); i++) dot += q[i] * delta[i];
-    for (size_t i = 0; i < delta.size(); i++) delta[i] -= dot * q[i];
-  }
-}
-
-} // namespace Gauge
 
 // ============================================================================
 // Layer 1: Generalized Convex Polytope observables
@@ -388,137 +292,12 @@ matrix<double> jacobian(const DelaunayTriangulation& T, const vector<double>& r)
 // ============================================================================
 
 // The linear-algebra primitives — vector reductions, the cyclic-Jacobi
-// eigensolver, the LU with determinant sign, and the truncated
-// pseudoinverse — live in fullerenes/dense_linalg.hh (namespace LinAlg);
-// the vector arithmetic operators come from auxiliary.hh's global
-// templates.  BorderedLA adds only the solver's PALC-shaped
-// bordered-system compositions on top.
-namespace BorderedLA {
-
-using namespace ::LinAlg;
-using ::LinAlg::SymEigen::decompose;
-using ::LinAlg::SymEigen::apply;
-using ::LinAlg::SymEigen::signature;
-using ::LinAlg::SymEigen::Signature;
-
-// Pseudo-arc-length bordered system, treated as a first-class object:
-//
-//   B = [   J         −κ₁     ]    (n × (n+1))
-//       [   r_dotᵀ     t_dot  ]    (1 × (n+1))
-//
-// .solve(neg_F, g) returns (δr, δt, sign(det B)) by the bordering
-// algorithm: two n-solves with J share an LU, and
-//   det(B) = det(J) · (t_dot + r_dotᵀ · J⁻¹ · κ₁)
-// by Schur complement, so the sign is free.
-struct Bordered {
-  const matrix<double>& J;
-  const V&              kappa1;
-  const V&              r_dot;
-  double                t_dot;
-
-  struct Solution { V dr; double dt; int det_sign; };
-
-  // Pre: J is n×n; kappa1, r_dot are n-vectors; neg_F is n-vector; g is scalar.
-  // Post on success: B · [dr; dt] = [neg_F; g] within working precision,
-  //                  and det_sign ∈ {−1, +1} is sign(det B).
-  // Post on failure: LuFail::Singular if J near-singular or denominator near 0.
-  std::expected<Solution, LuFail> solve(const V& neg_F, double g) const {
-    auto z1 = solve_with_sign(J, neg_F);
-    if (!z1) return std::unexpected(z1.error());
-    
-    auto z2 = solve_with_sign(J, kappa1);
-    if (!z2) return std::unexpected(z2.error());
-
-    double den = t_dot + dot(r_dot, z2->x);
-    if (fabs(den) < 1e-30) return std::unexpected(LuFail::Singular);
-    
-    double dt = (g - dot(r_dot, z1->x)) / den;
-    V      dr = z1->x + z2->x * dt;
-    int sign_den = (den > 0) - (den < 0);   // {−1, +1}
-    return Solution{std::move(dr), dt, z1->det_sign * sign_den};
-  }
-};
-
-// --- Symmetric truncated-pseudoinverse solve ---
-//
-// J is the Hessian of the BI total scalar curvature H, hence symmetric.
-// Its spectral decomposition  J = Q · diag(λ) · Qᵀ  yields the pseudo-
-// inverse  J⁺ = Q · diag(λ⁺) · Qᵀ  with (λ⁺)ᵢ = 1/λᵢ when |λᵢ| > rcond·
-// max|λ|, else 0.
-//
-// For the bordered system   B = [J -κ₁; τᵀ τ_t]   used in the PALC
-// corrector, we apply the symmetric pseudoinverse twice via the standard
-// bordering algorithm rather than directly factoring the (non-symmetric)
-// 13×13 B.  This has three benefits:
-//
-//   1. Half the work: one n×n eigendecomposition cached, applied twice.
-//   2. The bordered solution exactly satisfies the arc-length constraint
-//      and lies in image(J) = ker(J)^⊥ — the gauge-orthogonal subspace.
-//      Residual is confined to ker(J), the translation gauge of κ, where
-//      it is harmless to homotopy convergence by translation invariance.
-//   3. The eigenvalues yield the Lorentzian signature directly, giving
-//      a per-step diagnostic that distinguishes the BI failure classes
-//      (drum-cap, soft-kernel, fold) empirically.
-//
-// decompose/apply/signature are dense_linalg primitives; only the
-// PALC-shaped bordered composition lives here.
-
-// Bordered solve via bordering algorithm + ONE symmetric eigendecomp of J.
-//
-//   B·[Δr; Δt] = [-F; g]    where    B = [J -κ₁; τ_rᵀ τ_t]
-//
-// Decompose J once, apply the truncated pseudoinverse twice (cached):
-//   z₁ = J⁺·(-F)
-//   z₂ = J⁺·κ₁
-//   Δt = (g − τ_r·z₁) / (τ_t + τ_r·z₂)
-//   Δr = z₁ + z₂·Δt
-// Bottom row (arc-length closure) is satisfied EXACTLY by construction.
-// Top row is satisfied exactly within image(J); residual lives in ker(J),
-// which is the translation gauge of κ — a direction along which κ is
-// invariant, so the residual is harmless to homotopy convergence.
-struct BorderedSolution {
-  V         dr;
-  double    dt             = 0;
-  int       rank           = 0;
-  double    lambda_abs_min = 0;
-  double    lambda_abs_max = 0;
-  Signature sig            = {0, 0, 0};
-};
-
-BorderedSolution bordered_solve(const matrix<double>& J, const V& kappa1,
-                                 const V& tau_r, double tau_t,
-                                 const V& neg_F, double g, double rcond) {
-  auto d = decompose(J);
-  if (d.lambda.empty()) return {};
-  double lam_max = 0;
-  for (double l : d.lambda) lam_max = std::max(lam_max, std::fabs(l));
-  double cutoff = rcond * lam_max;
-  auto   r1     = apply(d, neg_F, cutoff);
-  auto   r2     = apply(d, kappa1, cutoff);
-  double den    = tau_t + dot(tau_r, r2.x);
-  if (std::fabs(den) < 1e-30) return {};
-  double dt     = (g - dot(tau_r, r1.x)) / den;
-  V      dr     = r1.x;
-  for (size_t i = 0; i < dr.size(); i++) dr[i] += r2.x[i] * dt;
-  // r1.rank == r2.rank since both share (Q, λ, cutoff); take r1's.
-  double lam_min = (r1.lambda_min_kept > 0) ? r1.lambda_min_kept : 0;
-  return {std::move(dr), dt, r1.rank, lam_min, lam_max,
-          signature(d.lambda, cutoff)};
-}
-
-// Predicate: TSVD-solve outcome is acceptable.
-// Up to 3 truncations is the gauge regime; more indicates non-gauge
-// collapse and the caller should treat as failure.
-bool tsvd_ok(int rank, int n) {
-  return rank >= n - 3;
-}
-
-} // namespace BorderedLA
-
-// Bring vector ops into scope for readability
+// eigensolver, and the LU with determinant sign — live in
+// fullerenes/dense_linalg.hh (namespace LinAlg); the vector arithmetic
+// operators come from auxiliary.hh's global templates.
 using LinAlg::V;
 
-// Pack one PALC- or Newton-step diagnostic into a TraceEntry.  Caller
+// Pack one continuation- or Newton-step diagnostic into a TraceEntry.  Caller
 // decides whether to record (avoids the cost of κ and J spectrum when
 // trace_jacobian is off); this just bundles the fields.
 static AlexandrovSolver::TraceEntry make_trace(
@@ -548,7 +327,25 @@ static double mean_edge_length(const DelaunayTriangulation& T) {
   return (n_e > 0) ? sum_l / n_e : 1.0;
 }
 
-// Pack one PALC- or Newton-step trajectory-diagnostic record.  Cheap to
+// Six times the signed volume enclosed by pos under T's face structure:
+// Σ_f a·(b×c) over live faces (signed tetrahedra from the origin) —
+// positive iff the CCW half-edge convention has outward normals.  The
+// same divergence-theorem quantity as PolyhedronView::volume_tetra, on
+// (DCEL, pos) data.  Used by the outward-orientation flip, the volume-
+// degeneracy gate, and the convexity precondition.
+static double signed_volume6(const DelaunayTriangulation& T,
+                              const vector<coord3d>& pos) {
+  double vol6 = 0;
+  for (int f = 0; f < T.nf; f++) {
+    if (T.f_he[f] < 0) continue;
+    int ha = T.f_he[f], hb = T.he_next[ha], hc = T.he_next[hb];
+    vol6 += pos[T.he_origin[ha]].dot(
+              pos[T.he_origin[hb]].cross(pos[T.he_origin[hc]]));
+  }
+  return vol6;
+}
+
+// Pack one continuation- or Newton-step trajectory-diagnostic record.  Cheap to
 // compute (O(nh) for theta + h_sq scans, plus one LU for det sign);
 // gated by AlexandrovSolver::record_diag at call site.
 static AlexandrovSolver::DiagEntry make_diag(
@@ -565,7 +362,7 @@ static AlexandrovSolver::DiagEntry make_diag(
   int n01 = 0, n001 = 0, n0001 = 0, n_alive = 0;
   for (int h = 0; h < T.nh; h += 2) {
     if (!T.alive(h)) continue;
-    if (T.he_face[h] == T.he_face[h ^ 1]) continue;  // bigon — θ undefined
+    if (T.is_bigon(h)) continue;                     // θ undefined on bigons
     double th = GCP::theta(T, r, h);
     if (!std::isfinite(th)) continue;
     n_alive++;
@@ -700,21 +497,14 @@ namespace Topology {
 // is needed because we start the homotopy from a Δ-complex iDT — bigon
 // faces may be present and need flipping during the path to maintain
 // Q-concavity.
-// `margin` parameterizes how strictly the iterate is held inside P(M):
-//   margin = -1e-10  closure with numerical noise buffer (existing behavior;
-//                    flip when θ > π + 1e-10 or q_j < q_i − ℓ²_ij − 1e-10)
-//   margin = 0       exact closure (boundary triggers a flip)
-//   margin = c > 0   strict-interior with safety distance c from ∂P(M):
-//                    flip when θ > π − c or q_j < q_i − ℓ²_ij + c
-// PALC uses a t-dependent schedule c·t so the margin shrinks to 0 as t → 0,
-// allowing legitimate flat-face diagonals (θ → π) at the polytope limit
-// while pushing the path strictly inside at intermediate t.  At t = 0
-// (Newton polish) the default margin = -1e-10 reproduces the closure check.
-int needs_flip(const DelaunayTriangulation& T, const vector<double>& r,
-                double margin = -1e-10) {
+// Closure is checked with a −1e-10 numerical-noise buffer: flip when
+// θ > π + 1e-10, resp. q_j < q_i − ℓ²_ij − 1e-10, so that legitimate
+// flat-face diagonals (θ → π at the polytope limit) do not trigger flips.
+int needs_flip(const DelaunayTriangulation& T, const vector<double>& r) {
+  constexpr double margin = -1e-10;   // closure buffer
   // (ConcQuadr): edge with two distinct adjacent triangles, θ > π − margin.
-  // For a bigon edge (he_face[h] == he_face[h^1]), GCP::theta is not
-  // meaningful; skip and let the (CloGeod) pass below handle it.
+  // For a bigon edge, GCP::theta is not meaningful; skip and let the
+  // (CloGeod) pass below handle it.
   // NaN θ — returned by alpha() when the abstract pyramid is degenerate
   // (h_sq < 0, i.e. Cayley-Menger fails) — also counts as bad: the
   // configuration is outside P(M) and a flip is required.  IEEE
@@ -722,14 +512,14 @@ int needs_flip(const DelaunayTriangulation& T, const vector<double>& r,
   double theta_threshold = M_PI - margin;
   for (int h = 0; h < T.nh; h += 2) {
     if (!T.alive(h)) continue;
-    if (T.he_face[h] == T.he_face[h ^ 1]) continue;       // bigon — handled below
+    if (T.is_bigon(h)) continue;                           // handled below
     double theta = GCP::theta(T, r, h);
     if (std::isnan(theta) || theta > theta_threshold) return h;
   }
   // (CloGeod): bigon i–j edge of an iji-face, q_j < q_i − ℓ²_ij + margin.
   for (int h = 0; h < T.nh; h += 2) {
     if (!T.alive(h)) continue;
-    if (T.he_face[h] != T.he_face[h ^ 1]) continue;       // not a bigon
+    if (!T.is_bigon(h)) continue;
     int u = T.he_origin[h], v = T.dest(h);
     if (u == v) continue;                                  // pure self-loop, not i–j edge
     // Identify i (the doubled vertex) and j (the single vertex) from the
@@ -750,13 +540,12 @@ int needs_flip(const DelaunayTriangulation& T, const vector<double>& r,
   return -1;
 }
 
-// Flip until needs_flip(T, r, margin) returns -1 (or 20 iter cap).
+// Flip until needs_flip(T, r) returns -1 (or 20 iter cap).
 // Returns number of flips performed.
-int flip_to_weighted_delaunay(DelaunayTriangulation& T, const vector<double>& r,
-                      double margin = -1e-10) {
+int flip_to_weighted_delaunay(DelaunayTriangulation& T, const vector<double>& r) {
   int total = 0;
   for (int iter = 0; iter < 20; iter++) {
-    int h = needs_flip(T, r, margin);
+    int h = needs_flip(T, r);
     if (h < 0) break;
     if (T.flip_edge(h)) total++;
     else break;
@@ -764,88 +553,18 @@ int flip_to_weighted_delaunay(DelaunayTriangulation& T, const vector<double>& r,
   return total;
 }
 
-// Synchronized batch multi-flip (Direction 2).  Identify all alive
-// non-bigon edges with θ > π − threshold, then flip them all in one
-// pass.  Single-edge flip cycles (which defeat sequential flip_to_-
-// delaunay on the symmetric drum-cap metrics) cannot occur here
-// because no θ re-evaluation happens between flips in the batch.
-// Returns number of flips actually performed (some may have been
-// skipped if they share vertices with an earlier flip in the batch
-// and are no longer alive by the time we reach them).
-int batch_multi_flip(DelaunayTriangulation& T, const vector<double>& r,
-                      double threshold) {
-  if (threshold <= 0) return 0;
-  vector<int> targets;
-  double cutoff = M_PI - threshold;
-  for (int h = 0; h < T.nh; h += 2) {
-    if (!T.alive(h)) continue;
-    if (T.he_face[h] == T.he_face[h ^ 1]) continue;       // bigon
-    double theta = GCP::theta(T, r, h);
-    if (std::isnan(theta) || theta > cutoff) targets.push_back(h);
-  }
-  int total = 0;
-  for (int h : targets) {
-    if (!T.alive(h)) continue;                             // killed by earlier flip
-    if (T.flip_edge(h)) total++;
-  }
-  return total;
-}
-
 } // namespace Topology
 
 // ============================================================================
-// Layer 5: Pseudo-arc-length continuation (Keller 1977)
+// Layer 5: Natural t-continuation of the BI homotopy
 //
-// Traces the homotopy curve F(t,r) = κ(r) − t·κ₁ = 0 using predictor-
-// corrector steps parameterized by arc length.  The bordering algorithm
-// solves the augmented (n+1)×(n+1) system using only n×n solves.
+// Traces the homotopy curve F(t,r) = κ(r) − t·κ₁ = 0 from t=1 toward t=0
+// by predictor-corrector steps in t.  (The legacy pseudo-arc-length
+// tracker and its experiment apparatus are retired to
+// attic/delaunay_alexandrov_palc.cc.attic.)
 // ============================================================================
 
-namespace PALC {
-
-// Deflation context for Direction 4: augments the homotopy residual by
-// a repulsive term centered at `target` with magnitude `strength`.
-//   F(r, t) → F(r, t) + (1 − t) · α · (r − r*) / ‖r − r*‖²
-// active() ⇒ apply.  inactive Deflation is the identity transformation
-// — F, J, and κ₁ are returned unchanged.
-struct Deflation {
-  vector<double> target;
-  double         strength = 0.0;
-
-  bool active(int n) const {
-    return strength > 0 && (int)target.size() == n;
-  }
-
-  // D(r) = α · (r − r*) / ‖r − r*‖²
-  vector<double> D(const vector<double>& r) const {
-    int n = (int)r.size();
-    vector<double> delta(n), out(n);
-    double dn2 = 0;
-    for (int i = 0; i < n; i++) { delta[i] = r[i] - target[i]; dn2 += delta[i]*delta[i]; }
-    if (dn2 < 1e-30) return out;   // singular at target — caller should avoid
-    double s = strength / dn2;
-    for (int i = 0; i < n; i++) out[i] = s * delta[i];
-    return out;
-  }
-
-  // ∂D_i/∂r_j = α/‖δ‖² · (δ_ij − 2·δ_i·δ_j/‖δ‖²)
-  matrix<double> dDdr(const vector<double>& r) const {
-    int n = (int)r.size();
-    matrix<double> dD(n, n, 0.0);
-    vector<double> delta(n);
-    double dn2 = 0;
-    for (int i = 0; i < n; i++) { delta[i] = r[i] - target[i]; dn2 += delta[i]*delta[i]; }
-    if (dn2 < 1e-30) return dD;
-    double s = strength / dn2;
-    double inv_dn2 = 1.0 / dn2;
-    for (int i = 0; i < n; i++)
-      for (int j = 0; j < n; j++)
-        dD(i, j) = s * ((i == j ? 1.0 : 0.0) - 2.0 * delta[i] * delta[j] * inv_dn2);
-    return dD;
-  }
-};
-
-struct Tangent { double t_dot; vector<double> r_dot; };
+namespace Continuation {
 
 // Homotopy velocity dr/dt = J⁻¹κ₁ along κ(r)=t·κ₁ (the un-normalized tangent
 // direction). Returns an invalid vector (LinAlg::is_valid == false) if J is
@@ -854,119 +573,17 @@ V dr_dt(const matrix<double>& J, const V& kappa1) {
   return LinAlg::solve(J, kappa1);
 }
 
-// PALC unit tangent (ṫ, ṙ) at (t, r): from J·ṙ = κ₁·ṫ and ‖(ṫ, ṙ)‖ = 1, ṫ < 0.
-Tangent compute_tangent(const matrix<double>& J, const vector<double>& kappa1) {
-  auto v = dr_dt(J, kappa1);
-  if (!LinAlg::is_valid(v))
-    return {-1.0, vector<double>(kappa1.size(), 0.0)};
-  double vn = LinAlg::norm(v);
-  double td = -1.0 / sqrt(1.0 + vn * vn);
-  vector<double> rd(v.size());
-  for (size_t i = 0; i < v.size(); i++) rd[i] = v[i] * td;
-  return {td, rd};
-}
-
-// Predictor: Euler step along tangent by arc length ds.
-pair<double, V> predict(double t, const V& r, const Tangent& tau, double ds) {
-  return { t + tau.t_dot * ds,  r + tau.r_dot * ds };
-}
-
-// Arc-length residual:  g = ds − τ_r·(r − r₀) − τ_t·(t − t₀)
-// (Closure of the predictor-corrector arc to length ds.)
-double arc_residual(double t, const V& r, double t0, const V& r0,
-                     const Tangent& tau, double ds) {
-  return ds - LinAlg::dot(tau.r_dot, r - r0) - tau.t_dot * (t - t0);
-}
-
-// Cap step magnitude to a trust radius.  No-op if already inside.
-V scale_to_radius(const V& dr, double radius) {
-  double n = LinAlg::norm(dr);
-  return (n > radius) ? dr * (radius / n) : dr;
-}
-
-// Apply the deflation modification (in place) to F, J, and κ₁_eff.
-// Models F_def = F + (1−t)·D(r);  J_def = J + (1−t)·∂D/∂r;  κ₁_eff = κ₁ + D(r).
-// No-op if defl is null or inactive.
-void apply_deflation(const Deflation* defl, double t, const V& r,
-                      V& F, matrix<double>& J, V& kappa1_eff) {
-  if (!defl || !defl->active((int)r.size())) return;
-  auto Dvec = defl->D(r);
-  auto dD   = defl->dDdr(r);
-  double w  = 1.0 - t;
-  for (size_t i = 0; i < F.size(); i++)         F[i]          += w * Dvec[i];
-  for (int    i = 0; i < J.m;       i++)
-    for (int  j = 0; j < J.n;       j++)        J(i, j)       += w * dD(i, j);
-  for (size_t i = 0; i < kappa1_eff.size(); i++) kappa1_eff[i] += Dvec[i];
-}
-
-// Corrector: Newton on the bordered system at each iterate.
-//
-// Two modes:
-//   use_tsvd = false  →  classic Bordered LU solve.  Standard Newton.
-//   use_tsvd = true   →  TSVD pseudoinverse on the bordered matrix.
-//                         Truncates singular values below rcond·σ_max,
-//                         producing the unique gauge-orthogonal min-norm
-//                         step.  See tsvd-design.md.
-//
-// Returns number of iterations (−1 on failure).
-int correct(const DelaunayTriangulation& T, double& t, V& r,
-            const V& kappa1, const Tangent& tau0,
-            double t0, const V& r0, double ds,
-            int max_iter, double tol,
-            const Deflation* defl = nullptr,
-            bool use_tsvd = false,
-            double rcond = 5e-3) {
-  for (int nit = 0; nit < max_iter; nit++) {
-    auto F          = GCP::kappa(T, r) - kappa1 * t;
-    auto J          = GCP::jacobian(T, r);
-    auto kappa1_eff = kappa1;
-    apply_deflation(defl, t, r, F, J, kappa1_eff);
-
-    if (LinAlg::max_abs(F) < tol) return nit;
-
-    double g = arc_residual(t, r, t0, r0, tau0, ds);
-
-    if (use_tsvd) {
-      // Symmetric pseudoinverse on J + bordering algorithm.
-      auto sol = BorderedLA::bordered_solve(
-                    J, kappa1_eff, tau0.r_dot, tau0.t_dot, -F, g, rcond);
-      if (sol.dr.empty() || !BorderedLA::tsvd_ok(sol.rank, J.m)) return -1;
-      // Step-norm termination: TSVD truncates 2–3 directions where κ
-      // is invariant, so the corrector cannot drive |F| to zero there
-      // — there is an irreducible kernel residual at O(rcond·σ_max).
-      // When the proposed step is tiny, no further progress is possible;
-      // accept.  Scaled by ‖r‖ to auto-adapt to problem size.
-      double step  = LinAlg::norm(sol.dr) + std::fabs(sol.dt);
-      double scale = LinAlg::norm(r) + 1.0;
-      if (step < tol * scale) return nit;
-      t += sol.dt;
-      r  = r + sol.dr;
-    } else {
-      BorderedLA::Bordered B{J, kappa1_eff, tau0.r_dot, tau0.t_dot};
-      auto sol = B.solve(-F, g);
-      if (!sol) return -1;
-      t += sol->dt;
-      r  = r + sol->dr;
-    }
-  }
-  return max_iter;
-}
-
 // Adapt step size based on corrector iterations (AUTO strategy).
-double adapt_ds(double ds, int nit, int max_nit, double ds_max) {
-  if (nit <= 1) ds *= 2.0;
-  else if (nit == 2) ds *= 1.5;
-  else if (nit <= max_nit / 2) ds *= 1.1;
-  else if (nit >= max_nit) ds *= 0.5;
-  return min(fabs(ds), ds_max);
+double adapt_dt(double dt, int nit, int max_nit, double dt_max) {
+  if (nit <= 1) dt *= 2.0;
+  else if (nit == 2) dt *= 1.5;
+  else if (nit <= max_nit / 2) dt *= 1.1;
+  else if (nit >= max_nit) dt *= 0.5;
+  return min(fabs(dt), dt_max);
 }
-
-// ---- Structured PALC primitives (step 3 of Tier-2 plan) ----
 
 constexpr int CORRECTOR_MAX_ITER = 8;
 constexpr double CORRECTOR_TOL = 1e-12;
-constexpr double DS_MIN = 1e-15;
-constexpr double DS_MAX = 0.5;
 
 // One predictor-corrector step.  Returns the corrector iteration count
 // alongside the (t, r) iterate — always present; "accepted" iff
@@ -977,32 +594,7 @@ struct StepResult {
   bool accepted() const { return nit >= 0 && nit < CORRECTOR_MAX_ITER; }
 };
 
-// Pre:  (t₀, r₀) ∈ F(T) with 0 < κᵢ(t₀, r₀) for the BI homotopy.
-// Post: if accepted(), (t, r) is on the homotopy path at arc-length
-//       distance ds from (t₀, r₀), to within CORRECTOR_TOL.
-StepResult palc_step(const DelaunayTriangulation& T,
-                      double t0, const V& r0, const V& kappa1,
-                      const matrix<double>& J, double ds,
-                      const Deflation* defl = nullptr,
-                      bool use_tsvd = false,
-                      double rcond = 5e-3) {
-  // Tangent on the deflated curve uses J_def and κ₁_eff.
-  matrix<double> J_eff = J;
-  V kappa1_eff = kappa1;
-  if (defl && defl->active((int)r0.size())) {
-    V F_dummy(r0.size(), 0.0);
-    apply_deflation(defl, t0, r0, F_dummy, J_eff, kappa1_eff);
-  }
-  auto tau = compute_tangent(J_eff, kappa1_eff);
-  auto [tp, rp] = predict(t0, r0, tau, ds);
-  double tc = tp; V rc = rp;
-  int nit = correct(T, tc, rc, kappa1, tau, t0, r0, ds,
-                     CORRECTOR_MAX_ITER, CORRECTOR_TOL, defl,
-                     use_tsvd, rcond);
-  return {nit, tc, std::move(rc)};
-}
-
-struct PALCStats {
+struct TrackStats {
   int steps = 0, flips = 0, newton_total = 0;
 };
 
@@ -1010,7 +602,7 @@ struct TrackResult {
   double t_final;
   V r_final;
   vector<pair<double, V>> history;
-  PALCStats stats;
+  TrackStats stats;
 };
 
 // Initial radii for the BI homotopy: r = 2·R_max·1.
@@ -1023,10 +615,10 @@ V initial_radii(const DelaunayTriangulation& T) {
   return V(T.nv, 2 * R);
 }
 
-// Plain (un-bordered) Newton driving κ(r) → target: r −= J⁻¹(κ(r) − target).
+// Plain Newton driving κ(r) → target: r −= J⁻¹(κ(r) − target).
 // Returns the iteration count: nit ∈ [0, max_iter) converged to tol, max_iter
-// if not, −1 on a failed linear solve. (PALC's `correct` is the bordered
-// analogue that also advances t; Newton::polish is the trust-region κ→0 one.)
+// if not, −1 on a failed linear solve.  (Newton::polish is the trust-region
+// κ→0 analogue.)
 int newton_correct(const DelaunayTriangulation& T, V& r, const V& target,
                    double tol, int max_iter) {
   for (int nit = 0; nit < max_iter; nit++) {
@@ -1052,8 +644,7 @@ int newton_correct(const DelaunayTriangulation& T, V& r, const V& target,
 // dimensionless homotopy parameter with the length-dimensioned radii the way
 // the PALC arclength ds²=dt²+‖dr‖² does (the root cause of PALC's scale bug).
 
-// Step bounds on dt. Unlike the PALC DS_* bounds (which measure (t,r)-space
-// arclength), dt steps the dimensionless homotopy parameter t∈[0,1] directly:
+// Step bounds on dt, the dimensionless homotopy parameter t∈[0,1]:
 // DT_MAX caps it at 10% of the t-range per step; DT_MIN is the give-up floor.
 constexpr double DT_MIN = 1e-9;
 constexpr double DT_MAX = 0.1;
@@ -1071,148 +662,56 @@ StepResult natural_step(const DelaunayTriangulation& T,
   return nit < 0 ? StepResult{-1, t1, r0} : StepResult{nit, t1, std::move(r)};
 }
 
-// Policy for the shared continuation driver: target, step-size bounds, whether
-// to clamp the step against overshooting t_target (natural), and the PALC-only
-// symmetry-escape knobs (stochastic perturbation, batch multi-flip).
-struct ContinuationParams {
-  double t_target;
-  double h_init, h_min, h_max;
-  bool clamp_to_target;
-  double interior_margin_coeff = 0.0;
-  double stochastic_eps = 0.0;
-  uint32_t stochastic_seed = 1;
-  double batch_multiflip_threshold = 0.0;
-  bool gauge_snap = false;        // PALC-only translation-gauge canonicalisation
-};
-
-// Post-accept bookkeeping for one accepted continuation step: re-Delaunay-flip
-// (strict-interior margin c·t, →0 at t=0 where flat-face diagonals legitimately
-// reach θ→π; c=0 uses the −1e-10 closure buffer), apply the PALC symmetry-escape
-// moves (batch multi-flip, stochastic perturbation — off unless enabled), and
-// record (t, r) in the history.
-void on_accept(DelaunayTriangulation& T, V& r, PALCStats& stats,
-               vector<pair<double, V>>& history, double t,
-               const ContinuationParams& p, std::mt19937& rng) {
-  double margin = (p.interior_margin_coeff > 0) ? p.interior_margin_coeff * t
-                                                : -1e-10;
-  stats.flips += Topology::flip_to_weighted_delaunay(T, r, margin);
-  if (p.batch_multiflip_threshold > 0) {
-    int bf = Topology::batch_multi_flip(T, r, p.batch_multiflip_threshold);
-    if (bf > 0) {
-      stats.flips += bf;
-      stats.flips += Topology::flip_to_weighted_delaunay(T, r, margin);
-    }
-  }
-  if (p.stochastic_eps > 0) {
-    std::uniform_real_distribution<double> jitter(-1.0, 1.0);
-    for (size_t i = 0; i < r.size(); i++)
-      r[i] *= 1.0 + p.stochastic_eps * jitter(rng);
-  }
-  // Translation-gauge fixing (Direction 5): canonicalise r to the apex-at-
-  // centroid representative of its translation orbit.  Gated on small-κ iterates
-  // (Gram-BFS positions are a B-I generalized polytope, not a real one, at high
-  // κ).  PALC-only — natural continuation leaves p.gauge_snap = false.
-  if (p.gauge_snap && LinAlg::max_abs(GCP::kappa(T, r)) < 0.5)
-    Gauge::snap(T, r);
+// Record (t, r) in the extrapolation history, collapsing same-t entries
+// (a re-accepted step at unchanged t replaces its predecessor).
+void record_history(vector<pair<double, V>>& history, double t, const V& r) {
   if (!history.empty() && fabs(t - history.back().first) < 1e-14)
     history.back() = {t, r};
   else
     history.push_back({t, r});
 }
 
-// ---- Shared continuation driver ----
-//
-// Trace κ(r)=t·κ₁ from t=1 toward p.t_target by repeated predictor-corrector
-// `step`s, re-Delaunay-flipping after each accepted step (on_accept) and
-// adapting the step size h.  PALC and natural continuation are the two `step`
-// kernels; they differ only in the kernel and the ContinuationParams.
-//   Pre:  r ∈ F(T), 0 < κᵢ(T, r) < δᵢ, p.t_target > 0.
-//   Post: t_final ≤ p.t_target if the continuation reached it, else it stalled.
-template <class StepFn>
-TrackResult continuation_loop(DelaunayTriangulation& T, V r, const V& kappa1,
-                              const StepFn& step, char phase,
-                              const ContinuationParams& p,
-                              vector<AlexandrovSolver::TraceEntry>* trace,
-                              vector<AlexandrovSolver::DiagEntry>* diag,
-                              vector<AlexandrovSolver::TrajEntry>* traj) {
-  double t = 1.0, h = p.h_init;
-  vector<pair<double, V>> history;
-  PALCStats stats;
-  std::mt19937 rng(p.stochastic_seed);
-
-  for (int step_i = 0; step_i < 500 && t > p.t_target; step_i++) {
-    auto J = GCP::jacobian(T, r);
-    double h_eff = p.clamp_to_target ? min(h, t - p.t_target) : h;
-    auto result = step(T, t, r, kappa1, J, h_eff);
-
-    if (result.accepted()) {
-      t = result.t; r = std::move(result.r);
-      on_accept(T, r, stats, history, t, p, rng);
-      h = adapt_ds(h, result.nit, CORRECTOR_MAX_ITER, p.h_max);
-    } else {
-      h *= 0.5;
-      if (h < p.h_min) break;
-    }
-    if (trace)
-      trace->push_back(make_trace(phase, step_i, t, h, result.nit,
-                                   GCP::kappa(T, r), J));
-    if (diag) {
-      auto Jd = GCP::jacobian(T, r);  // J on the (possibly post-flip) state
-      diag->push_back(make_diag(phase, step_i, t, h, result.nit,
-                                  T, r, GCP::kappa(T, r), Jd, stats.flips));
-    }
-    if (traj)
-      traj->push_back(make_traj(phase, step_i, t, T, r, GCP::kappa(T, r)));
-    stats.steps++;
-    stats.newton_total += max(result.nit, 0);
-  }
-  return {t, std::move(r), std::move(history), stats};
-}
-
-// Pseudo-arclength continuation (legacy; arclength is scale-dependent). Kept
-// for comparison via AlexandrovSolver::Continuation::PALC.
-TrackResult palc_track(DelaunayTriangulation& T, V r, const V& kappa1,
-                        double t_target, double ds_init,
-                        vector<AlexandrovSolver::TraceEntry>* trace,
-                        vector<AlexandrovSolver::DiagEntry>* diag,
-                        vector<AlexandrovSolver::TrajEntry>* traj = nullptr,
-                        double interior_margin_coeff = 0.0,
-                        double stochastic_eps = 0.0,
-                        uint32_t stochastic_seed = 1,
-                        double batch_multiflip_threshold = 0.0,
-                        const Deflation* deflation = nullptr,
-                        bool gauge_snap = false,
-                        bool use_tsvd = false,
-                        double rcond = 5e-3) {
-  auto kernel = [&](const DelaunayTriangulation& T_, double t_, const V& r_,
-                    const V& k1_, const matrix<double>& J_, double ds_) {
-    return palc_step(T_, t_, r_, k1_, J_, ds_, deflation,
-                     use_tsvd, rcond);
-  };
-  ContinuationParams p{.t_target = t_target, .h_init = ds_init,
-                       .h_min = DS_MIN, .h_max = DS_MAX,
-                       .clamp_to_target = false,
-                       .interior_margin_coeff = interior_margin_coeff,
-                       .stochastic_eps = stochastic_eps,
-                       .stochastic_seed = stochastic_seed,
-                       .batch_multiflip_threshold = batch_multiflip_threshold,
-                       .gauge_snap = gauge_snap};
-  return continuation_loop(T, std::move(r), kappa1, kernel, 'P', p, trace, diag, traj);
-}
-
-// Natural t-continuation (the default). Scale-invariant; the path is monotone,
-// so the PALC symmetry-escape and gauge-fixing knobs are unused.
+// Natural t-continuation: trace κ(r)=t·κ₁ from t=1 toward t_target by
+// natural_step predictor-corrector steps, re-Delaunay-flipping after each
+// accepted step and adapting dt (clamped against overshooting t_target).
+//   Pre:  r ∈ F(T), 0 < κᵢ(T, r) < δᵢ, t_target > 0.
+//   Post: t_final ≤ t_target if the continuation reached it, else it stalled.
 TrackResult natural_track(DelaunayTriangulation& T, V r, const V& kappa1,
                           double t_target, double dt_init,
                           vector<AlexandrovSolver::TraceEntry>* trace,
                           vector<AlexandrovSolver::DiagEntry>* diag,
-                          vector<AlexandrovSolver::TrajEntry>* traj = nullptr,
-                          double interior_margin_coeff = 0.0) {
-  ContinuationParams p{.t_target = t_target, .h_init = dt_init,
-                       .h_min = DT_MIN, .h_max = DT_MAX,
-                       .clamp_to_target = true,
-                       .interior_margin_coeff = interior_margin_coeff};
-  return continuation_loop(T, std::move(r), kappa1, natural_step, 'T', p, trace, diag, traj);
+                          vector<AlexandrovSolver::TrajEntry>* traj = nullptr) {
+  double t = 1.0, dt = dt_init;
+  vector<pair<double, V>> history;
+  TrackStats stats;
+
+  for (int step_i = 0; step_i < 500 && t > t_target; step_i++) {
+    auto J = GCP::jacobian(T, r);
+    auto result = natural_step(T, t, r, kappa1, J, min(dt, t - t_target));
+
+    if (result.accepted()) {
+      t = result.t; r = std::move(result.r);
+      stats.flips += Topology::flip_to_weighted_delaunay(T, r);
+      record_history(history, t, r);
+      dt = adapt_dt(dt, result.nit, CORRECTOR_MAX_ITER, DT_MAX);
+    } else {
+      dt *= 0.5;
+      if (dt < DT_MIN) break;
+    }
+    if (trace)
+      trace->push_back(make_trace('T', step_i, t, dt, result.nit,
+                                   GCP::kappa(T, r), J));
+    if (diag) {
+      auto Jd = GCP::jacobian(T, r);  // J on the (possibly post-flip) state
+      diag->push_back(make_diag('T', step_i, t, dt, result.nit,
+                                  T, r, GCP::kappa(T, r), Jd, stats.flips));
+    }
+    if (traj)
+      traj->push_back(make_traj('T', step_i, t, T, r, GCP::kappa(T, r)));
+    stats.steps++;
+    stats.newton_total += max(result.nit, 0);
+  }
+  return {t, std::move(r), std::move(history), stats};
 }
 
 // Polynomial extrapolation: given (t_i, r_i) pairs approaching t=0,
@@ -1241,7 +740,7 @@ vector<double> extrapolate(const vector<pair<double, vector<double>>>& history) 
   return result;
 }
 
-} // namespace PALC
+} // namespace Continuation
 
 // ============================================================================
 // Layer 6a: Trust-region Newton for κ(r) = 0
@@ -1257,11 +756,7 @@ pair<bool, double> polish(DelaunayTriangulation& T, V& r,
                            std::vector<AlexandrovSolver::TraceEntry>* out_trace = nullptr,
                            std::vector<AlexandrovSolver::DiagEntry>* out_diag = nullptr,
                            std::vector<AlexandrovSolver::TrajEntry>* out_traj = nullptr,
-                           int* flips_cum = nullptr,
-                           bool gauge_snap = false,
-                           bool gauge_project = false,
-                           bool use_tsvd = false,
-                           double rcond = 5e-3) {
+                           int* flips_cum = nullptr) {
   using LinAlg::energy; using LinAlg::norm; using LinAlg::max_abs;
 
   double r_avg = LinAlg::dot(r, V(r.size(), 1.0)) / r.size();
@@ -1279,32 +774,8 @@ pair<bool, double> polish(DelaunayTriangulation& T, V& r,
 
     double E         = energy(kappa);
     auto   J         = GCP::jacobian(T, r);
-    // TSVD or trust-region Newton — both produce a candidate step.
-    // TSVD: min-norm pseudoinverse step capped to trust radius.
-    //       Naturally gauge-orthogonal at the current iterate.
-    // LM:   classic Levenberg-Marquardt-bisected trust-region step.
-    V delta_raw;
-    if (use_tsvd) {
-      // Symmetric pseudoinverse: J = Q diag(λ) Qᵀ, J⁺ truncates the
-      // soft kernel, Δr = -J⁺·κ is the gauge-orthogonal min-norm step.
-      auto sol = LinAlg::SymEigen::solve(J, -kappa, rcond);
-      if (sol.x.empty() || !BorderedLA::tsvd_ok(sol.rank, J.m)) {
-        rejects++;
-        if (out_trace)
-          out_trace->push_back(make_trace('N', iter, 0.0, Delta, 0, kappa, J));
-        continue;
-      }
-      delta_raw = PALC::scale_to_radius(sol.x, Delta);
-    } else {
-      delta_raw = TrustRegion::solve(J, kappa, Delta);
-    }
-    // Gauge step-projection: remove the 3-D translation-gauge component
-    // from the trust-region step before clipping to F(T).  Gated on
-    // |κ|_max < 0.5 (high-κ Gram-BFS positions are meaningless).
-    if (gauge_project && max_abs(kappa) < 0.5) {
-      auto Q = Gauge::basis(T, r);
-      if (!Q.empty()) Gauge::project_step(delta_raw, Q);
-    }
+    // Levenberg-Marquardt-bisected trust-region step.
+    V delta_raw = TrustRegion::solve(J, kappa, Delta);
     // Clip step to F(T): keep r_trial inside the feasibility region so
     // pyramids stay non-degenerate and κ(r_trial) is finite (no NaN θ on
     // multi-edges, no false |κ|=0 convergence outside F).  Same helper
@@ -1324,7 +795,6 @@ pair<bool, double> polish(DelaunayTriangulation& T, V& r,
     if (ok) {
       r = r_trial;
       flips_local += Topology::flip_to_weighted_delaunay(T, r);
-      if (gauge_snap) Gauge::snap(T, r);
       rejects = 0;
     } else rejects++;
 
@@ -1442,13 +912,8 @@ vector<coord3d> from_radii(const DelaunayTriangulation& T, const V& r) {
   }
 
   // Orient outward
-  double vol = 0;
-  for (int f = 0; f < T.nf; f++) {
-    if (T.f_he[f] < 0) continue;
-    int ha = T.f_he[f], hb = T.he_next[ha], hc = T.he_next[hb];
-    vol += pos[T.he_origin[ha]].dot(pos[T.he_origin[hb]].cross(pos[T.he_origin[hc]]));
-  }
-  if (vol < 0) for (auto& p : pos) p = p * (-1.0);
+  if (signed_volume6(T, pos) < 0)
+    for (auto& p : pos) p = p * (-1.0);
 
   return pos;
 }
@@ -1534,16 +999,7 @@ static AlexandrovSolver::ValidationStatus validate_polytope(
 
   // Compute volume_norm = |V| / ⟨ℓ⟩³ for the well-formedness gate and
   // diagnostic stat.
-  double vol6 = 0;
-  for (int f = 0; f < D.nf; f++) {
-    if (D.f_he[f] < 0) continue;
-    int ha = D.f_he[f];
-    int hb = D.he_next[ha];
-    int hc = D.he_next[hb];
-    vol6 += pos[D.he_origin[ha]].dot(
-              pos[D.he_origin[hb]].cross(pos[D.he_origin[hc]]));
-  }
-  double volume = std::abs(vol6) / 6.0;
+  double volume = std::abs(signed_volume6(D, pos)) / 6.0;
   double mean_l = mean_edge_length(D);
   S.stats_volume_norm = volume / (mean_l * mean_l * mean_l);
 
@@ -1603,8 +1059,6 @@ static AlexandrovSolver::ValidationStatus validate_polytope(
 
 // The 5-step B-I algorithm: initial radii → continuation (κ(r)=t·κ₁, t:1→0)
 // → endgame extrapolation → Newton polish → reconstruct → validate.
-// `continuation` selects the t-parameterized (default) or legacy PALC
-// homotopy.
 vector<coord3d> AlexandrovSolver::solve() {
   stats_steps = stats_flips = stats_newton_total = 0;
   trace.clear();
@@ -1616,37 +1070,17 @@ vector<coord3d> AlexandrovSolver::solve() {
   if ((int)r_init_override.size() == D.nv) {
     r = r_init_override;
   } else {
-    r = PALC::initial_radii(D);
+    r = Continuation::initial_radii(D);
   }
   auto kappa1 = GCP::kappa(D, r);
 
-  // 2. Continuation: trace κ(r) = t·κ₁ from t=1 toward t_target.
-  PALC::TrackResult track;
-  if (continuation == Continuation::NATURAL) {
-    // Natural t-continuation (BI eq. 38) — scale-invariant, no arclength.
-    track = PALC::natural_track(D, r, kappa1, /*t_target=*/0.1, /*dt_init=*/0.05,
-                                 trace_jacobian ? &trace : nullptr,
-                                 record_diag ? &diag_trace : nullptr,
-                                 record_trajectory ? &trajectory : nullptr,
-                                 palc_interior_margin);
-  } else {
-    // Legacy pseudo-arclength continuation (kept for comparison).
-    PALC::Deflation defl;
-    defl.target = r_deflate_target;
-    defl.strength = deflate_strength;
-    track = PALC::palc_track(D, r, kappa1, /*t_target=*/0.1, /*ds_init=*/0.1,
-                              trace_jacobian ? &trace : nullptr,
-                              record_diag ? &diag_trace : nullptr,
-                              record_trajectory ? &trajectory : nullptr,
-                              palc_interior_margin,
-                              stochastic_perturbation_eps,
-                              stochastic_seed,
-                              palc_batch_multiflip_threshold,
-                              defl.active(D.nv) ? &defl : nullptr,
-                              palc_gauge_snap,
-                              palc_tsvd,
-                              palc_tsvd_rcond);
-  }
+  // 2. Continuation: natural t-continuation (BI eq. 38) of κ(r) = t·κ₁
+  //    from t=1 toward t_target — scale-invariant, no arclength.
+  auto track = Continuation::natural_track(
+      D, r, kappa1, /*t_target=*/0.1, /*dt_init=*/0.05,
+      trace_jacobian ? &trace : nullptr,
+      record_diag ? &diag_trace : nullptr,
+      record_trajectory ? &trajectory : nullptr);
   r = std::move(track.r_final);
   stats_steps        = track.stats.steps;
   stats_flips        = track.stats.flips;
@@ -1656,7 +1090,7 @@ vector<coord3d> AlexandrovSolver::solve() {
   stats_extrap_kappa = 0;
   r_before_extrap = r;
   if (!track.history.empty()) {
-    auto r_ext = PALC::extrapolate(track.history);
+    auto r_ext = Continuation::extrapolate(track.history);
     if (!r_ext.empty()) r = r + GCP::feasible_step(D, r, r_ext - r);
     stats_extrap_kappa = LinAlg::max_abs(GCP::kappa(D, r));
   }
@@ -1667,16 +1101,12 @@ vector<coord3d> AlexandrovSolver::solve() {
                                    trace_jacobian ? &trace : nullptr,
                                    record_diag ? &diag_trace : nullptr,
                                    record_trajectory ? &trajectory : nullptr,
-                                   &polish_flips,
-                                   palc_gauge_snap,
-                                   palc_gauge_project,
-                                   palc_tsvd,
-                                   palc_tsvd_rcond);
+                                   &polish_flips);
   stats_flips = polish_flips;
   stats_final_kappa = mk;
 
   if (verbose)
-    printf("  %d PALC steps, %d flips, max|κ|=%.2e (%s)\n",
+    printf("  %d continuation steps, %d flips, max|κ|=%.2e (%s)\n",
            stats_steps, stats_flips, mk, ok ? "converged" : "FAILED");
 
   // Reconstruct positions whether or not validation passes — we always
@@ -1771,15 +1201,14 @@ vector<bool> AlexandrovSolver::inessential_edges(const DelaunayTriangulation& T,
   vector<bool> tight(T.nh, false);
   for (int h = 0; h < T.nh; h += 2) {
     if (!T.alive(h)) continue;
-    // For bigon edges (he_face[h] == he_face[h^1]), GCP::theta is not
-    // meaningful and the edge is by definition not a flat-face diagonal
-    // of any 2-face of P (it's part of a degenerate iji-bigon face).
-    // Mark non-inessential.
-    if (T.he_face[h] == T.he_face[h ^ 1]) continue;
+    // For bigon edges, GCP::theta is not meaningful and the edge is by
+    // definition not a flat-face diagonal of any 2-face of P (it's part
+    // of a degenerate iji-bigon face).  Mark non-inessential.
+    if (T.is_bigon(h)) continue;
     double theta = GCP::theta(T, r, h);
     if (std::isfinite(theta) && std::fabs(theta - M_PI) < eps) {
-      tight[h]     = true;
-      tight[h ^ 1] = true;
+      tight[h]         = true;
+      tight[T.twin(h)] = true;
     }
   }
   return tight;
@@ -1837,13 +1266,7 @@ bool AlexandrovSolver::is_convex(const DelaunayTriangulation& T,
   // since the vertex test would vacuously pass on coplanar configurations
   // and (b) globally inverted positions (vol < 0) where the CCW normal
   // points inward.
-  double vol6 = 0;
-  for (int f = 0; f < T.nf; f++) {
-    if (T.f_he[f] < 0) continue;
-    int ha = T.f_he[f], hb = T.he_next[ha], hc = T.he_next[hb];
-    vol6 += pos[T.he_origin[ha]].dot(
-              pos[T.he_origin[hb]].cross(pos[T.he_origin[hc]]));
-  }
+  double vol6 = signed_volume6(T, pos);
   double vol_threshold6 = 1e-6 * mean_l * mean_l * mean_l;  // 1e-7 vol_norm
   if (!std::isfinite(vol6) || vol6 < vol_threshold6) return false;
 
@@ -2002,42 +1425,38 @@ bool AlexandrovSolver::has_self_intersection(const DelaunayTriangulation& T,
 // AlexandrovIDTCubic: the cubic polyhedral metric
 // ============================================================================
 
-// The face left of arc a->b is (a, b, target(next(find_arc(a, b)))) --
-// spelled with the lib's named arc navigation throughout.  Same convention
-// as delaunay.cc's build_topology and triangulation.hh's CubicPair.
 AlexandrovIDTCubic::KisMetric AlexandrovIDTCubic::kis_metric(const Triangulation& T)
 {
   KisMetric M;
   M.Nv = T.N;
   M.fdeg.resize(M.Nv);
-
-  auto face_left_of = [&T](node_t a, node_t b) -> tri_t {
-    return {a, b, T.target(T.next(T.find_arc(a, b)))};
-  };
-
-  IDCounter<tri_t> tid;
   for (node_t u = 0; u < T.N; u++) {
-    const int deg = T.degree(u);
-    M.fdeg[u] = deg;
-    if (deg != 5 && deg != 6)
+    M.fdeg[u] = T.degree(u);
+    if (M.fdeg[u] != 5 && M.fdeg[u] != 6)
       throw logic_error("AlexandrovIDTCubic: dual vertex " + to_string(u) +
-                        " has degree " + to_string(deg) +
+                        " has degree " + to_string(M.fdeg[u]) +
                         " (input is not a fullerene dual)");
-    for (node_t v : T[u]) {
-      tri_t f = face_left_of(u, v);
-      if (u < f[1] && u < f[2]) {          // registered once, at min corner
-        tid.insert(f.sorted());
-        M.triangle.push_back(f);
-      }
-    }
   }
+
+  // The oriented faces come from the lib: triangles() emits each face once,
+  // CCW, with each directed arc a->b in exactly one face (the face left of
+  // it, per the compute_faces_oriented convention).  Index them by arc, so
+  // face_left(a, b) is a lookup and across(a, b) is face_left(b, a).
+  M.triangle = T.triangles();
   const int ntri = M.triangle.size();  // = 2*Nv - 4
 
-  auto lookup = [&tid](const tri_t& t) -> int {
-    size_t id = tid(t.sorted());
-    if (id == (size_t)-1)
-      throw logic_error("AlexandrovIDTCubic::kis_metric: unregistered triangle");
-    return (int)id;
+  map<arc_t, int> face_of_arc;
+  for (int t = 0; t < ntri; t++) {
+    const tri_t& f = M.triangle[t];
+    for (int j = 0; j < 3; j++)
+      face_of_arc[{f[j], f[(j + 1) % 3]}] = t;
+  }
+  auto face_left = [&face_of_arc](node_t a, node_t b) -> int {
+    auto it = face_of_arc.find({a, b});
+    if (it == face_of_arc.end())
+      throw logic_error("AlexandrovIDTCubic::kis_metric: arc " + to_string(a) +
+                        "->" + to_string(b) + " has no registered face");
+    return it->second;
   };
 
   // Adjacency of the kis complex, CCW rings built directly (orientation
@@ -2046,17 +1465,16 @@ AlexandrovIDTCubic::KisMetric AlexandrovIDTCubic::kis_metric(const Triangulation
   // Around face center u: the incident triangle barycenters, in u's ring order.
   for (node_t u = 0; u < T.N; u++)
     for (node_t v : T[u])
-      kis[u].push_back(M.Nv + lookup(face_left_of(u, v)));
+      kis[u].push_back(M.Nv + face_left(u, v));
   // Around the barycenter of (u,v,w) (CCW): interleave corners with the
   // across-edge barycenters, [u, across(u,v), v, across(v,w), w, across(w,u)],
-  // which is CCW around the barycenter when (u,v,w) is CCW.  across(a,b) is
-  // the face on the other side of edge {a,b}: the face left of arc b->a.
+  // which is CCW around the barycenter when (u,v,w) is CCW.
   for (int t = 0; t < ntri; t++) {
     const tri_t& f = M.triangle[t];
     for (int j = 0; j < 3; j++) {
       node_t a = f[j], b = f[(j + 1) % 3];
       kis[M.Nv + t].push_back(a);
-      kis[M.Nv + t].push_back(M.Nv + lookup(face_left_of(b, a)));
+      kis[M.Nv + t].push_back(M.Nv + face_left(b, a));
     }
   }
   M.K = Triangulation(Graph(Spanify::OwnedDenseGraph<node_t>(kis)));

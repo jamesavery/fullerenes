@@ -154,6 +154,10 @@ struct DelaunayTriangulation {
   int  prev(int h)  const { return he_next[he_next[h]]; }  // only for triangulations
   int  dest(int h)  const { return he_origin[h ^ 1]; }
   bool alive(int h) const { return he_origin[h] >= 0; }
+  // Bigon edge: both half-edges of h bound the same face.  Arises in
+  // Δ-complexes around low-degree cone vertices (an i–j edge of an "iji"
+  // face); dihedral quantities across such an edge are undefined.
+  bool is_bigon(int h) const { return he_face[h] == he_face[twin(h)]; }
 
   // CW rotation around origin(h): next outgoing half-edge clockwise.
   int cw(int h) const { return he_next[h ^ 1]; }

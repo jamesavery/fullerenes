@@ -47,113 +47,29 @@ struct AlexandrovSolver {
   std::vector<double> r;
   // Optional override of the initial radii.  When non-empty and of size
   // D.nv, solve() uses this in place of the default initial_radii(D)
-  // (= 2·R_max·1).  Used by warm-start callers and the symmetry-breaking
-  // perturbation experiments.
+  // (= 2·R_max·1).  Used by warm-start callers.
   std::vector<double> r_init_override;
 
-  // Continuation method for the BI homotopy κ(r)=t·κ₁.
-  //   NATURAL — t-parameterized continuation (BI eq. 38, dr/dt=J⁻¹κ₁).
-  //             The path is monotone in t (BI Thm 5: J non-degenerate,
-  //             constant Lorentzian signature for 0<κᵢ<δᵢ), so no arclength
-  //             is needed; scale-invariant by construction. This is the
-  //             default.
-  //   PALC    — pseudo-arclength continuation (legacy; arclength ds²=dt²+‖dr‖²
-  //             is scale-dependent). Kept for comparison/benchmarking.
-  enum class Continuation { NATURAL, PALC };
-  Continuation continuation = Continuation::NATURAL;
+  // The homotopy κ(r)=t·κ₁ is traced by natural t-continuation (BI eq. 38,
+  // dr/dt=J⁻¹κ₁): the path is monotone in t (BI Thm 5: J non-degenerate,
+  // constant Lorentzian signature for 0<κᵢ<δᵢ), so no arclength is needed,
+  // and the tracker is scale-invariant by construction.  The legacy
+  // pseudo-arclength path and its experiment knobs (Directions 1–6) are
+  // retired to src/c++/attic/delaunay_alexandrov_palc.cc.attic.
 
   bool verbose = false;
 
-  // ==== Legacy PALC-era experiment knobs (Directions 1–6) ==============
-  // Retained for the experiment drivers that sweep them (margin_sweep,
-  // stochastic_sweep, batch_multiflip_sweep, deflate_solve, perturb_solve,
-  // probe_jacobian, scan_full_range).  All default off; new code should
-  // not reach for these.  Candidates for removal at the next API break.
-  // Scope: stochastic_*, batch-multiflip, and deflation act on the PALC
-  // path ONLY; palc_interior_margin acts on both continuation paths;
-  // palc_gauge_* and palc_tsvd* act on the Newton polish as well, so they
-  // are live under NATURAL continuation too, despite the palc_ prefix.
-
-  // Coefficient for the strict-interior margin schedule applied during
-  // continuation: at homotopy parameter t ∈ (0, 1], iterates are kept in
-  // P(M) with safety distance c·t from ∂P(M) on the (ConcQuadr) and
-  // (CloGeod) sides.  At t = 0 (Newton polish), margin → 0 reproduces
-  // the closure check.  c = 0 disables margin enforcement (pre-#28
-  // behaviour).  Tunable for experimentation.
-  double palc_interior_margin = 0.0;
-  // Stochastic-perturbation experiment (Direction 1): after each accepted
-  // PALC step, multiplicatively perturb r per-vertex by uniform random
-  // factor in [1−ε, 1+ε] before the next predictor.  Continuously breaks
-  // any symmetry the metric induces in the trajectory.  ε = 0 (default)
-  // disables the perturbation.  `stochastic_seed` makes runs reproducible.
-  double stochastic_perturbation_eps = 0.0;
-  uint32_t stochastic_seed = 1;
-  // Synchronized batch multi-flip experiment (Direction 2): after each
-  // accepted PALC step (post the standard weighted-Delaunay flip phase),
-  // perform a batch flip of all alive non-bigon edges with
-  // θ_e > π − batch_multiflip_threshold, all in one pass without
-  // re-evaluating θ between flips.  Then a final flip pass cleans up.
-  // Threshold = 0 disables.
-  double palc_batch_multiflip_threshold = 0.0;
-  // Deflated homotopy (Direction 4): if r_deflate_target.size() == D.nv
-  // and deflate_strength > 0, augment the PALC residual with a repulsive
-  // deflation term that diverges at r_deflate_target — the empirically-
-  // known drum-cap fixed point from a prior failed run.
-  //   F_def(r, t) = κ(r) − t·κ₁ + (1−t)·α·(r − r*) / ‖r − r*‖²
-  // r_deflate_target = r*, deflate_strength = α.  At t = 1 the deflation
-  // is off (factor (1−t) = 0); at t = 0 it dominates near r* and forces
-  // PALC away from drum-cap.  After the PALC track, an un-deflated
-  // Newton polish gives a clean κ = 0 solution.  Inactive when target
-  // is empty or strength = 0.
-  std::vector<double> r_deflate_target;
-  double deflate_strength = 0.0;
-  // Translation-gauge fixing (Direction 5).  Two forms, both opt-in.
-  //
-  // (a) palc_gauge_snap (state-snap):  After each accepted PALC step
-  //     and each accepted Newton-polish step, reconstruct cone-point
-  //     positions p_v via Gram-BFS, compute centroid c, and replace
-  //     r_v ← ‖p_v − c‖ (clipped via GCP::feasible_step to stay in
-  //     F(T)).  Fixes 4/5 of the known κ-stall cases at the cost of
-  //     significant regressions on the previously-OK population
-  //     (~3% at C100).  Use only on cases known to need it.
-  //
-  // (b) palc_gauge_project (step-projection):  Less invasive form.
-  //     At each Newton-polish trust-region iteration, build the n×3
-  //     gauge basis Q from p̂_v = p_v / r_v (current Gram-BFS positions,
-  //     apex at origin), QR-orthonormalize, and project Newton's update
-  //     Δr ← (I − QQᵀ)Δr before applying.  Removes the gauge
-  //     component of each step without modifying r in place.
-  //
-  // Both are gated to skip iterates with |κ|_max ≥ 0.5 since
-  // Gram-BFS reconstruction is geometrically meaningless at high κ
-  // (the iterate is a B-I generalized polytope, not a real polytope).
-  bool palc_gauge_snap = false;
-  bool palc_gauge_project = false;
-  // Truncated-pseudoinverse bordered Newton (Direction 6, production form).
-  // When palc_tsvd=true, replace the LU-bordered solve in the corrector
-  // and the Levenberg-Marquardt trust-region step in Newton::polish with
-  // a symmetric truncated pseudoinverse on J: J = Q diag(λ) Qᵀ, then
-  // J⁺ inverts only |λ| > rcond·max|λ|.  In the corrector this is
-  // composed via the bordering algorithm (one decomposition cached and
-  // applied twice).  Produces the unique minimum-‖Δr‖ step that is
-  // automatically orthogonal to ker(J) — the translation-gauge
-  // directions, which are the soft-kernel obstruction during PALC.
-  // See claude-projects/delaunay-geometry/tsvd-design.md for the full
-  // mathematical specification, validation plan, and empirical results.
-  bool   palc_tsvd       = false;
-  double palc_tsvd_rcond = 5e-3;
-  // ==== end legacy experiment knobs ====================================
   bool trace_jacobian = false;       // record per-step spectrum of J
   int stats_steps = 0, stats_flips = 0, stats_newton_total = 0;
   double stats_final_kappa = 0;
   double stats_extrap_kappa = 0;   // max|kappa| right after endgame extrapolation
-  std::vector<double> r_before_extrap;   // last PALC iterate (for diagnostics)
+  std::vector<double> r_before_extrap;   // last continuation iterate (for diagnostics)
   ValidationStatus stats_status = ValidationStatus::FAIL_KAPPA_NOT_CONVERGED;
   bool valid() const { return stats_status == ValidationStatus::OK; }
 
   // Post-convergence verification (per CLAUDE.md invariants I-1, I-2).
-  // Populated by solve() after PALC + Newton; meaningful iff stats_final_kappa
-  // is small (the κ=0 hypothesis was achieved numerically).
+  // Populated by solve() after continuation + Newton; meaningful iff
+  // stats_final_kappa is small (the κ=0 hypothesis was achieved numerically).
   bool stats_t0_simplicial = false;       // D has no multi-edges/self-loops/bigons
   bool stats_tbar_simple_polygonal = false; // T̄(0) cells all have ≥3 distinct labels
   int  stats_tbar_n_cells = 0;            // number of polygonal cells in T̄(0)
@@ -163,13 +79,14 @@ struct AlexandrovSolver {
   bool stats_polytope_convex = false;     // every non-face vertex on inside of every face plane
   bool stats_polytope_no_self_intersect = false; // no two non-adjacent triangles intersect in 3D
 
-  // One entry per PALC step (if trace_jacobian) or Newton step (phase='N').
+  // One entry per continuation step (if trace_jacobian) or Newton step
+  // (phase='N').
   struct TraceEntry {
-    char   phase;                    // 'P' for PALC, 'N' for Newton polish
+    char   phase;                    // 'T' for continuation, 'N' for Newton polish
     int    step;
-    double t;                        // homotopy parameter (PALC only; else 0)
-    double ds;                       // PALC arc-length step
-    int    nit;                      // corrector iterations (PALC only)
+    double t;                        // homotopy parameter (continuation; else 0)
+    double ds;                       // dt step (continuation) / trust radius (Newton)
+    int    nit;                      // corrector iterations (continuation only)
     double kappa_max;                // max|kappa|
     double kappa_norm;               // ||kappa||_2
     std::vector<double> eigvals;     // eigenvalues of J, ascending
@@ -181,11 +98,11 @@ struct AlexandrovSolver {
   // ∂P(M) so we can compare drum-cap vs non-degenerate trajectories.
   bool record_diag = false;
   struct DiagEntry {
-    char   phase;                    // 'P' for PALC step, 'N' for Newton iter
+    char   phase;                    // 'T' for continuation step, 'N' for Newton iter
     int    step;
     double t;                        // homotopy parameter
-    double ds;                       // arc-length step (PALC) / trust radius (Newton)
-    int    nit;                      // corrector iters (PALC) / 1 (Newton)
+    double ds;                       // dt step (continuation) / trust radius (Newton)
+    int    nit;                      // corrector iters (continuation) / 1 (Newton)
     double kappa_max;                // max|κ|
     // Distance to ∂P(M) on the (ConcQuadr) side: min over non-bigon edges
     // of (π − θ_e).  Small values mean the iterate is close to the
@@ -223,7 +140,7 @@ struct AlexandrovSolver {
   // iff Gram-BFS reconstruction failed (κ too high / degenerate iterate).
   bool record_trajectory = false;
   struct TrajEntry {
-    char   phase;                          // 'T'/'P' continuation, 'N' Newton polish
+    char   phase;                          // 'T' continuation, 'N' Newton polish
     int    step;
     double t;                              // homotopy parameter (0 in Newton)
     double kappa_max;                      // max|κ|
@@ -280,8 +197,8 @@ struct AlexandrovSolver {
   // Place vertices in R^3 from a triangulation + per-vertex radii using
   // BFS over the Gram matrix entries pos[u].pos[v] = (r_u^2+r_v^2-L_uv^2)/2.
   // Exposed for debugging: lets callers visualise non-converged radii
-  // (e.g. the last PALC iterate of a failed solve).  Returns empty on
-  // gross inconsistency (negative perpendicular squared distance).
+  // (e.g. the last continuation iterate of a failed solve).  Returns empty
+  // on gross inconsistency (negative perpendicular squared distance).
   static std::vector<coord3d> reconstruct(const DelaunayTriangulation& T,
                                           const std::vector<double>& r);
 
@@ -338,8 +255,9 @@ struct AlexandrovSolver {
 
   // GCP dihedral θ_e at base edge h: sum of pyramid dihedrals from the two
   // adjacent faces.  At κ=0, equals the polytope's interior dihedral at e.
-  // For a non-bigon edge this is well-defined; for bigon edges (h and h^1
-  // in the same face) the result is not geometrically meaningful.
+  // For a non-bigon edge this is well-defined; for bigon edges
+  // (DelaunayTriangulation::is_bigon) the result is not geometrically
+  // meaningful.
   // @anchor gcp-theta
   // @pre  h is a live half-edge of T; r as in gcp-kappa
   static double theta(const DelaunayTriangulation& T,
@@ -351,7 +269,7 @@ struct AlexandrovSolver {
   // Both halves of an edge are set consistently.  ε defaults to 1e-7 (rad).
   // @anchor bi-inessential-edges
   // @pre  as gcp-kappa
-  // @post result.size() == T.nh; result[h] == result[h^1]
+  // @post result.size() == T.nh; result[h] == result[T.twin(h)]
   static std::vector<bool> inessential_edges(const DelaunayTriangulation& T,
                                               const std::vector<double>& r,
                                               double eps = 1e-7);
