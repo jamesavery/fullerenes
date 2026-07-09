@@ -20,12 +20,16 @@ if(NOT BLAS_FOUND OR NOT LAPACK_FOUND)
   find_package(LAPACK REQUIRED)
 endif()
 find_package(GSL)
-find_package(GTest REQUIRED)
+find_package(GTest)
 find_library(TBB_LIB tbb)
 
 
 enable_testing()
-include_directories(${GTEST_INCLUDE_DIRS})
+if(GTest_FOUND)
+  include_directories(${GTEST_INCLUDE_DIRS})
+else()
+  message(STATUS "GTest not found -- GTest-based unit tests will be skipped")
+endif()
 
 if(TBB_LIB)
   message(STATUS "Found TBB runtime: ${TBB_LIB}")
@@ -201,6 +205,18 @@ endif()
 
 set(CMAKE_CXX_FLAGS "-fPIC -O3 -m64 -pthread")
 
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  # Clang (through at least 18.x) still reports __cpp_concepts=201907L (the
+  # C++20 value) even in -std=gnu++23 mode -- it hasn't implemented the core
+  # defect-report resolutions libstdc++ checks for. libstdc++'s <expected>
+  # header gates its entire contents on __cpp_concepts >= 202002L, so
+  # std::expected silently vanishes under Clang+libstdc++ even though
+  # Clang's concepts support is otherwise sufficient. Force the macro so
+  # <expected> becomes visible; this is a known, widely used workaround and
+  # does not paper over any real missing capability.
+  string(APPEND CMAKE_CXX_FLAGS " -Wno-builtin-macro-redefined -D__cpp_concepts=202002L")
+endif()
+
 configure_file(
   ${CMAKE_SOURCE_DIR}/include/fullerenes/config.hh.in
   ${CMAKE_BINARY_DIR}/include/fullerenes/config.hh
@@ -235,11 +251,11 @@ if(ENABLE_SYCL)
     # acpp's bundled compiler for the clang-based backends (generic/SSCP, AMD hip,
     # cuda clang) is clang-14, which does not accept CMake's gcc-derived
     # -std=gnu++23 (clang-14 only knows the pre-standard spelling gnu++2b for
-    # C++23). CMake computed the standard flag against the host g++-13 and does not
-    # re-derive it when CMAKE_CXX_COMPILER is swapped to acpp below. So disable the
-    # automatic standard flag for the acpp subdirs and request gnu++2b explicitly;
-    # g++-13 (X86/omp.library-only backend) also accepts gnu++2b, so this is safe
-    # across all non-nvcxx backends.
+    # C++23). CMake computed the standard flag against the host compiler and does
+    # not re-derive it when CMAKE_CXX_COMPILER is swapped to acpp below. So
+    # disable the automatic standard flag for the acpp subdirs and request
+    # gnu++2b explicitly; the X86/omp.library-only backend's host gcc also
+    # accepts gnu++2b, so this is safe across all non-nvcxx backends.
     set(CMAKE_CXX_STANDARD)
     string(APPEND CMAKE_CXX_FLAGS " -std=gnu++2b")
   endif()
