@@ -309,16 +309,43 @@ struct matrix3d {
     return ys;
   }
 
-  // Eigenvalue solver specialized to symmetric real 3x3 matrices using Viete's 
-  // closed form solution to cubic polynomials with three real roots.
+  // Symmetric part (m_ij + m_ji)/2.  Exact for symmetric input; for input that
+  // is symmetric only up to roundoff (e.g. an X^T X product formed under FMA
+  // contraction, whose off-diagonals can differ in the last ulp) it is the
+  // well-defined symmetric representative.  The eigen* methods below operate on
+  // this part, so they never require -- or assert -- exact symmetry of *this.
+  matrix3d symmetric_part() const {
+    const matrix3d &M(*this);
+    matrix3d S;
+    for(int i=0;i<3;i++)
+      for(int j=0;j<3;j++)
+        S(i,j) = 0.5*(M(i,j)+M(j,i));
+    return S;
+  }
+
+  // Unnormalised null-space direction of a symmetric B = S - lambda*I: the
+  // largest-magnitude cross product of two of its rows.  For a simple
+  // eigenvalue (B has rank 2) this is the eigenvector direction; for a repeated
+  // eigenvalue all row pairs are parallel and the returned norm collapses to ~0.
+  static coord3d null_direction(const matrix3d& B) {
+    const coord3d r0(B(0,0),B(0,1),B(0,2)), r1(B(1,0),B(1,1),B(1,2)), r2(B(2,0),B(2,1),B(2,2));
+    const coord3d cr[3] = { r0.cross(r1), r0.cross(r2), r1.cross(r2) };
+    coord3d best = cr[0];
+    double best_n2 = best.norm2();
+    for(int k=1;k<3;k++){ double n2 = cr[k].norm2(); if(n2 > best_n2){ best_n2 = n2; best = cr[k]; } }
+    return best;
+  }
+
+  // Eigenvalue solver specialized to symmetric real 3x3 matrices using Viete's
+  // closed form solution to cubic polynomials with three real roots.  Operates
+  // on the symmetric part (see symmetric_part()), so it is correct for exactly-
+  // symmetric input and for input asymmetric only by floating-point roundoff.
   coord3d eigenvalues() const
   {
-    const matrix3d &M(*this);
-    // Make sure that matrix is symmetric. TODO: FP comparison, not exact.
-    assert(M(0,1) == M(1,0) && M(0,2) == M(2,0) && M(1,2) == M(2,1));
+    const matrix3d S(symmetric_part());
 
     // Coefficients up to symmetry
-    double a(M(0,0)), b(M(0,1)), c(M(0,2)), d(M(1,1)), e(M(1,2)), f(M(2,2));
+    double a(S(0,0)), b(S(0,1)), c(S(0,2)), d(S(1,1)), e(S(1,2)), f(S(2,2));
     
     // Coefficients of characteristic polynomial, calculated with Mathematica
     long double 
@@ -338,11 +365,15 @@ struct matrix3d {
       q  = (2.L*B*B*B - 9.L*A*B*C + 27.L*A*A*D)/(27.L*A*A*A),
       xc = B/(3.L*A);
 
-    // François Viète's solution to cubic polynomials with three real roots. 
+    // François Viète's solution to cubic polynomials with three real roots.
+    // For a symmetric matrix (three real roots) p <= 0 exactly; roundoff on a
+    // near-isotropic matrix can push -p/3 slightly negative, so clamp its square
+    // root argument to 0 (K -> 0 collapses the near-equal roots onto their mean,
+    // B/(3A), which is correct to O(sqrt(|p|))).  cos_arg is clamped likewise.
     coord3d t;
     long double cos_arg = (3.L*q)/(2.L*p)*sqrtl(-3.L/p);
     cos_arg = std::max(-1.0L, std::min(1.0L, cos_arg)); // clamp for FP robustness
-    long double K = 2*sqrtl(-p/3.L),
+    long double K = 2*sqrtl(std::max(0.0L, -p/3.L)),
                 theta0 = (1.L/3.L)*acosl(cos_arg);
     for(int k=0;k<3;k++) t[k] = K*cosl(theta0-k*2.L*M_PI/3.L);
 
@@ -351,59 +382,124 @@ struct matrix3d {
   }
   
 
+  // Unit eigenvector for a SIMPLE eigenvalue lambda of the symmetric part:
+  // the normalised largest-norm cross product of two rows of (S - lambda*I).
+  // A repeated (degenerate) eigenvalue has a >= 2-dimensional eigenspace in
+  // which no single vector is distinguished; this returns the zero vector as a
+  // documented sentinel -- use eigensystem() to obtain a full orthonormal
+  // eigenbasis, which handles degeneracy directly.
   coord3d eigenvector(const double lambda) const {
-    const matrix3d &M(*this);
-    coord3d x;
-  
-    // using the first two eqs
-    // [ a_12 * a_23 - a_13 * (a_22 - r) ]
-    // [ a_12 * a_13 - a_23 * (a_11 - r) ]
-    // [ (a_11 - r) * (a_22 - r) - a_12^2 ]
-    x = coord3d( M(0,1)*M(1,2) - M(0,2)*(M(1,1)-lambda),
-                 M(0,1)*M(0,2) - M(1,2)*(M(0,0)-lambda),
-                 (M(0,0)-lambda)*(M(1,1)-lambda) - M(0,1)*M(0,1) );
-    if (x.norm() / (M(0,0) + M(1,1) + M(2,2)) > 1.e-12) // not zero-ish
-      return x/x.norm();
-  
-    // using the first+last eqs
-    // [ a_12 * (a_33 - r) - a_13 * a_23 ]
-    // [ a_13^2 - (a_11 - r) * (a_33 - r) ]
-    // [ a_23 * (a_11 - r) - a_12 * a_13 ]
-    x = coord3d( M(0,1)*(M(2,2)-lambda) - M(0,2)*M(1,2),
-                 M(0,2)*M(0,2) - (M(0,0)-lambda)*(M(2,2)-lambda),
-                 M(1,2)*(M(0,0)-lambda) - M(0,1)*M(0,2) );
-    if (x.norm() / (M(0,0) + M(1,1) + M(2,2)) > 1.e-12) // not zero-ish
-      return x/x.norm();
-  
-    // using the last two eqs
-    // [ a_23^2 - (a_22 - r) * (a_33 - r) ]
-    // [ a_12 * (a_33 - r) - a_13 * a_23 ]
-    // [ a_13 * (a_22 - r) - a_12 * a_23 ]
-    x = coord3d( M(1,2)*M(1,2) - (M(1,1)-lambda)*(M(2,2)-lambda),
-                 M(0,1)*(M(2,2)-lambda) - M(0,2)*M(1,2),
-                 M(0,2)*(M(1,1)-lambda) - M(0,1)*M(1,2) );
-    if (x.norm() / (M(0,0) + M(1,1) + M(2,2)) > 1.e-12) // not zero-ish
-      return x/x.norm();
-  
-    cerr << "something is very wrong, possibly two degenerate evals" << std::endl;
+    const matrix3d S(symmetric_part());
+    matrix3d B(S);
+    for(int i=0;i<3;i++) B(i,i) -= lambda;
+
+    const coord3d n(null_direction(B));
+    const double nn = n.norm(), scale = S.norm();
+    if(nn > 1e-9*(scale>0?scale*scale:1.0)) return n/nn;
     return coord3d();
   }
 
+  // Eigen-decomposition of the symmetric part (see eigenvalues()).  Returns
+  // (lambda, C) where lambda holds the eigenvalues sorted by ABSOLUTE VALUE,
+  // smallest first (PolyhedronView::principal_axes and other callers rely on
+  // this ordering), and row i of C is the unit eigenvector for lambda[i].
+  //
+  // The eigenvectors are always orthonormal (C is orthogonal).  Degeneracy is
+  // handled by extracting the eigenvector of the most isolated eigenvalue first
+  // and completing an orthonormal basis in its 2D orthogonal complement via a
+  // 2x2 sub-problem (which gracefully covers a two-fold degenerate eigenvalue);
+  // the isotropic case -- all eigenvalues equal, e.g. a multiple of the
+  // identity or the zero matrix -- returns the standard basis.
+  //
+  // The closed-form eigenvalues (eigenvalues()) lose precision for a
+  // near-degenerate cluster (the acos argument approaches +-1), so they are
+  // only used to seed the eigenvector extraction.  The returned eigenvalues are
+  // recovered accurately from the eigenvectors: one step of Rayleigh-quotient
+  // iteration refines the isolated eigenvalue, and the other two come directly
+  // from the 2x2 restriction of S to the complementary plane.
   pair<coord3d,matrix3d> eigensystem() const {
-    coord3d lambda(eigenvalues());
-    matrix3d C;
+    const matrix3d S(symmetric_part());
+    const coord3d  lam0(eigenvalues());   // closed-form seeds (unsorted)
 
-    // Sort eigenvalues by absolute value, smallest first
-    if(fabs(lambda[0]) > fabs(lambda[1])) std::swap(lambda[0],lambda[1]);
-    if(fabs(lambda[1]) > fabs(lambda[2])) std::swap(lambda[1],lambda[2]);
-    if(fabs(lambda[0]) > fabs(lambda[1])) std::swap(lambda[0],lambda[1]);
+    const double scale  = S.norm();
+    const double fscale = (scale>0 ? scale : 1.0);
 
-    // Build eigenvector matrix
-    for(int i=0;i<3;i++){
-      coord3d c(eigenvector(lambda[i]));
-      for(int j=0;j<3;j++) C(i,j) = c[j];
+    double  lam[3];
+    coord3d vec[3];
+    bool    resolved = false;
+
+    // Isotropy is detected from the MATRIX, not from lam0: S is a multiple of I
+    // iff its deviatoric part vanishes.  (The closed-form eigenvalues carry a
+    // spurious O(sqrt(eps)) spread for a clustered spectrum, so a gap test on
+    // them would misclassify an isotropic matrix and then divide by a collapsed
+    // null direction.)  Every direction is then an eigenvector.
+    const double trace = S(0,0)+S(1,1)+S(2,2);
+    matrix3d dev(S); for(int i=0;i<3;i++) dev(i,i) -= trace/3.0;
+
+    if(dev.norm() > 1e-12*fscale){
+      // Most isolated eigenvalue: largest minimum gap to the other two.  Its
+      // eigenspace is 1-dimensional; the seed only needs to pick it out.
+      const double gap[3] = {
+        std::min(fabs(lam0[0]-lam0[1]), fabs(lam0[0]-lam0[2])),
+        std::min(fabs(lam0[1]-lam0[0]), fabs(lam0[1]-lam0[2])),
+        std::min(fabs(lam0[2]-lam0[0]), fabs(lam0[2]-lam0[1]))
+      };
+      int iso = 0;
+      if(gap[1] > gap[iso]) iso = 1;
+      if(gap[2] > gap[iso]) iso = 2;
+
+      // Isolated eigenvector: extract, refine the eigenvalue as v.(S v), then
+      // sharpen with a second extraction -- but only if the refined eigenvalue
+      // has not made (S - li*I) collapse to zero (which happens when li lands
+      // exactly on the eigenvalue), in which case the first vi is already exact.
+      double li = lam0[iso];
+      matrix3d B(S); for(int k=0;k<3;k++) B(k,k) -= li;
+      coord3d n(null_direction(B));
+      const double n0 = n.norm();
+      coord3d vi(n/n0);
+      li = vi.dot(S*vi);
+
+      matrix3d B1(S); for(int k=0;k<3;k++) B1(k,k) -= li;
+      const coord3d n1(null_direction(B1));
+      if(n1.norm() > 1e-8*n0){ vi = n1/n1.norm(); li = vi.dot(S*vi); }
+
+      // Orthonormal basis {u,w} of the plane orthogonal to vi.
+      const coord3d ax =
+        (fabs(vi[0]) <= fabs(vi[1]) && fabs(vi[0]) <= fabs(vi[2])) ? coord3d(1,0,0)
+        : (fabs(vi[1]) <= fabs(vi[2]) ? coord3d(0,1,0) : coord3d(0,0,1));
+      coord3d u(vi.cross(ax)); u /= u.norm();
+      const coord3d w(vi.cross(u));   // unit: vi and u are orthonormal
+
+      // Diagonalise the symmetric 2x2 restriction [[a2,b2],[b2,d2]] of S to the
+      // plane.  Its eigenvalues are the (accurate) remaining eigenvalues; the
+      // rotation is the identity when they are degenerate.
+      const coord3d Su(S*u), Sw(S*w);
+      const double a2 = u.dot(Su), b2 = u.dot(Sw), d2 = w.dot(Sw);
+      const double theta = 0.5*atan2(2.0*b2, a2-d2);
+      const double cs = cos(theta), sn = sin(theta);
+
+      const int p = (iso+1)%3, q = (iso+2)%3;
+      lam[iso] = li;                              vec[iso] = vi;
+      lam[p]   = a2*cs*cs + 2.0*b2*cs*sn + d2*sn*sn; vec[p] = u*cs + w*sn;
+      lam[q]   = a2*sn*sn - 2.0*b2*cs*sn + d2*cs*cs; vec[q] = u*(-sn) + w*cs;
+      resolved = true;
     }
-    return make_pair(lambda,C);
+
+    if(!resolved){
+      // Isotropic: standard basis; eigenvalues are the (equal) diagonal.
+      const coord3d e[3] = { coord3d(1,0,0), coord3d(0,1,0), coord3d(0,0,1) };
+      for(int i=0;i<3;i++){ vec[i] = e[i]; lam[i] = e[i].dot(S*e[i]); }
+    }
+
+    // Sort (eigenvalue, eigenvector) pairs by absolute value, smallest first.
+    for(int a=0;a<2;a++)
+      for(int b=a+1;b<3;b++)
+        if(fabs(lam[a]) > fabs(lam[b])){ std::swap(lam[a],lam[b]); std::swap(vec[a],vec[b]); }
+
+    matrix3d C;
+    for(int i=0;i<3;i++)
+      for(int j=0;j<3;j++) C(i,j) = vec[i][j];
+    return make_pair(coord3d(lam[0],lam[1],lam[2]), C);
   }
 
   // Skew-symmetric cross product matrix: cross_matrix(a) * b == a.cross(b)
