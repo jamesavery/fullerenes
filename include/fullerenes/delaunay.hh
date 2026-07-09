@@ -152,7 +152,7 @@ struct DelaunayTriangulation {
   int  twin(int h)  const { return h ^ 1; }
   int  edge(int h)  const { return h >> 1; }
   int  prev(int h)  const { return he_next[he_next[h]]; }  // only for triangulations
-  int  dest(int h)  const { return he_origin[h ^ 1]; }
+  int  dest(int h)  const { return he_origin[twin(h)]; }
   bool alive(int h) const { return he_origin[h] >= 0; }
   // Bigon edge: both half-edges of h bound the same face.  Arises in
   // Δ-complexes around low-degree cone vertices (an i–j edge of an "iji"
@@ -160,10 +160,10 @@ struct DelaunayTriangulation {
   bool is_bigon(int h) const { return he_face[h] == he_face[twin(h)]; }
 
   // CW rotation around origin(h): next outgoing half-edge clockwise.
-  int cw(int h) const { return he_next[h ^ 1]; }
+  int cw(int h) const { return he_next[twin(h)]; }
 
   // CCW rotation around origin(h): next outgoing half-edge counterclockwise.
-  int ccw(int h) const { return (he_next[he_next[h]]) ^ 1; }
+  int ccw(int h) const { return twin(prev(h)); }
 
   int vertex_degree(int v) const;  // count outgoing half-edges from v
 
@@ -429,7 +429,7 @@ struct DelaunayTriangulation {
   // Delaunay triangulation.  Both half-edges of an edge return the same value.
   bool is_cocircular_edge(int h) const;
 
-  // Per-half-edge cocircular mask: tight[h] == tight[h^1]; dead half-edges
+  // Per-half-edge cocircular mask: tight[h] == tight[twin(h)]; dead half-edges
   // are false.  O(num_edges) integer-arithmetic predicates.
   std::vector<bool> cocircular_edges() const;
 
