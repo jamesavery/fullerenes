@@ -2,6 +2,7 @@
 #include "fullerenes/polyhedron.hh"
 #include "fullerenes/unfold.hh"
 #include "fullerenes/buckinverse.hh"
+#include "fullerenes/dense_linalg.hh"
 #include <cmath>
 #include <climits>
 #include <numeric>
@@ -588,51 +589,26 @@ static void solveTridiagonal(const vector<double>& diag, vector<coord3d>& rhs) {
 
 // Solve 5x5 cyclic tridiagonal system for F-ring.
 // All diagonal entries = 6, sub/super-diagonal = -1, corner entries = -1.
-// Uses direct Gaussian elimination (5x5 is tiny).
 static void solveCyclicTridiag5(vector<coord3d>& rhs) {
-    // Matrix: 6 on diagonal, -1 on sub/super, -1 in corners (0,4) and (4,0)
-    // Solve by Sherman-Morrison: write A = T + u*v^T where T is standard
-    // tridiagonal (with A[0][0]=7, A[4][4]=7) and u*v^T corrects the corners.
-    // Or just do direct 5x5 solve — it's fast enough.
-
-    // Direct Gaussian elimination with partial pivoting on 5x5
-    double A[5][5] = {
-        { 6, -1,  0,  0, -1},
-        {-1,  6, -1,  0,  0},
-        { 0, -1,  6, -1,  0},
-        { 0,  0, -1,  6, -1},
-        {-1,  0,  0, -1,  6}
-    };
-    coord3d b[5];
-    for (int i = 0; i < 5; i++) b[i] = rhs[i];
-
-    // Forward elimination
-    for (int col = 0; col < 5; col++) {
-        // Find pivot
-        int pivot = col;
-        for (int row = col + 1; row < 5; row++)
-            if (fabs(A[row][col]) > fabs(A[pivot][col])) pivot = row;
-        if (pivot != col) {
-            swap(A[col], A[pivot]);
-            swap(b[col], b[pivot]);
-        }
-        // Eliminate below
-        for (int row = col + 1; row < 5; row++) {
-            double factor = A[row][col] / A[col][col];
-            for (int j = col; j < 5; j++)
-                A[row][j] -= factor * A[col][j];
-            b[row] = b[row] - b[col] * factor;
-        }
+    // A is symmetric and strictly diagonally dominant (|6| > |-1| + |-1|), so
+    // it is never singular — LinAlg::solve's zero-vector singular sentinel is
+    // unreachable here, and no caller failure path was ever exercised. The
+    // three coordinate components share this one matrix; solving each via
+    // LinAlg::solve (partial-pivot LU, max |column entry|) reproduces the
+    // former hand-rolled 5x5 elimination bit-for-bit.
+    matrix<double> A(5, 5, 0.0);
+    for (int i = 0; i < 5; i++) {
+        A(i, i)           =  6;
+        A(i, (i + 4) % 5) = -1;
+        A(i, (i + 1) % 5) = -1;
     }
 
-    // Back substitution
-    for (int i = 4; i >= 0; i--) {
-        for (int j = i + 1; j < 5; j++)
-            b[i] = b[i] - b[j] * A[i][j];
-        b[i] = b[i] / A[i][i];
+    for (int c = 0; c < 3; c++) {
+        LinAlg::V b(5);
+        for (int i = 0; i < 5; i++) b[i] = rhs[i][c];
+        LinAlg::V x = LinAlg::solve(A, b);
+        for (int i = 0; i < 5; i++) rhs[i][c] = x[i];
     }
-
-    for (int i = 0; i < 5; i++) rhs[i] = b[i];
 }
 
 // For F-ring expansion: translate + rotate tp-side to make room for the new ring.
