@@ -29,17 +29,19 @@ struct JsonVal {
     enum Type { Null, Num, Str, Arr, Obj } type = Null;
     double num = 0;
     string str;
+    // Only vector<JsonVal> may hold the incomplete JsonVal; a composite such as
+    // vector<pair<string,JsonVal>> is UB. Obj keeps its keys alongside in `keys`.
     vector<JsonVal> arr;
-    vector<pair<string,JsonVal>> obj;
+    vector<string> keys;
     const JsonVal& operator[](const string& key) const {
-        for (auto& [k,v] : obj) if (k == key) return v;
+        for (size_t i = 0; i < keys.size(); i++) if (keys[i] == key) return arr[i];
         static JsonVal null_val; return null_val;
     }
     const JsonVal& operator[](size_t i) const { return arr[i]; }
     int as_int() const { return (int)num; }
     double as_double() const { return num; }
     const string& as_str() const { return str; }
-    size_t size() const { return type == Arr ? arr.size() : type == Obj ? obj.size() : 0; }
+    size_t size() const { return type == Arr || type == Obj ? arr.size() : 0; }
 };
 
 static void skip_ws(const char*& p) { while (*p == ' ' || *p == '\n' || *p == '\r' || *p == '\t') p++; }
@@ -74,7 +76,7 @@ static JsonVal parse_json(const char*& p) {
             auto key = parse_json(p); skip_ws(p);
             if (*p == ':') p++;
             auto val = parse_json(p);
-            v.obj.push_back({key.str, val}); skip_ws(p);
+            v.keys.push_back(key.str); v.arr.push_back(val); skip_ws(p);
             if (*p == ',') { p++; skip_ws(p); continue; }
             if (*p == '}') { p++; break; }
             break;
