@@ -65,6 +65,13 @@ enum class LuFail { Singular };
 std::expected<LuSolved, LuFail> solve_with_sign(const matrix<double>& A,
                                                 const V& b);
 
+// Signed determinant of A via the same partial-pivot LU as solve_with_sign:
+// magnitude ∏|diag(U)|, sign (−1)^{# row swaps} × ∏ sign(diag(U)).  A singular
+// matrix has det = 0 — a legitimate VALUE, not a failure — so an exact zero
+// pivot returns 0.0 rather than reporting LuFail::Singular the way
+// solve_with_sign does.
+double det(const matrix<double>& A);
+
 // Solve A·x = b.  Zero vector on failure.
 V solve(const matrix<double>& A, const V& b);
 

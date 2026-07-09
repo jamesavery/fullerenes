@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <numeric>
 
 using namespace std;
 
@@ -11,7 +12,7 @@ namespace LinAlg {
 
 double dot(const V& a, const V& b) { double s=0; for (size_t i=0;i<a.size();i++) s+=a[i]*b[i]; return s; }
 double norm(const V& v)            { return sqrt(dot(v, v)); }
-double max_abs(const V& v)         { double m=0; for (double x:v) { if (!(x==x)) return HUGE_VAL; m=max(m,fabs(x)); } return m; }
+double max_abs(const V& v)         { double m=0; for (double x:v) { if (std::isnan(x)) return HUGE_VAL; m=max(m,fabs(x)); } return m; }
 double sum_sq(const V& v)          { return dot(v, v); }
 bool   is_valid(const V& v)        { double n=sum_sq(v); return isfinite(n) && n > 1e-30; }
 double energy(const V& v)          { return 0.5 * sum_sq(v); }
@@ -74,7 +75,7 @@ bool jacobi_eig(std::vector<double> A, int n, std::vector<double>& lam,
 
   // Sort ascending, permuting eigenvector rows along.
   std::vector<int> order(n);
-  for (int i = 0; i < n; i++) order[i] = i;
+  std::iota(order.begin(), order.end(), 0);
   std::sort(order.begin(), order.end(),
             [&](int x, int y) { return at(x, x) < at(y, y); });
   lam.assign(n, 0);
@@ -88,39 +89,52 @@ bool jacobi_eig(std::vector<double> A, int n, std::vector<double>& lam,
   return true;
 }
 
-std::vector<double> sym_eigvals(const matrix<double>& A)
+// Symmetric part of A as a flat row-major buffer: ½(A + Aᵀ).  The Jacobi
+// eigensolver assumes a symmetric input, so both eigen entry points funnel
+// their matrix through here first.
+static std::vector<double> symmetrize_flat(const matrix<double>& A)
 {
   int n = A.m;
-  std::vector<double> Af(n*n);
+  std::vector<double> Af(size_t(n)*n);
   for (int i = 0; i < n; i++)
     for (int j = 0; j < n; j++)
       Af[size_t(i)*n + j] = 0.5 * (A(i,j) + A(j,i));
+  return Af;
+}
+
+std::vector<double> sym_eigvals(const matrix<double>& A)
+{
+  int n = A.m;
   std::vector<double> w;
-  if (!jacobi_eig(std::move(Af), n, w, nullptr)) return {};
+  if (!jacobi_eig(symmetrize_flat(A), n, w, nullptr)) return {};
   return w;
 }
 
 // --- LU with partial pivoting ---
 
-std::expected<LuSolved, LuFail>
-solve_with_sign(const matrix<double>& A, const V& b)
+// Partial-pivot LU factorization, shared by solve_with_sign and det.  Copies A
+// into the row-major working buffer M (n×n) and reduces it so M holds U on and
+// above the diagonal; sign := (−1)^{#row swaps} × ∏ sign(diag U).  When b is
+// non-null the same swaps and forward elimination are applied to it, leaving the
+// triangular system U·x = b ready for back-substitution.  Returns false on an
+// exact zero pivot (A singular); M and sign are then only partially reduced.
+static bool lu_decompose(const matrix<double>& A, vector<double>& M,
+                         int& sign, V* b)
 {
   int n = A.m;
-  vector<double> M(size_t(n)*n);              // row-major working copy
+  M.assign(size_t(n)*n, 0.0);                  // row-major working copy
   for (int i = 0; i < n; i++)
     for (int j = 0; j < n; j++)
       M[size_t(i)*n + j] = A(i, j);
-  V x(b);
-  int sign = 1;
+  sign = 1;
   for (int c = 0; c < n; c++) {
     int p = c;
     for (int q = c+1; q < n; q++)
       if (fabs(M[size_t(q)*n + c]) > fabs(M[size_t(p)*n + c])) p = q;
-    double piv = M[size_t(p)*n + c];
-    if (piv == 0) return std::unexpected(LuFail::Singular);
+    if (M[size_t(p)*n + c] == 0) return false;
     if (p != c) {
       for (int j = c; j < n; j++) swap(M[size_t(c)*n + j], M[size_t(p)*n + j]);
-      swap(x[c], x[p]);
+      if (b) swap((*b)[c], (*b)[p]);
       sign = -sign;                            // row swap parity
     }
     if (M[size_t(c)*n + c] < 0) sign = -sign;  // sign of diag(U)
@@ -128,15 +142,40 @@ solve_with_sign(const matrix<double>& A, const V& b)
       double m = M[size_t(q)*n + c] / M[size_t(c)*n + c];
       if (m == 0) continue;
       for (int j = c+1; j < n; j++) M[size_t(q)*n + j] -= m * M[size_t(c)*n + j];
-      x[q] -= m * x[c];
+      if (b) (*b)[q] -= m * (*b)[c];
     }
   }
+  return true;
+}
+
+std::expected<LuSolved, LuFail>
+solve_with_sign(const matrix<double>& A, const V& b)
+{
+  int n = A.m;
+  vector<double> M;
+  V   x(b);
+  int sign;
+  if (!lu_decompose(A, M, sign, &x)) return std::unexpected(LuFail::Singular);
   for (int c = n-1; c >= 0; c--) {             // back substitution
     double s = x[c];
     for (int j = c+1; j < n; j++) s -= M[size_t(c)*n + j] * x[j];
     x[c] = s / M[size_t(c)*n + c];
   }
   return LuSolved{std::move(x), sign};
+}
+
+double det(const matrix<double>& A)
+{
+  int n = A.m;
+  vector<double> M;
+  int sign;
+  // An exact zero pivot means A is singular — det = 0 is the true value here,
+  // not an error, so we return 0.0 rather than propagating LuFail::Singular.
+  if (!lu_decompose(A, M, sign, nullptr)) return 0.0;
+  // |det A| = ∏|U_ii|; sign already carries (−1)^{#swaps} × ∏ sign(U_ii).
+  double mag = 1.0;
+  for (int i = 0; i < n; i++) mag *= fabs(M[size_t(i)*n + i]);
+  return sign * mag;
 }
 
 V solve(const matrix<double>& A, const V& b)
@@ -169,13 +208,9 @@ namespace SymEigen {
 Decomp decompose(const matrix<double>& A)
 {
   int n = A.m;
-  std::vector<double> Af(n * n);
-  for (int i = 0; i < n; i++)                       // symmetrize (row-major)
-    for (int j = 0; j < n; j++)
-      Af[size_t(i) * n + j] = 0.5 * (A(i, j) + A(j, i));
   V lambda;
   std::vector<double> Vrows;                        // row m = eigvec m
-  if (!jacobi_eig(std::move(Af), n, lambda, &Vrows))
+  if (!jacobi_eig(symmetrize_flat(A), n, lambda, &Vrows))
     return Decomp{matrix<double>(0, 0, 0.0), {}};
   matrix<double> Q(n, n, 0.0);
   for (int i = 0; i < n; i++)
