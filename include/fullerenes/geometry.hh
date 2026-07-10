@@ -336,49 +336,39 @@ struct matrix3d {
     return best;
   }
 
-  // Eigenvalue solver specialized to symmetric real 3x3 matrices using Viete's
-  // closed form solution to cubic polynomials with three real roots.  Operates
-  // on the symmetric part (see symmetric_part()), so it is correct for exactly-
+  // Eigenvalue solver specialized to symmetric real 3x3 matrices, via the
+  // trigonometric closed form applied to the DEVIATORIC part (Smith's method;
+  // the same formulation as the device solver symMat3::eigenvalues in
+  // sym-mat.cc).  Working on S - q*I with q = Tr(S)/3 avoids the catastrophic
+  // cancellation the raw characteristic-polynomial route suffers for clustered
+  // spectra: the trace part carries no error into the root separation, and the
+  // middle root is recovered exactly from the trace identity.  Operates on the
+  // symmetric part (see symmetric_part()), so it is correct for exactly-
   // symmetric input and for input asymmetric only by floating-point roundoff.
+  // Returned in DESCENDING order: lambda[0] >= lambda[1] >= lambda[2].
   coord3d eigenvalues() const
   {
     const matrix3d S(symmetric_part());
+    const double a(S(0,0)), b(S(0,1)), c(S(0,2)), d(S(1,1)), e(S(1,2)), f(S(2,2));
 
-    // Coefficients up to symmetry
-    double a(S(0,0)), b(S(0,1)), c(S(0,2)), d(S(1,1)), e(S(1,2)), f(S(2,2));
-    
-    // Coefficients of characteristic polynomial, calculated with Mathematica
-    long double 
-      A = -1.L,
-      B = a+d+f,
-      C = b*b + c*c - a*d + e*e - a*f - d*f,
-      D = -c*c*d + 2*b*c*e - a*e*e - b*b*f + a*d*f;
+    const long double q  = (a + (long double)d + f)/3.L;         // Tr(S)/3
+    const long double p1 = (long double)b*b + (long double)c*c + (long double)e*e;
+    const long double p2 = (a-q)*(a-q) + (d-q)*(d-q) + (f-q)*(f-q) + 2.L*p1;
+    if(p2 == 0) return coord3d(q, q, q);   // exactly isotropic: S = q*I
 
-    if(D==0){			// Second order equation. TODO: FP comparison
-      long double Disc = sqrtl(B*B-4*A*C);
-      return coord3d(0,(-B-Disc)/(2.L*A),(-B+Disc)/(2.L*A));
-    }
+    const long double p = sqrtl(p2/6.L);
+    // r = det((S - q*I)/p) / 2 lies in [-1,1] up to roundoff; clamp.
+    const long double det_dev = -c*(long double)c*(d-q) + 2.L*(long double)b*c*e
+                               - (a-q)*(long double)e*e - (long double)b*b*(f-q)
+                               + (a-q)*(d-q)*(f-q);
+    long double r = det_dev/(2.L*p*p*p);
+    r = std::max(-1.0L, std::min(1.0L, r));
 
-    // Depress characteristic polynomial - see http://en.wikipedia.org/wiki/Cubic_equation#Reduction_to_a_depressed_cubic
-    long double 
-      p  = (3.L*A*C - B*B)/(3.L*A*A),
-      q  = (2.L*B*B*B - 9.L*A*B*C + 27.L*A*A*D)/(27.L*A*A*A),
-      xc = B/(3.L*A);
-
-    // François Viète's solution to cubic polynomials with three real roots.
-    // For a symmetric matrix (three real roots) p <= 0 exactly; roundoff on a
-    // near-isotropic matrix can push -p/3 slightly negative, so clamp its square
-    // root argument to 0 (K -> 0 collapses the near-equal roots onto their mean,
-    // B/(3A), which is correct to O(sqrt(|p|))).  cos_arg is clamped likewise.
-    coord3d t;
-    long double cos_arg = (3.L*q)/(2.L*p)*sqrtl(-3.L/p);
-    cos_arg = std::max(-1.0L, std::min(1.0L, cos_arg)); // clamp for FP robustness
-    long double K = 2*sqrtl(std::max(0.0L, -p/3.L)),
-                theta0 = (1.L/3.L)*acosl(cos_arg);
-    for(int k=0;k<3;k++) t[k] = K*cosl(theta0-k*2.L*M_PI/3.L);
-
-    // lambda = t - B/(3A)
-    return t - coord3d(xc,xc,xc);
+    const long double phi  = acosl(r)/3.L;                // phi in [0, pi/3]
+    const long double lam0 = q + 2.L*p*cosl(phi);                    // largest
+    const long double lam2 = q + 2.L*p*cosl(phi + 2.L*M_PI/3.L);     // smallest
+    const long double lam1 = 3.L*q - lam0 - lam2;                    // trace identity
+    return coord3d(lam0, lam1, lam2);
   }
   
 
@@ -411,15 +401,15 @@ struct matrix3d {
   // the isotropic case -- all eigenvalues equal, e.g. a multiple of the
   // identity or the zero matrix -- returns the standard basis.
   //
-  // The closed-form eigenvalues (eigenvalues()) lose precision for a
-  // near-degenerate cluster (the acos argument approaches +-1), so they are
-  // only used to seed the eigenvector extraction.  The returned eigenvalues are
-  // recovered accurately from the eigenvectors: one step of Rayleigh-quotient
+  // The closed-form eigenvalues (eigenvalues(), Smith form) seed the
+  // eigenvector extraction; the returned eigenvalues are nevertheless
+  // recovered from the eigenvectors -- one step of Rayleigh-quotient
   // iteration refines the isolated eigenvalue, and the other two come directly
-  // from the 2x2 restriction of S to the complementary plane.
+  // from the 2x2 restriction of S to the complementary plane -- so the result
+  // does not inherit even the (small) closed-form rounding.
   pair<coord3d,matrix3d> eigensystem() const {
     const matrix3d S(symmetric_part());
-    const coord3d  lam0(eigenvalues());   // closed-form seeds (unsorted)
+    const coord3d  lam0(eigenvalues());   // closed-form seeds (descending)
 
     const double scale  = S.norm();
     const double fscale = (scale>0 ? scale : 1.0);
