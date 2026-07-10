@@ -14,7 +14,11 @@ if(NOT CMAKE_Fortran_IMPLICIT_LINK_LIBRARIES)
 endif()
 
 find_package(OpenMP)
-target_link_libraries(fullerenes fortran_opt buckygen ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES})
+# BLAS/LAPACK deliberately NOT linked: the last LAPACK call in the C++ core
+# (planargraph's dgetrf_) migrated to the in-house BLAS-free dense_linalg,
+# and the Fortran solvers never used them.  See dense_linalg.hh for why the
+# library must not silently regain a BLAS dependency.
+target_link_libraries(fullerenes fortran_opt buckygen)
 if(OpenMP_CXX_FOUND)
   target_link_libraries(fullerenes OpenMP::OpenMP_CXX)
 endif()
