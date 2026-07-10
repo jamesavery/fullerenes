@@ -422,7 +422,7 @@ void DelaunayTriangulation::recompute_face_angles(int f)
   // h_i: u_i -> u_{i+1} with length L_i.  Angle at origin(h_i) is the
   // corner between sides L_i (outgoing) and L_{i-1} (incoming), opposite
   // to L_{i+1}.
-  int h[3] = { f_he[f], he_next[f_he[f]], he_next[he_next[f_he[f]]] };
+  const auto h = face_halfedges(f);
   double L[3] = { he_length[h[0]], he_length[h[1]], he_length[h[2]] };
   for (int i = 0; i < 3; i++)
     he_angle[h[i]] = triangle_angle(L[i], L[(i + 2) % 3], L[(i + 1) % 3]);

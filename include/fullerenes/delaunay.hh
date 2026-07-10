@@ -165,6 +165,18 @@ struct DelaunayTriangulation {
   // CCW rotation around origin(h): next outgoing half-edge counterclockwise.
   int ccw(int h) const { return twin(prev(h)); }
 
+  // The three half-edges of (triangular) face f, in he_next order starting
+  // from its representative.  Pre: f is live (f_he[f] >= 0).
+  std::array<int,3> face_halfedges(int f) const {
+    const int h = f_he[f];
+    return {h, he_next[h], prev(h)};
+  }
+  // The three corner vertices of face f, CCW (origins of face_halfedges(f)).
+  std::array<int,3> face_vertices(int f) const {
+    const auto h = face_halfedges(f);
+    return {he_origin[h[0]], he_origin[h[1]], he_origin[h[2]]};
+  }
+
   int vertex_degree(int v) const;  // count outgoing half-edges from v
 
   // Range over the outgoing half-edges of v (the cw ring from v_out[v]); empty if v

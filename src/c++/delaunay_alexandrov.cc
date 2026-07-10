@@ -338,9 +338,8 @@ static double signed_volume6(const DelaunayTriangulation& T,
   double vol6 = 0;
   for (int f = 0; f < T.nf; f++) {
     if (T.f_he[f] < 0) continue;
-    int ha = T.f_he[f], hb = T.he_next[ha], hc = T.he_next[hb];
-    vol6 += pos[T.he_origin[ha]].dot(
-              pos[T.he_origin[hb]].cross(pos[T.he_origin[hc]]));
+    const auto v = T.face_vertices(f);
+    vol6 += pos[v[0]].dot(pos[v[1]].cross(pos[v[2]]));
   }
   return vol6;
 }
@@ -417,11 +416,10 @@ static AlexandrovSolver::TrajEntry make_traj(
   e.kappa = kappa;
   e.positions = Reconstruct::from_radii(T, r);   // empty/NaN if Gram-BFS fails
   for (int f = 0; f < T.nf; f++) {
-    int h = T.f_he[f];
-    if (h < 0 || !T.alive(h)) continue;          // dead face slot
-    int h1 = T.he_next[h], h2 = T.he_next[h1];
-    e.faces.push_back({T.he_origin[h], T.he_origin[h1], T.he_origin[h2]});
-    e.face_len.push_back({T.he_length[h], T.he_length[h1], T.he_length[h2]});
+    if (T.f_he[f] < 0 || !T.alive(T.f_he[f])) continue;   // dead face slot
+    const auto h = T.face_halfedges(f);
+    e.faces.push_back({T.he_origin[h[0]], T.he_origin[h[1]], T.he_origin[h[2]]});
+    e.face_len.push_back({T.he_length[h[0]], T.he_length[h[1]], T.he_length[h[2]]});
   }
   return e;
 }
@@ -862,8 +860,8 @@ vector<coord3d> from_radii(const DelaunayTriangulation& T, const V& r) {
   for (int f = 0; f < T.nf; f++) if (T.f_he[f] >= 0) { f0 = f; break; }
   if (f0 < 0) return pos;
 
-  int h0 = T.f_he[f0], h1 = T.he_next[h0], h2 = T.he_next[h1];
-  int i = T.he_origin[h0], j = T.he_origin[h1], k = T.he_origin[h2];
+  const auto [h0, h1, h2] = T.face_halfedges(f0);
+  const auto [i, j, k]    = T.face_vertices(f0);
 
   pos[i] = coord3d(r[i], 0, 0);
 
@@ -1279,8 +1277,7 @@ bool AlexandrovSolver::is_convex(const DelaunayTriangulation& T,
   // polytopes, etc.
   for (int f = 0; f < T.nf; f++) {
     if (T.f_he[f] < 0) continue;
-    int ha = T.f_he[f], hb = T.he_next[ha], hc = T.he_next[hb];
-    int va = T.he_origin[ha], vb = T.he_origin[hb], vc = T.he_origin[hc];
+    const auto [va, vb, vc] = T.face_vertices(f);
     coord3d a = pos[va], b = pos[vb], c = pos[vc];
     coord3d nf_raw = (b - a).cross(c - a);
     double nlen = sqrt(nf_raw.dot(nf_raw));
@@ -1399,8 +1396,8 @@ bool AlexandrovSolver::has_self_intersection(const DelaunayTriangulation& T,
   tris.reserve(T.nf);
   for (int f = 0; f < T.nf; f++) {
     if (T.f_he[f] < 0) continue;
-    int ha = T.f_he[f], hb = T.he_next[ha], hc = T.he_next[hb];
-    tris.push_back({T.he_origin[ha], T.he_origin[hb], T.he_origin[hc]});
+    const auto v = T.face_vertices(f);
+    tris.push_back({v[0], v[1], v[2]});
   }
 
   for (size_t i = 0; i < tris.size(); i++) {
