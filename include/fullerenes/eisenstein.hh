@@ -9,6 +9,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <numeric>
 
 using namespace std;
 
@@ -182,6 +183,47 @@ inline long wedge(Eisenstein u, Eisenstein v) {
   return (long)u.first * v.second - (long)u.second * v.first;
 }
 
+// Sign-exact 2*Re(a * conj(b)): positive iff the angle between a and b is
+// acute.  Companion to wedge (the sine sign); together they totally order
+// directions around the circle.
+inline long dot2(Eisenstein a, Eisenstein b) {
+  const Eisenstein z = a * b.complex_conj();
+  return 2L * z.first + z.second;
+}
+
+// a and b point the same way (parallel, same sense).
+inline bool same_dir(Eisenstein a, Eisenstein b) { return wedge(a, b) == 0 && dot2(a, b) > 0; }
+
+// v reduced to its primitive lattice direction (divide out the gcd).
+inline Eisenstein primitive_dir(Eisenstein v) {
+  const int g = std::gcd(std::abs(v.first), std::abs(v.second));
+  return g ? Eisenstein(v.first / g, v.second / g) : v;
+}
+
+// First unit strictly CCW (resp. CW) of a non-zero direction v.  Always
+// exists: the gap between consecutive units is 60 degrees, so exactly one
+// unit is the nearest strictly on that side.
+inline Eisenstein first_ccw(Eisenstein v) {
+  Eisenstein best; bool have = false;
+  for (int i = 0; i < 6; i++) {
+    const Eisenstein u = Eisenstein::unit[i];
+    if (wedge(v, u) <= 0) continue;                     // not strictly CCW of v
+    if (!have || wedge(u, best) > 0) { best = u; have = true; }
+  }
+  if (!have) throw std::logic_error("first_ccw: null direction");
+  return best;
+}
+inline Eisenstein first_cw(Eisenstein v) {
+  Eisenstein best; bool have = false;
+  for (int i = 0; i < 6; i++) {
+    const Eisenstein u = Eisenstein::unit[i];
+    if (wedge(v, u) >= 0) continue;                     // not strictly CW of v
+    if (!have || wedge(u, best) < 0) { best = u; have = true; }
+  }
+  if (!have) throw std::logic_error("first_cw: null direction");
+  return best;
+}
+
 // Some Eisenstein integer (a, b) with a >= 0, b >= 0 and
 // a^2 + a*b + b^2 == N.  Returns the first sector-0 representative
 // found by scanning b = 0, 1, ...; aborts if no solution exists.
@@ -273,6 +315,28 @@ struct Sector { Eisenstein R, L;
   bool is_empty()      const { return wedge(R, L) <= 0; }
   bool contains(Eisenstein d) const {
     return wedge(R, d) >= 0 && wedge(d, L) >= 0;
+  }
+  // d strictly inside the OPEN sector (R, L) -- excludes both boundary rays.
+  // Reflex-safe (sectors up to 300 degrees); throws on a degenerate sector
+  // where R, L are parallel and same-sense (there is no interior).
+  bool strictly_inside(Eisenstein d) const {
+    const long rl = wedge(R, L);
+    if (rl > 0) return wedge(R, d) > 0 && wedge(d, L) > 0;      // convex (< 180)
+    if (rl < 0) return !(wedge(L, d) > 0 && wedge(d, R) > 0);   // reflex: complement of (L, R)
+    if (dot2(R, L) < 0) return wedge(R, d) > 0;                 // exactly 180 (R, L antiparallel)
+    throw std::logic_error("Sector::strictly_inside: degenerate sector (R, L parallel, same sense)");
+  }
+  // Reflex-safe HALF-OPEN membership (unlike contains(), which assumes a convex
+  // <= 180-degree sector): the shared boundary ray belongs to exactly one side.
+  bool contains_oc(Eisenstein d) const {   // (R, L] -- open at R, closed at L
+    if (same_dir(d, L)) return true;
+    if (same_dir(d, R)) return false;
+    return strictly_inside(d);
+  }
+  bool contains_co(Eisenstein d) const {   // [R, L) -- closed at R, open at L
+    if (same_dir(d, R)) return true;
+    if (same_dir(d, L)) return false;
+    return strictly_inside(d);
   }
   Sector narrow_with(Eisenstein r_new, Eisenstein l_new) const {
     return { wedge(R, r_new) > 0 ? r_new : R,

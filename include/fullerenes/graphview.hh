@@ -255,6 +255,39 @@ struct TriangulationView : PlanarGraphView {
         bool   improved;
     };
 
+    // The Thurston star unfolding from a source cone: the surface cut along
+    // the shortest simple geodesics source -> every other cone (a star tree)
+    // and developed into the Eisenstein plane.  Boundary-only and exact in
+    // Z[w]: every vertex of the development is a lattice point.
+    //
+    // The payload is the STANDARD labelled outline (Unfolding::outline's
+    // type, CW like it), so the fold/unfold pipeline consumes it directly:
+    // entries alternate (source copy, source), (leaf position, cone), so the
+    // even entries are the k-1 source copies, the odd entries the k-1 other
+    // cones, and the i-th squared cut length is
+    // (outline[2i+1].first - outline[2i].first).norm2().  The only fields
+    // beyond the outline are the outcome code and the globally-shortest
+    // flag, which is a property of the input's geodesics and cannot be read
+    // off the picture.  Construction, proofs and sweep evidence:
+    // claude-projects/visualization/STAR-UNFOLDING.md.
+    struct star_unfolding {
+        enum class Code { Ok, SourceNotCone, NoSimpleGeodesic, CollinearCuts };
+        Code   code = Code::Ok;
+        string metadata;                    // names the offender when code != Ok
+
+        node_t source = -1;
+        vector<pair<Eisenstein, node_t>> outline;   // CW 2(k-1)-gon, see above
+        bool cuts_globally_shortest = true;         // false: some cut is only
+                                                    // simple-shortest (degenerate)
+
+        static star_unfolding error(Code c, string m) {
+            star_unfolding r;
+            r.code     = c;
+            r.metadata = std::move(m);
+            return r;
+        }
+    };
+
     // --- Triangulation methods ---
     PlanarGraph dual_graph() const;
     vector<face_t> cubic_faces() const;
@@ -323,6 +356,29 @@ struct TriangulationView : PlanarGraphView {
     // Returns an empty geodesic for paths of length <= 1 (U == V or unreachable).
     static geodesic compose_simple_geodesics(const vector<int>& path,
                                              const matrix<simple_geodesic>& simple);
+
+    // Thurston star unfolding from `source` (any vertex labelling).
+    // @anchor tri-star-unfold
+    // @pre  degree(source) != 6                        (else Code::SourceNotCone)
+    // @post on Ok: outline is the closed CW 2(k-1)-gon of the cut development
+    //       (k = cone count), alternating source copies and leaf cones, each
+    //       leaf appearing exactly once; the walk closes exactly, and the
+    //       (a,b) lattice shoelace equals -(2N - 4) (CW traversal covering
+    //       every face once) -- both asserted.
+    // @error Code::SourceNotCone    when degree(source) == 6
+    // @error Code::NoSimpleGeodesic when some cone has no simple geodesic
+    //       from source
+    // @error Code::CollinearCuts    when two cut directions coincide at source
+    // @throws std::runtime_error on closure/area failure -- a deep invariant
+    //       that cannot occur for valid input (swept clean over every isomer
+    //       and every source, C20-C100).
+    // @ref  claude-projects/visualization/STAR-UNFOLDING.md
+    star_unfolding star_unfold(node_t source) const;
+    // Sweep form: shares precomputed simple_geodesics / surface_distances
+    // over `cones` (the degree != 6 vertices) across many sources.
+    star_unfolding star_unfold(node_t source, const vector<node_t>& cones,
+                               const matrix<simple_geodesic>& simple,
+                               const matrix<double>& dist) const;
 
     node_t end_of_the_line(node_t u0, int i, int a, int b) const;
     // coords_out (optional): per quad vertex, its integer Eisenstein lattice coord
