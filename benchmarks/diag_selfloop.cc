@@ -20,7 +20,7 @@
 
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/delaunay.hh"
-#include "fullerenes/delaunay_alexandrov12.hh"
+#include "fullerenes/delaunay_alexandrov.hh"
 #include "fullerenes/buckygen-wrapper.hh"
 
 #include <cstdio>

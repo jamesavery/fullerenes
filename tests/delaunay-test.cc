@@ -1,7 +1,6 @@
 #include <gtest/gtest.h>
 #include "fullerenes/delaunay.hh"
 #include "fullerenes/delaunay_embed3d.hh"
-#include "fullerenes/delaunay_old.hh"
 #include "fullerenes/isomerdb.hh"
 #include "fullerenes/planargraph.hh"
 #include "fullerenes/buckygen-wrapper.hh"
