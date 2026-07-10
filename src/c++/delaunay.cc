@@ -900,7 +900,8 @@ static void flip_away_self_loops(DelaunayTriangulation& D, int v) {
   }
 }
 
-void DelaunayTriangulation::remove_flat_vertices(double flat_tol)
+void DelaunayTriangulation::remove_flat_vertices(double flat_tol,
+                                                 const std::function<void(int)>& on_pop)
 {
   // Remove every flat (cone angle 2*pi) vertex, leaving the cones, via a WORK-LIST.
   //
@@ -951,6 +952,10 @@ void DelaunayTriangulation::remove_flat_vertices(double flat_tol)
   // the affected (live, flat) rim neighbours. Returns true iff v was removed.
   auto try_remove = [&](int v) -> bool {
     if (v < 0 || v >= nv || v_out[v] < 0 || !is_flat(v, flat_tol)) return false;
+    // Observer hook: fire at every live-flat pop, before self-loop cleanup, when
+    // the mesh is globally Delaunay per the driver invariant (see header). Must
+    // not mutate the mesh; taken on trust.
+    if (on_pop) on_pop(v);
     // Collect the star rim on BOTH sides of flip_away_self_loops (its self-loop flips
     // perturb the pre-flip ring; the removal re-triangulates the post-flip rim) -- a
     // complete superset of the edges whose Delaunay status the surgery can change.
@@ -959,13 +964,20 @@ void DelaunayTriangulation::remove_flat_vertices(double flat_tol)
     flip_away_self_loops(*this, v);
     for (int h : incident(v)) ring.push_back(dest(h));
     remove_flat_vertex(v);
-    if (v_out[v] >= 0) return false;                         // deg <= 2: not removed
-    while (nv > 0 && v_out[nv - 1] < 0) nv--;
+    bool removed_v = (v_out[v] < 0);
+    if (removed_v)
+      while (nv > 0 && v_out[nv - 1] < 0) nv--;
+    // Restore Delaunay from the rim seeds even when the removal failed (deg <= 2):
+    // flip_away_self_loops may have flipped, and every pop must see a globally-
+    // Delaunay mesh for the seeded restore to be exact (Lemma 6, CORRECTNESS-PROOF.md).
+    // On a failed attempt v is live with no self-loops, so every changed-diamond edge
+    // still has a ring endpoint and the seed set below stays complete.
     std::vector<int> seeds;
     for (int w : ring)
       if (w >= 0 && w < nv && v_out[w] >= 0)
         for (int h : incident(w)) seeds.push_back(h);
     lawson_sweep(seeds, sweep_in_stack);
+    if (!removed_v) return false;
     for (int w : ring) push(w);                              // re-push affected rim flats
     if (verbose_removal && (++removed % verbose_removal == 0)) {
       std::fprintf(stderr, "[remove_flat] removed %lld, %d live remain\n", removed, count_live());
@@ -1010,6 +1022,16 @@ void DelaunayTriangulation::remove_flat_vertices(double flat_tol)
     if (!seed_all_flats()) break;   // no flats remain -> done
     if (!drain())          break;   // flats remain but none removable even after restructure -> done
   }
+
+  // Fail loud on a stuck reduction: a live flat vertex surviving the fixed-point
+  // rounds means the driver could not reduce the mesh to its cones (deg <= 2 flats
+  // that no restructure unblocked). Returning the partial reduction silently would
+  // hand callers a non-cone iDT; see CORRECTNESS-PROOF.md (Obligation 2 guard status).
+  for (int v = 0; v < nv; v++)
+    if (v_out[v] >= 0 && is_flat(v, flat_tol))
+      throw std::runtime_error(
+          "remove_flat_vertices: stuck with live flat vertex v=" +
+          std::to_string(v) + " after fixed-point rounds -- see CORRECTNESS-PROOF.md");
 
   if (verbose_removal) {
     std::fprintf(stderr, "[remove_flat] done: removed %lld, %d live remain\n", removed, count_live());

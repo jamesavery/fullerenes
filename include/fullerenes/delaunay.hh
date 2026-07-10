@@ -250,7 +250,23 @@ struct DelaunayTriangulation {
   void remove_flat_vertex(int v);
   // Remove every flat vertex (is_flat(v, flat_tol)), leaving the cones. See
   // is_flat for choosing flat_tol (1e-6 exact, ~1e-2 for a CEPS metric).
-  void remove_flat_vertices(double flat_tol = 1e-6);
+  //
+  // Observer hook: if `on_pop` is non-empty, it is invoked as on_pop(v) at
+  // EVERY work-list pop of a live flat vertex v -- after the live/flat guard
+  // passes and BEFORE that vertex's self-loop cleanup, i.e. at the moment the
+  // mesh is globally Delaunay per the driver invariant. It fires in every drain
+  // path (the initial drain and each restructure round). The observer MUST NOT
+  // mutate the mesh (it is an observation hook only); this is taken on trust,
+  // not checked. An empty on_pop (the default) is a zero-overhead no-op.
+  //
+  // @throws std::runtime_error on an un-flippable self-loop at a flat vertex
+  //         (the internal self-loop cleanup's Obligation-1/O-STAR guard).
+  // @throws std::runtime_error on Lawson budget exhaustion (propagated from
+  //         lawson_sweep).
+  // @throws std::runtime_error on a stuck reduction: a live flat vertex
+  //         survives the fixed-point rounds.
+  void remove_flat_vertices(double flat_tol = 1e-6,
+                            const std::function<void(int)>& on_pop = {});
 
   // Renumber the live vertices to 0..n_live-1 (dropping removed ones) and
   // shrink nv, rewriting he_origin and the per-vertex arrays. Needed after a
