@@ -72,7 +72,7 @@ static int count_crossings(const DelaunayTriangulation& D, const vector<coord3d>
   return count;
 }
 
-static void scan(int N, double scale, AlexandrovSolver::Continuation method) {
+static void scan(int N, double scale) {
   BuckyGen::buckygen_queue Q = BuckyGen::start(N, false, false);
   int total = 0;
   int n_ok = 0, n_fail = 0, n_cross = 0, n_badori = 0;
@@ -132,7 +132,6 @@ static void scan(int N, double scale, AlexandrovSolver::Continuation method) {
 
       AlexandrovSolver solver;
       solver.D = D;
-      solver.continuation = method;
       auto t0 = chrono::high_resolution_clock::now();
       auto coords = solver.solve();
       auto t1 = chrono::high_resolution_clock::now();
@@ -241,21 +240,12 @@ static void scan(int N, double scale, AlexandrovSolver::Continuation method) {
 
 int main(int argc, char** argv) {
   if (argc < 2) {
-    fprintf(stderr, "Usage: %s N [scale] [natural|palc]\n", argv[0]);
+    fprintf(stderr, "Usage: %s N [scale]\n", argv[0]);
     return 1;
   }
   double scale = (argc >= 3) ? atof(argv[2]) : 1.0;
-  auto method = AlexandrovSolver::Continuation::NATURAL;
-  if (argc >= 4) {
-    string m = argv[3];
-    if (m == "palc") method = AlexandrovSolver::Continuation::PALC;
-    else if (m != "natural")
-      fprintf(stderr, "warning: unknown method '%s'; using natural\n", m.c_str());
-  }
-  printf("method: %s, scale: %g\n",
-         method == AlexandrovSolver::Continuation::PALC ? "palc" : "natural",
-         scale);
+  printf("scale: %g\n", scale);
   fflush(stdout);  // flush before scan()'s buckygen fork() duplicates the buffer
-  scan(atoi(argv[1]), scale, method);
+  scan(atoi(argv[1]), scale);
   return 0;
 }
