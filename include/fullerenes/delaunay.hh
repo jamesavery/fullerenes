@@ -260,7 +260,14 @@ struct DelaunayTriangulation {
   // not checked. An empty on_pop (the default) is a zero-overhead no-op.
   //
   // @throws std::runtime_error on an un-flippable self-loop at a flat vertex
-  //         (the internal self-loop cleanup's Obligation-1/O-STAR guard).
+  //         that survives the cocircular tie-break (the O-STAR guard).  An
+  //         EXACTLY TIED loop diamond (end angle = pi; realizable, see
+  //         O-STAR.md's crushed-tube counterexample) is first resolved by
+  //         the t = 1 tie-break: flip a cocircular side-fan spoke
+  //         (energy-neutral, Delaunay-preserving), after which the loop is
+  //         strictly convex.  The throw remains for the (G2') residual
+  //         (ties whose every small side has fan size >= 2) and as the
+  //         fail-loud backstop.
   // @throws std::runtime_error on Lawson budget exhaustion (propagated from
   //         lawson_sweep).
   // @throws std::runtime_error on a stuck reduction: a live flat vertex

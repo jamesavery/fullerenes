@@ -854,19 +854,85 @@ void DelaunayTriangulation::remove_flat_vertex(int v)
   }
 }
 
+// Tie-break for an exactly tied self-loop (O-STAR.md: the t = 1 tie-break
+// theorem; the crushed-tube counterexample shows ties are reachable).
+//
+// In a globally Delaunay pop-time state the Half-Angle Lemma bounds each
+// diamond end of a self-loop at a flat vertex by pi; is_convex (strict,
+// 1e-12 band) refuses the boundary case end = pi -- an exact tie.  At a
+// tie, the tied side's closing spoke has an exactly cocircular diamond
+// (E1/E4), and the theorem guarantees that for a side with theta <= pi and
+// fan size t = 1 flipping that spoke is legal, energy-neutral, keeps the
+// state Delaunay, and leaves the loop strictly convex on both ends.
+//
+// This helper tries every cocircular spoke in the loop's two side fans,
+// smaller-theta side first (the theorem's side), and KEEPS a flip only if
+// it convexifies the loop -- otherwise it undoes it (a cocircular flip is
+// involutive: the flipped diamond is the same concyclic quad on its other
+// diagonal, so the reverse flip is equally legal and neutral).  Every
+// intermediate state is therefore Delaunay, and each spoke is tried at
+// most once.  Returns true iff the loop's diamond is strictly convex on
+// exit; on false the state is exactly as on entry.
+static bool tie_break_self_loop(DelaunayTriangulation& D, int v, int h_loop)
+{
+  // The loop's two ring slots split v's star into two side fans; the side
+  // of slot s is the cw arc (s^1, s], walked half-open [cw(s^1), cw(s)).
+  // (Same split as the instrumentation; Gauss-Bonnet-verified convention.)
+  auto side_spokes = [&](int slot, double& theta) {
+    std::vector<int> spokes;
+    theta = 0.0;
+    const int start = D.cw(slot ^ 1), stop = D.cw(slot);
+    long guard = 0;
+    for (int g = start; g != stop; g = D.cw(g)) {
+      theta += D.he_angle[g];
+      if (D.dest(g) != v) spokes.push_back(g);
+      if (++guard > D.nh)
+        throw std::runtime_error("tie_break_self_loop: ring walk overran");
+    }
+    return spokes;
+  };
+
+  const int slots[2] = {h_loop, h_loop ^ 1};
+  double theta[2];
+  std::vector<int> spokes[2];
+  for (int i = 0; i < 2; i++) spokes[i] = side_spokes(slots[i], theta[i]);
+
+  const int first = (theta[0] <= theta[1]) ? 0 : 1;
+  for (int i : {first, 1 - first}) {
+    for (int g : spokes[i]) {
+      if (!D.diamond(g).is_cocircular(1e-12)) continue;
+      if (!D.flip_edge(g)) continue;      // inscribed quad: convex, but stay guarded
+      if (D.diamond(h_loop).is_convex()) return true;
+      D.flip_edge(g);                     // undo: not the theorem's spoke
+    }
+  }
+  return false;
+}
+
 // Flip away all self-loops at vertex v.
 // Self-loops at a flat vertex arise from ear diagonals in previous
 // removals; they must be cleared before remove_flat_vertex, otherwise
 // extract_fan sees v in its own polygon and splice_fan would wire a
-// live edge to the about-to-be-dead vertex.  Correctness obligation
-// (CORRECTNESS-PROOF.md, Theorem 3): every self-loop at a flat v is
-// flippable, i.e. its diamond is convex at v.  Empirically true on
-// 1.94B+ fullerene isomers; in the adversarial case of a strictly
-// Delaunay self-loop at a flat vertex the assert below catches it.
+// live edge to the about-to-be-dead vertex.  By the Half-Angle Lemma
+// (O-STAR.md) every self-loop at a flat vertex in a Delaunay state has
+// diamond ends <= pi; strict convexity can fail only on an EXACT tie
+// (end = pi), which the t = 1 tie-break above resolves.  The residual
+// throw covers (G2') ties (every small side with fan size >= 2) and
+// acts as the fail-loud backstop (E7: the output is never wrong).
 static void flip_away_self_loops(DelaunayTriangulation& D, int v) {
   if (D.v_out[v] < 0) return;
+  // Pass budget: a safeguard, not a tuning knob.  Each productive pass
+  // either flips a loop away (bounded by the loop count at v) or
+  // tie-breaks one loop, whose flip the NEXT pass performs; oscillation
+  // is impossible for exact-tie geometry, but the budget converts any
+  // unforeseen cocircular pathology into a loud throw instead of a hang.
+  int budget = 8 * (D.vertex_degree(v) + 4);
   bool flipped_any = true;
   while (flipped_any) {
+    if (--budget < 0)
+      throw std::runtime_error(
+          "flip_away_self_loops: pass budget exhausted at flat v=" +
+          std::to_string(v) + " (cocircular pathology; see O-STAR.md)");
     flipped_any = false;
     int h0 = D.v_out[v];
     if (h0 < 0) break;
@@ -875,6 +941,7 @@ static void flip_away_self_loops(DelaunayTriangulation& D, int v) {
       if (D.dest(h) == v) {
         if (D.flip_edge(h))     { flipped_any = true; break; }
         if (D.flip_edge(h ^ 1)) { flipped_any = true; break; }
+        if (tie_break_self_loop(D, v, h)) { flipped_any = true; break; }
       }
       h = D.cw(h);
     } while (h != h0);
@@ -882,10 +949,6 @@ static void flip_away_self_loops(DelaunayTriangulation& D, int v) {
   // Invariant check (runtime, not assert: asserts compile out with -DNDEBUG):
   // no self-loop survives at a flat vertex.  If one does, splice_fan would
   // double-deallocate the self-loop edge and corrupt the DCEL silently.
-  // Theorem in CORRECTNESS-PROOF.md proves this never fires on
-  // non-Delaunay or freshly-created self-loops; the residual is the
-  // rim-flip-evolution case, which is empirically clean across all
-  // tested inputs.
   int h0 = D.v_out[v];
   if (h0 >= 0) {
     int h = h0;
@@ -893,8 +956,8 @@ static void flip_away_self_loops(DelaunayTriangulation& D, int v) {
       if (D.dest(h) == v)
         throw std::runtime_error(
             "flip_away_self_loops: un-flippable self-loop at flat v=" +
-            std::to_string(v) + " (Obligation 1 violated; "
-            "see CORRECTNESS-PROOF.md)");
+            std::to_string(v) + " survives the tie-break "
+            "(a (G2') residual tie or a reflex end; see O-STAR.md)");
       h = D.cw(h);
     } while (h != h0);
   }
