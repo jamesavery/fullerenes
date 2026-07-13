@@ -100,6 +100,10 @@ add_executable(planargraph-ascii-test planargraph-ascii-test.cc)
 target_link_libraries(planargraph-ascii-test fullerenes GTest::GTest GTest::Main)
 add_test(NAME planargraph-ascii-test COMMAND planargraph-ascii-test)
 
+add_executable(isomerdb-test isomerdb-test.cc)
+target_link_libraries(isomerdb-test fullerenes GTest::GTest GTest::Main)
+add_test(NAME isomerdb-test COMMAND isomerdb-test)
+
 add_executable(star-unfold-test star-unfold-test.cc)
 target_link_libraries(star-unfold-test fullerenes GTest::GTest GTest::Main)
 add_test(NAME star-unfold-test COMMAND star-unfold-test)

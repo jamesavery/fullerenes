@@ -1,12 +1,18 @@
 #include "FullereneSelect.hh"
 
 FullereneSelect::FullereneSelect(int N, bool IPR, string extension) {
-  // Is there a binary DB?
-  has_db = true;
+  // Probe binary DB first, then PDB; without either, run database-less.
   printf("FullereneSelect(%d,%d,%s)\n",N,IPR,extension.c_str());
-  db = IsomerDB::readBinary(N,IPR,extension);
-  if(db.N<0) db = IsomerDB::readPDB(N,IPR,extension);
-  if(db.N<0) { db.N = N; db.IPR = IPR; has_db = false; }
+  has_db = true;
+  try {
+    db = IsomerDB::readBinary(N,IPR,extension);
+  } catch(const std::exception&) {
+    try {
+      db = IsomerDB::readPDB(N,IPR,extension);
+    } catch(const std::exception&) {
+      db.N = N; db.IPR = IPR; has_db = false;
+    }
+  }
 }
 
 

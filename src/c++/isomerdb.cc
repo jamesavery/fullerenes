@@ -1,10 +1,24 @@
 #include "fullerenes/config.hh"
 #include "fullerenes/isomerdb.hh"
+
+#include <stdexcept>
 // TODO: Hov! Isomer count is wrong when reading text database. Find and fix!
 
-// TODO: Make C++98 compatible to support old compilers or make optional
-
 string IsomerDB::database_path = FULLERENE_DATABASE_PATH;
+
+// A missing or corrupt database file is an environment/configuration error:
+// there is no valid IsomerDB to return, and both prior behaviors -- abort()
+// and returning an IsomerDB(-1) sentinel that unchecked callers dereference
+// -- lose the diagnosis.  All readers fail loud through here instead.
+[[noreturn]] static void throw_db_error(const string& where, const string& what,
+                                        const string& filename)
+{
+  throw std::runtime_error(
+      "IsomerDB::" + where + ": " + what + " '" + filename +
+      "' (database root '" + IsomerDB::database_path +
+      "'; set the FULLERENE_DATABASE_PATH CMake variable or assign "
+      "IsomerDB::database_path)");
+}
 
 // Metadata for Cn isomers
 vector<size_t> IsomerDB::Nisomers_data[2]                 = {
@@ -34,11 +48,12 @@ bool IsomerDB::writeBinary(const string filename) const
   }
   u_int16_t header = N | (IPR<<8) | (with_ncycham<<9);
   fwrite(&header,2,1,f);
-
   fwrite(&Nisomers,4,1,f);
-  fwrite(&entries[0],sizeof(Entry),Nisomers,f);
+  fwrite(entries.data(),sizeof(Entry),Nisomers,f);
 
-  return true;
+  bool ok = !ferror(f);
+  fclose(f);
+  return ok;
 }
 
 
@@ -56,45 +71,78 @@ bool IsomerDB::writeCSV(const string filename) const
       f << "\""<<string(e.group,3) << "\",\"" << CSVarray(e.RSPI,12) << "\",\"" << CSVarray(e.PNI,5) << "\",\"" << CSVarray(e.HNI,6) << "\","
 	<< int(e.NeHOMO) << "," << int(e.NedgeHOMO) << "," << e.HLgap << "," << e.ncycham << ",\"" << CSVarray(e.INMR,6) << "\"\r\n";
     }
-    return true;
+    return f.good();
   }
 
 IsomerDB IsomerDB::readBinary(const string filename){
   FILE *f = fopen(filename.c_str(),"rb");
-  if(!f){
-    cerr << "Couldn't open database file " << filename << " for reading: " << strerror(errno) << ".\n";
-    return IsomerDB(-1);
-  }
-  u_int16_t header;
-  size_t nread1 = fread(&header,2,1,f);
-    
-  IsomerDB DB(header & 0xff, header >> 8 & 1, header >> 9 & 1);
-  size_t nread2 = fread(&DB.Nisomers,4,1,f);
-  DB.entries.resize(DB.Nisomers);
-  size_t nread3 = fread(&DB.entries[0],sizeof(Entry),DB.Nisomers,f);
+  if(!f)
+    throw_db_error("readBinary", string("cannot open database file (")
+                   + strerror(errno) + ")", filename);
 
-  if(!nread1 || !nread2 || !nread3) return IsomerDB(-1);
+  u_int16_t header;
+  u_int32_t n;
+  if(fread(&header,2,1,f) != 1 || fread(&n,4,1,f) != 1){
+    fclose(f);
+    throw_db_error("readBinary", "truncated header in database file", filename);
+  }
+
+  // Validate the declared entry count against the actual file size BEFORE
+  // sizing any buffer by it: a corrupt count would otherwise force a huge
+  // allocation or a silent short read.
+  long data_start = ftell(f);
+  fseek(f, 0, SEEK_END);
+  long data_bytes = ftell(f) - data_start;
+  fseek(f, data_start, SEEK_SET);
+  if(data_bytes < 0 || (long long)n * (long long)sizeof(Entry) != (long long)data_bytes){
+    fclose(f);
+    throw_db_error("readBinary",
+                   "corrupt database file (declares " + to_string(n) +
+                   " entries of " + to_string(sizeof(Entry)) +
+                   " bytes but holds " + to_string(data_bytes) +
+                   " data bytes):", filename);
+  }
+
+  IsomerDB DB(header & 0xff, header >> 8 & 1, header >> 9 & 1);
+  DB.Nisomers = (int)n;
+  DB.entries.resize(n);
+  if(n > 0 && fread(DB.entries.data(),sizeof(Entry),n,f) != n){
+    fclose(f);
+    throw_db_error("readBinary", "read error in database file", filename);
+  }
+  fclose(f);
   return DB;
 }
- 
+
 IsomerDB::Entry IsomerDB::getIsomer(int N, int isomer, bool IPR){
   string filename = database_path+"/binary/c"+pad_string(to_string(N),3)+(IPR?"IPR":"all")+".bin";
   FILE *f = fopen(filename.c_str(),"rb");
-  if(!f){
-    cerr << "Couldn't open database file " << filename << " for reading: " << strerror(errno) << ".\n";
-    abort();
-  }
+  if(!f)
+    throw_db_error("getIsomer", string("cannot open database file (")
+                   + strerror(errno) + ")", filename);
+
   u_int16_t header;
   u_int32_t Nisomers;
+  if(fread(&header,2,1,f) != 1 || fread(&Nisomers,4,1,f) != 1){
+    fclose(f);
+    throw_db_error("getIsomer", "truncated header in database file", filename);
+  }
+  if(isomer < 1 || (u_int32_t)isomer > Nisomers){
+    fclose(f);
+    throw std::out_of_range(
+        "IsomerDB::getIsomer: isomer index " + to_string(isomer) +
+        " outside [1, " + to_string(Nisomers) + "] for C" + to_string(N) +
+        (IPR ? " (IPR)" : "") + " in '" + filename + "'");
+  }
+
   Entry e;
-
-  if(fread(&header,2,1,f) != 1){ cerr << "Read error from database file " << filename << ": " << strerror(errno) << ".\n"; }
-  if(fread(&Nisomers,4,1,f) != 1){ cerr << "Read error from database file " << filename << ": " << strerror(errno) << ".\n"; }
-  assert(isomer <= Nisomers);
-  fseek(f,(isomer-1)*sizeof(Entry),SEEK_CUR);
-    
-  if(fread(&e,sizeof(Entry),1,f) != 1){ cerr << "Read error from database file " << filename << ": " << strerror(errno) << ".\n"; }
-
+  fseek(f,(long)(isomer-1)*sizeof(Entry),SEEK_CUR);
+  if(fread(&e,sizeof(Entry),1,f) != 1){
+    fclose(f);
+    throw_db_error("getIsomer", "read error at isomer " + to_string(isomer)
+                   + " in database file", filename);
+  }
+  fclose(f);
   return e;
 }
 
@@ -119,18 +167,21 @@ IsomerDB IsomerDB::readPDB(int N, bool IPR, string extension) {
     filename= database_path+"/All/c"+pad_string(to_string(N),3,'0')+"all"+extension+".database";
 
   ifstream dbfile(filename.c_str());
-  if(!dbfile){
-    cerr << "Couldn't open database file " << filename << " for reading. (error: " << strerror(errno) << ")\n";
-    return IsomerDB(-1);
-  }
-    
+  if(!dbfile)
+    throw_db_error("readPDB", string("cannot open database file (")
+                   + strerror(errno) + ")", filename);
+
   string line;
   int Nread,IP,IH, pos=0;
-  getline(dbfile,line);
-    
+  if(!getline(dbfile,line))
+    throw_db_error("readPDB", "empty database file", filename);
+
   Nread = fortran_readI(line,pos,3);
   IP = fortran_readI(line,pos,1);
   IH = fortran_readI(line,pos,1);
+  if(Nread <= 0)
+    throw_db_error("readPDB", "malformed header line '" + line +
+                   "' in database file", filename);
 
   IsomerDB DB(Nread,IP,IH);
     
@@ -172,12 +223,10 @@ IsomerDB IsomerDB::readPDB(int N, bool IPR, string extension) {
   return DB;
 }
 
-int64_t IsomerDB::number_isomers(int N, const string& sym, bool IPR){ 
+int64_t IsomerDB::number_isomers(int N, const string& sym, bool IPR){
+  if(N < (IPR?60:20) || (N & 1)) return 0;   // below the family's base size, or odd
   int Nindex = (N-(IPR?60:20))/2;
-  // fprintf(stderr,"number_isomers(%d,%s,%d) : %d = %s\n",N,sym.c_str(),IPR,Nindex,
-  // 	  (Nindex >= Nisomers_data[IPR].size()? "Out of range" : to_string(Nisomers_data[IPR][Nindex]).c_str())
-  // 	  );
-  if(Nindex >= Nisomers_data[IPR].size()) return 0;
+  if(Nindex >= (int)Nisomers_data[IPR].size()) return 0;
 
   if(sym == "Any" || sym == "") return Nisomers_data[IPR][Nindex]; 
 
@@ -197,11 +246,10 @@ int64_t IsomerDB::number_isomers(int N, const string& sym, bool IPR){
   return 0;
 }
 
-vector<string> IsomerDB::symmetries(int N, bool IPR){ 
+vector<string> IsomerDB::symmetries(int N, bool IPR){
+  if(N < (IPR?60:20) || (N & 1)) return vector<string>();
   int Nindex = (N-(IPR?60:20))/2;
-  //  printf("symmetries(%d,%d) : %d = ",N,IPR,Nindex);
-  if(Nindex >= symmetries_data[IPR].size()) return vector<string>();
-  //  cout << symmetries_data[IPR][Nindex] << endl;
+  if(Nindex >= (int)symmetries_data[IPR].size()) return vector<string>();
 
-  return symmetries_data[IPR][Nindex]; 
+  return symmetries_data[IPR][Nindex];
 }
