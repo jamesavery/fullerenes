@@ -119,7 +119,9 @@ bool Diamond::is_cocircular(double tol) const
   return std::abs(cotB + cotD) < tol;
 }
 
-// Old FulleroidDelaunay + IDTAudit implementation moved to delaunay_old.cc.
+// Old adjacency-list FulleroidDelaunay + IDTAudit implementation retired to
+// src/c++/attic/delaunay_old.cc.attic (superseded by the DCEL
+// DelaunayTriangulation below; zero consumers as of 2026-07-09).
 
 // ============================================================================
 // DelaunayTriangulation — DCEL-based iDT (delta-complex)
@@ -185,8 +187,8 @@ int DelaunayTriangulation::alloc_directed_edge(int u, int v, double L)
 {
   int h = alloc_edge();
   he_origin[h]     = u;
-  he_origin[h ^ 1] = v;
-  he_length[h] = he_length[h ^ 1] = L;
+  he_origin[twin(h)] = v;
+  he_length[h] = he_length[twin(h)] = L;
   return h;
 }
 
@@ -203,7 +205,7 @@ int DelaunayTriangulation::wire_triangle(int h0, int h1, int h2)
 int DelaunayTriangulation::vertex_degree(int v) const
 {
   int deg = 0;
-  for ([[maybe_unused]] int h : incident(v)) deg++;
+  for ([[maybe_unused]] int h : incident(v)) deg++;   // empty range when v_out[v] < 0
   return deg;
 }
 
@@ -226,6 +228,7 @@ DelaunayTriangulation::single_source_shortest_paths(int src) const
   while (!pq.empty()) {
     auto [d, u] = pq.top(); pq.pop();
     if (d > dist[u]) continue;             // stale entry
+    // incident(u) is empty when v_out[u] < 0, subsuming the old h0<0 guard.
     for (int h : incident(u)) {
       int    v  = dest(h);
       double nd = d + he_length[h];
@@ -273,15 +276,35 @@ static DelaunayTriangulation build_topology(const Triangulation& T)
 
   // Phase 1: Assign half-edge IDs to directed arcs.
   // For each undirected edge {u,v} with u<v: half-edges 2k (u->v) and 2k+1 (v->u).
-  map<pair<int,int>, int> arc_to_he;
+  // he_of_arc replaces the old std::map<pair<int,int>,int>: it is a dense array
+  // indexed by the triangulation's own flat arc id (T.arcid(u,i) = u*dmax + i,
+  // the arc from u to its i-th neighbour), with the reverse arc located by
+  // T.find(v,u) -- the same dense-arc vocabulary TriangulationView uses in
+  // compute_faces_oriented.  Edge ids are still assigned in the SAME order
+  // (u ascending, v in u's ring order, counting only u<v arcs), so the
+  // half-edge numbering -- and every id derived from it -- is bit-identical to
+  // the previous map-based build.
+  std::vector<int> he_of_arc((size_t)T.N * T.dmax, -1);
   int eid = 0;
-  for (node_t u = 0; u < T.N; u++)
-    for (node_t v : T[u])
+  for (node_t u = 0; u < T.N; u++) {
+    auto row = T[u];
+    int deg = row.size();
+    for (int i = 0; i < deg; i++) {
+      node_t v = row[i];
       if (u < v) {
-        arc_to_he[{u,v}] = 2 * eid;
-        arc_to_he[{v,u}] = 2 * eid + 1;
+        int jr = T.find(v, u);          // position of u in v's row (the reverse arc)
+        if (jr < 0)
+          throw std::runtime_error(
+              "build_topology: arc " + std::to_string(u) + "->" +
+              std::to_string(v) + " has no reverse arc " + std::to_string(v) +
+              "->" + std::to_string(u) + " (input is not a consistently "
+              "oriented triangulation)");
+        he_of_arc[T.arcid(u, i)]  = 2 * eid;
+        he_of_arc[T.arcid(v, jr)] = 2 * eid + 1;
         eid++;
       }
+    }
+  }
 
   D.nh = 2 * eid;
   D.he_next.resize(D.nh);
@@ -290,9 +313,13 @@ static DelaunayTriangulation build_topology(const Triangulation& T)
   D.he_length.resize(D.nh);   // metric: caller fills
   D.he_angle.resize(D.nh);    // metric: caller fills (recompute_all_angles)
 
-  // Phase 2: Set origins.
-  for (auto& [arc, hid] : arc_to_he)
-    D.he_origin[hid] = arc.first;
+  // Phase 2: Set origins (origin(arc u->*) = u).
+  for (node_t u = 0; u < T.N; u++) {
+    auto row = T[u];
+    int deg = row.size();
+    for (int i = 0; i < deg; i++)
+      D.he_origin[he_of_arc[T.arcid(u, i)]] = u;
+  }
 
   // Phase 3: Set next pointers and face assignments.
   // For vertex u with CCW neighbors [..., v, w, ...]:
@@ -306,21 +333,21 @@ static DelaunayTriangulation build_topology(const Triangulation& T)
     int deg = row.size();
     for (int j = 0; j < deg; j++) {
       node_t v = row[j], w = row[(j+1) % deg];
-      int h_uv = arc_to_he.at({u, v});
-      int h_vw = arc_to_he.at({v, w});
+      int h_uv = he_of_arc[T.arcid(u, j)];
+      int h_vw = he_of_arc[T.arcid(v, T.find(v, w))];
       D.he_next[h_uv] = h_vw;
 
       // Assign face when u is the smallest vertex (canonical representative).
       if (u < v && u < w) {
         int fid = D.nf++;
-        int h_wu = arc_to_he.at({w, u});
+        int h_wu = he_of_arc[T.arcid(w, T.find(w, u))];
         D.he_face[h_uv] = fid;
         D.he_face[h_vw] = fid;
         D.he_face[h_wu] = fid;
         D.f_he.push_back(h_uv);
       }
     }
-    if (deg > 0) D.v_out[u] = arc_to_he.at({u, row[0]});
+    if (deg > 0) D.v_out[u] = he_of_arc[T.arcid(u, 0)];
   }
 
   // Per-vertex original degree (topological; metric-independent).
@@ -353,8 +380,8 @@ DelaunayTriangulation::from_intrinsic_metric(const Triangulation& T,
   // the metric differs.
   DelaunayTriangulation D = build_topology(T);
   for (int h = 0; h < D.nh; h += 2) {
-    double L = length(D.he_origin[h], D.he_origin[h ^ 1]);
-    D.he_length[h] = D.he_length[h ^ 1] = L;
+    double L = length(D.he_origin[h], D.he_origin[D.twin(h)]);
+    D.he_length[h] = D.he_length[D.twin(h)] = L;
   }
   D.recompute_all_angles();   // fills he_angle AND refreshes the v_cone_angle cache
   return D;
@@ -366,7 +393,7 @@ Diamond DelaunayTriangulation::diamond(int h) const
 {
   // h: u->v.  Face left of h has third vertex B = dest(next(h)).
   // Twin face has third vertex D = dest(next(twin(h))).
-  int t = h ^ 1;
+  int t = twin(h);
   int u = he_origin[h], v = he_origin[t];
   int B = dest(he_next[h]);
   int D = dest(he_next[t]);
@@ -393,7 +420,7 @@ void DelaunayTriangulation::recompute_face_angles(int f)
   // h_i: u_i -> u_{i+1} with length L_i.  Angle at origin(h_i) is the
   // corner between sides L_i (outgoing) and L_{i-1} (incoming), opposite
   // to L_{i+1}.
-  int h[3] = { f_he[f], he_next[f_he[f]], he_next[he_next[f_he[f]]] };
+  const auto h = face_halfedges(f);
   double L[3] = { he_length[h[0]], he_length[h[1]], he_length[h[2]] };
   for (int i = 0; i < 3; i++)
     he_angle[h[i]] = triangle_angle(L[i], L[(i + 2) % 3], L[(i + 1) % 3]);
@@ -436,6 +463,7 @@ double DelaunayTriangulation::vertex_angle_sum(int v) const
 {
   // Sum the corner angle at v over all incident faces. he_angle[h] is the
   // angle at origin(h) in face(h): one corner per outgoing half-edge.
+  // incident(v) is empty when v_out[v] < 0.
   double sum = 0.0;
   for (int h : incident(v)) sum += he_angle[h];
   return sum;
@@ -463,7 +491,7 @@ bool DelaunayTriangulation::is_delaunay_edge(int h) const
 // flipped edge was non-Delaunay; paper lem:selfloop-delaunay).
 bool DelaunayTriangulation::flip_edge(int h)
 {
-  int t = h ^ 1;
+  int t = twin(h);
   int h1 = he_next[h], h2 = he_next[h1];
   int h4 = he_next[t], h5 = he_next[h4];
   int u = he_origin[h],  v = he_origin[t];
@@ -574,7 +602,7 @@ int DelaunayTriangulation::lawson_sweep(const vector<int>& seed_edges, vector<bo
 
     // Record rim edges before flipping (they'll be checked next).
     int h1 = he_next[h], h2 = he_next[h1];
-    int h4 = he_next[h ^ 1], h5 = he_next[h4];
+    int h4 = he_next[twin(h)], h5 = he_next[h4];
 
     if (!flip_edge(h))
       throw std::runtime_error(
@@ -772,7 +800,7 @@ static void splice_fan(DelaunayTriangulation& D, int v,
   for (auto& d : tri.diagonals) {
     int h_d = D.alloc_directed_edge(fan.nb[d.from], fan.nb[d.to], d.length);
     local_arc[{d.from, d.to}] = h_d;
-    local_arc[{d.to, d.from}] = h_d ^ 1;
+    local_arc[{d.to, d.from}] = D.twin(h_d);
   }
 
   // --- Wire each ear triangle ---
@@ -1186,7 +1214,8 @@ DelaunayTriangulation DelaunayTriangulation::compute(const Triangulation& T)
 
 DelaunayTriangulation DelaunayTriangulation::compute(const Triangulation& T,
                                                      const EdgeLengthFn& length,
-                                                     double flat_tol)
+                                                     double flat_tol,
+                                                     std::vector<int>* new_to_old)
 {
   // Prescribed-metric iDT. Unlike the equilateral compute(T), we do NOT
   // sort_flat_last() (that classifies flatness by degree, which is wrong for
@@ -1196,7 +1225,11 @@ DelaunayTriangulation DelaunayTriangulation::compute(const Triangulation& T,
   // so no pre-sort is needed.
   DelaunayTriangulation D = from_intrinsic_metric(T, length);
   D.remove_flat_vertices(flat_tol);
-  D.compact_vertices();  // cones are scattered (no flat-last sort); compact to nv=cones
+  // Cones are scattered (no flat-last sort); compact to nv = cones.  The
+  // surviving-cone labels in T's numbering are reported through new_to_old
+  // when requested (callers that annotate cones, e.g. AlexandrovIDTCubic).
+  std::vector<int> n2o = D.compact_vertices();
+  if (new_to_old) *new_to_old = std::move(n2o);
   return D;
 }
 
@@ -1282,8 +1315,13 @@ DelaunayTriangulation::canonical_tesselation(const vector<int>& vertex_labels,
           // Deep invariant failure: two silently-empty results would
           // compare equal, so fail loud instead of returning a sentinel.
           throw std::runtime_error(
-              "canonical_tesselation: cell walk did not close "
-              "(corrupt tight mask or DCEL)");
+              "canonical_tesselation: cell-boundary walk from half-edge " +
+              std::to_string(h_start) + " failed to close after " +
+              std::to_string(nh) + " interior-edge (tight) steps, stuck at "
+              "half-edge " + std::to_string(h_next) + "; the tight mask "
+              "encloses a cell -- a well-formed iDT tesselation always closes. "
+              "(Thrown rather than returning an empty tesselation, which a "
+              "legitimately empty iDT also yields and so could not signal this.)");
       }
       h = h_next;
     } while (h != h_start);
@@ -1341,7 +1379,7 @@ string CanonicalTesselation::to_string() const
 // New edges: u-w (L/2), w-v (L/2), w-B (computed), w-D (computed).
 // New faces: (u,w,B), (w,v,B), (v,w,D), (w,u,D).
 static int bisect_edge(DelaunayTriangulation& D, int h) {
-  int t = h ^ 1;
+  int t = D.twin(h);
   int u = D.he_origin[h], v = D.dest(h);
   double L = D.he_length[h];
 
@@ -1383,17 +1421,17 @@ static int bisect_edge(DelaunayTriangulation& D, int h) {
   int wB_he = D.alloc_directed_edge(w, B,  wB);
   int wD_he = D.alloc_directed_edge(w, Dv, wD);
 
-  D.v_out[w] = uw ^ 1;  // w -> u
+  D.v_out[w] = D.twin(uw);  // w -> u
 
   // Wire four new CCW faces around w.
-  D.wire_triangle(uw,     wB_he,   h_Bu);     // (u, w, B)
-  D.wire_triangle(wv,     h_vB,    wB_he^1);  // (w, v, B)
-  D.wire_triangle(wv^1,   wD_he,   h_Dv);     // (v, w, D)
-  D.wire_triangle(uw^1,   h_uD,    wD_he^1);  // (w, u, D)
+  D.wire_triangle(uw,          wB_he,   h_Bu);          // (u, w, B)
+  D.wire_triangle(wv,          h_vB,    D.twin(wB_he)); // (w, v, B)
+  D.wire_triangle(D.twin(wv),  wD_he,   h_Dv);          // (v, w, D)
+  D.wire_triangle(D.twin(uw),  h_uD,    D.twin(wD_he)); // (w, u, D)
 
   // Fix v_out for u, v if they pointed at the deleted edge.
   if (D.v_out[u] == h) D.v_out[u] = uw;
-  if (D.v_out[v] == t) D.v_out[v] = wv ^ 1;
+  if (D.v_out[v] == t) D.v_out[v] = D.twin(wv);
 
   return w;
 }
@@ -1533,7 +1571,7 @@ bool DelaunayTriangulation::check_consistency() const
 {
   // 1. Twin pairs: twin(twin(h)) == h.
   for (int h = 0; h < nh; h++)
-    if (alive(h) && (h ^ 1) >= nh) return false;
+    if (alive(h) && twin(h) >= nh) return false;
 
   // 2. Next-cycle closure: following next 3 times returns to start (triangulation).
   for (int h = 0; h < nh; h++)
@@ -1563,7 +1601,7 @@ bool DelaunayTriangulation::check_consistency() const
 
   // 8. Twin length consistency.
   for (int h = 0; h < nh; h += 2)
-    if (alive(h) && he_length[h] != he_length[h ^ 1]) return false;
+    if (alive(h) && he_length[h] != he_length[twin(h)]) return false;
 
   // 9. Triangle inequality on every live face.
   for (int h = 0; h < nh; h++) {

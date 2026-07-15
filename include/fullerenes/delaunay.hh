@@ -152,14 +152,30 @@ struct DelaunayTriangulation {
   int  twin(int h)  const { return h ^ 1; }
   int  edge(int h)  const { return h >> 1; }
   int  prev(int h)  const { return he_next[he_next[h]]; }  // only for triangulations
-  int  dest(int h)  const { return he_origin[h ^ 1]; }
+  int  dest(int h)  const { return he_origin[twin(h)]; }
   bool alive(int h) const { return he_origin[h] >= 0; }
+  // Bigon edge: both half-edges of h bound the same face.  Arises in
+  // Δ-complexes around low-degree cone vertices (an i–j edge of an "iji"
+  // face); dihedral quantities across such an edge are undefined.
+  bool is_bigon(int h) const { return he_face[h] == he_face[twin(h)]; }
 
   // CW rotation around origin(h): next outgoing half-edge clockwise.
-  int cw(int h) const { return he_next[h ^ 1]; }
+  int cw(int h) const { return he_next[twin(h)]; }
 
   // CCW rotation around origin(h): next outgoing half-edge counterclockwise.
-  int ccw(int h) const { return (he_next[he_next[h]]) ^ 1; }
+  int ccw(int h) const { return twin(prev(h)); }
+
+  // The three half-edges of (triangular) face f, in he_next order starting
+  // from its representative.  Pre: f is live (f_he[f] >= 0).
+  std::array<int,3> face_halfedges(int f) const {
+    const int h = f_he[f];
+    return {h, he_next[h], prev(h)};
+  }
+  // The three corner vertices of face f, CCW (origins of face_halfedges(f)).
+  std::array<int,3> face_vertices(int f) const {
+    const auto h = face_halfedges(f);
+    return {he_origin[h[0]], he_origin[h[1]], he_origin[h[2]]};
+  }
 
   int vertex_degree(int v) const;  // count outgoing half-edges from v
 
@@ -361,9 +377,12 @@ struct DelaunayTriangulation {
   // ready for AlexandrovSolver. Equivalent to compute(T) when length == 1.
   // flat_tol sets the cone/flat threshold (see is_flat): 1e-6 for an exact
   // metric, ~1e-2 for a numerically solved one.
+  // If new_to_old is non-null it receives compact_vertices()' map: the
+  // original T-label of each surviving cone vertex 0..nv-1.
   static DelaunayTriangulation compute(const Triangulation& T,
                                        const EdgeLengthFn& length,
-                                       double flat_tol = 1e-6);
+                                       double flat_tol = 1e-6,
+                                       std::vector<int>* new_to_old = nullptr);
 
   // --- Surface metric (intrinsic; promoted from the delta-complex project) ---
   // Per-cone-pair geodesic distances and geodesics on the metric delta-complex,
@@ -479,7 +498,7 @@ struct DelaunayTriangulation {
   // Delaunay triangulation.  Both half-edges of an edge return the same value.
   bool is_cocircular_edge(int h) const;
 
-  // Per-half-edge cocircular mask: tight[h] == tight[h^1]; dead half-edges
+  // Per-half-edge cocircular mask: tight[h] == tight[twin(h)]; dead half-edges
   // are false.  O(num_edges) integer-arithmetic predicates.
   std::vector<bool> cocircular_edges() const;
 

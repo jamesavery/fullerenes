@@ -104,6 +104,14 @@ add_executable(isomerdb-test isomerdb-test.cc)
 target_link_libraries(isomerdb-test fullerenes GTest::GTest GTest::Main)
 add_test(NAME isomerdb-test COMMAND isomerdb-test)
 
+add_executable(alexandrov-cubic-test alexandrov-cubic-test.cc)
+target_link_libraries(alexandrov-cubic-test fullerenes buckygen GTest::GTest GTest::Main)
+add_test(NAME alexandrov-cubic-test COMMAND alexandrov-cubic-test)
+
+add_executable(dense-linalg-test dense-linalg-test.cc)
+target_link_libraries(dense-linalg-test fullerenes GTest::GTest GTest::Main)
+add_test(NAME dense-linalg-test COMMAND dense-linalg-test)
+
 add_executable(star-unfold-test star-unfold-test.cc)
 target_link_libraries(star-unfold-test fullerenes GTest::GTest GTest::Main)
 add_test(NAME star-unfold-test COMMAND star-unfold-test)
