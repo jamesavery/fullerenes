@@ -49,7 +49,9 @@ release, e.g. `-DCMAKE_C_COMPILER=gcc-13 -DCMAKE_CXX_COMPILER=g++-13
 
 ## Dependencies
 
-Required: CMake 3.5+, C++17 compiler, Fortran compiler (gfortran), BLAS, LAPACK, GSL, GTest, OpenMP.
+Required: CMake 3.5+, C++17 compiler, Fortran compiler (gfortran), GSL, GTest, OpenMP.
+(BLAS/LAPACK are deliberately NOT dependencies: all dense linear algebra goes
+through the in-house BLAS-free `dense_linalg` module — see its header for why.)
 Optional (GPU): Intel DPC++ compiler (`icpx`/`clang++`), CUDA toolkit, oneDPL.
 
 ## Architecture

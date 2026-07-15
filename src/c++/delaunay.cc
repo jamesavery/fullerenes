@@ -2,7 +2,6 @@
 
 #include <stack>
 #include <cmath>
-#include <cassert>
 #include <algorithm>
 #include <map>
 #include <climits>
@@ -12,8 +11,6 @@
 #include <string>
 #include <sstream>
 #include <cstdio>
-#include <limits>
-#include <queue>
 
 // ============================================================================
 // Intrinsic geometry primitives
@@ -21,7 +18,7 @@
 
 // Heron product: H(a,b,c) = (a+b+c)(-a+b+c)(a-b+c)(a+b-c) = 16*Area^2.
 // Returns 0 if triangle inequality is violated.
-static double heron(double a, double b, double c)
+static double heron_product(double a, double b, double c)
 {
   double s1 = -a + b + c;
   double s2 =  a - b + c;
@@ -34,7 +31,7 @@ static double heron(double a, double b, double c)
 // cot(alpha) = (b^2 + c^2 - opp^2) / sqrt(H).
 static double cot_opposite(double opp, double b, double c)
 {
-  double H = heron(opp, b, c);
+  double H = heron_product(opp, b, c);
   double num = b*b + c*c - opp*opp;
   if (H <= 0) return (num >= 0) ? 1e15 : -1e15;
   return num / sqrt(H);
@@ -63,7 +60,7 @@ bool Diamond::is_convex() const
   // sin(angle_at_u) proportional to sqrt(Ha)*Q + P*sqrt(Hd), must be > 0.
   // sin(angle_at_v) proportional to sqrt(Ha)*Qv + Pv*sqrt(Hd), must be > 0.
   double e2 = e*e;
-  double Ha = heron(e, a, b), Hd = heron(e, c, d);
+  double Ha = heron_product(e, a, b), Hd = heron_product(e, c, d);
   double sHa = (Ha > 0) ? sqrt(Ha) : 0;
   double sHd = (Hd > 0) ? sqrt(Hd) : 0;
 
@@ -80,7 +77,7 @@ double Diamond::flipped_length() const
   double e2 = e*e, a2 = a*a, b2 = b*b, c2 = c*c, d2 = d*d;
   double P = e2 + a2 - b2;
   double Q = e2 + c2 - d2;
-  double Ha = heron(e, a, b), Hd = heron(e, c, d);
+  double Ha = heron_product(e, a, b), Hd = heron_product(e, c, d);
   double sqrtHH = (Ha > 0 && Hd > 0) ? sqrt(Ha * Hd) : 0;
   double f2 = a2 + c2 - (P * Q - sqrtHH) / (2 * e2);
   return (f2 > 0) ? sqrt(f2) : 0;
@@ -122,7 +119,9 @@ bool Diamond::is_cocircular(double tol) const
   return std::abs(cotB + cotD) < tol;
 }
 
-// Old FulleroidDelaunay + IDTAudit implementation moved to delaunay_old.cc.
+// Old adjacency-list FulleroidDelaunay + IDTAudit implementation retired to
+// src/c++/attic/delaunay_old.cc.attic (superseded by the DCEL
+// DelaunayTriangulation below; zero consumers as of 2026-07-09).
 
 // ============================================================================
 // DelaunayTriangulation — DCEL-based iDT (delta-complex)
@@ -166,7 +165,7 @@ int DelaunayTriangulation::alloc_face()
 
 void DelaunayTriangulation::dealloc_edge(int h)
 {
-  int eid = h >> 1;
+  int eid = edge(h);
   he_origin[2*eid] = -1;
   he_origin[2*eid+1] = -1;
   he_next[2*eid] = -1;
@@ -188,8 +187,8 @@ int DelaunayTriangulation::alloc_directed_edge(int u, int v, double L)
 {
   int h = alloc_edge();
   he_origin[h]     = u;
-  he_origin[h ^ 1] = v;
-  he_length[h] = he_length[h ^ 1] = L;
+  he_origin[twin(h)] = v;
+  he_length[h] = he_length[twin(h)] = L;
   return h;
 }
 
@@ -205,9 +204,8 @@ int DelaunayTriangulation::wire_triangle(int h0, int h1, int h2)
 
 int DelaunayTriangulation::vertex_degree(int v) const
 {
-  if (v_out[v] < 0) return 0;
-  int h0 = v_out[v], h = h0, deg = 0;
-  do { deg++; h = cw(h); } while (h != h0);
+  int deg = 0;
+  for ([[maybe_unused]] int h : incident(v)) deg++;   // empty range when v_out[v] < 0
   return deg;
 }
 
@@ -230,19 +228,12 @@ DelaunayTriangulation::single_source_shortest_paths(int src) const
   while (!pq.empty()) {
     auto [d, u] = pq.top(); pq.pop();
     if (d > dist[u]) continue;             // stale entry
-    const int h0 = v_out[u];
-    if (h0 < 0) continue;
-    int h = h0;
-    do {
-      if (alive(h)) {
-        int v = he_origin[h ^ 1];
-        if (v >= 0 && v < nv) {
-          double nd = d + he_length[h];
-          if (nd < dist[v]) { dist[v] = nd; pq.push({nd, v}); }
-        }
-      }
-      h = cw(h);
-    } while (h != h0);
+    // incident(u) is empty when v_out[u] < 0, subsuming the old h0<0 guard.
+    for (int h : incident(u)) {
+      int    v  = dest(h);
+      double nd = d + he_length[h];
+      if (nd < dist[v]) { dist[v] = nd; pq.push({nd, v}); }
+    }
   }
   return dist;
 }
@@ -285,15 +276,35 @@ static DelaunayTriangulation build_topology(const Triangulation& T)
 
   // Phase 1: Assign half-edge IDs to directed arcs.
   // For each undirected edge {u,v} with u<v: half-edges 2k (u->v) and 2k+1 (v->u).
-  map<pair<int,int>, int> arc_to_he;
+  // he_of_arc replaces the old std::map<pair<int,int>,int>: it is a dense array
+  // indexed by the triangulation's own flat arc id (T.arcid(u,i) = u*dmax + i,
+  // the arc from u to its i-th neighbour), with the reverse arc located by
+  // T.find(v,u) -- the same dense-arc vocabulary TriangulationView uses in
+  // compute_faces_oriented.  Edge ids are still assigned in the SAME order
+  // (u ascending, v in u's ring order, counting only u<v arcs), so the
+  // half-edge numbering -- and every id derived from it -- is bit-identical to
+  // the previous map-based build.
+  std::vector<int> he_of_arc((size_t)T.N * T.dmax, -1);
   int eid = 0;
-  for (node_t u = 0; u < T.N; u++)
-    for (node_t v : T[u])
+  for (node_t u = 0; u < T.N; u++) {
+    auto row = T[u];
+    int deg = row.size();
+    for (int i = 0; i < deg; i++) {
+      node_t v = row[i];
       if (u < v) {
-        arc_to_he[{u,v}] = 2 * eid;
-        arc_to_he[{v,u}] = 2 * eid + 1;
+        int jr = T.find(v, u);          // position of u in v's row (the reverse arc)
+        if (jr < 0)
+          throw std::runtime_error(
+              "build_topology: arc " + std::to_string(u) + "->" +
+              std::to_string(v) + " has no reverse arc " + std::to_string(v) +
+              "->" + std::to_string(u) + " (input is not a consistently "
+              "oriented triangulation)");
+        he_of_arc[T.arcid(u, i)]  = 2 * eid;
+        he_of_arc[T.arcid(v, jr)] = 2 * eid + 1;
         eid++;
       }
+    }
+  }
 
   D.nh = 2 * eid;
   D.he_next.resize(D.nh);
@@ -302,9 +313,13 @@ static DelaunayTriangulation build_topology(const Triangulation& T)
   D.he_length.resize(D.nh);   // metric: caller fills
   D.he_angle.resize(D.nh);    // metric: caller fills (recompute_all_angles)
 
-  // Phase 2: Set origins.
-  for (auto& [arc, hid] : arc_to_he)
-    D.he_origin[hid] = arc.first;
+  // Phase 2: Set origins (origin(arc u->*) = u).
+  for (node_t u = 0; u < T.N; u++) {
+    auto row = T[u];
+    int deg = row.size();
+    for (int i = 0; i < deg; i++)
+      D.he_origin[he_of_arc[T.arcid(u, i)]] = u;
+  }
 
   // Phase 3: Set next pointers and face assignments.
   // For vertex u with CCW neighbors [..., v, w, ...]:
@@ -318,21 +333,21 @@ static DelaunayTriangulation build_topology(const Triangulation& T)
     int deg = row.size();
     for (int j = 0; j < deg; j++) {
       node_t v = row[j], w = row[(j+1) % deg];
-      int h_uv = arc_to_he.at({u, v});
-      int h_vw = arc_to_he.at({v, w});
+      int h_uv = he_of_arc[T.arcid(u, j)];
+      int h_vw = he_of_arc[T.arcid(v, T.find(v, w))];
       D.he_next[h_uv] = h_vw;
 
       // Assign face when u is the smallest vertex (canonical representative).
       if (u < v && u < w) {
         int fid = D.nf++;
-        int h_wu = arc_to_he.at({w, u});
+        int h_wu = he_of_arc[T.arcid(w, T.find(w, u))];
         D.he_face[h_uv] = fid;
         D.he_face[h_vw] = fid;
         D.he_face[h_wu] = fid;
         D.f_he.push_back(h_uv);
       }
     }
-    if (deg > 0) D.v_out[u] = arc_to_he.at({u, row[0]});
+    if (deg > 0) D.v_out[u] = he_of_arc[T.arcid(u, 0)];
   }
 
   // Per-vertex original degree (topological; metric-independent).
@@ -365,8 +380,8 @@ DelaunayTriangulation::from_intrinsic_metric(const Triangulation& T,
   // the metric differs.
   DelaunayTriangulation D = build_topology(T);
   for (int h = 0; h < D.nh; h += 2) {
-    double L = length(D.he_origin[h], D.he_origin[h ^ 1]);
-    D.he_length[h] = D.he_length[h ^ 1] = L;
+    double L = length(D.he_origin[h], D.he_origin[D.twin(h)]);
+    D.he_length[h] = D.he_length[D.twin(h)] = L;
   }
   D.recompute_all_angles();   // fills he_angle AND refreshes the v_cone_angle cache
   return D;
@@ -378,7 +393,7 @@ Diamond DelaunayTriangulation::diamond(int h) const
 {
   // h: u->v.  Face left of h has third vertex B = dest(next(h)).
   // Twin face has third vertex D = dest(next(twin(h))).
-  int t = h ^ 1;
+  int t = twin(h);
   int u = he_origin[h], v = he_origin[t];
   int B = dest(he_next[h]);
   int D = dest(he_next[t]);
@@ -405,7 +420,7 @@ void DelaunayTriangulation::recompute_face_angles(int f)
   // h_i: u_i -> u_{i+1} with length L_i.  Angle at origin(h_i) is the
   // corner between sides L_i (outgoing) and L_{i-1} (incoming), opposite
   // to L_{i+1}.
-  int h[3] = { f_he[f], he_next[f_he[f]], he_next[he_next[f_he[f]]] };
+  const auto h = face_halfedges(f);
   double L[3] = { he_length[h[0]], he_length[h[1]], he_length[h[2]] };
   for (int i = 0; i < 3; i++)
     he_angle[h[i]] = triangle_angle(L[i], L[(i + 2) % 3], L[(i + 1) % 3]);
@@ -447,13 +462,10 @@ void DelaunayTriangulation::recompute_cone_angles()
 double DelaunayTriangulation::vertex_angle_sum(int v) const
 {
   // Sum the corner angle at v over all incident faces. he_angle[h] is the
-  // angle at origin(h); cw() walks the outgoing half-edges (one per incident
-  // face) around v.
-  int h0 = v_out[v];
-  if (h0 < 0) return 0.0;
+  // angle at origin(h) in face(h): one corner per outgoing half-edge.
+  // incident(v) is empty when v_out[v] < 0.
   double sum = 0.0;
-  int h = h0;
-  do { sum += he_angle[h]; h = cw(h); } while (h != h0);
+  for (int h : incident(v)) sum += he_angle[h];
   return sum;
 }
 
@@ -474,12 +486,12 @@ bool DelaunayTriangulation::is_delaunay_edge(int h) const
 }
 
 // Flip the diagonal of the diamond around edge h.  Returns true on success.
-// Accepts any non-Delaunay edge with a convex diamond, including the
-// B == D case (which produces a self-loop edge at B, strictly Delaunay
-// by Lemma 1 of CORRECTNESS-PROOF.md).
+// Accepts any edge with a strictly convex diamond, including the B == D
+// case (which produces a self-loop edge at B, strictly Delaunay when the
+// flipped edge was non-Delaunay; paper lem:selfloop-delaunay).
 bool DelaunayTriangulation::flip_edge(int h)
 {
-  int t = h ^ 1;
+  int t = twin(h);
   int h1 = he_next[h], h2 = he_next[h1];
   int h4 = he_next[t], h5 = he_next[h4];
   int u = he_origin[h],  v = he_origin[t];
@@ -522,18 +534,16 @@ bool DelaunayTriangulation::flip_edge(int h)
 
 bool DelaunayTriangulation::is_delaunay() const
 {
-  for (int h = 0; h < nh; h += 2)
-    if (alive(h) && !is_delaunay_edge(h))
-      return false;
+  for (int h : edges())
+    if (!is_delaunay_edge(h)) return false;
   return true;
 }
 
 int DelaunayTriangulation::count_non_delaunay() const
 {
   int count = 0;
-  for (int h = 0; h < nh; h += 2)
-    if (alive(h) && !is_delaunay_edge(h))
-      count++;
+  for (int h : edges())
+    if (!is_delaunay_edge(h)) count++;
   return count;
 }
 
@@ -543,8 +553,7 @@ int DelaunayTriangulation::lawson_sweep()
   // historical sweep -- same edges, same push order, hence same LIFO processing).
   vector<int> all;
   all.reserve(nh / 2);
-  for (int h = 0; h < nh; h += 2)
-    if (alive(h)) all.push_back(h);
+  for (int h : edges()) all.push_back(h);
   vector<bool> in_stack(nh / 2, false);
   return lawson_sweep(all, in_stack);
 }
@@ -568,43 +577,43 @@ int DelaunayTriangulation::lawson_sweep(const vector<int>& seed_edges, vector<bo
   stack<int> S;
   for (int h : seed_edges)
     if (alive(h)) {
-      int eid = h >> 1;
+      int eid = edge(h);
       if (!in_stack[eid]) { S.push(eid << 1); in_stack[eid] = true; }
     }
 
   // The Bobenko-Springborn discrete Dirichlet energy strictly decreases on
-  // every flip (Theorem 1, CORRECTNESS-PROOF.md), so the sweep always
-  // terminates in finitely many flips on a metrized delta-complex.  The
-  // 200*nv budget is a defensive guard, not part of the algorithm: if it
-  // fires we have a counterexample to Theorem 1 and must abort loudly
-  // rather than return a non-Delaunay output.
+  // every flip (paper thm:lawson-converge), so the sweep always terminates
+  // in finitely many flips on a metrized delta-complex.  The 200*nv budget
+  // is a defensive guard, not part of the algorithm: if it fires we have a
+  // counterexample to the energy argument and must abort loudly rather
+  // than return a non-Delaunay output.
   int budget = 200 * nv;
   while (!S.empty()) {
     if (budget <= 0)
       throw std::runtime_error(
           "lawson_sweep: budget exhausted (200*nv = " +
-          std::to_string(200 * nv) + " flips); Theorem 1 should preclude "
-          "this -- see CORRECTNESS-PROOF.md");
+          std::to_string(200 * nv) + " flips); the energy argument "
+          "(paper thm:lawson-converge) should preclude this");
 
     int h = S.top(); S.pop();
-    in_stack[h >> 1] = false;
+    in_stack[edge(h)] = false;
 
     if (!alive(h) || is_delaunay_edge(h)) continue;
 
     // Record rim edges before flipping (they'll be checked next).
     int h1 = he_next[h], h2 = he_next[h1];
-    int h4 = he_next[h ^ 1], h5 = he_next[h4];
+    int h4 = he_next[twin(h)], h5 = he_next[h4];
 
     if (!flip_edge(h))
       throw std::runtime_error(
           "lawson_sweep: flip_edge rejected a non-Delaunay edge h=" +
-          std::to_string(h) + "; Lemma 2 (convex-flippable diamond) "
-          "violated -- see CORRECTNESS-PROOF.md");
+          std::to_string(h) + "; non-Delaunay implies strictly convex "
+          "(paper lem:ndimpliesconvex) is violated");
     flips++; budget--;
 
     // Push the 4 rim edges.
     for (int rim : {h1, h2, h4, h5}) {
-      int eid = rim >> 1;
+      int eid = edge(rim);
       if (!in_stack[eid]) { S.push(rim & ~1); in_stack[eid] = true; }
     }
   }
@@ -791,7 +800,7 @@ static void splice_fan(DelaunayTriangulation& D, int v,
   for (auto& d : tri.diagonals) {
     int h_d = D.alloc_directed_edge(fan.nb[d.from], fan.nb[d.to], d.length);
     local_arc[{d.from, d.to}] = h_d;
-    local_arc[{d.to, d.from}] = h_d ^ 1;
+    local_arc[{d.to, d.from}] = D.twin(h_d);
   }
 
   // --- Wire each ear triangle ---
@@ -854,53 +863,114 @@ void DelaunayTriangulation::remove_flat_vertex(int v)
   }
 }
 
+// Tie-break for an exactly tied self-loop (paper thm:tie-break; ties are
+// realizable, paper rem:ties-real).
+//
+// In a globally Delaunay pop-time state the half-angle lemma (paper
+// thm:half-angle) bounds each diamond end of a self-loop at a flat vertex
+// by pi; is_convex (strict, 1e-12 band) refuses the boundary case
+// end = pi -- an exact tie.  At a tie the ENTIRE tied side fan lies on the
+// closing circumcircle (the cocircular-fan lemma, paper
+// thm:cocircular-fan), so the closing spoke's diamond is exactly
+// cocircular at every fan size, and flipping it is legal, energy-neutral,
+// keeps the state Delaunay, and leaves the loop strictly convex on both
+// ends.
+//
+// This helper tries every cocircular spoke in the loop's two side fans,
+// smaller-theta side first (the theorem's side), and KEEPS a flip only if
+// it convexifies the loop -- otherwise it undoes it (a cocircular flip is
+// involutive: the flipped diamond is the same concyclic quad on its other
+// diagonal, so the reverse flip is equally legal and neutral).  Every
+// intermediate state is therefore Delaunay, and each spoke is tried at
+// most once.  Returns true iff the loop's diamond is strictly convex on
+// exit; on false the complex is unchanged (the involutive double-flip
+// restores the same delta-complex, up to half-edge slot relabeling).
+static bool tie_break_self_loop(DelaunayTriangulation& D, int v, int h_loop)
+{
+  // The loop's two ring slots split v's star into two side fans; the side
+  // of slot s is the cw arc (s^1, s], walked half-open [cw(s^1), cw(s)).
+  // (Same split as the instrumentation; Gauss-Bonnet-verified convention.)
+  auto side_spokes = [&](int slot, double& theta) {
+    std::vector<int> spokes;
+    theta = 0.0;
+    const int start = D.cw(slot ^ 1), stop = D.cw(slot);
+    long guard = 0;
+    for (int g = start; g != stop; g = D.cw(g)) {
+      theta += D.he_angle[g];
+      if (D.dest(g) != v) spokes.push_back(g);
+      if (++guard > D.nh)
+        throw std::runtime_error("tie_break_self_loop: ring walk overran");
+    }
+    return spokes;
+  };
+
+  const int slots[2] = {h_loop, h_loop ^ 1};
+  double theta[2];
+  std::vector<int> spokes[2];
+  for (int i = 0; i < 2; i++) spokes[i] = side_spokes(slots[i], theta[i]);
+
+  const int first = (theta[0] <= theta[1]) ? 0 : 1;
+  for (int i : {first, 1 - first}) {
+    for (int g : spokes[i]) {
+      if (!D.diamond(g).is_cocircular(1e-12)) continue;
+      if (!D.flip_edge(g)) continue;      // inscribed quad: convex, but stay guarded
+      if (D.diamond(h_loop).is_convex()) return true;
+      D.flip_edge(g);                     // undo: not the theorem's spoke
+    }
+  }
+  return false;
+}
+
 // Flip away all self-loops at vertex v.
 // Self-loops at a flat vertex arise from ear diagonals in previous
 // removals; they must be cleared before remove_flat_vertex, otherwise
 // extract_fan sees v in its own polygon and splice_fan would wire a
-// live edge to the about-to-be-dead vertex.  Correctness obligation
-// (CORRECTNESS-PROOF.md, Theorem 3): every self-loop at a flat v is
-// flippable, i.e. its diamond is convex at v.  Empirically true on
-// 1.94B+ fullerene isomers; in the adversarial case of a strictly
-// Delaunay self-loop at a flat vertex the assert below catches it.
+// live edge to the about-to-be-dead vertex.  By the half-angle lemma
+// (paper thm:half-angle) every self-loop at a flat vertex in a Delaunay
+// state has diamond ends <= pi; strict convexity can fail only on an
+// EXACT tie (end = pi), which the tie-break above resolves at every fan
+// size (paper thm:tie-break).  On exact sphere input of minimum degree 3
+// the final throw is therefore provably dead (paper thm:main); it guards
+// the floating-point boundary strip and out-of-scope inputs, so the
+// output is never wrong.
 static void flip_away_self_loops(DelaunayTriangulation& D, int v) {
   if (D.v_out[v] < 0) return;
+  // Pass budget: a safeguard, not a tuning knob.  Each productive pass
+  // either flips a loop away (bounded by the loop count at v) or
+  // tie-breaks one loop, whose flip the NEXT pass performs; oscillation
+  // is impossible for exact-tie geometry, but the budget converts any
+  // unforeseen cocircular pathology into a loud throw instead of a hang.
+  int budget = 8 * (D.vertex_degree(v) + 4);
   bool flipped_any = true;
   while (flipped_any) {
+    if (--budget < 0)
+      throw std::runtime_error(
+          "flip_away_self_loops: pass budget exhausted at flat v=" +
+          std::to_string(v) + " (cocircular pathology)");
     flipped_any = false;
-    int h0 = D.v_out[v];
-    if (h0 < 0) break;
-    int h = h0;
-    do {
-      if (D.dest(h) == v) {
-        if (D.flip_edge(h))     { flipped_any = true; break; }
-        if (D.flip_edge(h ^ 1)) { flipped_any = true; break; }
+    for (int h : D.incident(v)) {
+      if (D.dest(h) != v) continue;
+      if (D.flip_edge(h) || D.flip_edge(h ^ 1) ||
+          tie_break_self_loop(D, v, h)) {
+        flipped_any = true;
+        break;                    // the ring changed: restart the scan
       }
-      h = D.cw(h);
-    } while (h != h0);
+    }
   }
   // Invariant check (runtime, not assert: asserts compile out with -DNDEBUG):
-  // no self-loop survives at a flat vertex.  If one does, splice_fan would
+  // no self-loop survives at a flat vertex.  If one did, splice_fan would
   // double-deallocate the self-loop edge and corrupt the DCEL silently.
-  // Theorem in CORRECTNESS-PROOF.md proves this never fires on
-  // non-Delaunay or freshly-created self-loops; the residual is the
-  // rim-flip-evolution case, which is empirically clean across all
-  // tested inputs.
-  int h0 = D.v_out[v];
-  if (h0 >= 0) {
-    int h = h0;
-    do {
-      if (D.dest(h) == v)
-        throw std::runtime_error(
-            "flip_away_self_loops: un-flippable self-loop at flat v=" +
-            std::to_string(v) + " (Obligation 1 violated; "
-            "see CORRECTNESS-PROOF.md)");
-      h = D.cw(h);
-    } while (h != h0);
-  }
+  for (int h : D.incident(v))
+    if (D.dest(h) == v)
+      throw std::runtime_error(
+          "flip_away_self_loops: self-loop at flat v=" +
+          std::to_string(v) + " survives the tie-break (provably "
+          "impossible on exact min-degree-3 sphere input, paper thm:main; "
+          "floating-point boundary state or out-of-scope input)");
 }
 
-void DelaunayTriangulation::remove_flat_vertices(double flat_tol)
+void DelaunayTriangulation::remove_flat_vertices(double flat_tol,
+                                                 const std::function<void(int)>& on_pop)
 {
   // Remove every flat (cone angle 2*pi) vertex, leaving the cones, via a WORK-LIST.
   //
@@ -951,6 +1021,10 @@ void DelaunayTriangulation::remove_flat_vertices(double flat_tol)
   // the affected (live, flat) rim neighbours. Returns true iff v was removed.
   auto try_remove = [&](int v) -> bool {
     if (v < 0 || v >= nv || v_out[v] < 0 || !is_flat(v, flat_tol)) return false;
+    // Observer hook: fire at every live-flat pop, before self-loop cleanup, when
+    // the mesh is globally Delaunay per the driver invariant (see header). Must
+    // not mutate the mesh; taken on trust.
+    if (on_pop) on_pop(v);
     // Collect the star rim on BOTH sides of flip_away_self_loops (its self-loop flips
     // perturb the pre-flip ring; the removal re-triangulates the post-flip rim) -- a
     // complete superset of the edges whose Delaunay status the surgery can change.
@@ -959,13 +1033,20 @@ void DelaunayTriangulation::remove_flat_vertices(double flat_tol)
     flip_away_self_loops(*this, v);
     for (int h : incident(v)) ring.push_back(dest(h));
     remove_flat_vertex(v);
-    if (v_out[v] >= 0) return false;                         // deg <= 2: not removed
-    while (nv > 0 && v_out[nv - 1] < 0) nv--;
+    bool removed_v = (v_out[v] < 0);
+    if (removed_v)
+      while (nv > 0 && v_out[nv - 1] < 0) nv--;
+    // Restore Delaunay from the rim seeds even when the removal failed (deg <= 2):
+    // flip_away_self_loops may have flipped, and every pop must see a globally-
+    // Delaunay mesh for the seeded restore to be exact (paper cor:local-restore).
+    // On a failed attempt v is live with no self-loops, so every changed-diamond edge
+    // still has a ring endpoint and the seed set below stays complete.
     std::vector<int> seeds;
     for (int w : ring)
       if (w >= 0 && w < nv && v_out[w] >= 0)
         for (int h : incident(w)) seeds.push_back(h);
     lawson_sweep(seeds, sweep_in_stack);
+    if (!removed_v) return false;
     for (int w : ring) push(w);                              // re-push affected rim flats
     if (verbose_removal && (++removed % verbose_removal == 0)) {
       std::fprintf(stderr, "[remove_flat] removed %lld, %d live remain\n", removed, count_live());
@@ -1011,14 +1092,26 @@ void DelaunayTriangulation::remove_flat_vertices(double flat_tol)
     if (!drain())          break;   // flats remain but none removable even after restructure -> done
   }
 
+  // Fail loud on a stuck reduction: a live flat vertex surviving the fixed-point
+  // rounds means the driver could not reduce the mesh to its cones. Provably dead
+  // on exact sphere input of minimum degree 3 (paper thm:main, via lem:flat-deg3:
+  // a flat vertex always has degree >= 3 once its self-loops are cleared);
+  // returning the partial reduction silently would hand callers a non-cone iDT.
+  for (int v = 0; v < nv; v++)
+    if (v_out[v] >= 0 && is_flat(v, flat_tol))
+      throw std::runtime_error(
+          "remove_flat_vertices: stuck with live flat vertex v=" +
+          std::to_string(v) + " after fixed-point rounds");
+
   if (verbose_removal) {
     std::fprintf(stderr, "[remove_flat] done: removed %lld, %d live remain\n", removed, count_live());
     std::fflush(stderr);
   }
 
-  // Final Lawson.  The output is globally Delaunay regardless of removal order by
-  // Theorem 1 (Bobenko-Springborn energy strictly decreases on every flip, including
-  // B == D self-loop-creating flips; the new self-loop is strictly Delaunay by Lemma 1).
+  // Final Lawson.  The output is globally Delaunay regardless of removal order
+  // (paper thm:lawson-converge: the Bobenko-Springborn energy strictly decreases
+  // on every flip, including B == D self-loop-creating flips, whose new self-loop
+  // is strictly Delaunay by paper lem:selfloop-delaunay).
   flip_to_delaunay();
 }
 
@@ -1121,7 +1214,8 @@ DelaunayTriangulation DelaunayTriangulation::compute(const Triangulation& T)
 
 DelaunayTriangulation DelaunayTriangulation::compute(const Triangulation& T,
                                                      const EdgeLengthFn& length,
-                                                     double flat_tol)
+                                                     double flat_tol,
+                                                     std::vector<int>* new_to_old)
 {
   // Prescribed-metric iDT. Unlike the equilateral compute(T), we do NOT
   // sort_flat_last() (that classifies flatness by degree, which is wrong for
@@ -1131,7 +1225,11 @@ DelaunayTriangulation DelaunayTriangulation::compute(const Triangulation& T,
   // so no pre-sort is needed.
   DelaunayTriangulation D = from_intrinsic_metric(T, length);
   D.remove_flat_vertices(flat_tol);
-  D.compact_vertices();  // cones are scattered (no flat-last sort); compact to nv=cones
+  // Cones are scattered (no flat-last sort); compact to nv = cones.  The
+  // surviving-cone labels in T's numbering are reported through new_to_old
+  // when requested (callers that annotate cones, e.g. AlexandrovIDTCubic).
+  std::vector<int> n2o = D.compact_vertices();
+  if (new_to_old) *new_to_old = std::move(n2o);
   return D;
 }
 
@@ -1147,28 +1245,24 @@ bool DelaunayTriangulation::is_cocircular_edge(int h) const
   return diamond(h).is_cocircular();
 }
 
+// Per-half-edge mask from a per-edge predicate, symmetric on twins.
+template <class Pred>
+static vector<bool> edge_mask(const DelaunayTriangulation& D, Pred pred)
+{
+  vector<bool> mask(D.nh, false);
+  for (int h : D.edges())
+    mask[h] = mask[h ^ 1] = pred(h);
+  return mask;
+}
+
 vector<bool> DelaunayTriangulation::cocircular_edges() const
 {
-  vector<bool> tight(nh, false);
-  for (int h = 0; h < nh; h += 2) {
-    if (!alive(h)) continue;
-    bool t = diamond(h).is_cocircular();
-    tight[h]     = t;
-    tight[h ^ 1] = t;
-  }
-  return tight;
+  return edge_mask(*this, [&](int h) { return diamond(h).is_cocircular(); });
 }
 
 vector<bool> DelaunayTriangulation::cocircular_edges(double tol) const
 {
-  vector<bool> tight(nh, false);
-  for (int h = 0; h < nh; h += 2) {
-    if (!alive(h)) continue;
-    bool t = diamond(h).is_cocircular(tol);
-    tight[h]     = t;
-    tight[h ^ 1] = t;
-  }
-  return tight;
+  return edge_mask(*this, [&](int h) { return diamond(h).is_cocircular(tol); });
 }
 
 // Lex-min cyclic rotation of a polygon boundary (oriented surface, no reverse).
@@ -1217,12 +1311,17 @@ DelaunayTriangulation::canonical_tesselation(const vector<int>& vertex_labels,
       int safety = 0;
       while (tight[h_next]) {
         h_next = he_next[h_next ^ 1];
-        if (++safety > nh) {
-          // Topology gone wrong -- bail out with an empty cell so the
-          // caller can detect and report the problem.
-          T.cells.clear();
-          return T;
-        }
+        if (++safety > nh)
+          // Deep invariant failure: two silently-empty results would
+          // compare equal, so fail loud instead of returning a sentinel.
+          throw std::runtime_error(
+              "canonical_tesselation: cell-boundary walk from half-edge " +
+              std::to_string(h_start) + " failed to close after " +
+              std::to_string(nh) + " interior-edge (tight) steps, stuck at "
+              "half-edge " + std::to_string(h_next) + "; the tight mask "
+              "encloses a cell -- a well-formed iDT tesselation always closes. "
+              "(Thrown rather than returning an empty tesselation, which a "
+              "legitimately empty iDT also yields and so could not signal this.)");
       }
       h = h_next;
     } while (h != h_start);
@@ -1280,7 +1379,7 @@ string CanonicalTesselation::to_string() const
 // New edges: u-w (L/2), w-v (L/2), w-B (computed), w-D (computed).
 // New faces: (u,w,B), (w,v,B), (v,w,D), (w,u,D).
 static int bisect_edge(DelaunayTriangulation& D, int h) {
-  int t = h ^ 1;
+  int t = D.twin(h);
   int u = D.he_origin[h], v = D.dest(h);
   double L = D.he_length[h];
 
@@ -1322,17 +1421,17 @@ static int bisect_edge(DelaunayTriangulation& D, int h) {
   int wB_he = D.alloc_directed_edge(w, B,  wB);
   int wD_he = D.alloc_directed_edge(w, Dv, wD);
 
-  D.v_out[w] = uw ^ 1;  // w -> u
+  D.v_out[w] = D.twin(uw);  // w -> u
 
   // Wire four new CCW faces around w.
-  D.wire_triangle(uw,     wB_he,   h_Bu);     // (u, w, B)
-  D.wire_triangle(wv,     h_vB,    wB_he^1);  // (w, v, B)
-  D.wire_triangle(wv^1,   wD_he,   h_Dv);     // (v, w, D)
-  D.wire_triangle(uw^1,   h_uD,    wD_he^1);  // (w, u, D)
+  D.wire_triangle(uw,          wB_he,   h_Bu);          // (u, w, B)
+  D.wire_triangle(wv,          h_vB,    D.twin(wB_he)); // (w, v, B)
+  D.wire_triangle(D.twin(wv),  wD_he,   h_Dv);          // (v, w, D)
+  D.wire_triangle(D.twin(uw),  h_uD,    D.twin(wD_he)); // (w, u, D)
 
   // Fix v_out for u, v if they pointed at the deleted edge.
   if (D.v_out[u] == h) D.v_out[u] = uw;
-  if (D.v_out[v] == t) D.v_out[v] = wv ^ 1;
+  if (D.v_out[v] == t) D.v_out[v] = D.twin(wv);
 
   return w;
 }
@@ -1340,8 +1439,7 @@ static int bisect_edge(DelaunayTriangulation& D, int h) {
 int DelaunayTriangulation::bisect_multi_edges() {
   // Find multi-edges: vertex pairs with >1 edge.
   map<pair<int,int>, vector<int>> pair_to_hes;
-  for (int h = 0; h < nh; h += 2) {
-    if (!alive(h)) continue;
+  for (int h : edges()) {
     int u = he_origin[h], v = dest(h);
     pair_to_hes[{min(u,v), max(u,v)}].push_back(h);
   }
@@ -1375,16 +1473,16 @@ int DelaunayTriangulation::alloc_vertex(double cone_angle, int orig_degree) {
   return v;
 }
 
-int DelaunayTriangulation::split_face(int h0, std::array<double,3> spoke) {
+int DelaunayTriangulation::split_face(int h0, std::array<double,3> spokes) {
   int h1 = he_next[h0], h2 = he_next[h1];
   int a = he_origin[h0], b = he_origin[h1], c = he_origin[h2];
   int f = he_face[h0];
 
   int P = alloc_vertex(2.0 * M_PI, 3);
   dealloc_face(f);                                  // only the face; the 3 edges stay
-  int sa = alloc_directed_edge(P, a, spoke[0]);
-  int sb = alloc_directed_edge(P, b, spoke[1]);
-  int sc = alloc_directed_edge(P, c, spoke[2]);
+  int sa = alloc_directed_edge(P, a, spokes[0]);
+  int sb = alloc_directed_edge(P, b, spokes[1]);
+  int sc = alloc_directed_edge(P, c, spokes[2]);
   wire_triangle(sa, h0, twin(sb));                  // (P, a, b)
   wire_triangle(sb, h1, twin(sc));                  // (P, b, c)
   wire_triangle(sc, h2, twin(sa));                  // (P, c, a)
@@ -1473,7 +1571,7 @@ bool DelaunayTriangulation::check_consistency() const
 {
   // 1. Twin pairs: twin(twin(h)) == h.
   for (int h = 0; h < nh; h++)
-    if (alive(h) && (h ^ 1) >= nh) return false;
+    if (alive(h) && twin(h) >= nh) return false;
 
   // 2. Next-cycle closure: following next 3 times returns to start (triangulation).
   for (int h = 0; h < nh; h++)
@@ -1503,7 +1601,7 @@ bool DelaunayTriangulation::check_consistency() const
 
   // 8. Twin length consistency.
   for (int h = 0; h < nh; h += 2)
-    if (alive(h) && he_length[h] != he_length[h ^ 1]) return false;
+    if (alive(h) && he_length[h] != he_length[twin(h)]) return false;
 
   // 9. Triangle inequality on every live face.
   for (int h = 0; h < nh; h++) {
@@ -1544,12 +1642,11 @@ bool DelaunayTriangulation::to_ascii(const DelaunayTriangulation& D, FILE* file)
       throw std::runtime_error("DelaunayTriangulation::to_ascii: vertex " + std::to_string(v)
                                + " is dead (non-compacted DCEL; compact_vertices first)");
 
-  // old edge (h>>1) -> dense new edge index, assigned in ascending old order; -1 for dead.
+  // old edge id -> dense new edge index, assigned in ascending old order; -1 for dead.
   std::vector<int> new_edge(D.nh / 2, -1);
   int ne = 0;
-  for (int h = 0; h < D.nh; h += 2)
-    if (D.alive(h)) new_edge[h >> 1] = ne++;
-  auto new_he = [&](int h) { return 2 * new_edge[h >> 1] + (h & 1); };
+  for (int h : D.edges()) new_edge[D.edge(h)] = ne++;
+  auto new_he = [&](int h) { return 2 * new_edge[D.edge(h)] + (h & 1); };
 
   int nf_alive = 0;
   for (int f = 0; f < D.nf; f++)
@@ -1558,10 +1655,9 @@ bool DelaunayTriangulation::to_ascii(const DelaunayTriangulation& D, FILE* file)
   std::fprintf(file, "iDT-DCEL 1\n%d %d %d\n", D.nv, nf_alive, ne);
   for (int v = 0; v < D.nv; v++)
     std::fprintf(file, "%d\n", D.v_orig_degree[v]);
-  for (int h = 0; h < D.nh; h += 2)
-    if (D.alive(h))
-      std::fprintf(file, "%d %d %d %d %.17g\n", D.he_origin[h], D.he_origin[h + 1],
-                   new_he(D.he_next[h]), new_he(D.he_next[h + 1]), D.he_length[h]);
+  for (int h : D.edges())
+    std::fprintf(file, "%d %d %d %d %.17g\n", D.he_origin[h], D.he_origin[h + 1],
+                 new_he(D.he_next[h]), new_he(D.he_next[h + 1]), D.he_length[h]);
   return std::ferror(file) == 0;
 }
 

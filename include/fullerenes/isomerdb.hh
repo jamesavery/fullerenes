@@ -3,7 +3,6 @@
 #include <vector>
 #include <map>
 #include <string>
-#include <assert.h>
 #include <fstream>
 #include <errno.h>
 
@@ -55,15 +54,33 @@ public:
     return s.substr(1,s.size()-2);
   }
 
+  // The write routines report failure through their return value (a
+  // modeled outcome: the caller chose the destination); the read routines
+  // THROW on a missing or corrupt database file (an environment error --
+  // there is no valid IsomerDB to return, and continuing with a sentinel
+  // caused silent downstream corruption).  The database root comes from
+  // the FULLERENE_DATABASE_PATH CMake variable (via config.hh) and can be
+  // overridden at runtime through IsomerDB::database_path.
   bool writeBinary(const string filename) const;
   bool writeCSV(const string filename) const;
 
+  // @throws std::runtime_error when `filename` cannot be opened, is
+  //         truncated, or its entry count disagrees with its size.
   static IsomerDB readBinary(const string filename);
+  // Random access to one isomer (1-based index, matching the database
+  // convention) without loading the whole file.
+  // @throws std::runtime_error on a missing or truncated database file.
+  // @throws std::out_of_range when isomer is outside [1, Nisomers].
   static Entry getIsomer(int N, int isomer, bool IPR=false);
-  static FullereneGraph makeIsomer(int N, const Entry& e); 
+  static FullereneGraph makeIsomer(int N, const Entry& e);
 
-  static IsomerDB readBinary(int N=20, bool IPR=false, string extension = ""); // Read DB in binary format
-  static IsomerDB readPDB(int N=20, bool IPR=false, string extension = "");    // Read DB in Peter's ASCII text format
+  // Read DB in binary format.
+  // @throws as readBinary(filename).
+  static IsomerDB readBinary(int N=20, bool IPR=false, string extension = "");
+  // Read DB in Peter's ASCII text format.
+  // @throws std::runtime_error on a missing database file or a malformed
+  //         header line.
+  static IsomerDB readPDB(int N=20, bool IPR=false, string extension = "");
 
   static int64_t        number_isomers(int N, const string& sym="Any", bool IPR=false);
   static vector<string> symmetries(int N, bool IPR=false);
@@ -72,9 +89,10 @@ public:
   static vector< vector<string> > symmetries_data[2];
   static vector< vector<size_t> > symmetry_count_data[2];
 
-  IsomerDB(int N=-1, bool IPR = false, bool IH=false, 
-	   vector<Entry> entries=vector<Entry>()) : 
-    N(N), IPR(IPR), with_ncycham(IH), entries(entries) { }
+  IsomerDB(int N=-1, bool IPR = false, bool IH=false,
+	   vector<Entry> entries=vector<Entry>()) :
+    N(N), Nisomers((int)entries.size()), IPR(IPR), with_ncycham(IH),
+    entries(entries) { }
 
 };
 

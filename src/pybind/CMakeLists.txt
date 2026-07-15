@@ -49,7 +49,7 @@ endif()
 #   subdir     -> the in-tree `fullerenes` target. The parent's global
 #                 include_directories(include; build/include) already cover the
 #                 headers + generated config.hh, and linking the target pulls in
-#                 its transitive deps (buckygen, fortran, BLAS/LAPACK, OpenMP).
+#                 its transitive deps (buckygen, fortran, OpenMP).
 # ---------------------------------------------------------------------------
 if(PYF_STANDALONE)
   get_filename_component(_default_root "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)

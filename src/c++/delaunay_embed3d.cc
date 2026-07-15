@@ -1,11 +1,13 @@
 #include "fullerenes/delaunay_embed3d.hh"
 #include "fullerenes/union_find.hh"
+#include "fullerenes/dense_linalg.hh"
 
 #include <cmath>
 #include <cassert>
 #include <algorithm>
 #include <numeric>
 #include <map>
+#include <stdexcept>
 #include <vector>
 
 // ============================================================================
@@ -91,45 +93,6 @@ static matrix<double> double_center(const matrix<double>& A) {
     for (int j = 0; j < N; j++)
       B(i, j) = -0.5 * (A(i, j) - row_mean[i] - col_mean[j] + grand_mean);
   return B;
-}
-
-// Jacobi eigendecomposition of symmetric matrix A.
-// Returns {eigenvalues, eigenvectors} where columns of V are eigenvectors.
-static pair<vector<double>, matrix<double>> jacobi_eigen(matrix<double> A) {
-  int N = A.m;
-  matrix<double> V(N, N, 0.0);
-  for (int i = 0; i < N; i++) V(i, i) = 1.0;
-
-  for (int iter = 0; iter < 10000; iter++) {
-    // Find largest off-diagonal element
-    double max_val = 0; int p = 0, q = 1;
-    for (int i = 0; i < N; i++)
-      for (int j = i + 1; j < N; j++)
-        if (fabs(A(i, j)) > max_val) { max_val = fabs(A(i, j)); p = i; q = j; }
-    if (max_val < 1e-15) break;
-
-    double app = A(p,p), aqq = A(q,q), apq = A(p,q);
-    double theta = (fabs(app - aqq) < 1e-30) ? M_PI/4 : 0.5 * atan2(2*apq, app - aqq);
-    double cs = cos(theta), sn = sin(theta);
-
-    // Givens rotation on rows, columns, and eigenvector accumulator
-    for (int j = 0; j < N; j++) {
-      double bp = A(p,j), bq = A(q,j);
-      A(p,j) = cs*bp + sn*bq;  A(q,j) = -sn*bp + cs*bq;
-    }
-    for (int i = 0; i < N; i++) {
-      double bp = A(i,p), bq = A(i,q);
-      A(i,p) = cs*bp + sn*bq;  A(i,q) = -sn*bp + cs*bq;
-    }
-    for (int i = 0; i < N; i++) {
-      double vp = V(i,p), vq = V(i,q);
-      V(i,p) = cs*vp + sn*vq;  V(i,q) = -sn*vp + cs*vq;
-    }
-  }
-
-  vector<double> evals(N);
-  for (int i = 0; i < N; i++) evals[i] = A(i, i);
-  return {evals, V};
 }
 
 // Solve ||p + tau*d|| = Delta for the positive root tau.
@@ -288,7 +251,14 @@ static V3 mds_placement(const matrix<double>& D,
     for (int j = 0; j < N; j++)
       D_sq(i, j) = D(i, j) * D(i, j);
 
-  auto [evals, V] = jacobi_eigen(double_center(D_sq));
+  // Gram-matrix eigendecomposition (BLAS-free cyclic Jacobi).  double_center is
+  // symmetric by construction, so the guard trip (empty result) is unreachable.
+  LinAlg::SymEigen::Decomp ed = LinAlg::SymEigen::decompose(double_center(D_sq));
+  if (ed.lambda.empty())
+    throw std::runtime_error("mds_placement: SymEigen::decompose returned no "
+                             "spectrum for a symmetric double-centered matrix");
+  const vector<double>&  evals = ed.lambda;   // ascending
+  const matrix<double>&  V     = ed.Q;        // eigenvectors as columns
 
   // Sort eigenvalues descending
   vector<int> order(N);
@@ -411,36 +381,6 @@ vector<vector<int>> compute_orbits(int n, const vector<vector<int>>& G) {
 // Orbit structure for symmetry-constrained embedding
 // ============================================================================
 
-// 3x3 Jacobi eigendecomposition of symmetric matrix A.
-// On return: A is diagonal (eigenvalues), V columns are eigenvectors.
-static void jacobi_eigen_3x3(matrix3d& A, matrix3d& V) {
-  V = matrix3d::unit_matrix();
-  for (int iter = 0; iter < 100; iter++) {
-    double mx = 0; int p = 0, q = 1;
-    for (int i = 0; i < 3; i++)
-      for (int j = i+1; j < 3; j++)
-        if (fabs(A(i,j)) > mx) { mx = fabs(A(i,j)); p = i; q = j; }
-    if (mx < 1e-15) break;
-
-    double app = A(p,p), aqq = A(q,q), apq = A(p,q);
-    double theta = (fabs(app - aqq) < 1e-30) ? M_PI/4 : 0.5 * atan2(2*apq, app - aqq);
-    double cs = cos(theta), sn = sin(theta);
-
-    for (int j = 0; j < 3; j++) {
-      double bp = A(p,j), bq = A(q,j);
-      A(p,j) = cs*bp + sn*bq; A(q,j) = -sn*bp + cs*bq;
-    }
-    for (int i = 0; i < 3; i++) {
-      double bp = A(i,p), bq = A(i,q);
-      A(i,p) = cs*bp + sn*bq; A(i,q) = -sn*bp + cs*bq;
-    }
-    for (int i = 0; i < 3; i++) {
-      double vp = V(i,p), vq = V(i,q);
-      V(i,p) = cs*vp + sn*vq; V(i,q) = -sn*vp + cs*vq;
-    }
-  }
-}
-
 // Per-orbit data for reduced-parameter optimization.
 struct OrbitInfo {
   int rep;                    // orbit representative (smallest index)
@@ -461,23 +401,17 @@ static pair<int, matrix3d> fixed_point_subspace(const vector<matrix3d>& stabiliz
     A += D.transpose() * D;
   }
 
-  // Eigendecompose A (symmetric PSD)
-  matrix3d V;
-  jacobi_eigen_3x3(A, V);
-
-  // Eigenvalues are on the diagonal of A after decomposition.
-  // Null space = eigenvectors with eigenvalue ~ 0.
-  // Sort by eigenvalue ascending to put null-space vectors first in basis.
-  double evals[3] = {A(0,0), A(1,1), A(2,2)};
-  int order[3] = {0, 1, 2};
-  sort(order, order+3, [&](int a, int b) { return evals[a] < evals[b]; });
+  // Eigendecompose A (symmetric PSD).  eigensystem() sorts eigenvalues by
+  // absolute value ascending -- for a PSD matrix that is value-ascending, so
+  // the null-space eigenvectors (eigenvalue ~ 0) come first -- and returns each
+  // unit eigenvector as row k of C.  The fixed-point subspace is the null space.
+  auto [evals, C] = A.eigensystem();
 
   int dim = 0;
   matrix3d basis;
   for (int k = 0; k < 3; k++) {
-    int col = order[k];
-    if (evals[col] < 1e-10) {
-      for (int r = 0; r < 3; r++) basis(r, dim) = V(r, col);
+    if (evals[k] < 1e-10) {
+      for (int r = 0; r < 3; r++) basis(r, dim) = C(k, r);   // C row k -> basis column
       dim++;
     }
   }
@@ -633,22 +567,23 @@ static V3 symmetry_aware_init(const V3& mds_full, const matrix<double>& D,
 }
 
 // Polar decomposition: extract the orthogonal factor Q from M = Q*S.
-// Uses SVD (M = U Sigma V^T) to return Q = U V^T.
+// Uses SVD (M = U Sigma W^T) to return Q = U W^T, with W the right singular
+// vectors (eigenvectors of MtM = M^T M).  eigensystem() returns each unit
+// eigenvector as a ROW of C, so W = C^T and Q = U W^T = U C.
 static matrix3d polar_orthogonal(const matrix3d& M) {
   matrix3d MtM = M.transpose() * M;
-  matrix3d V;
-  jacobi_eigen_3x3(MtM, V);
+  auto [evals, C] = MtM.eigensystem();
 
-  double svals[3] = { sqrt(max(0.0, MtM(0,0))),
-                      sqrt(max(0.0, MtM(1,1))),
-                      sqrt(max(0.0, MtM(2,2))) };
+  double svals[3] = { sqrt(max(0.0, evals[0])),
+                      sqrt(max(0.0, evals[1])),
+                      sqrt(max(0.0, evals[2])) };
 
   matrix3d U;
   int computed = 0;
   for (int col = 0; col < 3; col++) {
     if (svals[col] > 1e-12) {
-      coord3d v_col(V(0,col), V(1,col), V(2,col));
-      coord3d u_col = M * v_col * (1.0 / svals[col]);
+      coord3d w_col(C(col,0), C(col,1), C(col,2));   // right singular vector = C row
+      coord3d u_col = M * w_col * (1.0 / svals[col]);
       U(0,col) = u_col[0]; U(1,col) = u_col[1]; U(2,col) = u_col[2];
       computed++;
     }
@@ -669,7 +604,7 @@ static matrix3d polar_orthogonal(const matrix3d& M) {
     return matrix3d::unit_matrix();
   }
 
-  return U * V.transpose();
+  return U * C;
 }
 
 // Align symmetry matrices to the embedding frame via generalized intertwiner.

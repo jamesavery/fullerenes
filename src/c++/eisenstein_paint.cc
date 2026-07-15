@@ -4,7 +4,7 @@
 #include "fullerenes/eisenstein_raster.hh"
 #include "fullerenes/eisenstein_tikz.hh"
 #include "fullerenes/delaunay_strip.hh"
-#include "fullerenes/delaunay_alexandrov12.hh"
+#include "fullerenes/delaunay_alexandrov.hh"
 #include "fullerenes/barycentric.hh"
 
 #include <algorithm>

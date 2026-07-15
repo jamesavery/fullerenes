@@ -6,6 +6,7 @@
 #include "fullerenes/layout2d.hh"
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/cubicgraph.hh"
+#include "fullerenes/dense_linalg.hh"
 
 using namespace std;
 
@@ -404,28 +405,12 @@ void perfmatch_dfs(map<arc_t,int>& faceEdge, const vector<face_t>& faces,
 
 }
 
-#ifdef HAS_LAPACK
-#ifdef HAS_MKL
-#include <mkl.h>
-#else
-extern "C" void dgetrf_(int *M, int *N, double *A, int *LDA, int *IPIV, int *INFO);
-#endif
-
+// |det| of a flat row-major N×N matrix via the in-house BLAS-free LU
+// (LinAlg::det).  Formerly routed through LAPACK dgetrf_, which the deployed
+// OpenBLAS silently miscomputes for N ≳ 60 — exactly the FKT regime below.
 double lu_det(const vector<double> &A, int N)
 {
-  int info = 0;
-  double *result = new double[N*N];
-  int    *ipiv   = new int[N];
-  double prod = 1.0;
-  memcpy(result,&A[0],N*N*sizeof(double));
-  dgetrf_(&N,&N, result, &N, ipiv, &info);
-  {
-    int i;
-    for(i=0;i<N;i++) prod *= result[(N+1)*i];
-  }
-  free(result);
-  free(ipiv);
-  return fabs(prod);
+  return fabs(LinAlg::det(matrix<double>(N, N, A)));
 }
 
 
@@ -460,14 +445,6 @@ size_t PlanarGraphView::count_perfect_matchings() const
 
   return round(sqrtl(fabs(lu_det(Af,N))));
 }
-#else
-size_t PlanarGraphView::count_perfect_matchings() const
-{
-   cerr << "count_perfect_matchings() requires LAPACK.\n";
-   //    cerr << "count_perfect_matchings() is temporarily out of service.\n";
-  return 0;
-}
-#endif
 
 
 vector<coord3d> PlanarGraphView::zero_order_geometry(double scalerad) const

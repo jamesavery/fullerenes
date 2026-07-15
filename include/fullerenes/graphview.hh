@@ -553,10 +553,15 @@ struct SurfaceCone {
 };
 
 struct ConeFinderParams {
-  double R_pent;                  // disk + exclusion radius, mesh units (required)
+  // THE default number of Taubin passes for cone detection.  Every localizer that
+  // seeds from find_cones (the sub-project's signed / bayesian / joint tracks) forwards
+  // its own taubin_iters here, so this constant is the single source of that default.
+  static constexpr int default_taubin_iters = 10;
+
+  double R_pent;                  // disk + exclusion radius (a RADIUS), mesh units (required)
   double threshold_frac  = 0.1;   // accept a cone iff disk-K >= this * pi/3
   int    max_centres     = 12;    // upper bound (fullerene: exactly 12 pentagons)
-  int    taubin_iters    = 10;    // Taubin smoothing passes
+  int    taubin_iters    = default_taubin_iters;  // Taubin passes on the internal working copy
   int    meanshift_iters = 200;   // max mean-shift iterations per centre
   explicit ConeFinderParams(double R) : R_pent(R) {}
 };
