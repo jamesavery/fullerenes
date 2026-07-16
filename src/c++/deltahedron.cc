@@ -2536,8 +2536,10 @@ int DeltahedronView<double>::reflect_all_concave(std::span<coord3d> pts, double 
 
 // Incremental convex hull returning just the triangle list.
 // Each triangle is an array of 3 vertex indices into the pts array.
-// Triangles are oriented with outward normals.
-static vector<array<int,3>> build_convex_hull(std::span<coord3d> pts)
+// Triangles are oriented with outward normals. Exported (geometry.hh
+// convex_hull_tris) for warm-start convexification outside this pipeline;
+// build_convex_hull below is the file-local alias the existing callers use.
+vector<array<int,3>> convex_hull_tris(std::span<const coord3d> pts)
 {
   int n = (int)pts.size();
   if(n < 4) return {};
@@ -2643,6 +2645,12 @@ static vector<array<int,3>> build_convex_hull(std::span<coord3d> pts)
   }
 
   return tris;
+}
+
+// File-local alias: the pipeline callers predate the export and pass mutable spans.
+static inline vector<array<int,3>> build_convex_hull(std::span<coord3d> pts)
+{
+  return convex_hull_tris(pts);
 }
 
 template<>

@@ -703,6 +703,14 @@ struct ClosestPoint { coord3d pos; std::array<double,3> bary; double dist2; };
 ClosestPoint closest_point_on_triangle(const coord3d& p, const tri_t& t,
                                         std::span<const coord3d> points);
 
+// Convex hull of a 3D point set as a triangle list (indices into pts), outward-
+// oriented normals. Incremental construction; empty result for degenerate input
+// (< 4 points or all coplanar). Requires >= 4 points not all coplanar for a
+// non-empty result; degenerate input returns an empty vector (never throws). Impl
+// in deltahedron.cc (the hull the deltahedron pipeline's project_onto_convex_hull
+// builds, exported for warm-start convexification in the research sub-projects).
+std::vector<std::array<int,3>> convex_hull_tris(std::span<const coord3d> pts);
+
 struct Tetra3D {
   coord3d a,b,c,d;
 
