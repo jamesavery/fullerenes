@@ -1,4 +1,4 @@
-link_libraries(fortran_opt fullerenes)
+link_libraries(fullerenes)
 add_executable(file-to-spiral file-to-spiral.cc)
 add_executable(file-to-pov file-to-pov.cc)
 add_executable(file-to-file file-to-file.cc)

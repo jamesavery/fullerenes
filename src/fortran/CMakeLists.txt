@@ -25,7 +25,10 @@ add_library(fortran_lib
 add_executable(fullerene_program main.f)
 target_link_libraries(fortran_opt PRIVATE fortran_config)
 target_link_libraries(fortran_lib PRIVATE fortran_config)
-target_link_libraries(fullerene_program fortran_config fortran_opt fortran_lib fullerenes ${OpenMP_CXX_LIBRARIES})
+# Static-archive order matters now that libfullerenes no longer carries the
+# fortran_opt objects: fortran_lib (spiral.f, opt.f) pulls tred2l/tqlil and
+# the geometry/force kernels from fortran_opt, so fortran_opt must follow it.
+target_link_libraries(fullerene_program fortran_lib fortran_opt fortran_config fullerenes ${OpenMP_CXX_LIBRARIES})
 
 # When using Apple Clang for C++ and Homebrew gfortran for Fortran, the Fortran
 # linker needs the macOS SDK library path to find libc++ (propagated from the

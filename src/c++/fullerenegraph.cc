@@ -7,6 +7,7 @@
 #include "fullerenes/fullerenegraph.hh"
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/layout2d.hh"
+#include "fullerenes/wu-forcefield.hh"
 
 // Creates the m-point halma-fullerene from the current fullerene C_n with n(1+m)^2 vertices. (I.e. 4,9,16,25,36,... times)
 FullereneGraph FullereneGraphView::halma_fullerene(const int m, const bool) const {
@@ -123,32 +124,13 @@ vector<coord3d> FullereneGraphView::zero_order_geometry(double scalerad) const
   return coordinates;
 }
 
-extern "C" void sa_optff_(const void **graph, const int *N, const int *ihessian, const int *iprinthessian,
-                       const int *iopt,double *Dist,double *ftol,double *force);
-extern "C" void default_force_parameters_(const int *iopt, double *parameters);
-
+// Host force-field geometry optimization. Formerly the last C++ -> Fortran
+// dependence (sa_optff_ in src/fortran/opt-standalone.f); now the native
+// Wu force-field port, validated pointwise and end-to-end against the
+// Fortran (claude-projects/unfortran/tests/test_wu_forcefield.cc).
 vector<coord3d> FullereneGraphView::optimized_geometry(std::span<const coord3d> points, int opt_method, double ftol) const
 {
-  //  assert(layout2d.size() == N);
-  vector<coord3d> coordinates(points.begin(),points.end());
-  vector<double> force_parameters(19);
-
-  default_force_parameters_(&opt_method,&force_parameters[0]);
-
-  // cout << "force parameters: " << force_parameters << endl;
-  // cout << "optimization method: " << opt_method << endl;
-
-  // cout << "g = " << *this << ";\n";
-
-  int zero = 0;
-  int one = 1;
-  // Fortran interface expects FullereneGraph*, but this method is on
-  // FullereneGraphView. Both start with the same GraphView layout, so
-  // the Fortran callbacks (which only read adjacency) work correctly.
-  const void *g = static_cast<const GraphView*>(this);
-  sa_optff_(&g,&N,&zero,&zero,&opt_method,(double*)&coordinates[0],&ftol,&force_parameters[0]);
-
-  return coordinates;
+  return wu_optimized_geometry(*this, points, opt_method, ftol);
 }
 
 
