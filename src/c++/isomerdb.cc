@@ -193,22 +193,22 @@ IsomerDB IsomerDB::readPDB(int N, bool IPR, string extension) {
   */
   while(getline(dbfile,line)){
     int pos = 0;
-    Entry e;
+    Entry e{};
     fortran_readA(e.group,line,pos,3);
     for(int i=0;i<12;i++) e.RSPI[i] = fortran_readI(line,pos,3);
     if(IP==0){
+      // Formats 1004/1007: 5I2 pentagon indices, 6I2 hexagon indices (k=0..5).
       for(int i=0;i<5;i++) e.PNI[i] = fortran_readI(line,pos,2);
-      for(int i=0;i<3;i++) e.HNI[i] = 0;
-      for(int i=3;i<6;i++) e.HNI[i] = fortran_readI(line,pos,2);
-      // for(int i=0;i<6;i++) e.HNI[i] = fortran_readI(line,pos,2); // Discrepancy between util.f and db files
+      for(int i=0;i<6;i++) e.HNI[i] = fortran_readI(line,pos,2);
     } else {
+      // Formats 1008/1009: IPR files store only the k=3..5 hexagon indices.
       for(int i=0;i<5;i++) e.PNI[i] = 0;
       for(int i=0;i<3;i++) e.HNI[i] = 0;
       for(int i=3;i<6;i++) e.HNI[i] = fortran_readI(line,pos,2);
     }
     e.NeHOMO = fortran_readI(line,pos,2);
-    e.NedgeHOMO = fortran_readI(line,pos,1); 
-    e.HLgap = fortran_readF(line,pos,10);
+    e.NedgeHOMO = fortran_readI(line,pos,1);
+    e.HLgap = fortran_readF(line,pos,7);       // F7.5
     if(IH==1) e.ncycham = fortran_readI(line,pos,7);
     for(int i=0;i<6;i++) e.INMR[i] = fortran_readI(line,pos,3);
     DB.entries.push_back(e);
