@@ -29,9 +29,11 @@ int main(int ac, char **av)
       continue;
     }
 
-    IsomerDB db = IsomerDB::readBinary(N,IPR);
-    if(db.N < 0){
-      fprintf(stderr,"Can't open database for C%d\n",N);
+    IsomerDB db;
+    try {
+      db = IsomerDB::readBinary(N,IPR);
+    } catch(const std::exception& e){
+      fprintf(stderr,"Can't open database for C%d: %s\n",N,e.what());
       return -1;
     }
     Nisomers[Nindex] = db.Nisomers;

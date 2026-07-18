@@ -84,8 +84,7 @@ int main(int argc, char** argv) {
   // 2. Run the Alexandrov solver — produces the (drum-cap) fixed point.
   auto D = DelaunayTriangulation::compute(T);
   AlexandrovSolver solver;
-  solver.D         = D;
-  solver.palc_tsvd = true;
+  solver.D = D;
   auto bi_coords = solver.solve();
   fprintf(stderr, "AlexandrovSolver: status=%s  kappa=%.3e  vol_norm=%.3e\n",
           AlexandrovSolver::status_str(solver.stats_status),

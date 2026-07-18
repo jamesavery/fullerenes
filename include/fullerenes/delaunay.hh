@@ -194,6 +194,22 @@ struct DelaunayTriangulation {
   };
   IncidentHalfEdges incident(int v) const { return {*this, v}; }
 
+  // Range over one (even) half-edge per live edge. The canonical edge
+  // traversal, skipping dead slots.
+  struct LiveEdges {
+    const DelaunayTriangulation& D;
+    struct iterator {
+      const DelaunayTriangulation* D; int h;
+      void advance() { while (h < D->nh && !D->alive(h)) h += 2; }
+      int       operator*()  const { return h; }
+      iterator& operator++()       { h += 2; advance(); return *this; }
+      bool      operator!=(const iterator& o) const { return h != o.h; }
+    };
+    iterator begin() const { iterator it{&D, 0}; it.advance(); return it; }
+    iterator end()   const { return {&D, D.nh}; }
+  };
+  LiveEdges edges() const { return {*this}; }
+
   // --- Construction ---
 
   // A metric on the edges: length of the undirected edge {u,v}.
@@ -245,11 +261,20 @@ struct DelaunayTriangulation {
 
   // --- Delaunay operations ---
   bool is_delaunay_edge(int h) const;
-  // Flip the diagonal of the diamond around edge h.  Accepts any
-  // non-Delaunay edge with a convex diamond, including the B == D case
-  // (which produces a self-loop edge at B; see Lemma 1 of
-  // claude-projects/delaunay/CORRECTNESS-PROOF.md).
+  // Flip the diagonal of the diamond around edge h.  Accepts any edge with a
+  // strictly convex diamond and a positive flipped length, including the
+  // B == D case, which produces a self-loop edge at B (strictly Delaunay
+  // when the flipped edge was non-Delaunay; paper lem:selfloop-delaunay).
+  // @post on true:  the DCEL invariants hold with the new diagonal B-D in
+  //                 place of h; only the two diamond faces are rewired; the
+  //                 surface metric is unchanged (paper thm:metric-invariance).
+  // @post on false: the complex is untouched.
   bool flip_edge(int h);
+  // Global Delaunay restore, seeding with every live edge.
+  // @post is_delaunay()
+  // @throws std::runtime_error when the 200*nv flip budget is exhausted
+  //         (impossible by the energy argument, paper thm:lawson-converge;
+  //         fail-loud backstop).
   int  lawson_sweep();
   // Seeded core: restore Delaunay starting from a frontier of edges (one half-edge id
   // per edge), propagating to each flip's rim. For a hot caller that changed only a
@@ -257,6 +282,10 @@ struct DelaunayTriangulation {
   // sweep would. `in_stack` (sized nh/2) is the caller-owned stack-membership scratch;
   // it is left all-false on normal return, so a hot loop reuses one buffer without
   // re-zeroing. The no-arg lawson_sweep() seeds with all live edges and its own scratch.
+  // @pre  seeded: every non-Delaunay edge is in seed_edges or arises on the
+  //       rim of a seed cascade (paper lem:seeded-sweep).
+  // @post is_delaunay()
+  // @throws std::runtime_error when the 200*nv flip budget is exhausted.
   int  lawson_sweep(const vector<int>& seed_edges, vector<bool>& in_stack);
   int  count_non_delaunay() const;
   int  flip_to_delaunay();
@@ -266,7 +295,30 @@ struct DelaunayTriangulation {
   void remove_flat_vertex(int v);
   // Remove every flat vertex (is_flat(v, flat_tol)), leaving the cones. See
   // is_flat for choosing flat_tol (1e-6 exact, ~1e-2 for a CEPS metric).
-  void remove_flat_vertices(double flat_tol = 1e-6);
+  //
+  // Observer hook: if `on_pop` is non-empty, it is invoked as on_pop(v) at
+  // EVERY work-list pop of a live flat vertex v -- after the live/flat guard
+  // passes and BEFORE that vertex's self-loop cleanup, i.e. at the moment the
+  // mesh is globally Delaunay per the driver invariant. It fires in every drain
+  // path (the initial drain and each restructure round). The observer MUST NOT
+  // mutate the mesh (it is an observation hook only); this is taken on trust,
+  // not checked. An empty on_pop (the default) is a zero-overhead no-op.
+  //
+  // @throws std::runtime_error on an un-flippable self-loop at a flat vertex
+  //         that survives the cocircular tie-break.  An EXACTLY TIED loop
+  //         diamond (end angle = pi; realizable, paper rem:ties-real) is
+  //         resolved by flipping the tied side's closing spoke, whose
+  //         diamond is exactly cocircular at EVERY fan size (the
+  //         cocircular-fan lemma, paper thm:cocircular-fan +
+  //         thm:tie-break), so on exact sphere input of minimum degree 3
+  //         this throw is provably dead (paper thm:main); it guards the
+  //         floating-point boundary strip and out-of-scope inputs.
+  // @throws std::runtime_error on Lawson budget exhaustion (propagated from
+  //         lawson_sweep).
+  // @throws std::runtime_error on a stuck reduction: a live flat vertex
+  //         survives the fixed-point rounds (same scope note as above).
+  void remove_flat_vertices(double flat_tol = 1e-6,
+                            const std::function<void(int)>& on_pop = {});
 
   // Renumber the live vertices to 0..n_live-1 (dropping removed ones) and
   // shrink nv, rewriting he_origin and the per-vertex arrays. Needed after a
@@ -311,6 +363,11 @@ struct DelaunayTriangulation {
   // surface (Bobenko-Springborn 2007).  The output is generally a
   // delta-complex and may contain multi-edges, self-loops, and bigons
   // around cone vertices (deg-2 cones) -- all valid iDT features.
+  // On sphere input with minimum vertex degree 3 (any cubic-polyhedron
+  // dual, fullerene duals included) success is unconditional
+  // (paper thm:main).
+  // @post result.nv == number of deg != 6 vertices of T, all live
+  // @post result.is_delaunay()
   static DelaunayTriangulation compute(const Triangulation& T);
 
   // As compute(T), but for a PRESCRIBED intrinsic metric `length(u,v)`.

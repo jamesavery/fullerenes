@@ -3,7 +3,7 @@
 // per-vertex r values, edge-length-derived stats, and key
 // AlexandrovSolver outputs.
 //
-// Usage: probe_jacobian <spiral_name> [--gauge-snap]
+// Usage: probe_jacobian <spiral_name>
 
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/delaunay.hh"
@@ -16,32 +16,15 @@
 using namespace std;
 
 int main(int argc, char** argv) {
-  if (argc < 2) { fprintf(stderr, "Usage: %s <spiral> [--gauge-snap] [--gauge-project] [--tsvd] [--rcond <r>]\n", argv[0]); return 1; }
+  if (argc < 2) { fprintf(stderr, "Usage: %s <spiral>\n", argv[0]); return 1; }
   string name = argv[1];
-  bool gauge_snap = false, gauge_project = false, tsvd = false;
-  double rcond = 5e-3;
-  for (int i = 2; i < argc; i++) {
-    string a = argv[i];
-    if      (a == "--gauge-snap")    gauge_snap    = true;
-    else if (a == "--gauge-project") gauge_project = true;
-    else if (a == "--tsvd")          tsvd          = true;
-    else if (a == "--rcond" && i+1 < argc) rcond = std::stod(argv[++i]);
-  }
   spiral_nomenclature sn(name);
   Triangulation T(sn);
   auto D = DelaunayTriangulation::compute(T);
 
   AlexandrovSolver solver;
   solver.D = D;
-  solver.palc_gauge_snap    = gauge_snap;
-  solver.palc_gauge_project = gauge_project;
-  solver.palc_tsvd          = tsvd;
-  solver.palc_tsvd_rcond    = rcond;
   solver.solve();
-  printf("# gauge_snap=%s  gauge_project=%s  tsvd=%s  rcond=%.1e\n",
-         gauge_snap ? "true" : "false",
-         gauge_project ? "true" : "false",
-         tsvd ? "true" : "false", rcond);
 
   printf("# %s\n", name.c_str());
   printf("# status=%s  kappa=%.6e  vol_norm=%.6e  flips=%d  steps=%d\n",

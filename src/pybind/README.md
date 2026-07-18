@@ -43,7 +43,7 @@ the next `import`.
 > `clang++` (what `libfullerenes.so` is built with), and system Python's
 > `libstdc++` is the very one the library links — so plain system Python is
 > ABI-safe with no conda. If your library was built with gcc, override:
-> `pip install -e src/pybind --config-settings=cmake.define.CMAKE_CXX_COMPILER=g++-13`.
+> `pip install -e src/pybind --config-settings=cmake.define.CMAKE_CXX_COMPILER=<your-g++>`.
 > A non-editable `pip install` from an sdist is not supported yet (the wheel does
 > not bundle `libfullerenes.so` + its native deps — deferred).
 
