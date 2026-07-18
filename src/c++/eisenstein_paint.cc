@@ -1,5 +1,6 @@
 #include "fullerenes/eisenstein_paint.hh"
 
+#include "fullerenes/auxiliary.hh"           // IDCounter
 #include "fullerenes/eisenstein.hh"
 #include "fullerenes/eisenstein_raster.hh"
 #include "fullerenes/eisenstein_tikz.hh"
@@ -47,11 +48,11 @@ namespace {
 }  // namespace
 
 // =====================================================================
-// Result::stage_name
+// stage_name
 // =====================================================================
 
-const char* Result::stage_name() const {
-    switch (stage) {
+const char* stage_name(Stage s) {
+    switch (s) {
         case Stage::OK:              return "ok";
         case Stage::IDT_COMPUTE:     return "idt_compute";
         case Stage::ALEXANDROV:      return "alexandrov";
@@ -63,6 +64,9 @@ const char* Result::stage_name() const {
     }
     return "unknown";
 }
+
+const char* Result::stage_name()      const { return eisenstein_paint::stage_name(stage); }
+const char* CubicResult::stage_name() const { return eisenstein_paint::stage_name(stage); }
 
 // =====================================================================
 // Prelude: sort, iDT compute, Alexandrov solve.
@@ -128,6 +132,89 @@ Pipeline prepare(const Triangulation& T) {
 Inputs prepare_inputs(const Triangulation& T) {
     Pipeline P = prepare(T);
     return { std::move(P.T_sorted), std::move(P.D) };
+}
+
+// =====================================================================
+// Cubic prelude: raw dual iDT + AlexandrovIDTCubic + pentagon anchors.
+// =====================================================================
+
+namespace {
+
+// Anchor each of the 12 dual cones (sorted labels 0..11) at the
+// centroid of its pentagon's 5 surrounding cone vertices.  Every dual
+// triangle containing a deg-5 vertex is pentagon-incident and hence a
+// cone of AlexandrovIDTCubic, so each pentagon accumulates exactly 5
+// contributions; anything else is broken cone bookkeeping.
+std::vector<coord3d> pentagon_anchors(const Triangulation& T,
+                                      const Permutation& perm,
+                                      const std::vector<coord3d>& cone_pos,
+                                      const std::vector<tri_t>&   cone_tri)
+{
+    std::vector<coord3d> anchors(12, coord3d{0, 0, 0});
+    std::vector<int>     count(12, 0);
+    for (size_t i = 0; i < cone_tri.size(); ++i)
+        for (int k = 0; k < 3; ++k) {
+            const int p = cone_tri[i][k];
+            if (T.degree(p) == 6) continue;      // hexagon corner
+            const int ps = perm[p];              // sorted label, < 12
+            if (ps < 0 || ps >= 12)
+                paint_throw("eisenstein_paint::pentagon_anchors: deg-%d vertex %d "
+                            "has sorted label %d (expected cone label < 12)",
+                            T.degree(p), p, ps);
+            anchors[ps] += cone_pos[i];
+            ++count[ps];
+        }
+    for (int c = 0; c < 12; ++c) {
+        if (count[c] != 5)
+            paint_throw("eisenstein_paint::pentagon_anchors: cone %d accumulated "
+                        "%d cone-vertex contributions (expected 5)", c, count[c]);
+        anchors[c] = anchors[c] / 5.0;
+    }
+    return anchors;
+}
+
+// AlexandrovIDTCubic solve + anchor derivation.  Mirrors run_alexandrov's
+// staging: kis/iDT trouble -> IDT_COMPUTE, non-simplicial cubic iDT ->
+// NON_SIMPLICIAL, any other non-validating outcome -> ALEXANDROV.
+void run_cubic_alexandrov(const Triangulation& T, CubicPipeline& CP) {
+    AlexandrovIDTCubic AC;
+    try {
+        CP.cone_vertex_positions = AC.solve(T);
+    } catch (const std::exception& e) {
+        throw StageError(Stage::IDT_COMPUTE,
+            std::string("eisenstein_paint::prepare_cubic: AlexandrovIDTCubic: ")
+            + e.what());
+    }
+    CP.cone_triangle = AC.cone_triangle;
+
+    if (!AC.solver.valid()) {
+        using VS = AlexandrovSolver::ValidationStatus;
+        const std::string detail = std::string("AlexandrovIDTCubic: ")
+                                 + AlexandrovSolver::status_str(AC.solver.stats_status);
+        const Stage st = (AC.solver.stats_status == VS::FAIL_NOT_SIMPLE)
+                           ? Stage::NON_SIMPLICIAL
+                           : Stage::ALEXANDROV;
+        throw StageError(st, "eisenstein_paint::prepare_cubic: " + detail);
+    }
+    if (CP.cone_vertex_positions.size() != CP.cone_triangle.size())
+        throw StageError(Stage::ALEXANDROV,
+            "eisenstein_paint::prepare_cubic: AlexandrovIDTCubic returned "
+            + std::to_string(CP.cone_vertex_positions.size()) + " positions for "
+            + std::to_string(CP.cone_triangle.size()) + " cones");
+
+    CP.P.cone_positions = pentagon_anchors(T, CP.P.perm,
+                                           CP.cone_vertex_positions,
+                                           CP.cone_triangle);
+}
+
+}  // namespace
+
+CubicPipeline prepare_cubic(const Triangulation& T) {
+    CubicPipeline CP;
+    sort_and_compute_idt(T, CP.P);
+    require_simplicial(CP.P.D, "eisenstein_paint::prepare_cubic");
+    run_cubic_alexandrov(T, CP);
+    return CP;
 }
 
 // =====================================================================
@@ -616,19 +703,73 @@ back_permute(const std::vector<coord3d>& pos_sorted,
     return out;
 }
 
+// The metric-independent paint core: embed every cell of P.D, scan +
+// interpolate against P.cone_positions, back-permute to original labels.
+std::vector<coord3d> paint_dual(const Pipeline& P, int Nv_orig) {
+    auto cells = embed_all_or_stage(P.D, P.T_sorted);
+    auto lmaps = lmaps_or_stage    (cells, P.T_sorted);
+    check_coverage_or_stage(cells, lmaps, P.T_sorted.N);
+    auto pos3d_sorted = interpolate_pos3d(cells, lmaps,
+                                          P.cone_positions, P.T_sorted.N);
+    return back_permute(pos3d_sorted, P.perm, Nv_orig);
+}
+
+// Cubic vertex U = dual triangle T.triangles()[U] (the dual_graph()
+// labelling).  Position: centroid of the painted dual corners, then
+// exact polytope positions for the pentagon-incident cubic vertices.
+std::vector<coord3d>
+assemble_cubic(const Triangulation& T,
+               const std::vector<coord3d>& dual_coords,
+               const std::vector<coord3d>& cone_vertex_positions,
+               const std::vector<tri_t>&   cone_triangle)
+{
+    const std::vector<tri_t> tris = T.triangles();
+    IDCounter<tri_t> tri_numbers;
+    for (const tri_t& t : tris) tri_numbers.insert(t.sorted());
+
+    std::vector<coord3d> cubic(tris.size());
+    for (size_t U = 0; U < tris.size(); ++U)
+        cubic[U] = tris[U].centroid(dual_coords);
+
+    for (size_t i = 0; i < cone_triangle.size(); ++i) {
+        const auto it = tri_numbers.find(cone_triangle[i].sorted());
+        if (it == tri_numbers.end())
+            paint_throw("eisenstein_paint::assemble_cubic: cone %zu's dual "
+                        "triangle (%d,%d,%d) not in T.triangles()",
+                        i, cone_triangle[i][0], cone_triangle[i][1],
+                        cone_triangle[i][2]);
+        cubic[it->second] = cone_vertex_positions[i];
+    }
+    return cubic;
+}
+
 }  // namespace
 
 Result run(const Triangulation& T) {
     Result R;
     try {
-        Pipeline P     = prepare(T);
-        auto     cells = embed_all_or_stage(P.D, P.T_sorted);
-        auto     lmaps = lmaps_or_stage    (cells, P.T_sorted);
-        check_coverage_or_stage(cells, lmaps, P.T_sorted.N);
-        auto pos3d_sorted = interpolate_pos3d(cells, lmaps,
-                                              P.cone_positions, P.T_sorted.N);
-        R.coords = back_permute(pos3d_sorted, P.perm, T.N);
-        R.stage  = Stage::OK;
+        Pipeline P = prepare(T);
+        R.coords   = paint_dual(P, T.N);
+        R.stage    = Stage::OK;
+    } catch (const StageError& e) {
+        R.stage = e.stage;
+        R.why   = e.what();
+    } catch (const std::exception& e) {
+        R.stage = Stage::UNEXPECTED;
+        R.why   = std::string("unexpected: ") + e.what();
+    }
+    return R;
+}
+
+CubicResult run_cubic(const Triangulation& T) {
+    CubicResult R;
+    try {
+        CubicPipeline CP = prepare_cubic(T);
+        R.dual_coords    = paint_dual(CP.P, T.N);
+        R.cubic_coords   = assemble_cubic(T, R.dual_coords,
+                                          CP.cone_vertex_positions,
+                                          CP.cone_triangle);
+        R.stage = Stage::OK;
     } catch (const StageError& e) {
         R.stage = e.stage;
         R.why   = e.what();

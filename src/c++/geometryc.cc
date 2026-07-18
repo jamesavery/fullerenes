@@ -417,6 +417,12 @@ void coord3<double>::dangle(const coord3<double>& a, const coord3<double>& c, co
   const double den = 2.0*sqrt(L2 * R2);
   const double arg = (L2+R2-M2)/den;
 
+  // At the nondifferentiable extremes theta in {0, pi} the 1/sin(theta)
+  // factor below is singular; take the subgradient 0.  Mirrors the arg
+  // clamp in angle() and the Fortran DANGLE, and keeps the gradient
+  // finite when three atoms transiently align during optimization.
+  if(arg >= 1.0 || arg <= -1.0){ da = dc = coord3d(); return; }
+
   const coord3d dM2__da = (a-c)*2.0;
   const coord3d dL2__da = a*2.0;
   const coord3d dden__da = dL2__da * R2/sqrt(L2*R2);

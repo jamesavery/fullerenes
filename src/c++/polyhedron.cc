@@ -436,13 +436,25 @@ Polyhedron PolyhedronView<double>::leapfrog_dual() const
 
 Polyhedron Polyhedron::fullerene_polyhedron(FullereneGraph G)
 {
-  Polyhedron P(G,G.zero_order_geometry(),6);
+  // Start geometry: the Eisenstein-paint warm start (deterministic,
+  // shape-respecting) with the legacy Tutte-on-sphere start as fallback
+  // for the rare isomers where the paint pipeline reports failure.
+  vector<coord3d> x0;
+  try {
+    x0 = G.eisenstein_paint_geometry();
+  } catch (const std::exception& e) {
+    cerr << "fullerene_polyhedron: " << e.what()
+         << " -- falling back to zero_order_geometry\n";
+    x0 = G.zero_order_geometry();
+  }
+
+  Polyhedron P(G,x0,6);
   P.owned_points = G.optimized_geometry(P.points);
   P.repoint();
 
   P.move_to_origin();		// Center of mass at (0,0,0)
   P.align_with_axes();		// Align with principal axes
-  
+
   return P;
 }
 

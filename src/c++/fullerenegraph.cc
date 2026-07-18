@@ -7,6 +7,8 @@
 #include "fullerenes/fullerenegraph.hh"
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/layout2d.hh"
+#include "fullerenes/eisenstein_paint.hh"
+#include "fullerenes/wu_forcefield.hh"
 
 // Creates the m-point halma-fullerene from the current fullerene C_n with n(1+m)^2 vertices. (I.e. 4,9,16,25,36,... times)
 FullereneGraph FullereneGraphView::halma_fullerene(const int m, const bool) const {
@@ -123,25 +125,72 @@ vector<coord3d> FullereneGraphView::zero_order_geometry(double scalerad) const
   return coordinates;
 }
 
+vector<coord3d> FullereneGraphView::eisenstein_paint_geometry(double bond_length) const
+{
+  // Dual triangulation; dual vertex f = face f of compute_faces_oriented(6)
+  // (both enumerate faces in compute_face_representations order).
+  Triangulation T(dual_graph(6));
+
+  eisenstein_paint::CubicResult R = eisenstein_paint::run_cubic(T);
+  if (!R.ok())
+    throw std::runtime_error(
+        string("eisenstein_paint_geometry: run_cubic failed at stage ")
+        + R.stage_name() + ": " + R.why);
+
+  // R.cubic_coords[U] is the position of dual triangle T.triangles()[U]
+  // (the T.dual_graph() labelling); rebuild the same triangle table.
+  const vector<tri_t> tris = T.triangles();
+  IDCounter<tri_t> tri_numbers;
+  for (const tri_t& t : tris) tri_numbers.insert(t.sorted());
+
+  // Each vertex of this graph is the meeting point of its three incident
+  // faces = one dual triangle.  arc -> face table: every directed arc
+  // lies on the boundary cycle of exactly one oriented face.
+  const vector<face_t> faces = compute_faces_oriented(6);
+  vector<int> arc_face(size_t(N)*3, -1);
+  for (int f = 0; f < (int)faces.size(); ++f) {
+    const face_t& fc = faces[f];
+    for (int j = 0; j < (int)fc.size(); ++j) {
+      const node_t u = fc[j], v = fc[(j+1)%fc.size()];
+      arc_face[arcid(u, find(u,v))] = f;
+    }
+  }
+
+  vector<coord3d> points(N);
+  for (node_t a = 0; a < N; ++a) {
+    const tri_t t(arc_face[arcid(a,0)], arc_face[arcid(a,1)], arc_face[arcid(a,2)]);
+    const size_t U = tri_numbers(t.sorted());
+    if (U == size_t(-1))
+      throw std::runtime_error(
+          "eisenstein_paint_geometry: vertex " + to_string(a) +
+          "'s incident faces do not form a dual triangle");
+    points[a] = R.cubic_coords[U] * bond_length;
+  }
+  return points;
+}
+
+vector<coord3d> FullereneGraphView::optimized_geometry(std::span<const coord3d> points, int opt_method, double ftol) const
+{
+  vector<coord3d> coordinates(points.begin(),points.end());
+  wu::optimize(wu::forcefield(*this, opt_method), coordinates, ftol);
+  return coordinates;
+}
+
+// Legacy Fortran reference implementation (SA_OptFF, opt-standalone.f).
+// Kept callable for cross-validation of the C++ force field; retires
+// together with the Fortran sources.
 extern "C" void sa_optff_(const void **graph, const int *N, const int *ihessian, const int *iprinthessian,
                        const int *iopt,double *Dist,double *ftol,double *force);
 extern "C" void default_force_parameters_(const int *iopt, double *parameters);
 
-vector<coord3d> FullereneGraphView::optimized_geometry(std::span<const coord3d> points, int opt_method, double ftol) const
+vector<coord3d> FullereneGraphView::optimized_geometry_fortran(std::span<const coord3d> points, int opt_method, double ftol) const
 {
-  //  assert(layout2d.size() == N);
   vector<coord3d> coordinates(points.begin(),points.end());
   vector<double> force_parameters(19);
 
   default_force_parameters_(&opt_method,&force_parameters[0]);
 
-  // cout << "force parameters: " << force_parameters << endl;
-  // cout << "optimization method: " << opt_method << endl;
-
-  // cout << "g = " << *this << ";\n";
-
   int zero = 0;
-  int one = 1;
   // Fortran interface expects FullereneGraph*, but this method is on
   // FullereneGraphView. Both start with the same GraphView layout, so
   // the Fortran callbacks (which only read adjacency) work correctly.

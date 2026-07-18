@@ -25,9 +25,37 @@
 //   7. Back-permute the per-vertex 3D coords to T's original labels.
 //
 // Tier 1   `eisenstein_paint::run(T)`            full pipeline -> Result.
+// Tier 1'  `eisenstein_paint::run_cubic(T)`      cubic-metric variant -> CubicResult.
 // Tier 2   `eisenstein_paint::prepare(T)`        prelude (sort + iDT + Alexandrov)
 // Tier 2'  `eisenstein_paint::prepare_iDT(T)`    iDT only, no Alexandrov (~20x faster)
 // Tier 2'' `eisenstein_paint::prepare_inputs(T)` slim return for diagnostic tools
+// Tier 2c  `eisenstein_paint::prepare_cubic(T)`  cubic prelude (sort + iDT + IDTCubic)
+//
+// Cubic-metric variant (run_cubic): same integer paint machinery, but
+// the three cell-corner 3D anchors come from the AlexandrovIDTCubic
+// polytope (the convex realization of the CUBIC polyhedral metric --
+// flat unit pentagons/hexagons, kappa = k*pi/15 at the 20..60
+// pentagon-incident cubic vertices) instead of the 12-cone dual-metric
+// polytope.  M_cubic = sqrt(3) * M_dual outside 12 constant-size
+// pentagon caps (see delaunay_alexandrov.hh), so the dual-metric
+// barycentric weights remain geometrically faithful there, and the
+// weights are scale-free per cell.  Construction:
+//
+//   c1. AlexandrovIDTCubic::solve(T) -> exact 3D positions of the
+//       20..60 pentagon-incident cubic vertices (= dual triangles).
+//   c2. Anchor each of the 12 dual cones at the centroid of its
+//       pentagon's 5 surrounding cone vertices (the pentagon is
+//       intrinsically flat; the centroid is its exact center whenever
+//       the pentagon is realized flat on the polytope).
+//   c3. Paint the dual vertices with the standard integer pipeline
+//       (raw iDT of the dual metric; anchors from c2).
+//   c4. Cubic vertex U (= dual triangle U in T.triangles() /
+//       T.dual_graph() order) = centroid of its painted dual corners;
+//       pentagon-incident cubic vertices are then overwritten with
+//       their exact polytope positions from c1.
+//
+// The result is a warm start for the cubic-graph force-field optimizer
+// with the global shape of the cubic metric (edge lengths ~1 bond).
 //
 // Per-cell primitives (Tier 3, for callers that want to inspect or
 // drive individual phases): `embed_cell`, `embed_all_cells`,
@@ -82,6 +110,25 @@ struct Result {
 // instead of the full `Result::Stage::EMBED`.
 using Stage = Result::Stage;
 
+// Stage discriminator -> lowercase name ("ok", "alexandrov", ...).
+const char* stage_name(Stage s);
+
+// Result of run_cubic(T): warm-start coordinates for the CUBIC graph.
+// cubic_coords[U] is the 3D position of cubic vertex U in the
+// T.dual_graph() labelling, i.e. U indexes the dual triangle
+// T.triangles()[U] (compute_faces_oriented order).  dual_coords is the
+// painted dual (size T.N, original labels), kept for diagnostics and
+// for deltahedron-side consumers.
+struct CubicResult {
+    std::vector<coord3d> cubic_coords;   // size 2*T.N - 4 on OK; empty otherwise
+    std::vector<coord3d> dual_coords;    // size T.N (original labels) on OK
+    Stage                stage = Stage::OK;
+    std::string          why;
+
+    bool        ok()         const { return stage == Stage::OK; }
+    const char* stage_name() const;
+};
+
 // =====================================================================
 // Prelude state, shared by run() and the prepare* tier-2 entry points.
 // =====================================================================
@@ -113,10 +160,25 @@ public:
 // Tier 1 -- full pipeline; never throws.
 Result run(const Triangulation& T);
 
+// Tier 1' -- cubic-metric variant (see banner); never throws.
+CubicResult run_cubic(const Triangulation& T);
+
 // Tier 2 -- prelude only; throws StageError on failure.
 Pipeline prepare       (const Triangulation& T);   // sort + iDT + Alexandrov
 Pipeline prepare_iDT   (const Triangulation& T);   // sort + iDT only (no Alexandrov)
 Inputs   prepare_inputs(const Triangulation& T);   // structured-binding shortcut
+
+// Tier 2c -- cubic prelude: sort + raw iDT + AlexandrovIDTCubic +
+// pentagon-center anchor derivation.  P.cone_positions holds the 12
+// anchors (T_sorted labels); the exact polytope data is kept alongside
+// so run_cubic / diagnostics can overwrite the pentagon-incident cubic
+// vertices with their true positions.  Throws StageError on failure.
+struct CubicPipeline {
+    Pipeline             P;                       // D is the RAW dual iDT (no dual Alexandrov)
+    std::vector<coord3d> cone_vertex_positions;   // one per AlexandrovIDTCubic cone (20..60)
+    std::vector<tri_t>   cone_triangle;           // per cone: dual triangle, T ORIGINAL labels (CCW)
+};
+CubicPipeline prepare_cubic(const Triangulation& T);
 
 // =====================================================================
 // Per-cell types and primitives (Tier 3).
