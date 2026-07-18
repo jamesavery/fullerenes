@@ -703,6 +703,23 @@ struct ClosestPoint { coord3d pos; std::array<double,3> bary; double dist2; };
 ClosestPoint closest_point_on_triangle(const coord3d& p, const tri_t& t,
                                         std::span<const coord3d> points);
 
+// Convex hull of a 3D point set as a triangle list (indices into pts), outward-
+// oriented normals. Incremental construction, deterministic (points inserted in
+// index order, no joggle). eps-APPROXIMATE hull with eps = 1e-10 * (bbox
+// diagonal): points within eps of the hull surface may be omitted from the
+// output vertex set (so exactly-coplanar or on-edge subdivision points do not
+// appear as spurious vertices). Guarantees on the result: watertight (every
+// directed edge appears exactly once, its twin exactly once), outward-oriented,
+// and every input point lies <= O(eps) outside every output face plane.
+// Degenerate input -- fewer than 4 points, or points not spanning 3D at eps
+// scale (coincident / collinear / coplanar) -- returns an empty vector (never
+// throws). Impossible intermediate states (a corrupted surface: a doubly-claimed
+// directed edge, a non-simple-cycle horizon, or a face count above the Euler
+// bound 2n-4) abort with a diagnostic rather than looping. Impl in deltahedron.cc
+// (the hull the deltahedron pipeline's project_onto_convex_hull builds, exported
+// for warm-start convexification in the research sub-projects).
+std::vector<std::array<int,3>> convex_hull_tris(std::span<const coord3d> pts);
+
 struct Tetra3D {
   coord3d a,b,c,d;
 

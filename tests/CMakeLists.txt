@@ -60,6 +60,10 @@ if(GTest_FOUND)
   target_link_libraries(convex-hull-test fullerenes GTest::GTest GTest::Main)
   add_test(NAME convex-hull-test COMMAND convex-hull-test)
 
+  add_executable(convex-hull-tris-test convex-hull-tris-test.cc)
+  target_link_libraries(convex-hull-tris-test fullerenes GTest::GTest GTest::Main)
+  add_test(NAME convex-hull-tris-test COMMAND convex-hull-tris-test)
+
   add_executable(orientation-test orientation-test.cc)
   target_link_libraries(orientation-test fullerenes GTest::GTest GTest::Main)
   add_test(NAME orientation-test COMMAND orientation-test)

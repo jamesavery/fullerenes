@@ -213,6 +213,28 @@ struct FullereneGraphView : CubicGraphView {
 
     matrix<int> pentagon_distance_mtx() const;
     vector<coord3d> zero_order_geometry(double scalerad=4) const;
+
+    // Warm-start 3D geometry from the cubic-metric Eisenstein paint
+    // (eisenstein_paint::run_cubic): AlexandrovIDTCubic realizes the
+    // cubic polyhedral metric's 20..60 pentagon-incident vertices
+    // exactly, the integer paint interpolates the rest.  Deterministic,
+    // respects the intrinsic global shape (nanotubes come out
+    // elongated, not sphere-wrapped), edge lengths ~ bond_length.
+    // Throws std::runtime_error when the paint pipeline fails (rare:
+    // e.g. non-simplicial 12-cone iDT); callers wanting a total start
+    // geometry catch and fall back to zero_order_geometry.
+    vector<coord3d> eisenstein_paint_geometry(double bond_length=1.44) const;
+
+    // Force-field geometry optimization (Wu / extended Wu, harmonic) --
+    // the production optimizer for cubic fullerene graphs.  opt_method
+    // keeps the legacy variant numbering: 1/2 Wu, 3/4 extended Wu, 5/6
+    // softened extended Wu; even variants add a Coulomb origin repulsion
+    // phase.  Default 3 = hard-harmonic ExtWu.  Implemented by
+    // wu::forcefield + wu::optimize (wu_forcefield.hh); replaces the
+    // legacy Fortran SA_OptFF path, against which it is cross-validated
+    // pointwise and end-to-end by the parity tests in
+    // claude-projects/unfortran/tests (which link the Fortran archives
+    // directly -- libfullerenes itself is Fortran-free).
     vector<coord3d> optimized_geometry(std::span<const coord3d> initial_geometry,
                                        int opt_method=3, double ftol=1e-12) const;
 };

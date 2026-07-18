@@ -11,6 +11,7 @@
 #include <array>
 #include <chrono>
 #include <stdexcept>
+#include <cstdlib>
 
 // ============================================================
 // VertexHData: per-vertex convexity geometry and derivatives.
@@ -2536,51 +2537,69 @@ int DeltahedronView<double>::reflect_all_concave(std::span<coord3d> pts, double 
 
 // Incremental convex hull returning just the triangle list.
 // Each triangle is an array of 3 vertex indices into the pts array.
-// Triangles are oriented with outward normals.
-static vector<array<int,3>> build_convex_hull(std::span<coord3d> pts)
+// Triangles are oriented with outward normals. Exported (geometry.hh
+// convex_hull_tris) for warm-start convexification outside this pipeline;
+// build_convex_hull below is the file-local alias the existing callers use.
+vector<array<int,3>> convex_hull_tris(std::span<const coord3d> pts)
 {
-  int n = (int)pts.size();
+  const int n = (int)pts.size();
   if(n < 4) return {};
 
-  // Find 4 non-coplanar points for initial tetrahedron
+  // Degeneracy scale: relative to the point set's extent, NOT an absolute
+  // constant. eps = 1e-10 * (bbox diagonal). Every threshold below is a
+  // length/area compared against this scale, so the classification is
+  // invariant to the coordinate units of the input (a hull of coords ~1e2
+  // and one of coords ~1e-3 behave identically). The old absolute 1e-14 was
+  // below FP noise (~1e-14*|coord|) for coords ~1e2, which misclassified
+  // exactly-coplanar points (e.g. midpoint-subdivided meshes) as visible.
+  coord3d lo = pts[0], hi = pts[0];
+  for(int i = 1; i < n; i++)
+    for(int k = 0; k < 3; k++){
+      lo[k] = std::min(lo[k], pts[i][k]);
+      hi[k] = std::max(hi[k], pts[i][k]);
+    }
+  const double D   = (hi - lo).norm();
+  const double eps = 1e-10 * D;
+
+  // ---- Initial tetrahedron: 4 points spanning 3D at eps scale ----------
   int p0 = 0, p1 = -1, p2 = -1, p3 = -1;
 
-  // Find p1: furthest from p0
-  double best = 0;
+  // p1: furthest from p0 (max edge length). <= eps => point spread degenerate.
+  double best1 = 0;
   for(int i = 1; i < n; i++){
-    double d = (pts[i] - pts[p0]).dot(pts[i] - pts[p0]);
-    if(d > best){ best = d; p1 = i; }
+    double d = (pts[i] - pts[p0]).norm();
+    if(d > best1){ best1 = d; p1 = i; }
   }
-  if(p1 < 0) return {};
+  if(p1 < 0 || best1 <= eps) return {};   // all points coincide at eps scale
 
-  // Find p2: furthest from line p0-p1
+  // p2: furthest perpendicular distance from line p0-p1. <= eps => collinear.
   coord3d u01 = pts[p1] - pts[p0];
   double u01_len2 = u01.dot(u01);
-  best = 0;
+  double best2 = 0;
   for(int i = 0; i < n; i++){
     if(i == p0 || i == p1) continue;
     coord3d v = pts[i] - pts[p0];
     double proj = v.dot(u01) / u01_len2;
     coord3d perp = v - u01 * proj;
-    double d = perp.dot(perp);
-    if(d > best){ best = d; p2 = i; }
+    double d = perp.norm();
+    if(d > best2){ best2 = d; p2 = i; }
   }
-  if(p2 < 0) return {};
+  if(p2 < 0 || best2 <= eps) return {};   // all points collinear at eps scale
 
-  // Find p3: furthest from plane p0-p1-p2
+  // p3: furthest perpendicular distance from plane p0-p1-p2. <= eps => coplanar.
   coord3d normal = (pts[p1] - pts[p0]).cross(pts[p2] - pts[p0]);
-  double nlen = normal.norm();
-  if(nlen < 1e-15) return {};
+  double nlen = normal.norm();                 // = best1*best2 area scale (length^2)
+  if(nlen < eps*eps) return {};                // p0-p1-p2 degenerate at eps scale
   normal /= nlen;
-  best = 0;
+  double best3 = 0;
   for(int i = 0; i < n; i++){
     if(i == p0 || i == p1 || i == p2) continue;
     double d = fabs((pts[i] - pts[p0]).dot(normal));
-    if(d > best){ best = d; p3 = i; }
+    if(d > best3){ best3 = d; p3 = i; }
   }
-  if(p3 < 0) return {};
+  if(p3 < 0 || best3 <= eps) return {};   // all points coplanar at eps scale
 
-  // Build initial tetrahedron with outward-facing triangles
+  // Build initial tetrahedron with outward-facing triangles.
   coord3d centroid = (pts[p0] + pts[p1] + pts[p2] + pts[p3]) / 4.0;
 
   auto make_outward = [&](int a, int b, int c) -> array<int,3> {
@@ -2596,53 +2615,156 @@ static vector<array<int,3>> build_convex_hull(std::span<coord3d> pts)
   tris.push_back(make_outward(p0, p2, p3));
   tris.push_back(make_outward(p1, p2, p3));
 
-  // Track which vertices are on the hull
-  vector<bool> on_hull(n, false);
-  on_hull[p0] = on_hull[p1] = on_hull[p2] = on_hull[p3] = true;
-
-  // Incrementally add each remaining vertex
+  // ---- Incremental insertion (deterministic index order, no joggle) ----
+  // Invariant: tris is a watertight, outward-oriented triangulation of the
+  // convex hull of the points inserted so far. p0..p3 sit on this hull so
+  // they are skipped by the d_max<=eps test below along with every interior
+  // or on-surface point (eps-approximate hull semantics).
   for(int i = 0; i < n; i++){
-    if(on_hull[i]) continue;
     const coord3d& p = pts[i];
+    const int nf = (int)tris.size();
 
-    // Find visible faces (point is in front of the face)
-    vector<int> visible;
-    for(int f = 0; f < (int)tris.size(); f++){
-      coord3d fn = (pts[tris[f][1]] - pts[tris[f][0]]).cross(pts[tris[f][2]] - pts[tris[f][0]]);
-      if(fn.dot(p - pts[tris[f][0]]) > 1e-14 * fn.norm())
-        visible.push_back(f);
+    // (a) signed distance of p to each face, UNIT normals: d_f = n_hat . (p - a).
+    //     Faces are non-degenerate by construction (height >= eps below), so
+    //     |fn| > 0; guard defensively against an exact zero anyway.
+    // (b) seed = argmax d_f.
+    vector<double> dist(nf);
+    int    seed = -1;
+    double dmax = -std::numeric_limits<double>::infinity();
+    for(int f = 0; f < nf; f++){
+      const auto& t = tris[f];
+      coord3d fn = (pts[t[1]] - pts[t[0]]).cross(pts[t[2]] - pts[t[0]]);
+      double fnl = fn.norm();
+      coord3d nhat = fnl > 0 ? fn / fnl : coord3d();
+      double d = nhat.dot(p - pts[t[0]]);
+      dist[f] = d;
+      if(d > dmax){ dmax = d; seed = f; }
     }
-    if(visible.empty()) continue;  // inside hull
+    if(dmax <= eps) continue;   // p inside or within eps of the hull -> skip
 
-    on_hull[i] = true;
-
-    // Build directed edge -> face map for visible faces
+    // (c) directed-edge -> face map over ALL faces. A watertight oriented
+    //     surface has each directed edge in exactly one face; a collision
+    //     means the surface is corrupted.
     map<pair<int,int>, int> edge_face;
-    for(int fi : visible){
-      auto& t = tris[fi];
-      for(int j = 0; j < 3; j++)
-        edge_face[{t[j], t[(j+1)%3]}] = fi;
+    for(int f = 0; f < nf; f++){
+      const auto& t = tris[f];
+      for(int j = 0; j < 3; j++){
+        pair<int,int> e{t[j], t[(j+1)%3]};
+        auto it = edge_face.find(e);
+        if(it != edge_face.end()){
+          fprintf(stderr, "convex_hull_tris: directed edge (%d,%d) claimed by "
+                  "faces %d and %d at point %d -- corrupted surface\n",
+                  e.first, e.second, it->second, f, i);
+          abort();
+        }
+        edge_face[e] = f;
+      }
     }
 
-    // Horizon edges: directed edges of visible faces whose reverse is NOT in a visible face
+    // (d) Region R = BFS from seed over twin-edge adjacency, absorbing any face
+    //     with d_f > -eps. The -eps (coplanar absorption) is load-bearing and
+    //     is the one guarantee the code cannot exhibit locally: every face
+    //     OUTSIDE R has d <= -eps, i.e. p lies >= eps strictly below the plane
+    //     of every horizon-adjacent kept face. That plane contains the horizon
+    //     edge (a,b), so the distance from p to the LINE (a,b) is >= eps; hence
+    //     every new face {i,a,b} has height >= eps and degenerate slivers are
+    //     impossible by construction. (A strict d_f > 0 test would leave
+    //     exactly-coplanar faces straddling the boundary, producing zero-area
+    //     new faces whose garbage normals poison later visibility tests.)
+    vector<char> in_R(nf, 0);
+    std::queue<int> Q;
+    in_R[seed] = 1; Q.push(seed);
+    while(!Q.empty()){
+      int f = Q.front(); Q.pop();
+      const auto& t = tris[f];
+      for(int j = 0; j < 3; j++){
+        auto it = edge_face.find({t[(j+1)%3], t[j]});   // twin of edge (t[j],t[j+1])
+        if(it == edge_face.end()) continue;
+        int g = it->second;
+        if(!in_R[g] && dist[g] > -eps){ in_R[g] = 1; Q.push(g); }
+      }
+    }
+
+    // (e) Horizon = directed edges (a,b) of faces in R whose twin (b,a) lies in
+    //     a face NOT in R. It must form exactly one simple closed cycle: every
+    //     horizon vertex has in-degree 1 and out-degree 1 and all edges lie on a
+    //     single cycle.
     vector<pair<int,int>> horizon;
-    for(auto& [edge, fi] : edge_face){
-      if(edge_face.find({edge.second, edge.first}) == edge_face.end())
-        horizon.push_back(edge);
+    for(int f = 0; f < nf; f++){
+      if(!in_R[f]) continue;
+      const auto& t = tris[f];
+      for(int j = 0; j < 3; j++){
+        pair<int,int> e{t[j], t[(j+1)%3]};
+        auto it = edge_face.find({e.second, e.first});
+        if(it != edge_face.end() && !in_R[it->second])
+          horizon.push_back(e);
+      }
     }
 
-    // Remove visible faces (in reverse order to preserve indices)
-    sort(visible.rbegin(), visible.rend());
-    for(int fi : visible)
-      tris.erase(tris.begin() + fi);
+    {
+      map<int,int> next, outdeg, indeg;
+      for(auto& [a,b] : horizon){ outdeg[a]++; indeg[b]++; next[a] = b; }
+      bool degrees_ok = !horizon.empty() &&
+                        outdeg.size() == horizon.size() &&
+                        indeg.size()  == horizon.size();
+      if(degrees_ok){
+        for(auto& [v,c] : outdeg) if(c != 1) degrees_ok = false;
+        for(auto& [v,c] : indeg)  if(c != 1) degrees_ok = false;
+      }
+      // Count disjoint cycles in the (possibly partial) next-map; safe even
+      // when degrees are invalid because each vertex is followed at most once.
+      int cycles = 0;
+      { set<int> seen;
+        for(auto& [a,b] : horizon){
+          if(seen.count(a)) continue;
+          int cur = a; size_t guard = 0;
+          while(!seen.count(cur)){
+            seen.insert(cur);
+            auto it = next.find(cur);
+            if(it == next.end()) break;
+            cur = it->second;
+            if(++guard > horizon.size()+1) break;
+          }
+          cycles++;
+        }
+      }
+      if(!degrees_ok || cycles != 1){
+        fprintf(stderr, "convex_hull_tris: horizon not a simple cycle at point "
+                "%d (|R|=%d, horizon=%zu, cycles=%d) -- corrupted surface\n",
+                i, (int)std::count(in_R.begin(), in_R.end(), (char)1),
+                horizon.size(), cycles);
+        abort();
+      }
+    }
 
-    // Add new faces connecting point i to each horizon edge
-    for(auto& [a, b] : horizon)
-      tris.push_back({i, a, b});  // a,b is CCW from outside of invisible neighbor,
-                                   // so i,a,b has outward normal (away from hull interior)
+    // (f) Erase R's faces; append {i,a,b} per horizon edge. (a,b) is a directed
+    //     edge of a removed (outward CCW) face on the horizon, so i,a,b has an
+    //     outward normal (away from the hull interior) -- same argument as the
+    //     original construction.
+    vector<array<int,3>> kept;
+    kept.reserve(nf);
+    for(int f = 0; f < nf; f++)
+      if(!in_R[f]) kept.push_back(tris[f]);
+    for(auto& [a,b] : horizon)
+      kept.push_back({i, a, b});
+    tris.swap(kept);
+
+    // (g) Euler bound: a triangulated 2-sphere on at most n vertices has at
+    //     most 2n-4 faces. Overflow means the surface is corrupted.
+    if((int)tris.size() > 2*n - 4){
+      fprintf(stderr, "convex_hull_tris: face count %zu exceeds Euler bound %d "
+              "at point %d -- corrupted surface\n", tris.size(), 2*n - 4, i);
+      abort();
+    }
   }
 
   return tris;
+}
+
+// File-local alias: the pipeline callers predate the export and pass mutable spans.
+static inline vector<array<int,3>> build_convex_hull(std::span<coord3d> pts)
+{
+  return convex_hull_tris(pts);
 }
 
 template<>
