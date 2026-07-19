@@ -16,6 +16,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
+#include <map>
 #include <optional>
 #include <ostream>
 #include <set>
@@ -302,28 +303,40 @@ bool strictly_inside_meta(Eisenstein p, Eisenstein FP0, Eisenstein FP1, Eisenste
         && wedge(FP0 - FP2, p - FP2) > 0;
 }
 
-// Try every (endpoint, face_arc i, dir_uv) start combination.  Accept the
-// first chain whose walker terminates at target_vertex with a clean,
-// orientation-preserving, NON-FOLDING development (start at (0,0), end at
-// target_rel, no cone on the strict interior of the walk, and -- crucially --
-// no non-corner cone strictly inside the meta triangle (FP0, FP1, FP2)).
+// Enumerate ALL developments (deduplicated) whose walker terminates at
+// target_vertex with a clean, orientation-preserving, NON-FOLDING development:
+// start at (0,0), end at target_rel, no cone on the strict interior of the
+// walk, and no non-corner cone strictly inside the meta triangle (FP0,FP1,FP2).
 //
-// Multi-edge disambiguation.  Split-prime edge lengths (norm N with two
-// sector-0 reps in mirror orbits, e.g. N=19,28,37) admit TWO distinct
-// geodesics of the same length between the same cone pair.  Only ONE bounds
-// this face; the other wraps a neighbouring cone.  Lengths + interior angle
-// alone (what embed_cell places the corners from) cannot tell them apart, and
-// walk_line, trying start combinations in list order, may reach the target via
-// EITHER.  The meta-triangle cone-interiority test is the discriminator: it
-// keeps the branch whose development is a genuine flat embedding and rejects
-// the wrapping one (this is what removes the residual (61,48) intra-cell fold
-// on C140-[GS:1,2,4,8,20,21,55,57,63,67,69,71], whose cell 59 has all three
-// edges split-prime and corner c6 flanked by two multi-edges).
-std::optional<WalkVertices>
-find_chain(const Triangulation& T_sorted,
+// Why ALL, not the first.  A single cone pair can be joined by MULTIPLE
+// same-length lattice geodesics that all terminate at target_vertex and all
+// pass the per-edge filters above, yet develop DIFFERENT mesh face corridors.
+// Two distinct phenomena produce this:
+//   (i)  Split-prime edge lengths (norm N with two sector-0 reps in mirror
+//        orbits, e.g. N=19,28,37): two geodesics whose wrong branch wraps a
+//        NEIGHBOURING cone -- caught by the meta-triangle cone-interiority test.
+//   (ii) Obtuse/thin cells (one interior angle near 0): two long edge geodesics
+//        run nearly parallel through the sliver, and walk_line, trying start
+//        fans in list order, can reach target_vertex via a HEX-only corridor on
+//        the wrong side of the true edge (e.g. C102 cell 13, corners (8,5,3),
+//        L=(27,1,28): edge c0->c1 develops the false corridor {8,41,42,33,34,5}
+//        instead of the true {8,38,27,26,25,5}).  Both corridors are cone-free,
+//        so the cone-interiority test cannot separate them.
+// The discriminator for (ii) is CROSS-EDGE consistency, resolved one level up in
+// embed_cell: each F-frame lattice position is one surface point = one mesh
+// vertex, so the correct triple of edge developments must agree wherever their
+// clipped strips share a position.  find_chains therefore returns every
+// qualifying development (deduped by its (vertex_id -> position, k0) map) and
+// lets embed_cell pick the mutually-consistent triple.  For the common,
+// non-thin cell each edge yields exactly one development and the search is a
+// single trivially-consistent triple.
+std::vector<WalkVertices>
+find_chains(const Triangulation& T_sorted,
            int start_vertex, int target_vertex, Eisenstein target_rel,
            Eisenstein start_pos, Eisenstein FP0, Eisenstein FP1, Eisenstein FP2)
 {
+    std::vector<WalkVertices> results;
+    std::set<std::vector<std::array<long,4>>> seen;   // dedup by development map
     // Candidate endpoints, all ORIENTATION-PRESERVING (`back` is a rotation,
     // never a reflection): the raw cell-frame displacement, and its sector0
     // rotation-representative (a >= 0, b >= 0), where walk_line's corridor is
@@ -385,11 +398,19 @@ find_chain(const Triangulation& T_sorted,
                 }
                 if (folds_cone) continue;
 
-                return V;
+                // Deduplicate: many (arc, dir_uv) start combinations develop
+                // the identical corridor.  Signature is the sorted set of
+                // (vertex_id, pos.a, pos.b, k0) tuples in the cell frame.
+                std::vector<std::array<long,4>> sig;
+                sig.reserve(V.by_id.size());
+                for (const auto& [vid, pk] : V.by_id)
+                    sig.push_back({vid, pk.first.first, pk.first.second, pk.second});
+                std::sort(sig.begin(), sig.end());
+                if (seen.insert(sig).second) results.push_back(std::move(V));
             }
         }
     }
-    return std::nullopt;
+    return results;
 }
 
 // Translate verts to F's frame (add start_pos), clip to F's lattice
@@ -430,21 +451,54 @@ bool clip_to_meta_by_scanline(const WalkVertices& V,
     return true;
 }
 
-// Run the walker from start_vertex at start_pos in F's frame, aiming
-// at target_vertex at target_pos.  On success, fills `out` with the
-// F-frame strip (clipped to FP0/FP1/FP2 lattice triangle) and returns
-// true.  Returns false if no chain qualifies or no vertex survives.
-bool try_frame_walker(const Triangulation& T_sorted,
-                      int start_vertex, Eisenstein start_pos,
-                      int target_vertex, Eisenstein target_pos,
-                      Eisenstein FP0, Eisenstein FP1, Eisenstein FP2,
-                      EdgeStrip& out)
+// Run the walker from start_vertex at start_pos in F's frame, aiming at
+// target_vertex at target_pos.  Returns EVERY qualifying development as an
+// F-frame strip (clipped to the FP0/FP1/FP2 lattice triangle).  Empty if no
+// chain qualifies or none survives the clip.  embed_cell picks the one strip
+// per edge that is mutually consistent across the three edges.
+std::vector<EdgeStrip>
+frame_walker_candidates(const Triangulation& T_sorted,
+                        int start_vertex, Eisenstein start_pos,
+                        int target_vertex, Eisenstein target_pos,
+                        Eisenstein FP0, Eisenstein FP1, Eisenstein FP2)
 {
-    const auto chain = find_chain(T_sorted, start_vertex, target_vertex,
-                                  target_pos - start_pos,
-                                  start_pos, FP0, FP1, FP2);
-    if (!chain) return false;
-    return clip_to_meta_by_scanline(*chain, start_pos, FP0, FP1, FP2, out);
+    std::vector<EdgeStrip> out;
+    const auto chains = find_chains(T_sorted, start_vertex, target_vertex,
+                                    target_pos - start_pos,
+                                    start_pos, FP0, FP1, FP2);
+    for (const WalkVertices& chain : chains) {
+        EdgeStrip strip;
+        if (clip_to_meta_by_scanline(chain, start_pos, FP0, FP1, FP2, strip))
+            out.push_back(std::move(strip));
+    }
+    return out;
+}
+
+// Add every (position -> vertex_id) of `B` into `claim`.  Returns false the
+// moment a position is already claimed by a DIFFERENT vertex -- the cross-edge
+// fold that means the strips developed inconsistent corridors.
+bool merge_strip_claims(const EdgeStrip& B,
+                        std::map<std::pair<int,int>, int>& claim)
+{
+    for (const auto& row : B.by_scanline)
+        for (const StripVertex& sv : row) {
+            const std::pair<int,int> key{sv.position.first, sv.position.second};
+            const auto [it, ins] = claim.emplace(key, sv.vertex_id);
+            if (!ins && it->second != sv.vertex_id) return false;
+        }
+    return true;
+}
+
+// True iff the three clipped edge strips form ONE consistent position->vertex
+// map: every F-frame lattice position claimed by more than one strip carries
+// the same mesh vertex.  This is the cross-edge discriminator that rejects a
+// thin/obtuse cell's wrong-branch edge development (see find_chains).
+bool strips_consistent(const EdgeStrip& e01, const EdgeStrip& e12, const EdgeStrip& e20)
+{
+    std::map<std::pair<int,int>, int> claim;
+    return merge_strip_claims(e01, claim)
+        && merge_strip_claims(e12, claim)
+        && merge_strip_claims(e20, claim);
 }
 
 // Enumerate valid (P0, P1, P2) corner placements for F in F's frame.
@@ -508,25 +562,46 @@ Cell embed_cell(const DelaunayTriangulation& D,
         enumerate_corner_candidates(L20, alpha_0, N01, N12, N20);
     if (candidates.empty()) return F;
 
-    // Try each corner candidate; accept the one where all three F-frame
-    // walkers succeed.  For split-prime N01 there can be 2 candidates;
-    // only one matches the surface geodesics' actual unfolding direction.
+    // Try each corner candidate; accept the one where the three F-frame edge
+    // walkers admit a MUTUALLY CONSISTENT development.  Each edge can yield
+    // several qualifying developments (split-prime multi-edges, or the
+    // wrong-side corridor of a thin/obtuse cell -- see find_chains).  The
+    // correct cell development is unique: a shared F-frame lattice position is
+    // one surface point = one mesh vertex, so the true triple agrees wherever
+    // two strips overlap.  We therefore search the (small, deduped) product of
+    // the three edges' candidates for the first pairwise-consistent triple.
+    // For the common non-thin cell each edge has exactly one candidate and this
+    // is a single trivially-consistent check.  For split-prime N01 there can be
+    // 2 corner candidates; only one matches the surface geodesics.
     for (const CornerCandidate& C : candidates) {
-        EdgeStrip e01, e12, e20;
-        if (!try_frame_walker(T_sorted, F.c0, C.P0, F.c1, C.P1,
-                              C.P0, C.P1, C.P2, e01)) continue;
-        if (!try_frame_walker(T_sorted, F.c1, C.P1, F.c2, C.P2,
-                              C.P0, C.P1, C.P2, e12)) continue;
-        if (!try_frame_walker(T_sorted, F.c2, C.P2, F.c0, C.P0,
-                              C.P0, C.P1, C.P2, e20)) continue;
-        F.P0 = C.P0;
-        F.P1 = C.P1;
-        F.P2 = C.P2;
-        F.edge_01 = std::move(e01);
-        F.edge_12 = std::move(e12);
-        F.edge_20 = std::move(e20);
-        F.ok = true;
-        break;
+        const std::vector<EdgeStrip> cand01 =
+            frame_walker_candidates(T_sorted, F.c0, C.P0, F.c1, C.P1, C.P0, C.P1, C.P2);
+        const std::vector<EdgeStrip> cand12 =
+            frame_walker_candidates(T_sorted, F.c1, C.P1, F.c2, C.P2, C.P0, C.P1, C.P2);
+        const std::vector<EdgeStrip> cand20 =
+            frame_walker_candidates(T_sorted, F.c2, C.P2, F.c0, C.P0, C.P0, C.P1, C.P2);
+        if (cand01.empty() || cand12.empty() || cand20.empty()) continue;
+
+        bool placed = false;
+        for (const EdgeStrip& e01 : cand01) {
+            for (const EdgeStrip& e12 : cand12) {
+                for (const EdgeStrip& e20 : cand20) {
+                    if (!strips_consistent(e01, e12, e20)) continue;
+                    F.P0 = C.P0;
+                    F.P1 = C.P1;
+                    F.P2 = C.P2;
+                    F.edge_01 = e01;
+                    F.edge_12 = e12;
+                    F.edge_20 = e20;
+                    F.ok = true;
+                    placed = true;
+                    break;
+                }
+                if (placed) break;
+            }
+            if (placed) break;
+        }
+        if (placed) break;
     }
     return F;
 }

@@ -78,10 +78,12 @@ struct WalkResult {
 //       may make the marcher exit the wrong edge and reach the target via a
 //       DIFFERENT same-length geodesic.  Callers that cannot guarantee the
 //       sector must therefore VALIDATE the returned development, not trust it:
-//       find_chain (eisenstein_paint.cc) probes the raw cell-frame displacement
+//       find_chains (eisenstein_paint.cc) probes the raw cell-frame displacement
 //       and its sector0 rotation-representative over all start combinations and
-//       keeps only a walk that lands the target exactly AND folds no non-corner
-//       cone into the face (the multi-edge / obtuse-cell disambiguator).
+//       KEEPS EVERY walk that lands the target exactly AND folds no non-corner
+//       cone into the face; embed_cell then selects, per cell, the triple of
+//       edge developments that agree wherever their strips share a lattice
+//       position (the multi-edge / obtuse-cell cross-edge disambiguator).
 WalkResult walk_line(const Triangulation& T,
                      int u, int v, int w,
                      int dir_uv,
