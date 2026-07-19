@@ -2540,8 +2540,12 @@ int DeltahedronView<double>::reflect_all_concave(std::span<coord3d> pts, double 
 // Triangles are oriented with outward normals. Exported (geometry.hh
 // convex_hull_tris) for warm-start convexification outside this pipeline;
 // build_convex_hull below is the file-local alias the existing callers use.
-vector<array<int,3>> convex_hull_tris(std::span<const coord3d> pts)
+vector<array<int,3>> convex_hull_tris(std::span<const coord3d> pts, HullStats* stats)
 {
+  HullStats local_stats;
+  HullStats& st = stats ? *stats : local_stats;
+  st = HullStats{};
+
   const int n = (int)pts.size();
   if(n < 4) return {};
 
@@ -2609,101 +2613,181 @@ vector<array<int,3>> convex_hull_tris(std::span<const coord3d> pts)
     return {a, b, c};
   };
 
-  vector<array<int,3>> tris;
-  tris.push_back(make_outward(p0, p1, p2));
-  tris.push_back(make_outward(p0, p1, p3));
-  tris.push_back(make_outward(p0, p2, p3));
-  tris.push_back(make_outward(p1, p2, p3));
+  // ---- Conflict-graph incremental construction --------------------------
+  // The predecessor of this implementation scanned EVERY face per inserted
+  // point (seed search) and rebuilt a directed-edge map over ALL faces per
+  // insertion -- O(n * F) plane tests plus O(n * F log F) allocating map
+  // inserts. On the shells this library hulls, essentially every point is a
+  // hull vertex (F ~ 2n), so that is quadratic with a heavy constant
+  // (measured: 181 s at n = 25686). This version is the textbook fix
+  // (Clarkson-Shor conflict graph, de Berg et al. ch. 11):
+  //   - twin adjacency is MAINTAINED across insertions (nbr[3] per face), so
+  //     no edge map is ever rebuilt;
+  //   - each face caches its unit-normal plane (computed once at creation);
+  //   - each pending point holds a WITNESS: one face it strictly (> eps)
+  //     conflicts with. Insertion BFS-grows the visible region from the
+  //     witness; the dead faces' conflict lists are redistributed over the
+  //     NEW fan faces only. (Correctness of new-fan-only redistribution: the
+  //     faces visible from a point form an edge-connected set, and for planes
+  //     in the pencil through a horizon edge, visibility at both pencil ends
+  //     implies visibility in between -- so a point that saw a dead face and
+  //     is outside the new hull sees a fan face.)
+  //   - insertion order is a FIXED-SEED shuffle: expected O(n log n) conflict
+  //     tests and O(n) faces created, and the same input always produces the
+  //     same output (deterministic, no joggle).
+  // The eps semantics (strict > eps conflicts, > -eps coplanar absorption in
+  // the region BFS) are unchanged from the robust version, so the
+  // no-degenerate-fan-face argument carries over verbatim: every face outside
+  // the region has d <= -eps, its plane contains the horizon edge, so the new
+  // apex sits >= eps off that edge's line and every fan face has height >= eps.
+  struct Face {
+    array<int,3> v;    // CCW outward
+    array<int,3> nbr;  // nbr[j] = face across directed edge (v[j], v[(j+1)%3])
+    coord3d nhat;      // cached unit outward normal
+    double  off;       // nhat . pts[v[0]]
+    vector<int> pl;    // conflict list: pending points witnessed by this face
+    int  mark  = 0;    // insertion stamp: +s in region, -s tested-outside
+    bool alive = true;
+  };
+  vector<Face> F;
+  F.reserve(2 * (size_t)n);
 
-  // ---- Incremental insertion (deterministic index order, no joggle) ----
-  // Invariant: tris is a watertight, outward-oriented triangulation of the
-  // convex hull of the points inserted so far. p0..p3 sit on this hull so
-  // they are skipped by the d_max<=eps test below along with every interior
-  // or on-surface point (eps-approximate hull semantics).
+  auto add_face = [&](int a, int b, int c) -> int {
+    Face f;
+    f.v = {a, b, c};
+    f.nbr = {-1, -1, -1};
+    coord3d fn = (pts[b] - pts[a]).cross(pts[c] - pts[a]);
+    double fnl = fn.norm();
+    if(fnl <= 0){
+      fprintf(stderr, "convex_hull_tris: degenerate face (%d,%d,%d) created -- "
+              "corrupted surface\n", a, b, c);
+      abort();
+    }
+    f.nhat = fn / fnl;
+    f.off  = f.nhat.dot(pts[a]);
+    F.push_back(std::move(f));
+    st.faces_created++;
+    return (int)F.size() - 1;
+  };
+  // Signed distance of p to face f's cached plane. Every call is one conflict
+  // test -- the quantity the complexity regression test bounds.
+  auto face_dist = [&](int f, const coord3d& p) -> double {
+    st.conflict_tests++;
+    return F[f].nhat.dot(p) - F[f].off;
+  };
+
+  {
+    array<int,3> t0 = make_outward(p0, p1, p2);
+    array<int,3> t1 = make_outward(p0, p1, p3);
+    array<int,3> t2 = make_outward(p0, p2, p3);
+    array<int,3> t3 = make_outward(p1, p2, p3);
+    add_face(t0[0], t0[1], t0[2]);
+    add_face(t1[0], t1[1], t1[2]);
+    add_face(t2[0], t2[1], t2[2]);
+    add_face(t3[0], t3[1], t3[2]);
+    // Wire the tetrahedron's twin adjacency via its 12 directed edges.
+    map<pair<int,int>, pair<int,int>> ef;   // directed edge -> (face, slot)
+    for(int f = 0; f < 4; f++)
+      for(int j = 0; j < 3; j++)
+        ef[{F[f].v[j], F[f].v[(j+1)%3]}] = {f, j};
+    for(auto& [e, fs] : ef){
+      auto it = ef.find({e.second, e.first});
+      if(it == ef.end()){
+        fprintf(stderr, "convex_hull_tris: open tetrahedron edge (%d,%d)\n",
+                e.first, e.second);
+        abort();
+      }
+      F[fs.first].nbr[fs.second] = it->second.first;
+    }
+  }
+  int alive_count = 4;
+
+  // Initial conflict distribution: every non-tetra point goes to the tetra
+  // face it is furthest outside of (strictly > eps), or is dropped as interior
+  // (a point inside the current hull stays inside all later hulls).
+  vector<int> witness(n, -1);
   for(int i = 0; i < n; i++){
-    const coord3d& p = pts[i];
-    const int nf = (int)tris.size();
-
-    // (a) signed distance of p to each face, UNIT normals: d_f = n_hat . (p - a).
-    //     Faces are non-degenerate by construction (height >= eps below), so
-    //     |fn| > 0; guard defensively against an exact zero anyway.
-    // (b) seed = argmax d_f.
-    vector<double> dist(nf);
-    int    seed = -1;
-    double dmax = -std::numeric_limits<double>::infinity();
-    for(int f = 0; f < nf; f++){
-      const auto& t = tris[f];
-      coord3d fn = (pts[t[1]] - pts[t[0]]).cross(pts[t[2]] - pts[t[0]]);
-      double fnl = fn.norm();
-      coord3d nhat = fnl > 0 ? fn / fnl : coord3d();
-      double d = nhat.dot(p - pts[t[0]]);
-      dist[f] = d;
-      if(d > dmax){ dmax = d; seed = f; }
+    if(i == p0 || i == p1 || i == p2 || i == p3) continue;
+    int best_f = -1;
+    double best_d = eps;
+    for(int f = 0; f < 4; f++){
+      double d = face_dist(f, pts[i]);
+      if(d > best_d){ best_d = d; best_f = f; }
     }
-    if(dmax <= eps) continue;   // p inside or within eps of the hull -> skip
+    if(best_f >= 0){ F[best_f].pl.push_back(i); witness[i] = best_f; }
+  }
 
-    // (c) directed-edge -> face map over ALL faces. A watertight oriented
-    //     surface has each directed edge in exactly one face; a collision
-    //     means the surface is corrupted.
-    map<pair<int,int>, int> edge_face;
-    for(int f = 0; f < nf; f++){
-      const auto& t = tris[f];
+  // Fixed-seed shuffle of the insertion order (splitmix64-mixed LCG). The seed
+  // is a constant: the construction stays deterministic -- same input, same
+  // insertion order, same output -- while the shuffle delivers the expected
+  // O(n log n) bound the adversarial index orders (spatially sorted mesh
+  // vertices) would forfeit.
+  vector<int> order(n);
+  for(int i = 0; i < n; i++) order[i] = i;
+  {
+    uint64_t s = 0x9e3779b97f4a7c15ULL;
+    auto rnd = [&]() -> uint64_t {
+      s = s * 6364136223846793005ULL + 1442695040888963407ULL;
+      uint64_t z = s;
+      z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
+      z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
+      return z ^ (z >> 31);
+    };
+    for(int i = n - 1; i > 0; i--)
+      std::swap(order[i], order[(int)(rnd() % (uint64_t)(i + 1))]);
+  }
+
+  vector<int> region;                 // visible-region face ids (scratch)
+  vector<pair<int,int>> horizon;      // horizon directed edges (a,b) (scratch)
+  vector<int> horizon_out;            // face outside across horizon[k] (scratch)
+  vector<int> fan;                    // new fan face ids (scratch)
+  int stamp = 0;
+
+  for(int oi = 0; oi < n; oi++){
+    const int ip = order[oi];
+    if(witness[ip] < 0) continue;     // interior / absorbed / tetra vertex
+    const coord3d& p = pts[ip];
+    const int seed = witness[ip];
+    if(!F[seed].alive){
+      // Invariant: a dead face's conflict list is always redistributed, so a
+      // pending point's witness is alive. A dead witness is corruption.
+      fprintf(stderr, "convex_hull_tris: dead witness face %d for point %d -- "
+              "corrupted conflict graph\n", seed, ip);
+      abort();
+    }
+
+    // ---- visible region: BFS from the witness over twin adjacency, absorbing
+    // faces with d > -eps (coplanar absorption -- see block comment above).
+    // mark = +stamp: in region; mark = -stamp: tested, outside (its distance is
+    // not re-evaluated when reached from another region face).
+    ++stamp;
+    region.clear(); horizon.clear(); horizon_out.clear(); fan.clear();
+    F[seed].mark = stamp;
+    region.push_back(seed);
+    for(size_t qi = 0; qi < region.size(); ++qi){
+      const int f = region[qi];
       for(int j = 0; j < 3; j++){
-        pair<int,int> e{t[j], t[(j+1)%3]};
-        auto it = edge_face.find(e);
-        if(it != edge_face.end()){
-          fprintf(stderr, "convex_hull_tris: directed edge (%d,%d) claimed by "
-                  "faces %d and %d at point %d -- corrupted surface\n",
-                  e.first, e.second, it->second, f, i);
-          abort();
+        const int g = F[f].nbr[j];
+        if(F[g].mark == stamp) continue;              // already in region
+        if(F[g].mark != -stamp){                      // not yet tested this insertion
+          if(face_dist(g, p) > -eps){
+            F[g].mark = stamp;
+            region.push_back(g);
+            continue;
+          }
+          F[g].mark = -stamp;
         }
-        edge_face[e] = f;
+        // g is outside: directed edge (v[j], v[j+1]) of f is a horizon edge.
+        horizon.push_back({F[f].v[j], F[f].v[(j+1)%3]});
+        horizon_out.push_back(g);
       }
     }
 
-    // (d) Region R = BFS from seed over twin-edge adjacency, absorbing any face
-    //     with d_f > -eps. The -eps (coplanar absorption) is load-bearing and
-    //     is the one guarantee the code cannot exhibit locally: every face
-    //     OUTSIDE R has d <= -eps, i.e. p lies >= eps strictly below the plane
-    //     of every horizon-adjacent kept face. That plane contains the horizon
-    //     edge (a,b), so the distance from p to the LINE (a,b) is >= eps; hence
-    //     every new face {i,a,b} has height >= eps and degenerate slivers are
-    //     impossible by construction. (A strict d_f > 0 test would leave
-    //     exactly-coplanar faces straddling the boundary, producing zero-area
-    //     new faces whose garbage normals poison later visibility tests.)
-    vector<char> in_R(nf, 0);
-    std::queue<int> Q;
-    in_R[seed] = 1; Q.push(seed);
-    while(!Q.empty()){
-      int f = Q.front(); Q.pop();
-      const auto& t = tris[f];
-      for(int j = 0; j < 3; j++){
-        auto it = edge_face.find({t[(j+1)%3], t[j]});   // twin of edge (t[j],t[j+1])
-        if(it == edge_face.end()) continue;
-        int g = it->second;
-        if(!in_R[g] && dist[g] > -eps){ in_R[g] = 1; Q.push(g); }
-      }
-    }
-
-    // (e) Horizon = directed edges (a,b) of faces in R whose twin (b,a) lies in
-    //     a face NOT in R. It must form exactly one simple closed cycle: every
-    //     horizon vertex has in-degree 1 and out-degree 1 and all edges lie on a
-    //     single cycle.
-    vector<pair<int,int>> horizon;
-    for(int f = 0; f < nf; f++){
-      if(!in_R[f]) continue;
-      const auto& t = tris[f];
-      for(int j = 0; j < 3; j++){
-        pair<int,int> e{t[j], t[(j+1)%3]};
-        auto it = edge_face.find({e.second, e.first});
-        if(it != edge_face.end() && !in_R[it->second])
-          horizon.push_back(e);
-      }
-    }
-
+    // ---- horizon guard: exactly one simple closed cycle (in/out-degree 1).
+    map<int,int> next_v;
     {
-      map<int,int> next, outdeg, indeg;
-      for(auto& [a,b] : horizon){ outdeg[a]++; indeg[b]++; next[a] = b; }
+      map<int,int> outdeg, indeg;
+      for(auto& [a,b] : horizon){ outdeg[a]++; indeg[b]++; next_v[a] = b; }
       bool degrees_ok = !horizon.empty() &&
                         outdeg.size() == horizon.size() &&
                         indeg.size()  == horizon.size();
@@ -2711,8 +2795,6 @@ vector<array<int,3>> convex_hull_tris(std::span<const coord3d> pts)
         for(auto& [v,c] : outdeg) if(c != 1) degrees_ok = false;
         for(auto& [v,c] : indeg)  if(c != 1) degrees_ok = false;
       }
-      // Count disjoint cycles in the (possibly partial) next-map; safe even
-      // when degrees are invalid because each vertex is followed at most once.
       int cycles = 0;
       { set<int> seen;
         for(auto& [a,b] : horizon){
@@ -2720,44 +2802,118 @@ vector<array<int,3>> convex_hull_tris(std::span<const coord3d> pts)
           int cur = a; size_t guard = 0;
           while(!seen.count(cur)){
             seen.insert(cur);
-            auto it = next.find(cur);
-            if(it == next.end()) break;
+            auto it = next_v.find(cur);
+            if(it == next_v.end()) break;
             cur = it->second;
-            if(++guard > horizon.size()+1) break;
+            if(++guard > horizon.size() + 1) break;
           }
           cycles++;
         }
       }
       if(!degrees_ok || cycles != 1){
         fprintf(stderr, "convex_hull_tris: horizon not a simple cycle at point "
-                "%d (|R|=%d, horizon=%zu, cycles=%d) -- corrupted surface\n",
-                i, (int)std::count(in_R.begin(), in_R.end(), (char)1),
-                horizon.size(), cycles);
+                "%d (|R|=%zu, horizon=%zu, cycles=%d) -- corrupted surface\n",
+                ip, region.size(), horizon.size(), cycles);
         abort();
       }
     }
 
-    // (f) Erase R's faces; append {i,a,b} per horizon edge. (a,b) is a directed
-    //     edge of a removed (outward CCW) face on the horizon, so i,a,b has an
-    //     outward normal (away from the hull interior) -- same argument as the
-    //     original construction.
-    vector<array<int,3>> kept;
-    kept.reserve(nf);
-    for(int f = 0; f < nf; f++)
-      if(!in_R[f]) kept.push_back(tris[f]);
-    for(auto& [a,b] : horizon)
-      kept.push_back({i, a, b});
-    tris.swap(kept);
+    // ---- build the fan {ip, a, b} per horizon edge, wiring twins as we go.
+    // Fan face slots: [0] = (ip,a), [1] = (a,b), [2] = (b,ip). The (a,b) twin
+    // is the surviving outside face (whose stale nbr entry is repointed); the
+    // fan-to-fan twins follow the horizon cycle: nbr[2] of the fan over (a,b)
+    // is the fan starting at b, nbr[0] the fan ending at a.
+    map<int,int> fan_by_first;    // horizon vertex a -> fan face over (a, next_v[a])
+    for(size_t k = 0; k < horizon.size(); ++k){
+      const auto& [a, b] = horizon[k];
+      const int nf = add_face(ip, a, b);
+      fan.push_back(nf);
+      fan_by_first[a] = nf;
+      // repoint the outside face's twin entry for its directed edge (b,a)
+      const int g = horizon_out[k];
+      int slot = -1;
+      for(int j = 0; j < 3; j++)
+        if(F[g].v[j] == b && F[g].v[(j+1)%3] == a) slot = j;
+      if(slot < 0){
+        fprintf(stderr, "convex_hull_tris: horizon twin edge (%d,%d) not found "
+                "in outside face %d at point %d -- corrupted surface\n",
+                b, a, g, ip);
+        abort();
+      }
+      F[g].nbr[slot] = nf;
+      F[nf].nbr[1] = g;
+    }
+    for(size_t k = 0; k < horizon.size(); ++k){
+      const auto& [a, b] = horizon[k];
+      (void)a;
+      const int nf = fan[k];
+      F[nf].nbr[2] = fan_by_first.at(b);   // fan over (b, next_v[b]) shares edge (b,ip)
+    }
+    for(size_t k = 0; k < horizon.size(); ++k){
+      const int nf = fan[k];
+      const int succ = F[nf].nbr[2];       // successor fan around the cycle
+      F[succ].nbr[0] = nf;                 // its (ip, b) edge twins our (b, ip)
+    }
 
-    // (g) Euler bound: a triangulated 2-sphere on at most n vertices has at
-    //     most 2n-4 faces. Overflow means the surface is corrupted.
-    if((int)tris.size() > 2*n - 4){
-      fprintf(stderr, "convex_hull_tris: face count %zu exceeds Euler bound %d "
-              "at point %d -- corrupted surface\n", tris.size(), 2*n - 4, i);
+    // ---- retire the region's faces and redistribute their conflict lists
+    // over the NEW fan faces only (see block comment for why that suffices).
+    st.points_inserted++;
+    alive_count += (int)horizon.size() - (int)region.size();
+    for(const int f : region){
+      F[f].alive = false;
+      for(const int q : F[f].pl){
+        if(q == ip || witness[q] != f) continue;  // inserted now, or stale entry
+        int best_f = -1;
+        double best_d = eps;
+        for(const int nf : fan){
+          double d = face_dist(nf, pts[q]);
+          if(d > best_d){ best_d = d; best_f = nf; }
+        }
+        if(best_f >= 0){ F[best_f].pl.push_back(q); witness[q] = best_f; }
+        else            witness[q] = -1;          // inside (or within eps of) the new hull
+      }
+      vector<int>().swap(F[f].pl);
+    }
+    witness[ip] = -1;
+
+    // ---- Euler bound: a triangulated 2-sphere on at most n vertices has at
+    // most 2n-4 faces. Overflow means the surface is corrupted.
+    if(alive_count > 2*n - 4){
+      fprintf(stderr, "convex_hull_tris: face count %d exceeds Euler bound %d "
+              "at point %d -- corrupted surface\n", alive_count, 2*n - 4, ip);
       abort();
     }
   }
 
+  // ---- compact the alive faces and audit watertightness (each directed edge
+  // exactly once, twin present) in one final O(F) pass -- the same corruption
+  // class the per-insertion edge-map rebuild used to police, at a cost paid
+  // once instead of per insertion.
+  vector<array<int,3>> tris;
+  tris.reserve((size_t)alive_count);
+  for(const Face& f : F)
+    if(f.alive) tris.push_back(f.v);
+  {
+    map<pair<int,int>, int> edge_face;
+    for(int f = 0; f < (int)tris.size(); f++)
+      for(int j = 0; j < 3; j++){
+        pair<int,int> e{tris[f][j], tris[f][(j+1)%3]};
+        auto it = edge_face.find(e);
+        if(it != edge_face.end()){
+          fprintf(stderr, "convex_hull_tris: directed edge (%d,%d) claimed by "
+                  "faces %d and %d -- corrupted surface\n",
+                  e.first, e.second, it->second, f);
+          abort();
+        }
+        edge_face[e] = f;
+      }
+    for(auto& [e, f] : edge_face)
+      if(!edge_face.count({e.second, e.first})){
+        fprintf(stderr, "convex_hull_tris: directed edge (%d,%d) has no twin -- "
+                "corrupted surface\n", e.first, e.second);
+        abort();
+      }
+  }
   return tris;
 }
 

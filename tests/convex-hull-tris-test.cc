@@ -251,3 +251,36 @@ TEST(ConvexHullTris, GenericSpherePoints){
   EXPECT_EQ((int)verts.size(), NP) << "not every sphere point is on the hull";
   EXPECT_EQ((int)hull.size(), 2*NP - 4) << "F != 2V-4 for a triangulated sphere";
 }
+
+// Complexity regression: the conflict-graph construction does expected
+// O(n log n) point-face conflict tests and creates O(n) faces over the
+// fixed-seed shuffled insertion order. The all-points-extreme sphere cloud is
+// the adversarial input class for the quadratic full-scan implementations this
+// replaced (each of which needed ~n^2/2 = 2e8 tests here, an order of
+// magnitude over the bound below). The bound is a machine-independent COUNT
+// (HullStats), so this test cannot flake on wall-clock and fails loudly if the
+// construction ever regresses to a per-insertion full scan.
+TEST(ConvexHullTris, ConflictGraphComplexity){
+  LCG g(0xfeedfaceULL);
+  const int NP = 20000;
+  vector<coord3d> pts;
+  pts.reserve(NP);
+  for(int i = 0; i < NP; i++) pts.push_back(sphere_point(g, 100.0));
+
+  HullStats st;
+  vector<array<int,3>> hull = convex_hull_tris(pts, &st);
+  EXPECT_EQ((int)hull_vertices(hull).size(), NP);
+  EXPECT_EQ((int)hull.size(), 2*NP - 4);
+  expect_watertight(hull);
+
+  const double nlogn = double(NP) * (log(double(NP)) / log(2.0));
+  EXPECT_LT((double)st.conflict_tests, 60.0 * nlogn)
+      << "conflict tests " << st.conflict_tests << " exceed 60*n*log2(n) = "
+      << 60.0 * nlogn << " -- quadratic regression?";
+  EXPECT_LT((double)st.faces_created, 30.0 * NP)
+      << "faces created " << st.faces_created << " exceed 30n";
+  fprintf(stderr, "[stats] n=%d conflict_tests=%zu (%.1f per n*log2 n) "
+          "faces_created=%zu (%.2f per n) inserted=%zu\n",
+          NP, st.conflict_tests, st.conflict_tests / nlogn,
+          st.faces_created, st.faces_created / double(NP), st.points_inserted);
+}
