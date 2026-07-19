@@ -676,6 +676,34 @@ struct DeltahedronView : TriangulationView {
     double hessian_check(std::span<const coord3<T>> geometry, const vector<bool>& free_mask,
                          const vector<bool>& interior_mask={}, double target_L=0,
                          double eps=1e-5, bool verbose=false) const;
+
+    // --- AET (equilateral-triangle target) energy stack ---
+    // The energy/gradient/HVP that optimize() and optimize_patch() are
+    // built on (E_bond + E_angle + E_curv [+ E_flat] [+ E_conv]), exposed
+    // as thin wrappers over the internal term implementations -- the
+    // single source of truth -- for external optimizer frameworks
+    // (incubation seam for claude-projects/optimize).  `edges` is the
+    // cached undirected_edges() list, precomputed once by the caller so
+    // repeated evaluations keep the internal callers' cost profile.
+    // aet_energy_gradient: returns E; if grad is non-null it is zeroed
+    // and filled.  aet_hv_product: Hv = (grad^2 E) v (Hv zeroed here).
+    double aet_energy_gradient(const vector<edge_t>& edges,
+                               std::span<const coord3<T>> x, vector<coord3<T>>* grad,
+                               double target_L, double k_bond, double k_angle,
+                               double k_curv, double k_flat,
+                               double k_conv = 0, double sigma_conv = 0,
+                               const vector<bool>& conv_mask = {}) const;
+    void aet_hv_product(const vector<edge_t>& edges,
+                        std::span<const coord3<T>> x, const vector<coord3<T>>& v,
+                        vector<coord3<T>>& Hv, double target_L,
+                        double k_bond, double k_angle, double k_curv, double k_flat,
+                        const vector<bool>& fixed = {},
+                        double k_conv = 0, double sigma_conv = 0) const;
+    // Signed convexity height h per vertex (h > 0 convex, h < 0 concave;
+    // fixed or degree > 6 vertices get h = 1).  Part of the AET seam: the
+    // convex-constrained acceptance gate consumes it.
+    void aet_h_values(std::span<const coord3<T>> x, vector<double>& h,
+                      const vector<bool>& fixed = {}) const;
 };
 
 // ---------------------------------------------------------------------------
@@ -708,6 +736,18 @@ template<> double DeltahedronView<double>::hessian_check(std::span<const coord3d
                                                          const vector<bool>& interior_mask,
                                                          double target_L, double eps,
                                                          bool verbose) const;
+template<> double DeltahedronView<double>::aet_energy_gradient(
+    const vector<edge_t>& edges, std::span<const coord3d> x, vector<coord3d>* grad,
+    double target_L, double k_bond, double k_angle, double k_curv, double k_flat,
+    double k_conv, double sigma_conv, const vector<bool>& conv_mask) const;
+template<> void DeltahedronView<double>::aet_hv_product(
+    const vector<edge_t>& edges, std::span<const coord3d> x, const vector<coord3d>& v,
+    vector<coord3d>& Hv, double target_L, double k_bond, double k_angle,
+    double k_curv, double k_flat, const vector<bool>& fixed,
+    double k_conv, double sigma_conv) const;
+template<> void DeltahedronView<double>::aet_h_values(
+    std::span<const coord3d> x, vector<double>& h,
+    const vector<bool>& fixed) const;
 
 // ---------------------------------------------------------------------------
 // TC verification: all view types must be trivially copyable.

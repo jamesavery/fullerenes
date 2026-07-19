@@ -1093,14 +1093,24 @@ vector<coord3d> AlexandrovSolver::solve() {
     stats_extrap_kappa = LinAlg::max_abs(GCP::kappa(D, r));
   }
 
-  // 4. Polish: trust-region Newton on κ(r) = 0
-  int polish_flips = stats_flips;
-  auto [ok, mk] = Newton::polish(D, r, 1e-10, 50,
-                                   trace_jacobian ? &trace : nullptr,
-                                   record_diag ? &diag_trace : nullptr,
-                                   record_trajectory ? &trajectory : nullptr,
-                                   &polish_flips);
-  stats_flips = polish_flips;
+  // 4. Polish: trust-region Newton on κ(r) = 0.  An installed
+  // polish_override (incubation seam, see header) replaces the internal
+  // polish on the identical post-extrapolation state; the internal
+  // trace/diag recorders are not populated on that path.
+  bool ok;
+  double mk;
+  if (polish_override) {
+    ok = polish_override(D, r);
+    mk = LinAlg::max_abs(GCP::kappa(D, r));
+  } else {
+    int polish_flips = stats_flips;
+    std::tie(ok, mk) = Newton::polish(D, r, 1e-10, 50,
+                                      trace_jacobian ? &trace : nullptr,
+                                      record_diag ? &diag_trace : nullptr,
+                                      record_trajectory ? &trajectory : nullptr,
+                                      &polish_flips);
+    stats_flips = polish_flips;
+  }
   stats_final_kappa = mk;
 
   if (verbose)
@@ -1181,6 +1191,18 @@ int AlexandrovSolver::jacobian_det_sign(const DelaunayTriangulation& T,
 bool AlexandrovSolver::feasible(const DelaunayTriangulation& T,
                                  const vector<double>& r) {
   return GCP::feasible(T, r);
+}
+
+vector<double> AlexandrovSolver::feasible_step(const DelaunayTriangulation& T,
+                                                const vector<double>& r,
+                                                const vector<double>& delta,
+                                                bool* clipped) {
+  return GCP::feasible_step(T, r, delta, clipped);
+}
+
+int AlexandrovSolver::flip_to_weighted_delaunay(DelaunayTriangulation& T,
+                                                 const vector<double>& r) {
+  return Topology::flip_to_weighted_delaunay(T, r);
 }
 
 double AlexandrovSolver::theta(const DelaunayTriangulation& T,
