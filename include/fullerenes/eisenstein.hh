@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <algorithm>
+#include <limits>
 #include <vector>
 #include <optional>
 #include <stdexcept>
@@ -226,8 +227,8 @@ inline Eisenstein first_cw(Eisenstein v) {
 
 // Some Eisenstein integer (a, b) with a >= 0, b >= 0 and
 // a^2 + a*b + b^2 == N.  Returns the first sector-0 representative
-// found by scanning b = 0, 1, ...; aborts if no solution exists.
-// Precondition: N >= 0 is a valid Eisenstein norm.
+// found by scanning b = 0, 1, ...; throws std::logic_error if no
+// solution exists.  Precondition: N >= 0 is a valid Eisenstein norm.
 Eisenstein eisenstein_of_norm(int N);
 
 // Enumerate ALL sector-0 Eisenstein reps (a >= 0, b >= 0) of norm N.
@@ -237,27 +238,125 @@ std::vector<Eisenstein> sector0_reps_of_norm(int N);
 
 
 // =====================================================================
-// D6 action between norm-equal Eisensteins.
+// Rational points of the Eisenstein plane.
 // =====================================================================
 
-// A D6 affine transform of Z[w] onto itself:
-//   T(z) = unit * z                       (if reflect == false)
-//        = unit * z.complex_conj()        (if reflect == true)
-// `unit` is one of the 6 Eisenstein units.
-struct D6Affine {
-  Eisenstein unit;
-  bool       reflect;
+// A point num/den (den > 0) of Q(w), the field of fractions of Z[w]:
+// the rational closure that EXACT lattice geometry lives in.  Midpoints
+// of lattice segments, barycentric samples with integer weights, and
+// crossing points of lattice segments all lie in Q(w), never further.
+// Construction canonicalizes -- sign moved into num, the gcd of
+// {|num.first|, |num.second|, den} divided out -- so component-wise
+// equality IS field equality.  Trivially copyable.
+struct EisensteinRational {
+  Eisenstein num{0, 0};
+  long       den = 1;
 
-  Eisenstein apply(Eisenstein z) const {
-    return (reflect ? z.complex_conj() : z) * unit;
+  EisensteinRational(Eisenstein n = {}, long d = 1) : num(n), den(d) {
+    if (den == 0) throw std::logic_error("EisensteinRational: zero denominator");
+    if (den < 0) { den = -den; num = -num; }
+    if (den == 1) return;                       // already canonical
+    const long g = std::gcd(std::gcd(std::labs((long)num.first),
+                                     std::labs((long)num.second)), den);
+    if (g > 1) { num = Eisenstein(num.first / (int)g, num.second / (int)g); den /= g; }
+  }
+
+  bool is_integral() const { return den == 1; }
+
+  bool operator==(const EisensteinRational& o) const { return num == o.num && den == o.den; }
+  bool operator!=(const EisensteinRational& o) const { return !(*this == o); }
+
+  // Cartesian coordinates, for display/diagnostics only (exact code never
+  // leaves Q(w)).
+  pair<double, double> coord() const {
+    const auto c = num.coord();
+    return { c.first / den, c.second / den };
   }
 };
 
-// Find the D6Affine T with T(z_from) == z_to.  Both inputs must have
-// the same norm.  Exactly one branch (rotation, reflection) gives a
-// unit by the D6 symmetry of Z[w]; align returns that branch.  Aborts
-// on norm mismatch or non-divisibility.
-D6Affine align(Eisenstein z_from, Eisenstein z_to);
+
+// =====================================================================
+// Lattice self-isometries of Z[w].
+// =====================================================================
+
+// An isometry of the plane mapping the Eisenstein lattice onto itself:
+//
+//   T(z) = t + u * z                    (reflect == false)
+//        = t + u * z.complex_conj()     (reflect == true)
+//
+// with u one of the 6 Eisenstein units and t in Z[w].  These are ALL of
+// them (the p6m crystallographic restriction): every plane isometry is
+// affine; one carrying the lattice onto itself sends 0 to a lattice
+// point, so t is in Z[w], and its linear part preserves the lattice and
+// lengths, hence lies in the point group D6 = {6 units} x {conj}.
+struct LatticeIsometry {
+  Eisenstein u{1, 0}, t{0, 0};
+  bool       reflect = false;
+
+  Eisenstein apply(Eisenstein z) const {
+    return t + u * (reflect ? z.complex_conj() : z);
+  }
+
+  // Exact on rational points, and PRESERVES CANONICAL FORM: unit
+  // multiplication and conjugation act on the (a, b) components as
+  // unimodular integer matrices, so they preserve gcd(|a|, |b|, den);
+  // adding t*den changes num only by multiples of den.  Hence any common
+  // divisor of the image's components and den already divided the
+  // preimage's -- 1 on canonical input -- and the constructor's gcd pass
+  // is a no-op.
+  // Width contract: Eisenstein components are int (see the sector-geometry
+  // banner); t*den must fit, so den is checked against INT_MAX -- a
+  // violated width bound throws instead of silently truncating.
+  EisensteinRational apply(const EisensteinRational& p) const {
+    if (p.den > std::numeric_limits<int>::max())
+      throw std::logic_error("LatticeIsometry::apply: denominator exceeds int width");
+    const Eisenstein n = reflect ? p.num.complex_conj() : p.num;
+    return EisensteinRational(t * (int)p.den + u * n, p.den);
+  }
+
+  // Composition in FUNCTION order: (A*B)(z) == A(B(z)).  Closed form,
+  // with s1 = conj^{r1} the first factor's reflection:
+  //   r = r1 ^ r2,  u = u1 * s1(u2),  t = t1 + u1 * s1(t2).
+  LatticeIsometry operator*(const LatticeIsometry& o) const {
+    const Eisenstein su = reflect ? o.u.complex_conj() : o.u;
+    const Eisenstein st = reflect ? o.t.complex_conj() : o.t;
+    return { u * su, t + u * st, reflect != o.reflect };
+  }
+
+  // Group inverse.  Rotation case: T^-1(z) = u^-1 z - u^-1 t with
+  // u^-1 = complex_conj(u) (a unit's inverse is its conjugate).
+  // Reflection case (T is an involution twist): w = conj(u^-1) conj(z)
+  // - conj(u^-1 t), and conj(u^-1) = u, so T^-1 = { u, -(u * conj(t)),
+  // reflect } -- reflect is preserved.
+  LatticeIsometry inverse() const {
+    if (!reflect) {
+      const Eisenstein ui = u.complex_conj();
+      return { ui, -(ui * t), false };
+    }
+    return { u, -(u * t.complex_conj()), true };
+  }
+
+  bool operator==(const LatticeIsometry& o) const {
+    return u == o.u && t == o.t && reflect == o.reflect;
+  }
+  bool operator!=(const LatticeIsometry& o) const { return !(*this == o); }
+};
+
+// The unique orientation-preserving lattice isometry carrying the
+// directed segment a_from -> b_from onto a_to -> b_to.  The segments
+// must have equal nonzero norm2, and the aligning rotation must be a
+// unit (both hold whenever the segments are honest copies of one
+// lattice segment); violations are deep invariants -> std::logic_error.
+LatticeIsometry isometry_from_segments(Eisenstein a_from, Eisenstein b_from,
+                                       Eisenstein a_to,   Eisenstein b_to);
+
+// Find the LINEAR (t = 0) lattice isometry T with T(z_from) == z_to.
+// Both inputs must have the same norm.  Exactly one branch (rotation,
+// reflection) gives a unit by the D6 symmetry of Z[w]; align returns
+// that branch (rotation preferred when both work, e.g. on the mirror
+// axes).  Throws std::logic_error on norm mismatch or non-divisibility
+// (deep invariants; same channel as isometry_from_segments).
+LatticeIsometry align(Eisenstein z_from, Eisenstein z_to);
 
 
 // =====================================================================
@@ -363,6 +462,12 @@ inline std::optional<Sector> entry_sector(Eisenstein A, Eisenstein B) {
   if (wedge(A, B) == 0) return std::nullopt;
   return ccw_order(A, B);
 }
+
+// Apex of the CCW unit triangle on base a -> b: the +60-degree rotation of
+// the base direction around its origin.  This is place_third_eis(a, b,
+// 1, 1, 1, +1) specialized to the unit triangle, spelled directly because
+// the unit apex always lies on the lattice (no optional, no throw).
+inline Eisenstein unit_apex(Eisenstein a, Eisenstein b) { return a + (b - a).nextCCW(); }
 
 // Thrown by place_third_eis for a triangle with no Z[w] apex -- a degenerate /
 // non-Loeschian face, which cannot occur on a valid delta-complex.  Carries

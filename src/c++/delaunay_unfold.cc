@@ -82,11 +82,11 @@ void dump_neighbour_unfolding_tikz(const CellPlacement& F,
                 N.cell_id, k, z_src.norm2(), z_dst.norm2());
             continue;
         }
-        D6Affine T = align(z_src, z_dst);
+        LatticeIsometry T = align(z_src, z_dst);
         auto apply = [&](Eisenstein p) {
             Eisenstein q = p - Qa;
             if (T.reflect) q = q.complex_conj();
-            q = q * T.unit;
+            q = q * T.u;
             return q + Pa;
         };
         Transformed t;
@@ -227,7 +227,7 @@ LatticeUnfolding unfold_from_seed(const DelaunayTriangulation& D,
     auto place = [&](int cell_id, Eisenstein P0g, Eisenstein P1g,
                       Eisenstein P2g, int parent_id,
                       Eisenstein anchor_local, Eisenstein anchor_global,
-                      const D6Affine& T)
+                      const LatticeIsometry& T)
     {
         LatticeUnfolding::UnfoldedCell g;
         const CellPlacement& F = cells[cell_id];
@@ -238,7 +238,7 @@ LatticeUnfolding unfold_from_seed(const DelaunayTriangulation& D,
         for (const auto& [p, v] : F.lattice_points) {
             Eisenstein q = p - anchor_local;
             if (T.reflect) q = q.complex_conj();
-            q = q * T.unit + anchor_global;
+            q = q * T.u + anchor_global;
             g.entries.push_back({q, v});
         }
         U.cells.push_back(std::move(g));
@@ -259,7 +259,7 @@ LatticeUnfolding unfold_from_seed(const DelaunayTriangulation& D,
     // Seed: place at its local lattice positions in the global frame.
     {
         const CellPlacement& F0 = cells[seed_cell_id];
-        D6Affine T_id{ .unit = Eisenstein(1, 0), .reflect = false };
+        LatticeIsometry T_id;   // identity
         place(seed_cell_id, F0.P0, F0.P1, F0.P2,
               /*parent=*/-1, F0.P0, F0.P0, T_id);
         cell_placed[seed_cell_id] = true;
@@ -298,11 +298,11 @@ LatticeUnfolding unfold_from_seed(const DelaunayTriangulation& D,
         Eisenstein z_local  = Pv_l - Pu_l;
         Eisenstein z_global = Pv_g - Pu_g;
         if (z_local.norm2() != z_global.norm2()) continue;
-        D6Affine T = align(z_local, z_global);
+        LatticeIsometry T = align(z_local, z_global);
         auto apply = [&](Eisenstein p) {
             Eisenstein q = p - Pu_l;
             if (T.reflect) q = q.complex_conj();
-            return q * T.unit + Pu_g;
+            return q * T.u + Pu_g;
         };
         Eisenstein P0g = apply(F.P0), P1g = apply(F.P1), P2g = apply(F.P2);
 
