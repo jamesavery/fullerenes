@@ -74,11 +74,19 @@ const char* CubicResult::stage_name() const { return eisenstein_paint::stage_nam
 
 namespace {
 
-void require_simplicial(const DelaunayTriangulation& D, const char* who) {
-    if (!D.is_simplicial())
-        throw StageError(Stage::NON_SIMPLICIAL,
-            std::string(who) + ": iDT is not simplicial "
-            "(self-loops or multi-edges present)");
+// Guard the iDT before the atlas / paint path runs.  Multi-edges (two
+// same-length geodesics between one cone pair) are legitimate delta-complex
+// features that now develop correctly (find_chain's cone-interiority branch
+// discriminator), so they are ACCEPTED -- this is no longer a simpliciality
+// requirement.  What stays a hard reject is what embed_cell genuinely cannot
+// place: a self-loop (a cone edge (v, v)) makes a face with a repeated corner,
+// and is_well_formed catches bigons / non-length-3 faces.
+void require_embeddable_idt(const DelaunayTriangulation& D, const char* who) {
+    for (int h = 0; h < D.nh; ++h)
+        if (D.alive(h) && D.he_origin[h] == D.dest(h))
+            throw StageError(Stage::NON_SIMPLICIAL,
+                std::string(who) + ": iDT has a self-loop (a cone edge to "
+                "itself); a face with a repeated corner cannot be embedded");
     if (!D.is_well_formed())
         throw StageError(Stage::NON_SIMPLICIAL,
             std::string(who) + ": iDT is not well-formed "
@@ -118,7 +126,7 @@ void run_alexandrov(Pipeline& P) {
 Pipeline prepare_iDT(const Triangulation& T) {
     Pipeline P;
     sort_and_compute_idt(T, P);
-    require_simplicial(P.D, "eisenstein_paint::prepare_iDT");
+    require_embeddable_idt(P.D, "eisenstein_paint::prepare_iDT");
     return P;
 }
 
@@ -212,7 +220,7 @@ void run_cubic_alexandrov(const Triangulation& T, CubicPipeline& CP) {
 CubicPipeline prepare_cubic(const Triangulation& T) {
     CubicPipeline CP;
     sort_and_compute_idt(T, CP.P);
-    require_simplicial(CP.P.D, "eisenstein_paint::prepare_cubic");
+    require_embeddable_idt(CP.P.D, "eisenstein_paint::prepare_cubic");
     run_cubic_alexandrov(T, CP);
     return CP;
 }
@@ -281,31 +289,104 @@ bool walks_through_cone(const WalkResult& wr) {
     return false;
 }
 
-// Try every (face_arc i, dir_uv) start combination.  Accept the first
-// chain whose walker terminates at target_vertex with a clean walk
-// (start at (0,0), end at target_rel, no cone on strict interior).
+// A developed vertex `p` (cell frame) is STRICTLY inside the meta triangle
+// (FP0, FP1, FP2) iff all three edge wedges are > 0.  Used to detect a
+// FOLDED development: an embedded iDT face carries cones only at its three
+// corners, so any OTHER cone landing strictly interior means the walk
+// developed the wrong same-length geodesic (a split-prime multi-edge whose
+// wrong branch wraps a neighbouring cone into the strip) or a reflected
+// corridor -- both non-embeddings that the atlas later rejects.
+bool strictly_inside_meta(Eisenstein p, Eisenstein FP0, Eisenstein FP1, Eisenstein FP2) {
+    return wedge(FP1 - FP0, p - FP0) > 0
+        && wedge(FP2 - FP1, p - FP1) > 0
+        && wedge(FP0 - FP2, p - FP2) > 0;
+}
+
+// Try every (endpoint, face_arc i, dir_uv) start combination.  Accept the
+// first chain whose walker terminates at target_vertex with a clean,
+// orientation-preserving, NON-FOLDING development (start at (0,0), end at
+// target_rel, no cone on the strict interior of the walk, and -- crucially --
+// no non-corner cone strictly inside the meta triangle (FP0, FP1, FP2)).
+//
+// Multi-edge disambiguation.  Split-prime edge lengths (norm N with two
+// sector-0 reps in mirror orbits, e.g. N=19,28,37) admit TWO distinct
+// geodesics of the same length between the same cone pair.  Only ONE bounds
+// this face; the other wraps a neighbouring cone.  Lengths + interior angle
+// alone (what embed_cell places the corners from) cannot tell them apart, and
+// walk_line, trying start combinations in list order, may reach the target via
+// EITHER.  The meta-triangle cone-interiority test is the discriminator: it
+// keeps the branch whose development is a genuine flat embedding and rejects
+// the wrapping one (this is what removes the residual (61,48) intra-cell fold
+// on C140-[GS:1,2,4,8,20,21,55,57,63,67,69,71], whose cell 59 has all three
+// edges split-prime and corner c6 flanked by two multi-edges).
 std::optional<WalkVertices>
 find_chain(const Triangulation& T_sorted,
-           int start_vertex, int target_vertex, Eisenstein target_rel)
+           int start_vertex, int target_vertex, Eisenstein target_rel,
+           Eisenstein start_pos, Eisenstein FP0, Eisenstein FP1, Eisenstein FP2)
 {
+    // Candidate endpoints, all ORIENTATION-PRESERVING (`back` is a rotation,
+    // never a reflection): the raw cell-frame displacement, and its sector0
+    // rotation-representative (a >= 0, b >= 0), where walk_line's corridor is
+    // developed.  Rotation keeps the SAME chirality orbit -- the same geodesic
+    // -- so the neighbour cycles stay CCW, which the CCW-only east-walker in
+    // enumerate_cell_lattice requires.  (A reflection would swap to the mirror
+    // geodesic and reverse every cycle, which folds; we never do it.)  The six
+    // unit rotations of any nonzero vector are 60 degrees apart, so exactly one
+    // lands in the 60-degree sector0.
+    Eisenstein rotrep{0, 0};
+    bool have_rot = false;
+    for (int k = 0; k < 6; ++k) {
+        const Eisenstein E = target_rel * unit_direction(k);   // rotate by w^k
+        if (E.first >= 0 && E.second >= 0) { rotrep = E; have_rot = true; break; }
+    }
+    std::vector<Eisenstein> endpoints;
+    endpoints.push_back(target_rel);
+    if (have_rot && rotrep != target_rel) endpoints.push_back(rotrep);
+
     const int deg = (int)T_sorted[start_vertex].size();
-    for (int i = 0; i < deg; ++i) {
-        const int v_a = T_sorted[start_vertex][i];
-        const int v_b = T_sorted[start_vertex][(i + 1) % deg];
-        for (int dir_uv = 0; dir_uv < 6; ++dir_uv) {
-            WalkResult wr = walk_line(T_sorted, start_vertex, v_a, v_b,
-                                      dir_uv, target_rel);
-            if (wr.final_vertex != target_vertex) continue;
+    for (const Eisenstein endpoint : endpoints) {
+        const LatticeIsometry back = align(endpoint, target_rel);   // walk frame -> cell frame (a rotation)
+        for (int i = 0; i < deg; ++i) {
+            const int v_a = T_sorted[start_vertex][i];
+            const int v_b = T_sorted[start_vertex][(i + 1) % deg];
+            for (int dir_uv = 0; dir_uv < 6; ++dir_uv) {
+                WalkResult wr = walk_line(T_sorted, start_vertex, v_a, v_b, dir_uv, endpoint);
+                if (wr.final_vertex != target_vertex) continue;
 
-            WalkVertices V;
-            if (!extract_walk_vertices(T_sorted, wr, V.by_id)) continue;
-            const auto itu = V.by_id.find(start_vertex);
-            const auto itv = V.by_id.find(target_vertex);
-            if (itu == V.by_id.end() || itu->second.first != Eisenstein(0, 0)) continue;
-            if (itv == V.by_id.end() || itv->second.first != target_rel)       continue;
-            if (walks_through_cone(wr)) continue;
+                WalkVertices V;
+                if (!extract_walk_vertices(T_sorted, wr, V.by_id)) continue;
+                const auto itu = V.by_id.find(start_vertex);
+                const auto itv = V.by_id.find(target_vertex);
+                if (itu == V.by_id.end() || itu->second.first != Eisenstein(0, 0)) continue;
+                if (itv == V.by_id.end() || itv->second.first != endpoint)         continue;
+                if (walks_through_cone(wr)) continue;
 
-            return V;
+                for (auto& [vid, pk] : V.by_id) {
+                    pk.first = back.apply(pk.first);
+                    // k0 is a lattice DIRECTION (T[v][0]'s developed direction), so
+                    // it rotates with the frame: map it through back's linear part.
+                    const Eisenstein d  = unit_direction(pk.second);
+                    const Eisenstein td = back.u * (back.reflect ? d.complex_conj() : d);
+                    pk.second = direction_of_unit(td);
+                }
+
+                // Reject a FOLDED development: any non-corner cone strictly
+                // inside the meta triangle means this walk took the wrong
+                // same-length geodesic branch.  Corners (start/target and the
+                // third corner) sit ON the boundary, so they are never strictly
+                // interior and need no special-casing.
+                bool folds_cone = false;
+                for (const auto& [vid, pk] : V.by_id) {
+                    if (vid >= 12) continue;                                     // hex
+                    if (vid == start_vertex || vid == target_vertex) continue;   // this edge's cones
+                    if (strictly_inside_meta(pk.first + start_pos, FP0, FP1, FP2)) {
+                        folds_cone = true; break;
+                    }
+                }
+                if (folds_cone) continue;
+
+                return V;
+            }
         }
     }
     return std::nullopt;
@@ -360,7 +441,8 @@ bool try_frame_walker(const Triangulation& T_sorted,
                       EdgeStrip& out)
 {
     const auto chain = find_chain(T_sorted, start_vertex, target_vertex,
-                                  target_pos - start_pos);
+                                  target_pos - start_pos,
+                                  start_pos, FP0, FP1, FP2);
     if (!chain) return false;
     return clip_to_meta_by_scanline(*chain, start_pos, FP0, FP1, FP2, out);
 }
