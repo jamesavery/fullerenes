@@ -69,6 +69,19 @@ struct WalkResult {
 // the geodesic); the walk returns g+1 entries in `walk`.  Internally
 // the walk is g concatenated primitive (gcd == 1) sub-walks, with
 // frame propagation at each intermediate hex vertex.
+//
+// @pre  For a correctly-developed (CCW, orientation-preserving) strip corridor,
+//       `endpoint` should lie in the sector0 wedge (endpoint.first >= 0 and
+//       endpoint.second >= 0).  The walk itself is orientation-preserving (it
+//       develops every crossed face CCW), so the frame is never reflected; but
+//       an endpoint outside sector0 -- especially with a negative component --
+//       may make the marcher exit the wrong edge and reach the target via a
+//       DIFFERENT same-length geodesic.  Callers that cannot guarantee the
+//       sector must therefore VALIDATE the returned development, not trust it:
+//       find_chain (eisenstein_paint.cc) probes the raw cell-frame displacement
+//       and its sector0 rotation-representative over all start combinations and
+//       keeps only a walk that lands the target exactly AND folds no non-corner
+//       cone into the face (the multi-edge / obtuse-cell disambiguator).
 WalkResult walk_line(const Triangulation& T,
                      int u, int v, int w,
                      int dir_uv,

@@ -2,8 +2,10 @@
 #include "fullerenes/layout2d.hh"
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <cstring>
+#include <map>
 #include <span>
 #include <unordered_map>
 
@@ -720,6 +722,62 @@ vector<vector<node_t>> oriented_neighbours_from_faces(int N, const vector<face_t
   return nb;
 }
 
+// Weld vertices that share an EXACT position -- a duplicate-vertex defect that a
+// PLY can carry (two vertex records at the same coordinates, woven into the
+// triangulation by a ZERO-LENGTH edge and its two zero-area faces). Left in, the
+// zero-length edge makes the intrinsic metric non-Euclidean (a + 0 <= a on the
+// degenerate face), which every metric consumer must then reject. Weld remaps
+// each face to the canonical (first-seen) index at its position, drops faces
+// that collapse to a repeated vertex, and compacts the point list; the rotation
+// builder below then validates that the collapsed mesh is still a closed
+// manifold (it throws otherwise -- a genuinely broken mesh, not a stray
+// duplicate). A clean mesh has no coincident vertices, so this is a no-op
+// (returns 0) and the point/face arrays are untouched. Returns #vertices merged.
+int weld_coincident_vertices(vector<coord3d>& points, vector<face_t>& faces) {
+  std::map<std::array<double, 3>, int> canon;    // position -> canonical (lowest) index
+  vector<int> to_canon(points.size());
+  int merged = 0;
+  for (int i = 0; i < (int)points.size(); i++) {
+    const std::array<double, 3> key{points[i][0], points[i][1], points[i][2]};
+    const auto [it, fresh] = canon.emplace(key, i);
+    to_canon[i] = it->second;
+    if (!fresh) merged++;
+  }
+  if (merged == 0) return 0;                      // clean mesh: leave everything as read
+
+  // Relabel faces to canonical indices; drop any that now repeat a vertex (the
+  // zero-area faces of a collapsed edge).
+  vector<face_t> kept;
+  kept.reserve(faces.size());
+  for (const face_t& f : faces) {
+    face_t g;
+    g.reserve(f.size());
+    for (int v : f) g.push_back(to_canon[v]);
+    bool degen = false;
+    for (size_t a = 0; a + 1 < g.size() && !degen; a++)
+      for (size_t b = a + 1; b < g.size(); b++)
+        if (g[a] == g[b]) { degen = true; break; }
+    if (!degen) kept.push_back(std::move(g));
+  }
+
+  // Compact: renumber the still-referenced vertices to a dense [0, M) in
+  // first-appearance order, rebuilding the point list to match.
+  vector<int> new_index(points.size(), -1);
+  vector<coord3d> new_points;
+  for (face_t& g : kept)
+    for (int& v : g)
+      if (new_index[v] < 0) {
+        new_index[v] = (int)new_points.size();
+        new_points.push_back(points[v]);
+      }
+  for (face_t& g : kept)
+    for (int& v : g) v = new_index[v];
+
+  points = std::move(new_points);
+  faces  = std::move(kept);
+  return merged;
+}
+
 // Flatten owned adjacency into the row-major CSR an RSRAdjacencyView wraps.
 // `flat`/`deg` must outlive the returned view.
 neighbours_t csr_view(const vector<vector<node_t>>& nb, vector<node_t>& flat, vector<uint8_t>& deg) {
@@ -787,6 +845,9 @@ Polyhedron Polyhedron::from_ply(FILE *file)
   vector<coord3d> points;
   vector<face_t>  faces;
   read_ply(file, points, faces);
+  // Repair duplicate coincident vertices (zero-length edges) before building the
+  // rotation system -- a no-op on a clean mesh (see weld_coincident_vertices).
+  weld_coincident_vertices(points, faces);
 
   vector<vector<node_t>> nb = oriented_neighbours_from_faces((int)points.size(), faces);
   check_degrees(nb, "Polyhedron::from_ply");

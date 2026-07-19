@@ -142,6 +142,61 @@ TEST(PlyIO, DeltahedronRoundTrip) {
   EXPECT_EQ(sorted_triangles(E.triangles()), sorted_triangles(D.triangles()));
 }
 
+// from_ply welds duplicate coincident vertices (a zero-length edge and its two
+// zero-area faces -- the tomography-mesh defect). This "doubled apex" is a valid
+// closed manifold (5 verts, 6 faces, consistently wound) where apex vertex 4 is
+// an exact copy of vertex 3 at (0,0,1), joined by the zero-length edge (3,4);
+// welding merges 4 into 3, drops the two degenerate bridge faces, and leaves the
+// clean tetrahedron {0,1,2,3}.
+TEST(PlyIO, WeldsCoincidentVertices) {
+  const char* doubled_apex =
+    "ply\nformat ascii 1.0\n"
+    "element vertex 5\n"
+    "property float x\nproperty float y\nproperty float z\n"
+    "element face 6\n"
+    "property list uchar int vertex_indices\nend_header\n"
+    "1 0 0\n-0.5 0.866 0\n-0.5 -0.866 0\n0 0 1\n0 0 1\n"       // vertex 4 == vertex 3
+    "3 0 2 1\n3 0 1 3\n3 1 2 4\n3 2 0 4\n3 3 1 4\n3 0 3 4\n";  // (3,4) is zero-length
+  FILE* tmp = std::tmpfile();
+  ASSERT_NE(tmp, nullptr);
+  std::fputs(doubled_apex, tmp);
+  std::rewind(tmp);
+  Deltahedron D = Deltahedron::from_ply(tmp);
+  std::fclose(tmp);
+
+  // The coincident apex is gone: a clean 4-vertex, 4-face tetrahedron.
+  EXPECT_EQ(D.N, 4);
+  EXPECT_EQ((int)D.triangles().size(), 4);
+  // No zero-length edge survives (the defect the weld exists to remove): every
+  // triangle side has positive 3D length.
+  double min_len = 1e300;
+  for (const tri_t& t : D.triangles())
+    for (int e = 0; e < 3; e++)
+      min_len = std::min(min_len, (D.points[t[(e + 1) % 3]] - D.points[t[e]]).norm());
+  EXPECT_GT(min_len, 1e-9);
+}
+
+// A clean mesh (no coincident vertices) is untouched by the weld -- the vertex
+// count and faces are exactly as read.
+TEST(PlyIO, WeldLeavesCleanMeshUnchanged) {
+  const char* tet_ply =
+    "ply\nformat ascii 1.0\n"
+    "element vertex 4\n"
+    "property float x\nproperty float y\nproperty float z\n"
+    "element face 4\n"
+    "property list uchar int vertex_indices\nend_header\n"
+    "0 0 0\n1 0 0\n0 1 0\n0 0 1\n"
+    "3 0 2 1\n3 0 1 3\n3 1 2 3\n3 2 0 3\n";
+  FILE* tmp = std::tmpfile();
+  ASSERT_NE(tmp, nullptr);
+  std::fputs(tet_ply, tmp);
+  std::rewind(tmp);
+  Deltahedron D = Deltahedron::from_ply(tmp);
+  std::fclose(tmp);
+  EXPECT_EQ(D.N, 4);
+  EXPECT_EQ((int)D.triangles().size(), 4);
+}
+
 // A non-triangulation PLY is rejected by Deltahedron::from_ply with mesh_io_error.
 TEST(PlyIO, DeltahedronRejectsNonTriangulation) {
   const char* cube_ply =
