@@ -480,6 +480,16 @@ void coord3<double>::ddihedral(const coord3<double>& b, const coord3<double>& c,
   const coord3d abc = ab.cross(bc);
   const coord3d bcd = bc.cross(cd);
 
+  // A degenerate quadruple (collinear a,b,c or b,c,d, or coincident
+  // atoms) has no defined dihedral plane and the 1/|abc|, 1/|bcd|
+  // factors below are singular; take the subgradient 0, mirroring the
+  // theta in {0, pi} guard in dangle().  Keeps the gradient finite when
+  // atoms transiently align during optimization.
+  if(abc.dot(abc) == 0 || bcd.dot(bcd) == 0 || bc.dot(bc) == 0){
+    db = dc = dd = coord3d();
+    return;
+  }
+
   const double abc_length_inv = 1.0/abc.norm();
   const double bcd_length_inv = 1.0/bcd.norm();
   const coord3d abc1 = abc * abc_length_inv;

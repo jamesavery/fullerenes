@@ -10,7 +10,7 @@ target_link_libraries(gc-spiral-benchmark fullerenes)
 add_executable(symmetry-benchmark symmetry-benchmark.cc)
 target_link_libraries(symmetry-benchmark fullerenes)
 
-link_libraries(fortran_opt fullerenes)
+link_libraries(fullerenes)
 add_executable(fullerene-optimize-seq fullerene-optimize-seq.cc)
 add_executable(generate_benchmark generate_benchmark.cc)
 

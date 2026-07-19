@@ -1,4 +1,4 @@
-link_libraries(fortran_opt fullerenes)
+link_libraries(fullerenes)
 add_executable(perfect-matchings perfect-matchings.cc)
 add_executable(playground-symmetry symmetry.cc)
 add_executable(read_polyhedron read_polyhedron.cc)

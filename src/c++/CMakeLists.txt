@@ -18,7 +18,13 @@ find_package(OpenMP)
 # (planargraph's dgetrf_) migrated to the in-house BLAS-free dense_linalg,
 # and the Fortran solvers never used them.  See dense_linalg.hh for why the
 # library must not silently regain a BLAS dependency.
-target_link_libraries(fullerenes fortran_opt buckygen)
+#
+# fortran_opt deliberately NOT linked either: the last C++ -> Fortran call
+# (optimized_geometry -> sa_optff_) was replaced by the native Wu force
+# field (wu_forcefield.cc); the legacy Fortran is now reachable only from
+# the legacy fullerene_program, and the cross-validation parity tests
+# (claude-projects/unfortran/tests) link the Fortran archives directly.
+target_link_libraries(fullerenes buckygen)
 if(OpenMP_CXX_FOUND)
   target_link_libraries(fullerenes OpenMP::OpenMP_CXX)
 endif()

@@ -25,6 +25,7 @@
 #include "fullerenes/triangulation.hh"
 #include <array>
 #include <cmath>
+#include <functional>
 #include <vector>
 
 struct AlexandrovSolver {
@@ -49,6 +50,17 @@ struct AlexandrovSolver {
   // D.nv, solve() uses this in place of the default initial_radii(D)
   // (= 2·R_max·1).  Used by warm-start callers.
   std::vector<double> r_init_override;
+
+  // Optional replacement for the stage-4 trust-region Newton polish.
+  // When set, solve() invokes it with the exact post-extrapolation state
+  // (D, r) in place of the internal polish; the callable must drive
+  // max|kappa(D, r)| toward 0, flipping D to weighted-Delaunay as it
+  // moves r (AlexandrovSolver::flip_to_weighted_delaunay), and return
+  // whether it converged.  The internal trace/diag recorders are not
+  // populated on this path.  Incubation seam for the optimize framework
+  // (claude-projects/optimize) to run its re-expressed polish inside the
+  // full production pipeline for head-to-head validation.
+  std::function<bool(DelaunayTriangulation&, std::vector<double>&)> polish_override;
 
   // The homotopy κ(r)=t·κ₁ is traced by natural t-continuation (BI eq. 38,
   // dr/dt=J⁻¹κ₁): the path is monotone in t (BI Thm 5: J non-degenerate,
@@ -250,6 +262,31 @@ struct AlexandrovSolver {
   // @pre  r.size() == T.nv
   static bool feasible(const DelaunayTriangulation& T,
                         const std::vector<double>& r);
+
+  // Clip step δ so r + δ' ∈ F(T) strictly: δ' = δ when already feasible,
+  // else (0.95 · s_max) · δ with s_max the largest feasible fraction
+  // (bisected).  The single source of truth for the F(T)-feasible step
+  // rule, used by the endgame extrapolation and the Newton polish; exposed
+  // so external polish implementations (polish_override) apply the SAME
+  // rule instead of transcribing it.  `clipped` (if non-null) reports
+  // whether a scale was applied.
+  // @anchor gcp-feasible-step
+  // @pre  r ∈ F(T); delta.size() == r.size()
+  // @post r + result ∈ F(T) strictly
+  static std::vector<double> feasible_step(const DelaunayTriangulation& T,
+                                            const std::vector<double>& r,
+                                            const std::vector<double>& delta,
+                                            bool* clipped = nullptr);
+
+  // Flip T to the weighted-Delaunay triangulation of r (B-I bad-edge
+  // rule), up to the internal iteration cap.  Returns the number of
+  // flips performed.  Exposed for external polish implementations
+  // (polish_override) — same single-source-of-truth rationale as
+  // feasible_step.
+  // @anchor topology-flip-to-weighted-delaunay
+  // @pre  as gcp-kappa
+  static int flip_to_weighted_delaunay(DelaunayTriangulation& T,
+                                        const std::vector<double>& r);
 
   // ------ B-I tesselation extraction (Theorem Del=Pol, B-I §3.4) ------
 

@@ -244,4 +244,24 @@ minimize::Outcome optimize(const ForceField& FF, std::span<coord3d> x,
     return run(F0, opt);
 }
 
+int separate_coincident(std::span<coord3d> x) {
+    const double too_close = 0.1, displacement = 0.5;  // optimize_other's constants
+    const size_t N = x.size();
+    int n_displaced = 0;
+    for (int pass = 0; pass < 5; ++pass) {  // re-scan: a displacement could re-collide
+        int moved = 0;
+        for (size_t u = 0; u < N; ++u)
+            for (size_t v = u + 1; v < N; ++v)
+                if ((x[u] - x[v]).norm() < too_close) {
+                    const coord3d d(displacement, displacement, displacement);
+                    x[u] += d;
+                    x[v] -= d;
+                    ++moved;
+                }
+        n_displaced += moved;
+        if (!moved) break;
+    }
+    return n_displaced;
+}
+
 }  // namespace wu

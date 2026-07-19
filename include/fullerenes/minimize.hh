@@ -19,8 +19,10 @@
 // Convergence tests (either may be disabled):
 //   * relative energy decrease  2|f1 - f0| <= ftol_rel (|f1|+|f0|+eps)
 //     with eps = 1e-9 -- the same criterion as the legacy Fortran
-//     SA_frprmn3d, so drivers replacing it inherit identical stopping
-//     semantics;
+//     SA_frprmn3d, except required on TWO consecutive iterations
+//     (the Fortran stops at the first event; a single slow step --
+//     capped, or barely satisfying Wolfe -- must not stop the descent
+//     far from the minimum);
 //   * gradient infinity norm    ||g||_inf <= gtol_inf.
 //
 // max_iters is a safeguard against runaway loops, not a tuning knob:
@@ -109,12 +111,11 @@ bool wolfe_search(FG&& fg,
     };
 
     // Zoom phase (Alg 3.6): maintain bracket [t_lo, t_hi] with
-    // phi(t_lo) the lowest Armijo-satisfying value seen.
-    auto zoom = [&](double t_lo, double f_lo, double dg_lo,
+    // phi(t_lo) the lowest Armijo-satisfying value seen; trial points by
+    // bisection (the interpolation-free safeguarded variant).
+    auto zoom = [&](double t_lo, double f_lo,
                     double t_hi, int evals_left) -> bool {
         for (int i = 0; i < evals_left; ++i) {
-            // Quadratic interpolation using (t_lo, f_lo, dg_lo) and the
-            // bisection midpoint as safeguard.
             double t = 0.5 * (t_lo + t_hi);
             double dphi = 0;
             const double fv = phi(t, dphi);
@@ -124,7 +125,7 @@ bool wolfe_search(FG&& fg,
             }
             if (std::fabs(dphi) <= -c2 * dg0) { f_out = fv; return true; }
             if (dphi * (t_hi - t_lo) >= 0) t_hi = t_lo;
-            t_lo = t; f_lo = fv; dg_lo = dphi;
+            t_lo = t; f_lo = fv;
         }
         // Budget exhausted: accept the best Armijo point if we have one.
         if (t_lo > 0) {
@@ -135,7 +136,7 @@ bool wolfe_search(FG&& fg,
         return false;
     };
 
-    double t_prev = 0, f_prev = f0, dg_prev = dg0;
+    double t_prev = 0, f_prev = f0;
     double t = std::min(t_init, t_max);
     for (int i = 0; i < max_evals; ++i) {
         double dphi = 0;
@@ -143,12 +144,12 @@ bool wolfe_search(FG&& fg,
         if (!std::isfinite(fv)
             || fv > f0 + c1 * t * dg0
             || (i > 0 && fv >= f_prev))
-            return zoom(t_prev, f_prev, dg_prev, t, max_evals - i - 1);
+            return zoom(t_prev, f_prev, t, max_evals - i - 1);
         if (std::fabs(dphi) <= -c2 * dg0) { f_out = fv; return true; }
         if (dphi >= 0)
-            return zoom(t, fv, dphi, t_prev, max_evals - i - 1);
+            return zoom(t, fv, t_prev, max_evals - i - 1);
         if (t >= t_max) { f_out = fv; return true; }   // capped: Armijo holds
-        t_prev = t; f_prev = fv; dg_prev = dphi;
+        t_prev = t; f_prev = fv;
         t = std::min(2 * t, t_max);
         if (t > 1e8) return false;
     }
@@ -175,6 +176,7 @@ Outcome lbfgs(FG&& fg, std::span<double> x, const Options& opt = {})
     ++out.n_evals;
 
     int stored = 0, head = 0;   // ring buffer of (s, y) pairs
+    int n_stag = 0;             // consecutive energy-stagnation events
     for (int k = 0; k < opt.max_iters; ++k) {
         out.iters = k;
         out.gmax  = detail::inf_norm(g);
@@ -239,15 +241,19 @@ Outcome lbfgs(FG&& fg, std::span<double> x, const Options& opt = {})
             continue;
         }
 
-        // Fortran-compatible relative-energy stagnation test.
+        // Fortran-compatible relative-energy stagnation test, required on
+        // two consecutive iterations (see header comment).
         if (opt.ftol_rel > 0
             && 2.0 * std::fabs(f_new - f)
                  <= opt.ftol_rel * (std::fabs(f_new) + std::fabs(f) + EPS)) {
-            f = f_new;
-            out.converged = true;
-            ++out.iters;
-            break;
-        }
+            if (++n_stag >= 2) {
+                f = f_new;
+                out.converged = true;
+                ++out.iters;
+                break;
+            }
+        } else
+            n_stag = 0;
 
         // Store the (s, y) pair when it carries curvature information.
         auto& s = S[head];

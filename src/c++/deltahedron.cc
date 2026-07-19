@@ -3544,6 +3544,41 @@ OptResult Deltahedron::optimize(std::span<const coord3d> initial_geometry, doubl
   return final_opt_result;
 }
 
+// AET seam (see graphview.hh): thin wrappers over the internal term
+// implementations, so external optimizer frameworks evaluate the SAME
+// energy stack as optimize()/optimize_patch().
+template<>
+double DeltahedronView<double>::aet_energy_gradient(
+    const vector<edge_t>& edges, std::span<const coord3d> x, vector<coord3d>* grad,
+    double target_L, double k_bond, double k_angle, double k_curv, double k_flat,
+    double k_conv, double sigma_conv, const vector<bool>& conv_mask) const
+{
+  return deltahedron_energy_and_gradient(*this, edges, x, grad, target_L,
+                                         k_bond, k_angle, k_curv, k_flat,
+                                         k_conv, sigma_conv, conv_mask);
+}
+
+template<>
+void DeltahedronView<double>::aet_hv_product(
+    const vector<edge_t>& edges, std::span<const coord3d> x, const vector<coord3d>& v,
+    vector<coord3d>& Hv, double target_L, double k_bond, double k_angle,
+    double k_curv, double k_flat, const vector<bool>& fixed,
+    double k_conv, double sigma_conv) const
+{
+  for (auto& h : Hv) h = coord3d(0, 0, 0);
+  deltahedron_hv_product(*this, edges, x, v, Hv, target_L,
+                         k_bond, k_angle, k_curv, k_flat, fixed,
+                         k_conv, sigma_conv);
+}
+
+template<>
+void DeltahedronView<double>::aet_h_values(
+    std::span<const coord3d> x, vector<double>& h,
+    const vector<bool>& fixed) const
+{
+  compute_h_values(*this, x, h, fixed);
+}
+
 template<>
 double DeltahedronView<double>::gradient_check(std::span<const coord3d> geometry, double target_L, double eps) const
 {

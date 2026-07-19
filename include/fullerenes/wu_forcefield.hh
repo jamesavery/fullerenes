@@ -160,4 +160,14 @@ ForceField forcefield(const FullereneGraphView& G, int variant = 3,
 minimize::Outcome optimize(const ForceField& FF, std::span<coord3d> x,
                            double ftol = 1e-12);
 
+// Start-geometry repair: zero_order_geometry occasionally places two
+// vertices at exactly the same position (observed: C40 isomer 8), which
+// makes bond/angle terms NaN and poisons any minimization from that
+// start.  Displace such pairs apart (same remedy and constants as
+// PolyhedronView::optimize_other) and let the force field do the rest.
+// Deterministic; no-op on well-separated geometry.  Returns the number
+// of displaced pairs.
+// @anchor wu-separate-coincident
+int separate_coincident(std::span<coord3d> x);
+
 }  // namespace wu

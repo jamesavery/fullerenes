@@ -1,7 +1,7 @@
+#include <cstdio>
 #include <fstream>
 #include <vector>
 #include <list>
-#include <vector>
 #include <utility> //required for pair
 
 #include "fullerenes/fullerenegraph.hh"
@@ -169,34 +169,19 @@ vector<coord3d> FullereneGraphView::eisenstein_paint_geometry(double bond_length
   return points;
 }
 
+// Host force-field geometry optimization. Formerly the last C++ -> Fortran
+// dependence (sa_optff_ in src/fortran/opt-standalone.f); now the native
+// Wu force-field port, validated pointwise and end-to-end against the
+// Fortran (claude-projects/unfortran/tests/test_wu_forcefield.cc).
 vector<coord3d> FullereneGraphView::optimized_geometry(std::span<const coord3d> points, int opt_method, double ftol) const
 {
   vector<coord3d> coordinates(points.begin(),points.end());
-  wu::optimize(wu::forcefield(*this, opt_method), coordinates, ftol);
-  return coordinates;
-}
-
-// Legacy Fortran reference implementation (SA_OptFF, opt-standalone.f).
-// Kept callable for cross-validation of the C++ force field; retires
-// together with the Fortran sources.
-extern "C" void sa_optff_(const void **graph, const int *N, const int *ihessian, const int *iprinthessian,
-                       const int *iopt,double *Dist,double *ftol,double *force);
-extern "C" void default_force_parameters_(const int *iopt, double *parameters);
-
-vector<coord3d> FullereneGraphView::optimized_geometry_fortran(std::span<const coord3d> points, int opt_method, double ftol) const
-{
-  vector<coord3d> coordinates(points.begin(),points.end());
-  vector<double> force_parameters(19);
-
-  default_force_parameters_(&opt_method,&force_parameters[0]);
-
-  int zero = 0;
-  // Fortran interface expects FullereneGraph*, but this method is on
-  // FullereneGraphView. Both start with the same GraphView layout, so
-  // the Fortran callbacks (which only read adjacency) work correctly.
-  const void *g = static_cast<const GraphView*>(this);
-  sa_optff_(&g,&N,&zero,&zero,&opt_method,(double*)&coordinates[0],&ftol,&force_parameters[0]);
-
+  wu::separate_coincident(coordinates);
+  minimize::Outcome out = wu::optimize(wu::forcefield(*this, opt_method), coordinates, ftol);
+  if (!out.converged)
+    fprintf(stderr, "FullereneGraphView::optimized_geometry: iteration budget "
+            "exhausted at E=%g, |grad|_inf=%g -- convergence, not the budget, "
+            "is the problem\n", out.f, out.gmax);
   return coordinates;
 }
 
