@@ -184,6 +184,9 @@ struct DelaunayTriangulation {
   };
   struct PointTracker {
     bool active = false;
+    // @inv partition: by_face[f] == { i : points[i].face == f } -- every
+    //      point indexed exactly once, under its own (live) face.  Holds
+    //      after every hooked operation; asserted by the transport tests.
     std::vector<TrackedPoint>     points;
     std::vector<std::vector<int>> by_face;   // face -> indices into points
     // FP policy: after transport, a barycentric in [-CLAMP_TOL, 0) is clamped

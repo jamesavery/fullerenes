@@ -527,28 +527,36 @@ void clamp_barycentric(DelaunayTriangulation::PointTracker& tk,
   for (int i = 0; i < 3; i++) b[i] /= s;
 }
 
-// One mid-transport tracked point: its index and planar position in the
-// operation's isometric development.  idx == -1 marks a point being seeded
-// (the removed flat vertex itself).
-struct Carried { int idx; double x, y; };
+// One tracked point EXPRESSED IN THE DEVELOPMENT: its index in
+// tracker.points and its coordinates in the operation's isometric planar
+// development.  idx == -1 marks a point being seeded (the removed flat
+// vertex itself, at the development's origin).
+struct DevelopedPoint { int idx; double x, y; };
 
-// A relocation candidate: the CCW planar development of one future face
-// (its face id is resolved at commit time by the caller).
-struct TriCand { double x0, y0, x1, y1, x2, y2; };
+// The development of one POST-operation face: its three corner positions,
+// in the slot order the face's half-edge cycle will have.  The face id is
+// resolved at commit time by the caller.
+struct DevelopedTriangle { double x0, y0, x1, y1, x2, y2; };
 
-// Choose the candidate where the point's minimum barycentric is largest
-// (deterministic on shared edges; boundary points cannot fall through) and
-// clamp.  Pure computation over the development: a clamp throw here fires
-// BEFORE the caller has mutated anything.
-struct Placed { int cand; double b[3]; };
-Placed place_point(DelaunayTriangulation::PointTracker& tk,
-                   double px, double py,
-                   const std::vector<TriCand>& cands, const char* who)
+// The re-expression of a developed point in the post-operation charts:
+// which candidate triangle hosts it, and its barycentric coordinates there.
+struct Relocation { int cand; double b[3]; };
+
+// Re-express one developed point: choose the candidate triangle where the
+// point's minimum barycentric is largest, then clamp.  Deterministic on
+// shared edges -- the winning chart depends only on the development
+// coordinates, never on which source face supplied the point -- and
+// boundary points cannot fall through.  Pure computation over the
+// development: a clamp throw here fires BEFORE the caller has mutated
+// anything (the commit-or-nothing property of both transport hooks).
+Relocation relocate(DelaunayTriangulation::PointTracker& tk,
+                    double px, double py,
+                    const std::vector<DevelopedTriangle>& cands, const char* who)
 {
-  Placed out{-1, {0, 0, 0}};
+  Relocation out{-1, {0, 0, 0}};
   double best_m = -std::numeric_limits<double>::infinity();
   for (size_t i = 0; i < cands.size(); i++) {
-    const TriCand& t = cands[i];
+    const DevelopedTriangle& t = cands[i];
     double b[3];
     const double m = planar_barycentric(px, py, t.x0, t.y0, t.x1, t.y1,
                                         t.x2, t.y2, b);
@@ -559,6 +567,53 @@ Placed place_point(DelaunayTriangulation::PointTracker& tk,
   }
   clamp_barycentric(tk, out.b, who);
   return out;
+}
+
+// Express every tracked point of face f in the operation's development:
+// the barycentric combination of f's slot corners (current cycle order),
+// where `corner` maps each half-edge of the cycle to its origin's
+// development position.  Appends to `out`; reads the tracker only.
+template <class CornerFn>
+void develop_bucket(const DelaunayTriangulation& D, int f, CornerFn corner,
+                    std::vector<DevelopedPoint>& out)
+{
+  if ((int)D.tracker.by_face.size() <= f) return;
+  const std::vector<int>& bucket = D.tracker.by_face[f];
+  if (bucket.empty()) return;
+  const auto h = D.face_halfedges(f);
+  double x0, y0, x1, y1, x2, y2;
+  corner(h[0], x0, y0); corner(h[1], x1, y1); corner(h[2], x2, y2);
+  for (int idx : bucket) {
+    const DelaunayTriangulation::TrackedPoint& p = D.tracker.points[idx];
+    out.push_back({idx, p.b[0]*x0 + p.b[1]*x1 + p.b[2]*x2,
+                        p.b[0]*y0 + p.b[1]*y1 + p.b[2]*y2});
+  }
+}
+
+// Commit precomputed relocations: point idx >= 0 moves to its new chart;
+// idx == -1 seeds a new tracked point with label seed_label.  face_of_cand
+// maps each candidate triangle to its (post-operation) face id.  Cannot
+// fail: every Relocation was verified by relocate() before any mutation.
+void commit_relocations(DelaunayTriangulation& D,
+                        const std::vector<DevelopedPoint>& pts,
+                        const std::vector<Relocation>& rel,
+                        const std::vector<int>& face_of_cand,
+                        int seed_label)
+{
+  for (size_t i = 0; i < pts.size(); i++) {
+    const int f = face_of_cand[rel[i].cand];
+    if (pts[i].idx < 0) {
+      const int idx = (int)D.tracker.points.size();
+      D.tracker.points.push_back({seed_label, f,
+          {rel[i].b[0], rel[i].b[1], rel[i].b[2]}});
+      D.tracker.bucket(f).push_back(idx);
+    } else {
+      DelaunayTriangulation::TrackedPoint& p = D.tracker.points[pts[i].idx];
+      p.face = f;
+      p.b[0] = rel[i].b[0]; p.b[1] = rel[i].b[1]; p.b[2] = rel[i].b[2];
+      D.tracker.bucket(f).push_back(pts[i].idx);
+    }
+  }
 }
 
 }  // namespace
@@ -625,19 +680,22 @@ bool DelaunayTriangulation::flip_edge(int h)
   // face slots fh, ft by rewiring in place (avoids dealloc/realloc).
   int fh = he_face[h], ft = he_face[t];
 
-  // ---- point transport: COMPUTE relocations before any mutation ----
-  // (DESIGN-cubic-exact-paint.md 4.1.)  Planar development of the diamond:
+  // ---- point transport: express + re-express BEFORE any mutation ----
+  // (DESIGN-cubic-exact-paint.md 4.1.)  Development of the diamond:
   // u = (0,0), v = (e,0), B above (face of h is CCW in the development),
   // D below.  Positions are keyed per HALF-EDGE (slot anchoring, tracker
   // banner): origins of {h, h1, h2} are {u, v, B}; of {t, h4, h5} are
   // {v, u, D}.  Label-free, so repeated-corner faces (B == D, bigons)
-  // transport the same.  The candidate triangles of the flipped diamond
-  // are (B, D, v) -> face fh and (D, B, u) -> face ft (the post-rewire
-  // cycles h->h5->h1 resp. t->h2->h4), so a clamp throw fires here with
-  // the complex and tracker fully untouched; the rewire below cannot
-  // throw, making the whole flip commit-or-nothing.
-  std::vector<Carried> carry;
-  std::vector<Placed>  placed;
+  // transport the same.  The post-flip charts are (B, D, v) -> face fh
+  // and (D, B, u) -> face ft (the post-rewire cycles h->h5->h1 resp.
+  // t->h2->h4), so a clamp throw fires here with the complex and tracker
+  // fully untouched; the rewire below cannot throw, making the whole
+  // flip commit-or-nothing.
+  // @post (transport) each point's intrinsic surface position is
+  //       unchanged: the development from the diamond's five lengths is
+  //       an isometry, and re-expression only changes coordinates.
+  std::vector<DevelopedPoint> carry;
+  std::vector<Relocation>     rel;
   if (tracker.active) {
     const double e_dev = he_length[h];
     const double lvB = he_length[h1], lBu = he_length[h2];
@@ -654,24 +712,16 @@ bool DelaunayTriangulation::flip_edge(int h)
       else if (he == h4) { x = 0;     y = 0;  }
       else               { x = xD;    y = yD; }   // h5
     };
-    for (int f : {fh, ft}) {
-      for (int idx : tracker.bucket(f)) {
-        const TrackedPoint& p = tracker.points[idx];
-        const int c0 = f_he[f], c1 = he_next[c0], c2 = he_next[c1];
-        double x0, y0, x1, y1, x2, y2;
-        corner(c0, x0, y0); corner(c1, x1, y1); corner(c2, x2, y2);
-        carry.push_back({idx, p.b[0]*x0 + p.b[1]*x1 + p.b[2]*x2,
-                              p.b[0]*y0 + p.b[1]*y1 + p.b[2]*y2});
-      }
-    }
+    develop_bucket(*this, fh, corner, carry);
+    develop_bucket(*this, ft, corner, carry);
     if (!carry.empty()) {
-      const std::vector<TriCand> cands = {
+      const std::vector<DevelopedTriangle> charts = {
         {xB, yB, xD, yD, e_dev, 0.0},   // cand 0 -> face fh (B, D, v)
         {xD, yD, xB, yB, 0.0,   0.0}};  // cand 1 -> face ft (D, B, u)
-      placed.reserve(carry.size());
-      for (const Carried& c : carry)
-        placed.push_back(place_point(tracker, c.x, c.y, cands,
-                                     "flip_edge transport"));
+      rel.reserve(carry.size());
+      for (const DevelopedPoint& c : carry)
+        rel.push_back(relocate(tracker, c.x, c.y, charts,
+                               "flip_edge transport"));
       tracker.bucket(fh).clear();
       tracker.bucket(ft).clear();
     }
@@ -702,14 +752,10 @@ bool DelaunayTriangulation::flip_edge(int h)
   if (B == D) v_out[B] = h5;
 
   // ---- point transport: COMMIT the precomputed relocations ----
-  // f_he[fh] = h and f_he[ft] = t were set above, so the candidate slot
+  // f_he[fh] = h and f_he[ft] = t were set above, so the chart slot
   // orders (B, D, v) / (D, B, u) match the anchoring convention.
-  for (size_t i = 0; i < carry.size(); i++) {
-    TrackedPoint& p = tracker.points[carry[i].idx];
-    p.face = (placed[i].cand == 0) ? fh : ft;
-    p.b[0] = placed[i].b[0]; p.b[1] = placed[i].b[1]; p.b[2] = placed[i].b[2];
-    tracker.bucket(p.face).push_back(carry[i].idx);
-  }
+  if (!carry.empty())
+    commit_relocations(*this, carry, rel, {fh, ft}, /*seed_label*/ -1);
   return true;
 }
 
@@ -1040,41 +1086,37 @@ void DelaunayTriangulation::remove_flat_vertex(int v)
                          // restructure rounds handle these; behaviorally
                          // identical to the previous fall-through)
 
-  // ---- point transport: COMPUTE relocations before any mutation ----
+  // ---- point transport: express + re-express BEFORE any mutation ----
   // (DESIGN-cubic-exact-paint.md 4.2.)  The FanPolygon IS the isometric
   // development of v's star (apex v at the origin, boundary vertex i at
   // (x(i), y(i))).  The removed vertex seeds a tracked point at the origin
   // (label = v: removal never renumbers, so this is the input label);
   // points already inside the star faces are carried.  Slot anchoring: the
   // cycle of star face i is {spoke_he[i], inner_rim[i], prev}, with origins
-  // {v, nb[i], nb[(i+1)%k]}.  Ear clipping and the placements (incl. the
-  // clamp guard) run BEFORE the surgery, so a transport-detected failure
-  // leaves complex and tracker untouched; a throw from the DCEL surgery
-  // itself (splice_fan internals) poisons both, per the file's deep-
-  // invariant convention.
+  // {v, nb[i], nb[(i+1)%k]}.  Ear clipping and every re-expression (incl.
+  // the clamp guard) run BEFORE the surgery, so a transport-detected
+  // failure leaves complex and tracker untouched; a throw from the DCEL
+  // surgery itself (splice_fan internals) poisons both, per the file's
+  // deep-invariant convention.
+  // @post (transport) each point's intrinsic surface position is
+  //       unchanged: the star development is an isometry, and
+  //       re-expression only changes coordinates; the seeded apex is the
+  //       removed vertex's own surface point.
   const bool tracking = tracker.active;
   FanPolygon fan;
   if (tracking || deg >= 4) fan = extract_fan(*this, v);
 
-  std::vector<Carried> carry;
+  std::vector<DevelopedPoint> carry;
   if (tracking) {
-    carry.push_back({-1, 0.0, 0.0});
+    carry.push_back({-1, 0.0, 0.0});                      // the seeded apex
     for (int i = 0; i < fan.k; i++) {
-      const int f = he_face[fan.spoke_he[i]];
       const int j = (i + 1) % fan.k;
       auto corner = [&](int he, double& x, double& y) {
         if      (he == fan.spoke_he[i])  { x = 0;        y = 0; }
         else if (he == fan.inner_rim[i]) { x = fan.x(i); y = fan.y(i); }
         else                             { x = fan.x(j); y = fan.y(j); }
       };
-      for (int idx : tracker.bucket(f)) {
-        const TrackedPoint& p = tracker.points[idx];
-        const int c0 = f_he[f], c1 = he_next[c0], c2 = he_next[c1];
-        double x0, y0, x1, y1, x2, y2;
-        corner(c0, x0, y0); corner(c1, x1, y1); corner(c2, x2, y2);
-        carry.push_back({idx, p.b[0]*x0 + p.b[1]*x1 + p.b[2]*x2,
-                              p.b[0]*y0 + p.b[1]*y1 + p.b[2]*y2});
-      }
+      develop_bucket(*this, he_face[fan.spoke_he[i]], corner, carry);
     }
   }
 
@@ -1091,21 +1133,21 @@ void DelaunayTriangulation::remove_flat_vertex(int v)
     new_tris.push_back({0, 1, 2});
   }
 
-  std::vector<Placed> placed;
+  std::vector<Relocation> rel;
   if (tracking) {
-    std::vector<TriCand> cands;
-    cands.reserve(new_tris.size());
+    std::vector<DevelopedTriangle> charts;
+    charts.reserve(new_tris.size());
     for (const auto& tv : new_tris)
-      cands.push_back({fan.x(tv[0]), fan.y(tv[0]),
-                       fan.x(tv[1]), fan.y(tv[1]),
-                       fan.x(tv[2]), fan.y(tv[2])});
-    placed.reserve(carry.size());
-    for (const Carried& c : carry)
-      placed.push_back(place_point(tracker, c.x, c.y, cands,
-                                   "remove_flat_vertex transport"));
-    // All placements verified: clear the source buckets before the surgery
-    // recycles their face slots (a recycled slot must never inherit stale
-    // entries).
+      charts.push_back({fan.x(tv[0]), fan.y(tv[0]),
+                        fan.x(tv[1]), fan.y(tv[1]),
+                        fan.x(tv[2]), fan.y(tv[2])});
+    rel.reserve(carry.size());
+    for (const DevelopedPoint& c : carry)
+      rel.push_back(relocate(tracker, c.x, c.y, charts,
+                             "remove_flat_vertex transport"));
+    // All re-expressions verified: clear the source buckets before the
+    // surgery recycles their face slots (a recycled slot must never
+    // inherit stale entries).
     for (int i = 0; i < fan.k; i++)
       tracker.bucket(he_face[fan.spoke_he[i]]).clear();
   }
@@ -1113,29 +1155,17 @@ void DelaunayTriangulation::remove_flat_vertex(int v)
   // ---- the removal itself (DCEL surgery) ----
   std::vector<int> new_faces;
   if (deg >= 4) {
-    // Phase 2: splice_fan replaces the star with the ear triangulation.
+    // splice_fan replaces the star with the ear triangulation.
     splice_fan(*this, v, fan, tri, tracking ? &new_faces : nullptr);
   } else {
-    // Phase 3: Direct removal (three faces merge into one triangle).
+    // Direct removal: three faces merge into one triangle.
     int f = remove_degree3(*this, v);
     if (tracking) new_faces.push_back(f);
   }
 
   // ---- point transport: COMMIT the precomputed relocations ----
-  for (size_t i = 0; i < carry.size(); i++) {
-    const int f = new_faces[placed[i].cand];
-    if (carry[i].idx < 0) {
-      const int idx = (int)tracker.points.size();
-      tracker.points.push_back({v, f,
-          {placed[i].b[0], placed[i].b[1], placed[i].b[2]}});
-      tracker.bucket(f).push_back(idx);
-    } else {
-      TrackedPoint& p = tracker.points[carry[i].idx];
-      p.face = f;
-      p.b[0] = placed[i].b[0]; p.b[1] = placed[i].b[1]; p.b[2] = placed[i].b[2];
-      tracker.bucket(f).push_back(carry[i].idx);
-    }
-  }
+  if (tracking)
+    commit_relocations(*this, carry, rel, new_faces, /*seed_label*/ v);
 }
 
 // Tie-break for an exactly tied self-loop (paper thm:tie-break; ties are

@@ -39,7 +39,7 @@
 // Failure contract: every failure here is a DEEP invariant violation
 // (malformed pipeline state, a chart that does not verify), thrown
 // uniformly as std::logic_error.  There is no named-outcome enum: the
-// pipeline's own prepare gate (StageError) is the modeled-failure
+// pipeline's own parametrize gate (PaintError) is the modeled-failure
 // boundary; past it, the atlas either works or the input violated its
 // contract.
 // =====================================================================

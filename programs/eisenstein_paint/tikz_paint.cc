@@ -71,8 +71,8 @@ int main(int argc, char** argv) {
     // type the unfold tools consume.
     auto to_placement = [](const ep::Cell& F, const ep::LatticeMap& lmap) {
         return CellPlacement{
-            F.cell_id, F.c0, F.c1, F.c2,
-            F.P0, F.P1, F.P2,
+            F.cell_id, F.corners[0], F.corners[1], F.corners[2],
+            F.P[0], F.P[1], F.P[2],
             F.ok ? lmap.entries : std::vector<std::pair<Eisenstein, int>>{},
             F.ok };
     };
@@ -95,10 +95,10 @@ int main(int argc, char** argv) {
 
     std::printf("cell %d: c0=%d c1=%d c2=%d  P0=(%d,%d) P1=(%d,%d) P2=(%d,%d)  "
                 "%zu lattice pts\n",
-                F.cell_id, F.c0, F.c1, F.c2,
-                F.P0.first, F.P0.second,
-                F.P1.first, F.P1.second,
-                F.P2.first, F.P2.second,
+                F.cell_id, F.corners[0], F.corners[1], F.corners[2],
+                F.P[0].first, F.P[0].second,
+                F.P[1].first, F.P[1].second,
+                F.P[2].first, F.P[2].second,
                 F_lmap.entries.size());
     for (int k = 0; k < 3; ++k) {
         const auto& nd = neighbours[k];

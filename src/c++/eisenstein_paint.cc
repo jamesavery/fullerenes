@@ -37,33 +37,43 @@ namespace eisenstein_paint {
 namespace {
 
 // =====================================================================
-// Internal: printf-style throw helper.
+// Internal helpers shared across the intrinsic layer.
 // =====================================================================
 
-[[noreturn]] void paint_throw(const char* fmt, ...) {
-    char buf[512];
-    va_list ap; va_start(ap, fmt);
-    std::vsnprintf(buf, sizeof buf, fmt, ap);
-    va_end(ap);
-    throw std::runtime_error(buf);
+// Layer I has ONE failure channel: every modeled failure throws
+// PaintError with its stage typed AT THE THROW SITE (the facades
+// translate to Status; nothing re-wraps or relabels).
+[[noreturn]] void embed_fail(std::string msg) {
+    throw PaintError(Code::EMBED, std::move(msg));
+}
+
+// The cone count of a cones-first-sorted triangulation: cones (degree
+// != 6) are sorted FIRST, so the count is the first index of degree 6.
+// The single definition of "how many cones" -- sorted_dual and the
+// per-cell primitives both call it.
+// @pre cones-first order (sort_flat_last applied)
+int count_cones(const TriangulationView& T_sorted) {
+    int n = 0;
+    while (n < (int)T_sorted.N && T_sorted.degree(n) != 6) ++n;
+    return n;
 }
 
 }  // namespace
 
 // =====================================================================
-// stage_name
+// code_name
 // =====================================================================
 
-const char* stage_name(Stage s) {
+const char* code_name(Code s) {
     switch (s) {
-        case Stage::OK:              return "ok";
-        case Stage::IDT_COMPUTE:     return "idt_compute";
-        case Stage::ALEXANDROV:      return "alexandrov";
-        case Stage::NON_SIMPLICIAL:  return "non_simplicial";
-        case Stage::EMBED:           return "embed";
-        case Stage::COVERAGE:        return "coverage";
-        case Stage::INTERPOLATE:     return "interpolate";
-        case Stage::UNEXPECTED:      return "unexpected";
+        case Code::OK:              return "ok";
+        case Code::IDT_COMPUTE:     return "idt_compute";
+        case Code::ALEXANDROV:      return "alexandrov";
+        case Code::NON_SIMPLICIAL:  return "non_simplicial";
+        case Code::EMBED:           return "embed";
+        case Code::COVERAGE:        return "coverage";
+        case Code::INTERPOLATE:     return "interpolate";
+        case Code::UNEXPECTED:      return "unexpected";
     }
     return "unknown";
 }
@@ -77,9 +87,7 @@ SortedDual sorted_dual(const TriangulationView& T) {
     S.perm = T.sort_flat_last();
     S.T    = Triangulation(T);
     S.T.apply_permutation(S.perm);
-    S.n_cones = 0;
-    for (node_t u = 0; u < S.T.N; ++u)
-        if (S.T.degree(u) != 6) ++S.n_cones;
+    S.n_cones = count_cones(S.T);
     return S;
 }
 
@@ -91,7 +99,7 @@ DelaunayTriangulation compute_dual_idt(const SortedDual& S, const char* who) {
     try {
         return DelaunayTriangulation::compute(S.T);
     } catch (const std::exception& e) {
-        throw StageError(Stage::IDT_COMPUTE,
+        throw PaintError(Code::IDT_COMPUTE,
             std::string(who) + ": iDT compute: " + e.what());
     }
 }
@@ -107,11 +115,11 @@ DelaunayTriangulation compute_dual_idt(const SortedDual& S, const char* who) {
 void require_chartable_idt(const DelaunayTriangulation& D, const char* who) {
     for (int h = 0; h < D.nh; ++h)
         if (D.alive(h) && D.he_origin[h] == D.dest(h))
-            throw StageError(Stage::NON_SIMPLICIAL,
+            throw PaintError(Code::NON_SIMPLICIAL,
                 std::string(who) + ": iDT has a self-loop (a cone edge to "
                 "itself); a face with a repeated corner cannot be charted");
     if (!D.is_well_formed())
-        throw StageError(Stage::NON_SIMPLICIAL,
+        throw PaintError(Code::NON_SIMPLICIAL,
             std::string(who) + ": iDT is not well-formed "
             "(some live half-edge is not in a length-3 face cycle)");
 }
@@ -178,9 +186,32 @@ bool extract_walk_vertices(const TriangulationView& T,
     return true;
 }
 
-// Walker output, indexed by T_sorted vertex id, in the START vertex's
-// LOCAL frame (start_vertex sits at (0, 0)).
-struct WalkVertices {
+// The cell's corner triangle in some Eisenstein frame, with the two
+// exact containment predicates of the chart machinery (integer wedges).
+struct MetaTriangle {
+    Eisenstein P0, P1, P2;
+
+    bool contains_strict(Eisenstein p) const {
+        return wedge(P1 - P0, p - P0) > 0
+            && wedge(P2 - P1, p - P1) > 0
+            && wedge(P0 - P2, p - P2) > 0;
+    }
+    bool contains_closed(Eisenstein p) const {
+        return wedge(P1 - P0, p - P0) >= 0
+            && wedge(P2 - P1, p - P1) >= 0
+            && wedge(P0 - P2, p - P2) >= 0;
+    }
+    // The same triangle expressed relative to a new origin (wedges are
+    // translation-invariant, so containment answers are unchanged).
+    MetaTriangle relative_to(Eisenstein origin) const {
+        return { P0 - origin, P1 - origin, P2 - origin };
+    }
+};
+
+// The isometric development of one iDT arc's strip into the START
+// vertex's local frame (start at (0, 0)): every developed T_sorted
+// vertex mapped to its position and frame offset k0.
+struct EdgeDevelopment {
     std::unordered_map<int, std::pair<Eisenstein, int>> by_id;
 };
 
@@ -194,23 +225,11 @@ bool walks_through_cone(const WalkResult& wr, int n_cones) {
     return false;
 }
 
-// A developed vertex `p` (cell frame) is STRICTLY inside the meta triangle
-// (FP0, FP1, FP2) iff all three edge wedges are > 0.  Used to detect a
-// FOLDED development: an embedded iDT face carries cones only at its three
-// corners, so any OTHER cone landing strictly interior means the walk
-// developed the wrong same-length geodesic (a split-prime multi-edge whose
-// wrong branch wraps a neighbouring cone into the strip) or a reflected
-// corridor -- both non-embeddings that the charts later reject.
-bool strictly_inside_meta(Eisenstein p, Eisenstein FP0, Eisenstein FP1, Eisenstein FP2) {
-    return wedge(FP1 - FP0, p - FP0) > 0
-        && wedge(FP2 - FP1, p - FP1) > 0
-        && wedge(FP0 - FP2, p - FP2) > 0;
-}
-
-// Enumerate ALL developments (deduplicated) whose walker terminates at
-// target_vertex with a clean, orientation-preserving, NON-FOLDING development:
-// start at (0,0), end at target_rel, no cone on the strict interior of the
-// walk, and no non-corner cone strictly inside the meta triangle (FP0,FP1,FP2).
+// ALL flat, orientation-preserving developments of one arc's strip
+// (deduplicated): every development whose walker terminates at
+// target_vertex with start at (0,0), end at target_rel, no cone on the
+// strict interior of the walk, and no non-corner cone strictly inside the
+// cell triangle M_rel (given in the start-relative frame).
 //
 // Why ALL, not the first.  A single cone pair can be joined by MULTIPLE
 // same-length lattice geodesics that all terminate at target_vertex and all
@@ -218,7 +237,7 @@ bool strictly_inside_meta(Eisenstein p, Eisenstein FP0, Eisenstein FP1, Eisenste
 // Two distinct phenomena produce this:
 //   (i)  Split-prime edge lengths (norm N with two sector-0 reps in mirror
 //        orbits, e.g. N=19,28,37): two geodesics whose wrong branch wraps a
-//        NEIGHBOURING cone -- caught by the meta-triangle cone-interiority test.
+//        NEIGHBOURING cone -- caught by the cell-triangle cone-interiority test.
 //   (ii) Obtuse/thin cells (one interior angle near 0): two long edge geodesics
 //        run nearly parallel through the sliver, and walk_line, trying start
 //        fans in list order, can reach target_vertex via a HEX-only corridor on
@@ -226,20 +245,25 @@ bool strictly_inside_meta(Eisenstein p, Eisenstein FP0, Eisenstein FP1, Eisenste
 //        L=(27,1,28): edge c0->c1 develops the false corridor {8,41,42,33,34,5}
 //        instead of the true {8,38,27,26,25,5}).  Both corridors are cone-free,
 //        so the cone-interiority test cannot separate them.
-// The discriminator for (ii) is CROSS-EDGE consistency, resolved one level up in
-// embed_cell: each F-frame lattice position is one surface point = one mesh
+// The discriminator for (ii) is CROSS-EDGE consistency, resolved one level up
+// in embed_cell: each F-frame lattice position is one surface point = one mesh
 // vertex, so the correct triple of edge developments must agree wherever their
-// clipped strips share a position.  find_chains therefore returns every
+// clipped strips share a position.  edge_developments therefore returns every
 // qualifying development (deduped by its (vertex_id -> position, k0) map) and
 // lets embed_cell pick the mutually-consistent triple.  For the common,
 // non-thin cell each edge yields exactly one development and the search is a
 // single trivially-consistent triple.
-std::vector<WalkVertices>
-find_chains(const TriangulationView& T_sorted, int n_cones,
-           int start_vertex, int target_vertex, Eisenstein target_rel,
-           Eisenstein start_pos, Eisenstein FP0, Eisenstein FP1, Eisenstein FP2)
+//
+// DETERMINISM: the enumeration order below -- endpoints [target_rel,
+// rotation-representative], start fans in neighbour-list order, dir_uv
+// 0..5, first-wins dedup -- is part of the algorithm (downstream selection
+// takes the FIRST consistent triple); do not reorder.
+std::vector<EdgeDevelopment>
+edge_developments(const TriangulationView& T_sorted, int n_cones,
+                  int start_vertex, int target_vertex, Eisenstein target_rel,
+                  const MetaTriangle& M_rel)
 {
-    std::vector<WalkVertices> results;
+    std::vector<EdgeDevelopment> results;
     std::set<std::vector<std::array<long,4>>> seen;   // dedup by development map
     // Candidate endpoints, all ORIENTATION-PRESERVING (`back` is a rotation,
     // never a reflection): the raw cell-frame displacement, and its sector0
@@ -270,7 +294,7 @@ find_chains(const TriangulationView& T_sorted, int n_cones,
                 WalkResult wr = walk_line(T_sorted, start_vertex, v_a, v_b, dir_uv, endpoint);
                 if (wr.final_vertex != target_vertex) continue;
 
-                WalkVertices V;
+                EdgeDevelopment V;
                 if (!extract_walk_vertices(T_sorted, wr, V.by_id)) continue;
                 const auto itu = V.by_id.find(start_vertex);
                 const auto itv = V.by_id.find(target_vertex);
@@ -288,7 +312,7 @@ find_chains(const TriangulationView& T_sorted, int n_cones,
                 }
 
                 // Reject a FOLDED development: any non-corner cone strictly
-                // inside the meta triangle means this walk took the wrong
+                // inside the cell triangle means this walk took the wrong
                 // same-length geodesic branch.  Corners (start/target and the
                 // third corner) sit ON the boundary, so they are never strictly
                 // interior and need no special-casing.
@@ -296,7 +320,7 @@ find_chains(const TriangulationView& T_sorted, int n_cones,
                 for (const auto& [vid, pk] : V.by_id) {
                     if (vid >= n_cones) continue;                                // hex
                     if (vid == start_vertex || vid == target_vertex) continue;   // this edge's cones
-                    if (strictly_inside_meta(pk.first + start_pos, FP0, FP1, FP2)) {
+                    if (M_rel.contains_strict(pk.first)) {
                         folds_cone = true; break;
                     }
                 }
@@ -317,26 +341,20 @@ find_chains(const TriangulationView& T_sorted, int n_cones,
     return results;
 }
 
-// Translate verts to F's frame (add start_pos), clip to F's lattice
-// triangle, bucket by scanline (b coordinate), write into `out`.
-// Returns false if no vertex survives the clip.
-bool clip_to_meta_by_scanline(const WalkVertices& V,
+// Restrict a development to the cell triangle: translate to F's frame
+// (add start_pos), keep the vertices inside the closed cell, bucket by
+// scanline (b coordinate).  Returns false if no vertex survives.
+bool clip_to_cell_by_scanline(const EdgeDevelopment& V,
                               Eisenstein start_pos,
-                              Eisenstein FP0, Eisenstein FP1, Eisenstein FP2,
+                              const MetaTriangle& M_cell,
                               EdgeStrip& out)
 {
-    const auto inside_meta = [&](Eisenstein p) {
-        return wedge(FP1 - FP0, p - FP0) >= 0
-            && wedge(FP2 - FP1, p - FP1) >= 0
-            && wedge(FP0 - FP2, p - FP2) >= 0;
-    };
-
     int b_min = INT_MAX, b_max = INT_MIN;
     std::vector<StripVertex> kept;
     kept.reserve(V.by_id.size());
     for (const auto& [vid, pk] : V.by_id) {
         const Eisenstein pos_F = pk.first + start_pos;
-        if (!inside_meta(pos_F)) continue;
+        if (!M_cell.contains_closed(pos_F)) continue;
         StripVertex sv;
         sv.position     = pos_F;
         sv.vertex_id    = vid;
@@ -355,24 +373,24 @@ bool clip_to_meta_by_scanline(const WalkVertices& V,
     return true;
 }
 
-// Run the walker from start_vertex at start_pos in F's frame, aiming at
-// target_vertex at target_pos.  Returns EVERY qualifying development as an
-// F-frame strip (clipped to the FP0/FP1/FP2 lattice triangle).  Empty if no
-// chain qualifies or none survives the clip.  embed_cell picks the one strip
-// per edge that is mutually consistent across the three edges.
+// All candidate strips of one arc: every qualifying development of the
+// arc start->target, clipped to the cell triangle and scanline-bucketed.
+// Empty if no development qualifies or none survives the clip;
+// embed_cell picks the one strip per arc that is mutually consistent
+// across the three arcs.
 std::vector<EdgeStrip>
-frame_walker_candidates(const TriangulationView& T_sorted, int n_cones,
-                        int start_vertex, Eisenstein start_pos,
-                        int target_vertex, Eisenstein target_pos,
-                        Eisenstein FP0, Eisenstein FP1, Eisenstein FP2)
+arc_strip_candidates(const TriangulationView& T_sorted, int n_cones,
+                     int start_vertex, Eisenstein start_pos,
+                     int target_vertex, Eisenstein target_pos,
+                     const MetaTriangle& M_cell)
 {
     std::vector<EdgeStrip> out;
-    const auto chains = find_chains(T_sorted, n_cones, start_vertex, target_vertex,
-                                    target_pos - start_pos,
-                                    start_pos, FP0, FP1, FP2);
-    for (const WalkVertices& chain : chains) {
+    for (const EdgeDevelopment& dev :
+         edge_developments(T_sorted, n_cones, start_vertex, target_vertex,
+                           target_pos - start_pos,
+                           M_cell.relative_to(start_pos))) {
         EdgeStrip strip;
-        if (clip_to_meta_by_scanline(chain, start_pos, FP0, FP1, FP2, strip))
+        if (clip_to_cell_by_scanline(dev, start_pos, M_cell, strip))
             out.push_back(std::move(strip));
     }
     return out;
@@ -438,15 +456,23 @@ enumerate_corner_candidates(double L20, double alpha_0,
     return out;
 }
 
-// The cone count of the charted complex: cones are the sorted labels
-// whose T_sorted degree != 6.  They are sorted FIRST, so the count is
-// the first index with degree 6 (or N if none).  O(n_cones) and purely
-// combinatorial -- keeps the per-cell primitives' signatures free of a
-// redundant n_cones parameter.
-int count_cones(const TriangulationView& T_sorted) {
-    int n = 0;
-    while (n < (int)T_sorted.N && T_sorted.degree(n) != 6) ++n;
-    return n;
+// The cross-edge consistency selection: the FIRST triple of arc strips
+// (in the given candidate orders -- the order is part of the algorithm's
+// determinism) that glue to ONE position -> vertex map wherever they
+// overlap (strips_consistent).  By the cell-development lemma the
+// consistent triple is the cell's unique flat chart, so first-match is
+// not a heuristic but the search for the unique solution.
+bool first_consistent_triple(const std::array<std::vector<EdgeStrip>, 3>& cand,
+                             std::array<const EdgeStrip*, 3>& out)
+{
+    for (const EdgeStrip& e01 : cand[0])
+        for (const EdgeStrip& e12 : cand[1])
+            for (const EdgeStrip& e20 : cand[2])
+                if (strips_consistent(e01, e12, e20)) {
+                    out = { &e01, &e12, &e20 };
+                    return true;
+                }
+    return false;
 }
 
 }  // namespace
@@ -463,61 +489,39 @@ Cell embed_cell(const DelaunayTriangulation& D,
     const int h0 = D.f_he[cell_id];
     const int h1 = D.he_next[h0];
     const int h2 = D.he_next[h1];
-    F.c0 = D.he_origin[h0];
-    F.c1 = D.he_origin[h1];
-    F.c2 = D.he_origin[h2];
+    F.corners = { D.he_origin[h0], D.he_origin[h1], D.he_origin[h2] };
 
     const double L01 = D.he_length[h0];
     const double L20 = D.he_length[h2];
     const long N01 = (long)std::lround(L01 * L01);
     const long N12 = (long)std::lround(D.he_length[h1] * D.he_length[h1]);
     const long N20 = (long)std::lround(L20 * L20);
-    const double alpha_0 = D.he_angle[h0];   // F's interior angle at c0
+    const double alpha_0 = D.he_angle[h0];   // F's interior angle at corner 0
 
-    std::vector<CornerCandidate> candidates =
-        enumerate_corner_candidates(L20, alpha_0, N01, N12, N20);
-    if (candidates.empty()) return F;
+    // Each corner candidate is a lattice-realisable corner placement
+    // (up to 2 for split-prime N01); each arc can admit several
+    // developments (see edge_developments).  The cell's chart is the
+    // unique corner placement + strip triple that is cross-edge
+    // consistent; the loops below search in deterministic order.
+    for (const CornerCandidate& C :
+         enumerate_corner_candidates(L20, alpha_0, N01, N12, N20)) {
+        const MetaTriangle M = { C.P0, C.P1, C.P2 };
+        const std::array<Eisenstein, 3> P = { C.P0, C.P1, C.P2 };
+        std::array<std::vector<EdgeStrip>, 3> cand;
+        for (int k = 0; k < 3; ++k)
+            cand[k] = arc_strip_candidates(T_sorted, n_cones,
+                                           F.corners[k],           P[k],
+                                           F.corners[(k + 1) % 3], P[(k + 1) % 3],
+                                           M);
+        if (cand[0].empty() || cand[1].empty() || cand[2].empty()) continue;
 
-    // Try each corner candidate; accept the one where the three F-frame edge
-    // walkers admit a MUTUALLY CONSISTENT development.  Each edge can yield
-    // several qualifying developments (split-prime multi-edges, or the
-    // wrong-side corridor of a thin/obtuse cell -- see find_chains).  The
-    // correct cell development is unique: a shared F-frame lattice position is
-    // one surface point = one mesh vertex, so the true triple agrees wherever
-    // two strips overlap.  We therefore search the (small, deduped) product of
-    // the three edges' candidates for the first pairwise-consistent triple.
-    // For the common non-thin cell each edge has exactly one candidate and this
-    // is a single trivially-consistent check.  For split-prime N01 there can be
-    // 2 corner candidates; only one matches the surface geodesics.
-    for (const CornerCandidate& C : candidates) {
-        const std::vector<EdgeStrip> cand01 =
-            frame_walker_candidates(T_sorted, n_cones, F.c0, C.P0, F.c1, C.P1, C.P0, C.P1, C.P2);
-        const std::vector<EdgeStrip> cand12 =
-            frame_walker_candidates(T_sorted, n_cones, F.c1, C.P1, F.c2, C.P2, C.P0, C.P1, C.P2);
-        const std::vector<EdgeStrip> cand20 =
-            frame_walker_candidates(T_sorted, n_cones, F.c2, C.P2, F.c0, C.P0, C.P0, C.P1, C.P2);
-        if (cand01.empty() || cand12.empty() || cand20.empty()) continue;
-
-        bool placed = false;
-        for (const EdgeStrip& e01 : cand01) {
-            for (const EdgeStrip& e12 : cand12) {
-                for (const EdgeStrip& e20 : cand20) {
-                    if (!strips_consistent(e01, e12, e20)) continue;
-                    F.P0 = C.P0;
-                    F.P1 = C.P1;
-                    F.P2 = C.P2;
-                    F.edge_01 = e01;
-                    F.edge_12 = e12;
-                    F.edge_20 = e20;
-                    F.ok = true;
-                    placed = true;
-                    break;
-                }
-                if (placed) break;
-            }
-            if (placed) break;
+        std::array<const EdgeStrip*, 3> strips;
+        if (first_consistent_triple(cand, strips)) {
+            F.P = P;
+            for (int k = 0; k < 3; ++k) F.edge[k] = *strips[k];
+            F.ok = true;
+            break;
         }
-        if (placed) break;
     }
     return F;
 }
@@ -543,18 +547,13 @@ namespace {
 // Find the StripVertex with given F-frame lattice position in any of
 // F's edge strips.  Returns nullptr if not found.
 const StripVertex* find_seed(const Cell& F, Eisenstein p) {
-    auto search = [&](const EdgeStrip& B) -> const StripVertex* {
-        if (p.second < B.b_min || p.second > B.b_max) return nullptr;
-        const auto& sl = B.by_scanline[p.second - B.b_min];
-        for (const auto& sv : sl) if (sv.position == p) return &sv;
-        return nullptr;
-    };
-    const StripVertex* sv = search(F.edge_01);
-    if (sv) return sv;
-    sv = search(F.edge_12);
-    if (sv) return sv;
-    sv = search(F.edge_20);
-    return sv;
+    for (int k = 0; k < 3; ++k) {
+        const EdgeStrip& B = F.edge[k];
+        if (p.second < B.b_min || p.second > B.b_max) continue;
+        for (const auto& sv : B.by_scanline[p.second - B.b_min])
+            if (sv.position == p) return &sv;
+    }
+    return nullptr;
 }
 
 // Per-scanline cursor state for the east walk.
@@ -569,22 +568,28 @@ VertexK0 east_step(const TriangulationView& T_sorted,
     const int nbr_idx = ((0 - cur.k0) % 6 + 6) % 6;
     const int deg     = (int)T_sorted[cur.vertex].size();
     if (deg == 5 && nbr_idx == 5)
-        paint_throw("eisenstein_paint::enumerate_cell_lattice(cell %d, b=%d, a=%d): "
-                    "cone-gap step at vertex %d (deg=5, k0=%d, dir=0 -> nbr_idx=5)",
-                    cell_id, b, a, cur.vertex, cur.k0);
+        embed_fail("eisenstein_paint::enumerate_cell_lattice(cell " +
+                   std::to_string(cell_id) + ", b=" + std::to_string(b) +
+                   ", a=" + std::to_string(a) + "): cone-gap step at vertex " +
+                   std::to_string(cur.vertex) + " (deg=5, k0=" +
+                   std::to_string(cur.k0) + ", dir=0 -> nbr_idx=5)");
     if (nbr_idx >= deg)
-        paint_throw("eisenstein_paint::enumerate_cell_lattice(cell %d, b=%d, a=%d): "
-                    "nbr_idx=%d >= deg=%d at vertex %d (k0=%d)",
-                    cell_id, b, a, nbr_idx, deg, cur.vertex, cur.k0);
+        embed_fail("eisenstein_paint::enumerate_cell_lattice(cell " +
+                   std::to_string(cell_id) + ", b=" + std::to_string(b) +
+                   ", a=" + std::to_string(a) + "): nbr_idx=" +
+                   std::to_string(nbr_idx) + " >= deg=" + std::to_string(deg) +
+                   " at vertex " + std::to_string(cur.vertex) +
+                   " (k0=" + std::to_string(cur.k0) + ")");
     const int nbr = T_sorted[cur.vertex][nbr_idx];
     int j = -1;
     const auto& nbr_list = T_sorted[nbr];
     for (int i = 0; i < (int)nbr_list.size(); ++i)
         if (nbr_list[i] == cur.vertex) { j = i; break; }
     if (j < 0)
-        paint_throw("eisenstein_paint::enumerate_cell_lattice(cell %d): "
-                    "T_sorted asymmetric (vertex %d not in T[%d])",
-                    cell_id, cur.vertex, nbr);
+        embed_fail("eisenstein_paint::enumerate_cell_lattice(cell " +
+                   std::to_string(cell_id) + "): T_sorted asymmetric (vertex " +
+                   std::to_string(cur.vertex) + " not in T[" +
+                   std::to_string(nbr) + "])");
     return { nbr, ((0 + 3 - j) % 6 + 6) % 6 };
 }
 
@@ -596,9 +601,9 @@ LatticeMap enumerate_cell_lattice(const Cell& F,
     LatticeMap out;
     out.cell_id = F.cell_id;
     if (!F.ok)
-        paint_throw("eisenstein_paint::enumerate_cell_lattice: F.ok=false (cell %d)",
-                    F.cell_id);
-    const ScanLines scan = scan_triangle(F.P0, F.P1, F.P2);
+        embed_fail("eisenstein_paint::enumerate_cell_lattice: F.ok=false (cell " +
+                   std::to_string(F.cell_id) + ")");
+    const ScanLines scan = scan_triangle(F.P[0], F.P[1], F.P[2]);
 
     for (int b = scan.b_min; b <= scan.b_max; ++b) {
         const ScanLine& sl = scan.lines[b - scan.b_min];
@@ -607,9 +612,10 @@ LatticeMap enumerate_cell_lattice(const Cell& F,
         Eisenstein pos(sl.a_left, b);
         const StripVertex* sv = find_seed(F, pos);
         if (!sv)
-            paint_throw("eisenstein_paint::enumerate_cell_lattice(cell %d): no seed for "
-                        "left chain pixel (%d, %d) in any edge",
-                        F.cell_id, sl.a_left, b);
+            embed_fail("eisenstein_paint::enumerate_cell_lattice(cell " +
+                       std::to_string(F.cell_id) + "): no seed for left chain "
+                       "pixel (" + std::to_string(sl.a_left) + ", " +
+                       std::to_string(b) + ") in any edge");
         VertexK0 cur{ sv->vertex_id, sv->frame_offset };
         out.entries.push_back({ pos, cur.vertex });
 
@@ -634,42 +640,49 @@ LatticeMap enumerate_cell_lattice(const Cell& F,
 
 namespace {
 
-std::vector<Cell>
-embed_all_or_stage(const DelaunayTriangulation& D, const TriangulationView& T_sorted)
+// The cell-development lemma as a guard: every live cell of an
+// intrinsically-Delaunay complex over the cone metric admits a flat
+// isometric Eisenstein chart, so a live cell with no consistent chart is
+// an EMBED failure, reported by cell id.
+void require_all_charted(const DelaunayTriangulation& D,
+                         const std::vector<Cell>& cells)
 {
-    std::vector<Cell> cells;
-    try {
-        cells = embed_all_cells(D, T_sorted);
-    } catch (const std::exception& e) {
-        throw StageError(Stage::EMBED,
-            std::string("embed_all_throw: ") + e.what());
-    }
-    int n_live = 0, n_ok = 0;
-    for (int f = 0; f < D.nf; ++f) {
-        if (D.f_he[f] < 0) continue;
-        ++n_live;
-        if (cells[f].ok) ++n_ok;
-    }
-    if (n_ok != n_live)
-        throw StageError(Stage::EMBED,
-            "embed_cell partial: " + std::to_string(n_ok) + "/" +
-            std::to_string(n_live));
-    return cells;
+    for (int f = 0; f < D.nf; ++f)
+        if (D.f_he[f] >= 0 && !cells[f].ok)
+            embed_fail("eisenstein_paint::parametrize: live cell " +
+                       std::to_string(f) + " admits no consistent chart");
 }
 
-std::vector<LatticeMap>
-lmaps_or_stage(const std::vector<Cell>& cells, const TriangulationView& T_sorted)
+// Per-vertex chart appearances: one Occurrence per lattice claim.
+std::vector<std::vector<Occurrence>>
+chart_occurrences(const std::vector<Cell>& cells,
+                  const std::vector<LatticeMap>& lmaps, int Nv)
 {
-    std::vector<LatticeMap> lmaps(cells.size());
-    try {
-        for (size_t fi = 0; fi < cells.size(); ++fi)
-            if (cells[fi].ok)
-                lmaps[fi] = enumerate_cell_lattice(cells[fi], T_sorted);
-    } catch (const std::exception& e) {
-        throw StageError(Stage::EMBED,
-            std::string("lmap_throw: ") + e.what());
+    std::vector<std::vector<Occurrence>> occ(Nv);
+    for (size_t fi = 0; fi < cells.size(); ++fi) {
+        if (!cells[fi].ok) continue;
+        for (const auto& [pos, vid] : lmaps[fi].entries)
+            occ[vid].push_back({ (int)fi, pos });
     }
-    return lmaps;
+    return occ;
+}
+
+// The coverage lemma as a guard: every non-cone vertex appears in exactly
+// 1 chart (interior) or 2 (on a shared iDT edge, where the paint is
+// idempotent); 0 or >= 3 appearances is a chart fold.
+// @anchor paint-coverage
+void check_coverage(const SurfaceParametrization& P)
+{
+    int unclaimed = 0, three_plus = 0;
+    for (int v = P.n_cones; v < (int)P.T.N; ++v) {
+        const int n = (int)P.occurrences[v].size();
+        if      (n == 0) ++unclaimed;
+        else if (n >= 3) ++three_plus;
+    }
+    if (unclaimed != 0 || three_plus != 0)
+        throw PaintError(Code::COVERAGE,
+            "coverage(unclaimed=" + std::to_string(unclaimed) +
+            ",three_plus="        + std::to_string(three_plus) + ")");
 }
 
 }  // namespace
@@ -681,28 +694,17 @@ SurfaceParametrization parametrize(const DelaunayTriangulation& D,
     P.D       = &D;
     P.T       = S.T;
     P.n_cones = S.n_cones;
-    P.cells   = embed_all_or_stage(D, S.T);
-    P.lmaps   = lmaps_or_stage(P.cells, S.T);
 
-    // Occurrences: one entry per (cell, lattice claim).  Coverage on the
-    // non-cone vertices: claimed by 1 cell (interior) or 2 (on a shared
-    // iDT edge, idempotent); 0 or >= 3 is a chart fold.
-    P.occurrences.assign(S.T.N, {});
-    for (size_t fi = 0; fi < P.cells.size(); ++fi) {
-        if (!P.cells[fi].ok) continue;
-        for (const auto& [pos, vid] : P.lmaps[fi].entries)
-            P.occurrences[vid].push_back({ (int)fi, pos });
-    }
-    int unclaimed = 0, three_plus = 0;
-    for (int v = S.n_cones; v < (int)S.T.N; ++v) {
-        const int n = (int)P.occurrences[v].size();
-        if      (n == 0) ++unclaimed;
-        else if (n >= 3) ++three_plus;
-    }
-    if (unclaimed != 0 || three_plus != 0)
-        throw StageError(Stage::COVERAGE,
-            "coverage(unclaimed=" + std::to_string(unclaimed) +
-            ",three_plus="        + std::to_string(three_plus) + ")");
+    P.cells = embed_all_cells(D, S.T);
+    require_all_charted(D, P.cells);
+
+    P.lmaps.resize(P.cells.size());
+    for (size_t fi = 0; fi < P.cells.size(); ++fi)
+        if (P.cells[fi].ok)
+            P.lmaps[fi] = enumerate_cell_lattice(P.cells[fi], S.T);
+
+    P.occurrences = chart_occurrences(P.cells, P.lmaps, S.T.N);
+    check_coverage(P);
     return P;
 }
 
@@ -727,18 +729,14 @@ void dump_cell_tikz(const Cell& F,
                     std::ostream& os,
                     double scale)
 {
-    // Collect unique vertices with source-edge index.
-    // 0 = edge_01, 1 = edge_12, 2 = edge_20.  First occurrence wins.
+    // Collect unique vertices with source-arc index k (strip of arc
+    // corners[k] -> corners[k+1]).  First occurrence wins.
     std::unordered_map<int, std::pair<Eisenstein, int>> verts;
-    auto add_edge = [&](const EdgeStrip& B, int idx) {
-        for (const auto& sl : B.by_scanline)
+    for (int k = 0; k < 3; ++k)
+        for (const auto& sl : F.edge[k].by_scanline)
             for (const auto& sv : sl)
                 if (verts.find(sv.vertex_id) == verts.end())
-                    verts[sv.vertex_id] = {sv.position, idx};
-    };
-    add_edge(F.edge_01, 0);
-    add_edge(F.edge_12, 1);
-    add_edge(F.edge_20, 2);
+                    verts[sv.vertex_id] = {sv.position, k};
 
     os << "\\documentclass[tikz,border=4pt]{standalone}\n"
           "\\usepackage{tikz}\n"
@@ -747,13 +745,13 @@ void dump_cell_tikz(const Cell& F,
        << ", every node/.style={font=\\tiny}]\n";
 
     os << "% cell " << F.cell_id
-       << "  c0=" << F.c0 << " c1=" << F.c1 << " c2=" << F.c2
-       << "  P0=(0,0) P1=(" << F.P1.first << "," << F.P1.second
-       << ") P2=(" << F.P2.first << "," << F.P2.second
+       << "  c0=" << F.corners[0] << " c1=" << F.corners[1] << " c2=" << F.corners[2]
+       << "  P0=(0,0) P1=(" << F.P[1].first << "," << F.P[1].second
+       << ") P2=(" << F.P[2].first << "," << F.P[2].second
        << ")  edge sizes = " << verts.size() << " unique\n";
 
     BBox bb;
-    bb.bump(F.P0); bb.bump(F.P1); bb.bump(F.P2);
+    bb.bump(F.P[0]); bb.bump(F.P[1]); bb.bump(F.P[2]);
     for (const auto& kv : verts) bb.bump(kv.second.first);
     const double margin = std::max(5.0, 0.5 * bb.span());
     bb.xmin -= margin; bb.xmax += margin;
@@ -781,24 +779,21 @@ void dump_cell_tikz(const Cell& F,
 
     // F's lattice triangle in red.
     os << "% iDT geodesics P0 -> P1 -> P2 -> P0\n";
-    tikz::emit_lattice_triangle(os, F.P0, F.P1, F.P2);
+    tikz::emit_lattice_triangle(os, F.P[0], F.P[1], F.P[2]);
 
     // Strip vertices.  Corners as red squares; others as circles
-    // colour-coded by source edge.  Vertices that fall OUTSIDE F's
+    // colour-coded by source arc.  Vertices that fall OUTSIDE F's
     // lattice triangle (a bug) get a thick red outline.
-    auto inside_meta = [&](Eisenstein p) {
-        return wedge(F.P1 - F.P0, p - F.P0) >= 0
-            && wedge(F.P2 - F.P1, p - F.P1) >= 0
-            && wedge(F.P0 - F.P2, p - F.P2) >= 0;
-    };
+    const MetaTriangle M = { F.P[0], F.P[1], F.P[2] };
     os << "% strip vertices (red ring = OUTSIDE F's lattice triangle)\n";
     for (const auto& kv : verts) {
         const int v_id = kv.first;
         const Eisenstein p = kv.second.first;
         const int bi = kv.second.second;
         auto [x, y] = cart(p);
-        const bool corner  = (v_id == F.c0 || v_id == F.c1 || v_id == F.c2);
-        const bool outside = !inside_meta(p);
+        const bool corner  = (v_id == F.corners[0] || v_id == F.corners[1] ||
+                              v_id == F.corners[2]);
+        const bool outside = !M.contains_closed(p);
         const char* fill = corner       ? "red!75!black"
                           : (bi == 0)   ? "blue!70!black"
                           : (bi == 1)   ? "green!55!black"
@@ -829,36 +824,27 @@ void dump_lattice_map_tikz(const Cell& F,
           "\\begin{tikzpicture}[scale=" << scale
        << ", every node/.style={font=\\tiny}]\n";
     os << "% cell " << F.cell_id
-       << "  c0=" << F.c0 << " c1=" << F.c1 << " c2=" << F.c2
-       << "  P0=(0,0) P1=(" << F.P1.first << "," << F.P1.second
-       << ") P2=(" << F.P2.first << "," << F.P2.second << ")  "
+       << "  c0=" << F.corners[0] << " c1=" << F.corners[1] << " c2=" << F.corners[2]
+       << "  P0=(0,0) P1=(" << F.P[1].first << "," << F.P[1].second
+       << ") P2=(" << F.P[2].first << "," << F.P[2].second << ")  "
        << lmap.entries.size() << " lattice pts\n";
 
     BBox bb;
-    bb.bump(F.P0); bb.bump(F.P1); bb.bump(F.P2);
+    bb.bump(F.P[0]); bb.bump(F.P[1]); bb.bump(F.P[2]);
     for (const auto& [p, v] : lmap.entries) bb.bump(p);
     const double margin = std::max(3.0, 0.3 * bb.span());
     bb.xmin -= margin; bb.xmax += margin;
     bb.ymin -= margin; bb.ymax += margin;
     tikz::emit_grid(os, bb);
-    tikz::emit_lattice_triangle(os, F.P0, F.P1, F.P2);
+    tikz::emit_lattice_triangle(os, F.P[0], F.P[1], F.P[2]);
 
     // Classify each lattice point: corner cone, on-edge hex (in any
-    // edge strip), or strict interior.
-    auto is_on_bdry = [&](Eisenstein p) -> bool {
-        auto check = [&](const EdgeStrip& B) {
-            if (p.second < B.b_min || p.second > B.b_max) return false;
-            const auto& sl = B.by_scanline[p.second - B.b_min];
-            for (const auto& sv : sl) if (sv.position == p) return true;
-            return false;
-        };
-        return check(F.edge_01) || check(F.edge_12) || check(F.edge_20);
-    };
-
+    // edge strip -- find_seed), or strict interior.
     for (const auto& [p, v] : lmap.entries) {
         auto [x, y] = cart(p);
-        const bool is_corner = (v == F.c0 || v == F.c1 || v == F.c2);
-        const bool on_bdry   = is_on_bdry(p);
+        const bool is_corner = (v == F.corners[0] || v == F.corners[1] ||
+                                v == F.corners[2]);
+        const bool on_bdry   = (find_seed(F, p) != nullptr);
         const bool highlight = (v == highlight_vertex_id);
         const char* shape = is_corner ? "rectangle" : "circle";
         const char* fill  = is_corner ? "red!75!black"

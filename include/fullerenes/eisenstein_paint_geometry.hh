@@ -51,7 +51,7 @@
 // does not cross a polytope crease); CubicGeometry reports bond stats
 // as a self-diagnostic -- any bond above 1 + tolerance indicates a bug.
 //
-// Failure handling: composable functions throw StageError; the facades
+// Failure handling: composable functions throw PaintError; the facades
 // dual_geometry / cubic_geometry never throw and return a Status.
 // =====================================================================
 
@@ -87,7 +87,7 @@ struct DualPolytope {
 };
 
 // Alexandrov realization of S's cone metric (iDT + B-I solve).
-// Throws StageError: IDT_COMPUTE / NON_SIMPLICIAL / ALEXANDROV per the
+// Throws PaintError: IDT_COMPUTE / NON_SIMPLICIAL / ALEXANDROV per the
 // solver's validation verdict.
 DualPolytope realize_dual(const SortedDual& S);
 
@@ -117,7 +117,7 @@ void interpolate_cell(const Cell& F,
 // `perm` (= SortedDual::perm).  The complex A was charted on must have
 // flat cells w.r.t. the surface the anchors live on -- i.e. A must be
 // parametrize(P.D, S) for a realized polytope P whose cone positions
-// are the anchors.  Throws StageError(INTERPOLATE).
+// are the anchors.  Throws PaintError(INTERPOLATE).
 std::vector<coord3d> evaluate(const SurfaceParametrization& A,
                               const std::vector<coord3d>& anchors,
                               const Permutation& perm);
@@ -134,17 +134,39 @@ struct CubicPolytope {
     // center); label T.N + U is cubic vertex U (T.triangles() /
     // T.dual_graph() order).  Cone i is vertex i of D.
     DelaunayTriangulation D;
-    std::vector<coord3d> cone_pos;        // pentagon-incident cubic vertices (20..60)
-    std::vector<tri_t>   cone_triangle;   // their dual triangles, T ORIGINAL labels (CCW)
-    std::vector<int>     kis_of_cone;     // kis id of cone i (= T.N + its cubic vertex U)
+    std::vector<coord3d> cone_pos;         // pentagon-incident cubic vertices (20..60)
+    std::vector<tri_t>   cone_triangle;    // their dual triangles, T ORIGINAL labels (CCW)
+    std::vector<int>     cone_kis_vertex;  // kis id of cone i (= T.N + its cubic vertex U)
 };
 
 // AlexandrovIDTCubic realization of T's cubic metric, with every flat
-// kis vertex tracked onto the polytope.  Throws StageError mirroring
+// kis vertex tracked onto the polytope.  Throws PaintError mirroring
 // realize_dual's staging (kis/iDT trouble -> IDT_COMPUTE, non-simplicial
 // cubic iDT -> NON_SIMPLICIAL, any other non-validating outcome ->
 // ALEXANDROV).
 CubicPolytope realize_cubic(const TriangulationView& T);
+
+// Realization of every kis vertex on the cubic polytope: cones at their
+// solver positions; every tracked point by barycentric combination
+// against its flat cell's three cone-corner positions -- exactly ON the
+// polytope surface, since the kappa = 0 cells are flat pieces of it.
+// Split by kis label: label >= Nv is cubic vertex (label - Nv), label
+// < Nv is dual vertex label (a cubic face center).
+struct CubicRealization {
+    std::vector<coord3d> cubic_coords;   // size 2*Nv - 4, T.triangles() order
+    std::vector<coord3d> dual_coords;    // size Nv, dual-vertex labels
+};
+
+// The cubic counterpart of evaluate(): evaluate the tracked kis complex
+// on the polytope.  Nv = the dual triangulation's vertex count (= T.N).
+// @pre  C from realize_cubic(T): every tracked label in range, cones'
+//       kis ids in the cubic-vertex range
+// @post coverage: every cubic vertex and every dual vertex written
+//       exactly once (cones + tracked points partition the kis vertices)
+// @throws PaintError(COVERAGE) when some vertex is unwritten; deep
+//       invariant violations (double-written or out-of-range labels)
+//       throw std::runtime_error
+CubicRealization evaluate_tracked_complex(const CubicPolytope& C, int Nv);
 
 // =====================================================================
 // Facades.  Never throw; check .status.
@@ -152,6 +174,9 @@ CubicPolytope realize_cubic(const TriangulationView& T);
 
 // Exact dual-metric geometry: every dual vertex placed exactly on the
 // Alexandrov dual polytope's surface.  coords in T's ORIGINAL labels.
+// @post status.code in { OK, IDT_COMPUTE, NON_SIMPLICIAL, ALEXANDROV,
+//       EMBED, COVERAGE, INTERPOLATE, UNEXPECTED }  (the dual facade's
+//       closed failure-mode set)
 struct DualGeometry {
     std::vector<coord3d> coords;      // size T.N on OK; empty otherwise
     Status               status;
@@ -168,6 +193,9 @@ DualGeometry dual_geometry(const TriangulationView& T);
 // bond is an intrinsic unit segment, so bond_max <= 1 up to solver
 // tolerance (crease-crossing bonds are strictly shorter chords); a
 // larger value indicates a bug, not geometry.
+// @post status.code in { OK, IDT_COMPUTE, NON_SIMPLICIAL, ALEXANDROV,
+//       COVERAGE, UNEXPECTED }  (the cubic facade's closed failure-mode
+//       set; EMBED/INTERPOLATE are dual-path-only)
 struct CubicGeometry {
     std::vector<coord3d> cubic_coords;   // size 2*T.N - 4 on OK
     std::vector<coord3d> dual_coords;    // size T.N on OK, original labels

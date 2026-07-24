@@ -134,8 +134,8 @@ vector<coord3d> FullereneGraphView::eisenstein_paint_geometry(double bond_length
   eisenstein_paint::CubicGeometry R = eisenstein_paint::cubic_geometry(T);
   if (!R.status.ok())
     throw std::runtime_error(
-        string("eisenstein_paint_geometry: cubic_geometry failed at stage ")
-        + R.status.name() + ": " + R.status.why);
+        string("eisenstein_paint_geometry: cubic_geometry failed (")
+        + R.status.name() + "): " + R.status.why);
 
   // R.cubic_coords[U] is the position of dual triangle T.triangles()[U]
   // (the T.dual_graph() labelling); rebuild the same triangle table.

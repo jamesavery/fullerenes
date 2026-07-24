@@ -69,8 +69,8 @@ int main(int argc, char** argv) {
     std::vector<CellPlacement> cells(cells_em.size());
     for (size_t fi = 0; fi < cells_em.size(); ++fi) {
         const ep::Cell& F = cells_em[fi];
-        cells[fi] = { F.cell_id, F.c0, F.c1, F.c2,
-                      F.P0, F.P1, F.P2,
+        cells[fi] = { F.cell_id, F.corners[0], F.corners[1], F.corners[2],
+                      F.P[0], F.P[1], F.P[2],
                       F.ok ? lmaps[fi].entries
                            : std::vector<std::pair<Eisenstein, int>>{},
                       F.ok };

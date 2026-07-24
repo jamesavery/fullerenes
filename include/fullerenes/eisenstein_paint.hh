@@ -39,9 +39,10 @@
 // (nothing assumes cone degree < 6).  Cone vertices are the sorted
 // labels < S.n_cones (= 12 for fullerene duals).
 //
-// Failure handling: intrinsic stage helpers throw StageError(stage,
-// msg).  The Layer-II facades convert to a Status value; callers of the
-// composable functions let StageError propagate.
+// Failure handling: the composable functions throw PaintError(code,
+// msg) -- one channel, typed at the throw site.  The Layer-II facades
+// convert to a Status value; callers of the composable functions let
+// PaintError propagate.
 //
 // GPU note: read-only triangulation parameters are TriangulationView
 // (non-owning, span-based) so the interfaces survive the move to batch
@@ -56,6 +57,7 @@
 #include "fullerenes/eisenstein.hh"
 #include "fullerenes/delaunay_strip.hh"      // StripVertex, Strip
 
+#include <array>
 #include <iosfwd>
 #include <stdexcept>
 #include <string>
@@ -64,38 +66,40 @@
 namespace eisenstein_paint {
 
 // =====================================================================
-// Failure vocabulary, shared by both layers.
+// Failure vocabulary, shared by both layers: a closed set of named
+// failure REASONS (style-failures.md's Code/metadata shape).
 // =====================================================================
 
-enum class Stage {
+enum class Code {
     OK,
     IDT_COMPUTE,           // DelaunayTriangulation::compute threw
     ALEXANDROV,            // Layer II: any non-validating solver outcome
     NON_SIMPLICIAL,        // iDT carries a self-loop / is not well-formed
-    EMBED,                 // some cell's embed_cell failed (or lmap threw)
+    EMBED,                 // some cell admits no consistent chart (or lmap threw)
     COVERAGE,              // some non-cone vertex claimed 0 or >= 3 times
     INTERPOLATE,           // Layer II: interpolate_cell threw
     UNEXPECTED,            // unrecognised std::exception escaped a facade
 };
 
-// Stage discriminator -> lowercase name ("ok", "alexandrov", ...).
-const char* stage_name(Stage s);
+// Code discriminator -> lowercase name ("ok", "alexandrov", ...).
+// (The emitted strings are sweep-output-stable; do not change them.)
+const char* code_name(Code c);
 
 // Failure value carried by the Layer-II facade results.
 struct Status {
-    Stage       stage = Stage::OK;
+    Code        code = Code::OK;
     std::string why;
 
-    bool        ok()   const { return stage == Stage::OK; }
-    const char* name() const { return stage_name(stage); }
+    bool        ok()   const { return code == Code::OK; }
+    const char* name() const { return code_name(code); }
 };
 
 // Single discriminated failure type thrown by the composable functions.
-class StageError : public std::runtime_error {
+class PaintError : public std::runtime_error {
 public:
-    Stage stage;
-    StageError(Stage s, std::string msg)
-        : std::runtime_error(std::move(msg)), stage(s) {}
+    Code code;
+    PaintError(Code c, std::string msg)
+        : std::runtime_error(std::move(msg)), code(c) {}
 };
 
 // =====================================================================
@@ -113,7 +117,7 @@ struct SortedDual {
 SortedDual sorted_dual(const TriangulationView& T);
 
 // The intrinsic Delaunay triangulation of S's cone metric -- a
-// delta-complex in general (multi-edges accepted).  Throws StageError
+// delta-complex in general (multi-edges accepted).  Throws PaintError
 // (IDT_COMPUTE on compute failure; NON_SIMPLICIAL on a self-loop or a
 // malformed face, which the cell machinery cannot chart).
 DelaunayTriangulation dual_idt(const SortedDual& S);
@@ -136,19 +140,16 @@ struct EdgeStrip {
     bool empty() const { return b_max < b_min; }
 };
 
-// One iDT 2-cell embedded into its own Eisenstein-lattice frame.
+// One iDT 2-cell embedded into its own Eisenstein-lattice frame -- the
+// cell's CHART.  Corner k sits at P[k]; arc k runs corners[k] ->
+// corners[(k+1)%3] and carries edge strip edge[k].  (Array form shared
+// with the atlas's AtlasCell, so parallel structure stays visibly
+// parallel.)
 struct Cell {
-    int        cell_id = -1;
-    int        c0 = -1, c1 = -1, c2 = -1;       // CCW corner T_sorted vertex ids
-    Eisenstein P0{0, 0};                         // = (0, 0)
-    Eisenstein P1{0, 0};
-    Eisenstein P2{0, 0};
-
-    // Per-edge strips, in the cell's own frame, scanline-indexed.
-    // edge_01 covers the arc c0 -> c1, etc.
-    EdgeStrip edge_01;
-    EdgeStrip edge_12;
-    EdgeStrip edge_20;
+    int                         cell_id = -1;
+    std::array<int, 3>          corners{ -1, -1, -1 };  // CCW T_sorted vertex ids
+    std::array<Eisenstein, 3>   P{};                    // corner positions; P[0] == (0,0)
+    std::array<EdgeStrip, 3>    edge{};                 // strip of arc k: corners[k] -> corners[k+1]
 
     bool ok = false;
 };
@@ -208,8 +209,8 @@ struct SurfaceParametrization {
 
 // Chart all live cells of D and check coverage: every non-cone vertex
 // (id >= S.n_cones) must appear in exactly 1 or 2 charts (2 = on a
-// shared iDT edge).  Throws StageError(EMBED) when a live cell fails to
-// embed or scan, StageError(COVERAGE) on a coverage violation.
+// shared iDT edge).  Throws PaintError(EMBED) when a live cell fails to
+// embed or scan, PaintError(COVERAGE) on a coverage violation.
 //
 // Works on any intrinsically-Delaunay D over S.T -- the raw dual_idt(S)
 // or Layer II's realized DualPolytope::D alike.

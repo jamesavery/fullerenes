@@ -104,8 +104,8 @@ int main(int argc, char** argv) {
         }
         ep::dump_cell_tikz(F, T_sorted, out);
         std::printf("  cell %d: c0=%d c1=%d c2=%d  P1=(%d,%d) P2=(%d,%d) -> %s\n",
-                    f, F.c0, F.c1, F.c2,
-                    F.P1.first, F.P1.second, F.P2.first, F.P2.second,
+                    f, F.corners[0], F.corners[1], F.corners[2],
+                    F.P[1].first, F.P[1].second, F.P[2].first, F.P[2].second,
                     path);
 
         // Canonical strips for each CCW arc.
