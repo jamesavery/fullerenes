@@ -148,6 +148,74 @@ struct DelaunayTriangulation {
   vector<int> free_edges;  // recycled edge slots (half-edge id / 2)
   vector<int> free_faces;  // recycled face slots
 
+  // --- Point tracker (optional; flip-tape transport) ---
+  // See claude-projects/delaunay-fillin/DESIGN-cubic-exact-paint.md.  When
+  // active, flip_edge and the flat-vertex removal transport the tracked
+  // points through each operation's isometric planar development, so a point
+  // recorded anywhere on the surface keeps a valid (face, barycentric)
+  // location as the triangulation changes.  compact_vertices renumbers only
+  // vertices, so tracked state is untouched by it; the tracker is NOT
+  // serialized by to_ascii/from_ascii.  Inactive by default: every hook is a
+  // single branch -- zero cost and zero behavior change for non-tracking use.
+  //
+  // Barycentrics are anchored to HALF-EDGE SLOTS, never vertex ids: slot i of
+  // face f is the origin of the i-th half-edge of the cycle starting at
+  // f_he[f].  Delta-complex faces may repeat corner labels (self-loop and
+  // bigon faces arise transiently); slots are always unambiguous.
+  //
+  // Failure contract: transport-detected failures (the clamp band below, a
+  // degenerate development) throw BEFORE the operation mutates anything --
+  // flip_edge and remove_flat_vertex compute every placement first and only
+  // then commit, so complex and tracker are unchanged on such a throw.  A
+  // throw from the DCEL surgery itself (splice_fan deep invariants) poisons
+  // complex and tracker alike, per the file's deep-invariant convention.
+  // bisect_multi_edges and split_face are NOT transport-hooked and throw
+  // when tracking is active.  Copies of a tracking complex snapshot the
+  // tracker: transport applies only to the copy you mutate.
+  //
+  // Seeding through remove_flat_vertices requires the removed vertices to be
+  // flat to roughly CLAMP_TOL precision (their star development must close);
+  // the loose flat_tol regime (~1e-2, CEPS metrics) is incompatible with
+  // tracking -- the seed placement throws rather than proceeding.
+  struct TrackedPoint {
+    int    label = -1;              // caller's id (opaque to the DCEL)
+    int    face  = -1;              // containing live face
+    double b[3]  = {0, 0, 0};       // barycentric per slot; b >= 0, sum == 1
+  };
+  struct PointTracker {
+    bool active = false;
+    std::vector<TrackedPoint>     points;
+    std::vector<std::vector<int>> by_face;   // face -> indices into points
+    // FP policy: after transport, a barycentric in [-CLAMP_TOL, 0) is clamped
+    // to 0 and the triple renormalized (accounted below); below -CLAMP_TOL
+    // transport throws -- that is a wrong-side transport bug, not roundoff.
+    // Never widen the band to make a case pass.
+    static constexpr double CLAMP_TOL = 1e-9;
+    long   n_clamped = 0;
+    double max_clamp = 0;
+
+    // The by_face bucket of face f, growing the index when alloc_face has
+    // extended nf.
+    std::vector<int>& bucket(int f);
+  };
+  PointTracker tracker;   // value member: copies/moves with the complex
+
+  // Activate transport (sizes the per-face index).  Call before the
+  // operations whose points you want carried (e.g. before
+  // remove_flat_vertices; the compute(..., track_removed) overload does this
+  // and seeds every removed flat vertex with label = its input-label).
+  // One tracking session per complex.
+  // @throws std::runtime_error when the tracker already carries points
+  //         (stale state would be silently transported).
+  void enable_point_tracking();
+
+  // Register a point at (face, barycentric); returns its index in
+  // tracker.points.
+  // @pre tracker.active; face live; b finite, >= -CLAMP_TOL componentwise,
+  //      summing to 1 within 1e-9 (clamped + renormalized on registration)
+  // @throws std::runtime_error on any violated precondition.
+  int track_point(int label, int face, double b0, double b1, double b2);
+
   // --- Clean accessors ---
   int  twin(int h)  const { return h ^ 1; }
   int  edge(int h)  const { return h >> 1; }
@@ -379,10 +447,15 @@ struct DelaunayTriangulation {
   // metric, ~1e-2 for a numerically solved one.
   // If new_to_old is non-null it receives compact_vertices()' map: the
   // original T-label of each surviving cone vertex 0..nv-1.
+  // With track_removed, point tracking is enabled before the reduction and
+  // every removed flat vertex is seeded as a tracked point (label = its
+  // T-label; removal never renumbers, so labels are the input's), ending
+  // located in the result's cells -- see the tracker banner above.
   static DelaunayTriangulation compute(const Triangulation& T,
                                        const EdgeLengthFn& length,
                                        double flat_tol = 1e-6,
-                                       std::vector<int>* new_to_old = nullptr);
+                                       std::vector<int>* new_to_old = nullptr,
+                                       bool track_removed = false);
 
   // --- Surface metric (intrinsic; promoted from the delta-complex project) ---
   // Per-cone-pair geodesic distances and geodesics on the metric delta-complex,
