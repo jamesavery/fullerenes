@@ -456,9 +456,20 @@ struct AlexandrovIDTCubic {
   // read stats/r/D after; build() only replaces solver.D.
   AlexandrovSolver solver;
 
+  // Configure-before-build knob: when set, the flat-vertex removal inside
+  // build() TRACKS every removed kis vertex (DelaunayTriangulation point
+  // tracker), so after solve() the kappa=0 solver.D carries each hexagon
+  // center, pentagon center and hexagon-only cubic vertex as a
+  // (cell, barycentric) location on the cubic polytope's surface --
+  // transported through the removal and all homotopy flips.  Tracker
+  // labels are kis-complex ids (see KisMetric: id < T.N = dual vertex /
+  // cubic face center; id T.N + t = cubic vertex t in T.triangles() order).
+  bool track_removed = false;
+
   // Cone bookkeeping, filled by build().  Cone i is vertex i of solver.D.
   std::vector<tri_t> cone_triangle;  // dual triangle (CCW, T labels) = the cubic vertex
   std::vector<int>   cone_npent;     // k = #pentagon corners (deg-5 T vertices), 1..3
+  std::vector<int>   cone_kis_vertex; // kis id of cone i (= T.N + its triangle index)
 
   // The kis complex of the dual triangulation T, plus its metric.
   struct KisMetric {

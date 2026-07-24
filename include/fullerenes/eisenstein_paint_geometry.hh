@@ -27,31 +27,29 @@
 //                         points so adjacent cells produce bit-identical
 //                         output across shared edges (idempotent paint).
 //
-// Cubic-metric warm start (cubic_geometry): the carbon-atom geometry
-// with the global shape of the CUBIC polyhedral metric (flat unit
-// pentagons/hexagons; see AlexandrovIDTCubic, delaunay_alexandrov.hh).
-// M_cubic = sqrt(3) * M_dual outside 12 constant-size pentagon caps, so
-// the dual-metric barycentric weights remain geometrically faithful
-// there.  Construction:
+// Cubic-metric geometry (cubic_geometry): the carbon-atom geometry
+// EXACTLY on the cubic Alexandrov polytope (the convex realization of
+// the CUBIC polyhedral metric -- flat unit pentagons/hexagons; see
+// AlexandrovIDTCubic, delaunay_alexandrov.hh).  Construction (the
+// flip-tape transport of DESIGN-cubic-exact-paint.md):
 //
-//   c1. realize_cubic(T): AlexandrovIDTCubic -> exact 3D positions of
-//       the 20..60 pentagon-incident cubic vertices (= dual triangles).
-//   c2. pentagon_anchors: anchor each of the 12 dual cones at the
-//       centroid of its pentagon's 5 surrounding cone vertices.
-//   c3. realize_dual(S) + parametrize + evaluate with the c2 anchors:
-//       the charts are evaluated on the FLAT cells of the dual
-//       polytope, so the only approximation is the (small, cap-local)
-//       dual-vs-cubic shape difference -- never a chord across a
-//       non-flat raw-iDT cell.  (Painting over the raw iDT is what
-//       mangled elongated isomers, e.g. C392-[1,8,10,12,14,120,132,
-//       157,181,189,191,198]-fullerene; the API no longer expresses it.)
-//   c4. assemble_cubic: cubic vertex U = centroid of its painted dual
-//       corners; pentagon-incident cubic vertices are then overwritten
-//       with their exact polytope positions from c1.
+//   c1. realize_cubic(T): AlexandrovIDTCubic with point tracking.  The
+//       kis complex's flat vertices -- hexagon centers, pentagon
+//       centers, hexagon-only cubic vertices -- are tracked as
+//       (cell, barycentric) locations through the flat-vertex removal
+//       and every homotopy flip, ending in the kappa = 0 iDT whose
+//       cells are flat pieces of the polytope.
+//   c2. Pentagon-incident cubic vertices are the cones: exact solver
+//       positions.
+//   c3. Every tracked kis vertex evaluates barycentrically against its
+//       cell's three cone positions -- exactly ON the polytope surface.
 //
-// Because the cubic anchors are a heuristic substitution (unlike the
-// exact dual paint), CubicGeometry carries bond-length statistics so
-// callers can see the warm-start quality instead of trusting stage OK.
+// No dual-metric solve, no anchor substitution, no centroid step (the
+// pre-2026-07-24 heuristics): the only error is the Alexandrov
+// solver's own convergence/reconstruction tolerance.  A cubic bond is
+// an intrinsic unit segment, so its 3D chord is <= 1 (equality iff it
+// does not cross a polytope crease); CubicGeometry reports bond stats
+// as a self-diagnostic -- any bond above 1 + tolerance indicates a bug.
 //
 // Failure handling: composable functions throw StageError; the facades
 // dual_geometry / cubic_geometry never throw and return a Status.
@@ -119,42 +117,34 @@ void interpolate_cell(const Cell& F,
 // `perm` (= SortedDual::perm).  The complex A was charted on must have
 // flat cells w.r.t. the surface the anchors live on -- i.e. A must be
 // parametrize(P.D, S) for a realized polytope P whose cone positions
-// (or a same-surface substitute like pentagon_anchors) are the anchors.
-// Throws StageError(INTERPOLATE).
+// are the anchors.  Throws StageError(INTERPOLATE).
 std::vector<coord3d> evaluate(const SurfaceParametrization& A,
                               const std::vector<coord3d>& anchors,
                               const Permutation& perm);
 
 // =====================================================================
-// The realized cubic polytope + cubic assembly.
+// The realized cubic polytope.
 // =====================================================================
 
 struct CubicPolytope {
+    // The post-flip cubic iDT at kappa = 0: every cell a flat piece of
+    // the polytope, and the POINT TRACKER carrying every removed kis
+    // vertex as a (cell, barycentric) location on the surface.  Tracker
+    // labels are kis ids: label u < T.N is dual vertex u (a cubic face
+    // center); label T.N + U is cubic vertex U (T.triangles() /
+    // T.dual_graph() order).  Cone i is vertex i of D.
+    DelaunayTriangulation D;
     std::vector<coord3d> cone_pos;        // pentagon-incident cubic vertices (20..60)
     std::vector<tri_t>   cone_triangle;   // their dual triangles, T ORIGINAL labels (CCW)
+    std::vector<int>     kis_of_cone;     // kis id of cone i (= T.N + its cubic vertex U)
 };
 
-// AlexandrovIDTCubic realization of T's cubic metric.  Throws
-// StageError mirroring realize_dual's staging (kis/iDT trouble ->
-// IDT_COMPUTE, non-simplicial cubic iDT -> NON_SIMPLICIAL, any other
-// non-validating outcome -> ALEXANDROV).
+// AlexandrovIDTCubic realization of T's cubic metric, with every flat
+// kis vertex tracked onto the polytope.  Throws StageError mirroring
+// realize_dual's staging (kis/iDT trouble -> IDT_COMPUTE, non-simplicial
+// cubic iDT -> NON_SIMPLICIAL, any other non-validating outcome ->
+// ALEXANDROV).
 CubicPolytope realize_cubic(const TriangulationView& T);
-
-// Anchor each of the 12 dual cones at the centroid of its pentagon's 5
-// surrounding cubic cone vertices.  Every dual triangle containing a
-// deg-5 vertex is pentagon-incident and hence a cone of C, so each
-// pentagon accumulates exactly 5 contributions; anything else throws
-// (broken cone bookkeeping).  anchors[perm[p]] for pentagon p.
-std::vector<coord3d> pentagon_anchors(const TriangulationView& T,
-                                      const Permutation& perm,
-                                      const CubicPolytope& C);
-
-// Cubic vertex U = dual triangle T.triangles()[U] (the T.dual_graph()
-// labelling).  Position: centroid of the painted dual corners, then
-// exact polytope positions for the pentagon-incident cubic vertices.
-std::vector<coord3d> assemble_cubic(const TriangulationView& T,
-                                    const std::vector<coord3d>& dual_coords,
-                                    const CubicPolytope& C);
 
 // =====================================================================
 // Facades.  Never throw; check .status.
@@ -168,14 +158,16 @@ struct DualGeometry {
 };
 DualGeometry dual_geometry(const TriangulationView& T);
 
-// Cubic-metric warm start for the carbon atoms.  cubic_coords[U] is the
-// position of cubic vertex U in the T.dual_graph() labelling (U indexes
-// T.triangles()); dual_coords is the painted dual (T original labels),
-// kept for diagnostics and deltahedron-side consumers.
+// Cubic-metric geometry for the carbon atoms, EXACT on the cubic
+// Alexandrov polytope (see banner).  cubic_coords[U] is the position of
+// cubic vertex U in the T.dual_graph() labelling (U indexes
+// T.triangles()); dual_coords[u] is dual vertex u (= cubic face center)
+// located on the SAME polytope, kept for deltahedron-side consumers.
 //
-// bond_* are the cubic-graph edge-length statistics of cubic_coords
-// (nominal bond = 1): the warm start is a heuristic (see banner), so
-// its quality is reported rather than silently trusted.
+// bond_* are the cubic-graph edge-length statistics of cubic_coords: a
+// bond is an intrinsic unit segment, so bond_max <= 1 up to solver
+// tolerance (crease-crossing bonds are strictly shorter chords); a
+// larger value indicates a bug, not geometry.
 struct CubicGeometry {
     std::vector<coord3d> cubic_coords;   // size 2*T.N - 4 on OK
     std::vector<coord3d> dual_coords;    // size T.N on OK, original labels

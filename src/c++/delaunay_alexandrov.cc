@@ -1517,10 +1517,11 @@ void AlexandrovIDTCubic::build(const TriangulationView& T)
 
   vector<int> new_to_old;
   DelaunayTriangulation D = DelaunayTriangulation::compute(
-      M.K, M.edge_length_fn(), FLAT_TOL, &new_to_old);
+      M.K, M.edge_length_fn(), FLAT_TOL, &new_to_old, track_removed);
 
   cone_triangle.clear();
   cone_npent.clear();
+  cone_kis_vertex = new_to_old;
   double total = 0;
   for (int i = 0; i < D.nv; i++) {
     const int old = new_to_old[i];
