@@ -45,7 +45,7 @@
 // =====================================================================
 
 #include "fullerenes/eisenstein.hh"        // Eisenstein, EisensteinRational, LatticeIsometry
-#include "fullerenes/eisenstein_paint.hh"  // Pipeline + the Tier-3 cell primitives
+#include "fullerenes/eisenstein_paint.hh"  // SurfaceParametrization + the cell primitives
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/delaunay.hh"
 
@@ -57,15 +57,15 @@ namespace eisenstein_paint {
 
 // One live iDT 2-cell as the atlas sees it: its chart (corner cone ids +
 // corner positions in its own Eisenstein frame) and its lattice claims.
+// Derived from the SurfaceParametrization's Cell/LatticeMap -- the claim
+// map is the hash-indexed view of the LatticeMap that the exact tracing
+// needs for O(1) position lookup.
 struct AtlasCell {
   bool ok = false;
   std::array<int, 3>        corners{ -1, -1, -1 };  // corner cone ids (CCW)
   std::array<Eisenstein, 3> P{};                    // corner positions in the cell's own frame
   std::unordered_map<Eisenstein, int> claim;        // lattice pos -> T_sorted vertex id
 };
-
-// One appearance of a T_sorted vertex in some cell's chart.
-struct Occurrence { int cell; Eisenstein pos; };
 
 // A T_sorted face developed into one chart: its three corners (CCW, unit
 // triangle -- verified exactly on resolution) plus a located interior/edge
@@ -77,16 +77,16 @@ struct ResolvedFace {
   EisensteinRational anchor;         // located midpoint of one face edge (inside `cell`)
 };
 
-// The atlas.  An OPEN struct: the fields past `occurrences` are the
-// internal combinatorics (T_sorted face/edge tables, transitions,
-// anchored edges, BFS routing, the lazy resolved-face cache), public for
-// diagnostic tooling but subject to change with the implementation --
-// treat them as internal-facing.
+// The atlas.  An OPEN struct: the fields past `cells` are the internal
+// combinatorics (T_sorted face/edge tables, transitions, anchored edges,
+// BFS routing, the lazy resolved-face cache), public for diagnostic
+// tooling but subject to change with the implementation -- treat them as
+// internal-facing.  (Per-vertex occurrences live on the
+// SurfaceParametrization; locate_vertex is a Layer-I function.)
 struct CellAtlas {
-  const DelaunayTriangulation* D = nullptr;  // the candidate 12-cone iDT
-  const Triangulation*         T = nullptr;  // T_sorted
-  std::vector<AtlasCell>               cells;        // indexed by D face id
-  std::vector<std::vector<Occurrence>> occurrences;  // per T_sorted vertex
+  const DelaunayTriangulation* D = nullptr;  // the charted cone iDT
+  TriangulationView            T;            // T_sorted (non-owning view)
+  std::vector<AtlasCell>       cells;        // indexed by D face id
 
   // Directed pair key shared by `trans`, `arc_face`, `edge_id` (and by
   // callers that query them): both ids packed into one 64-bit value.
@@ -121,20 +121,24 @@ struct CellAtlas {
   LatticeIsometry transition(int f_from, int f_to) const;
 };
 
-// Build the atlas over P's cells.
+// Build the atlas over P's charts.
 //
-// Accepts the pipeline from prepare_iDT (recommended) or prepare: the
-// atlas is INTRINSIC-ONLY -- it never reads P.cone_positions, so no
-// Alexandrov solve / 3D embedding is required.  This is the explicit
-// intrinsic/3D seam of the paint module: everything here lives in the
-// flat cone metric.  It is also curvature-sign-agnostic: nothing assumes
-// cone degrees < 6 or any bound on the cell diameter, so fulleroid-style
-// inputs (cone angles > 2pi) pass through unchanged.
+// P may be parametrized on the raw dual_idt (recommended for pure
+// surface work -- no Alexandrov solve / 3D embedding required) or on a
+// realized polytope's iDT.  The atlas is INTRINSIC-ONLY: everything
+// here lives in the flat cone metric.  It is also curvature-sign-
+// agnostic: nothing assumes cone degrees < 6 or any bound on the cell
+// diameter, so fulleroid-style inputs (cone angles > 2pi) pass through
+// unchanged.
 //
-//   @throws StageError       propagated from the Tier-3 cell primitives.
+// No chart is recomputed: the parametrization's cells and lattice maps
+// are indexed into hash form and the cross-cell structure (transitions,
+// anchored edges, BFS routing) is built on top.  P (and the D it points
+// to) must outlive the atlas.
+//
 //   @throws std::logic_error on any deep invariant violation (dead cell
 //           embedded, unclaimed lattice adjacency, uncovered edge graph, ...).
-CellAtlas build_atlas(const Pipeline& P);
+CellAtlas build_atlas(const SurfaceParametrization& P);
 
 // Trace the straight segment a -> b (both in `cell`'s frame; a inside the
 // CLOSED cell) through the cell complex.  Returns b's host cell, b
@@ -174,9 +178,7 @@ const ResolvedFace& resolve_face(CellAtlas& A, int f);
 struct CellPoint { int cell; EisensteinRational pos; };
 CellPoint locate_sample(CellAtlas& A, int f, long a, long b, long c, long den);
 
-// A T_sorted vertex is itself a lattice point: locate it via its first
-// recorded occurrence (no trace).
-//   @throws std::logic_error if no cell claims v (deep invariant).
-CellPoint locate_vertex(const CellAtlas& A, int v);
+// (locate_vertex is a Layer-I function on SurfaceParametrization -- a
+// vertex is located by its first recorded occurrence, no atlas needed.)
 
 }  // namespace eisenstein_paint

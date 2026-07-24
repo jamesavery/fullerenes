@@ -12,7 +12,7 @@
 //           out_prefix=cell.  Emits <prefix>_f<id>.tex per cell, plus
 //           <prefix>_f<id>_canon_<edge>.tex per CCW arc.
 
-#include "fullerenes/eisenstein_paint.hh"
+#include "fullerenes/eisenstein_paint_geometry.hh"
 #include "fullerenes/delaunay_strip.hh"
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/delaunay.hh"
@@ -47,8 +47,11 @@ int main(int argc, char** argv) {
     int         arc    = (argc > 4) ? std::atoi(argv[4]) : -1;
     const char* prefix = (argc > 5) ? argv[5] : "cell";
 
-    Triangulation T    = load_isomer(N, idx, IPR);
-    auto [T_sorted, D] = ep::prepare_inputs(T);
+    Triangulation T     = load_isomer(N, idx, IPR);
+    ep::SortedDual S_d  = ep::sorted_dual(T);
+    ep::DualPolytope P  = ep::realize_dual(S_d);
+    const Triangulation& T_sorted = S_d.T;
+    const DelaunayTriangulation& D = P.D;
     auto strips        = unfold_all_arc_strips(D, T_sorted);
 
     if (arc < 0) {

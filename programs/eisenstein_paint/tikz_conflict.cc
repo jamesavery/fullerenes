@@ -10,7 +10,7 @@
 //
 // vertex_id = -1 -> pick the first interior-ambiguity conflict found.
 
-#include "fullerenes/eisenstein_paint.hh"
+#include "fullerenes/eisenstein_paint_geometry.hh"
 #include "fullerenes/barycentric.hh"
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/delaunay.hh"
@@ -46,7 +46,10 @@ int main(int argc, char** argv) {
     }
     if (T.N == 0) { std::fprintf(stderr, "isomer not found\n"); return 1; }
 
-    auto [T_sorted, D] = ep::prepare_inputs(T);
+    ep::SortedDual S_d = ep::sorted_dual(T);
+    ep::DualPolytope Pl = ep::realize_dual(S_d);
+    const Triangulation& T_sorted = S_d.T;
+    const DelaunayTriangulation& D = Pl.D;
     auto cells         = ep::embed_all_cells(D, T_sorted);
 
     struct Claim { int cell_id; Eisenstein pos; bool is_interior; };

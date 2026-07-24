@@ -1,12 +1,14 @@
+// Eisenstein-paint, Layer I: intrinsic surface parametrization (see the
+// header banner).  Everything here is integer/combinatorial -- no coord3d
+// appears in this translation unit.  Layer II (the Alexandrov realization
+// and chart evaluation) lives in eisenstein_paint_geometry.cc.
+
 #include "fullerenes/eisenstein_paint.hh"
 
-#include "fullerenes/auxiliary.hh"           // IDCounter
 #include "fullerenes/eisenstein.hh"
 #include "fullerenes/eisenstein_raster.hh"
 #include "fullerenes/eisenstein_tikz.hh"
 #include "fullerenes/delaunay_strip.hh"
-#include "fullerenes/delaunay_alexandrov.hh"
-#include "fullerenes/barycentric.hh"
 
 #include <algorithm>
 #include <array>
@@ -66,164 +68,66 @@ const char* stage_name(Stage s) {
     return "unknown";
 }
 
-const char* Result::stage_name()      const { return eisenstein_paint::stage_name(stage); }
-const char* CubicResult::stage_name() const { return eisenstein_paint::stage_name(stage); }
+// =====================================================================
+// sorted_dual / dual_idt.
+// =====================================================================
 
-// =====================================================================
-// Prelude: sort, iDT compute, Alexandrov solve.
-// =====================================================================
+SortedDual sorted_dual(const TriangulationView& T) {
+    SortedDual S;
+    S.perm = T.sort_flat_last();
+    S.T    = Triangulation(T);
+    S.T.apply_permutation(S.perm);
+    S.n_cones = 0;
+    for (node_t u = 0; u < S.T.N; ++u)
+        if (S.T.degree(u) != 6) ++S.n_cones;
+    return S;
+}
 
 namespace {
 
-// Guard the iDT before the atlas / paint path runs.  Multi-edges (two
+// The raw iDT of S's cone metric; shared by dual_idt (guarded) and
+// Layer II's realize_dual (unguarded -- the Alexandrov flips supersede).
+DelaunayTriangulation compute_dual_idt(const SortedDual& S, const char* who) {
+    try {
+        return DelaunayTriangulation::compute(S.T);
+    } catch (const std::exception& e) {
+        throw StageError(Stage::IDT_COMPUTE,
+            std::string(who) + ": iDT compute: " + e.what());
+    }
+}
+
+// Guard the iDT before the chart machinery runs.  Multi-edges (two
 // same-length geodesics between one cone pair) are legitimate delta-complex
-// features that now develop correctly (find_chain's cone-interiority branch
-// discriminator), so they are ACCEPTED -- this is no longer a simpliciality
-// requirement.  What stays a hard reject is what embed_cell genuinely cannot
-// place: a self-loop (a cone edge (v, v)) makes a face with a repeated corner,
-// and is_well_formed catches bigons / non-length-3 faces.
-void require_embeddable_idt(const DelaunayTriangulation& D, const char* who) {
+// features that develop correctly (find_chains' discriminators), so they are
+// ACCEPTED.  What stays a hard reject is what embed_cell genuinely cannot
+// chart: a self-loop (a cone edge (v, v)) makes a face with a repeated
+// corner, and is_well_formed catches bigons / non-length-3 faces.  (Lifting
+// the repeated-corner limitation is queued: refactor-debt entry
+// 2026-07-24-paint-repeated-corner-cells.)
+void require_chartable_idt(const DelaunayTriangulation& D, const char* who) {
     for (int h = 0; h < D.nh; ++h)
         if (D.alive(h) && D.he_origin[h] == D.dest(h))
             throw StageError(Stage::NON_SIMPLICIAL,
                 std::string(who) + ": iDT has a self-loop (a cone edge to "
-                "itself); a face with a repeated corner cannot be embedded");
+                "itself); a face with a repeated corner cannot be charted");
     if (!D.is_well_formed())
         throw StageError(Stage::NON_SIMPLICIAL,
             std::string(who) + ": iDT is not well-formed "
             "(some live half-edge is not in a length-3 face cycle)");
 }
 
-void sort_and_compute_idt(const Triangulation& T, Pipeline& P) {
-    P.perm     = T.sort_flat_last();
-    P.T_sorted = T;
-    P.T_sorted.apply_permutation(P.perm);
-    try {
-        P.D = DelaunayTriangulation::compute(P.T_sorted);
-    } catch (const std::exception& e) {
-        throw StageError(Stage::IDT_COMPUTE,
-            std::string("eisenstein_paint::prepare: iDT compute: ") + e.what());
-    }
-}
-
-void run_alexandrov(Pipeline& P) {
-    AlexandrovSolver A;
-    A.D              = std::move(P.D);
-    P.cone_positions = A.solve();
-    P.D              = std::move(A.D);
-    if (A.valid()) return;
-
-    using VS = AlexandrovSolver::ValidationStatus;
-    const std::string detail = std::string("AlexandrovSolver: ")
-                             + AlexandrovSolver::status_str(A.stats_status);
-    const Stage st = (A.stats_status == VS::FAIL_NOT_SIMPLE)
-                       ? Stage::NON_SIMPLICIAL
-                       : Stage::ALEXANDROV;
-    throw StageError(st, "eisenstein_paint::prepare: " + detail);
-}
-
 }  // namespace
 
-Pipeline prepare_iDT(const Triangulation& T) {
-    Pipeline P;
-    sort_and_compute_idt(T, P);
-    require_embeddable_idt(P.D, "eisenstein_paint::prepare_iDT");
-    return P;
+// Exposed to Layer II (eisenstein_paint_geometry.cc) via this internal
+// declaration; not part of the public header.
+DelaunayTriangulation detail_compute_dual_idt(const SortedDual& S, const char* who) {
+    return compute_dual_idt(S, who);
 }
 
-Pipeline prepare(const Triangulation& T) {
-    Pipeline P;
-    sort_and_compute_idt(T, P);
-    run_alexandrov(P);
-    return P;
-}
-
-Inputs prepare_inputs(const Triangulation& T) {
-    Pipeline P = prepare(T);
-    return { std::move(P.T_sorted), std::move(P.D) };
-}
-
-// =====================================================================
-// Cubic prelude: raw dual iDT + AlexandrovIDTCubic + pentagon anchors.
-// =====================================================================
-
-namespace {
-
-// Anchor each of the 12 dual cones (sorted labels 0..11) at the
-// centroid of its pentagon's 5 surrounding cone vertices.  Every dual
-// triangle containing a deg-5 vertex is pentagon-incident and hence a
-// cone of AlexandrovIDTCubic, so each pentagon accumulates exactly 5
-// contributions; anything else is broken cone bookkeeping.
-std::vector<coord3d> pentagon_anchors(const Triangulation& T,
-                                      const Permutation& perm,
-                                      const std::vector<coord3d>& cone_pos,
-                                      const std::vector<tri_t>&   cone_tri)
-{
-    std::vector<coord3d> anchors(12, coord3d{0, 0, 0});
-    std::vector<int>     count(12, 0);
-    for (size_t i = 0; i < cone_tri.size(); ++i)
-        for (int k = 0; k < 3; ++k) {
-            const int p = cone_tri[i][k];
-            if (T.degree(p) == 6) continue;      // hexagon corner
-            const int ps = perm[p];              // sorted label, < 12
-            if (ps < 0 || ps >= 12)
-                paint_throw("eisenstein_paint::pentagon_anchors: deg-%d vertex %d "
-                            "has sorted label %d (expected cone label < 12)",
-                            T.degree(p), p, ps);
-            anchors[ps] += cone_pos[i];
-            ++count[ps];
-        }
-    for (int c = 0; c < 12; ++c) {
-        if (count[c] != 5)
-            paint_throw("eisenstein_paint::pentagon_anchors: cone %d accumulated "
-                        "%d cone-vertex contributions (expected 5)", c, count[c]);
-        anchors[c] = anchors[c] / 5.0;
-    }
-    return anchors;
-}
-
-// AlexandrovIDTCubic solve + anchor derivation.  Mirrors run_alexandrov's
-// staging: kis/iDT trouble -> IDT_COMPUTE, non-simplicial cubic iDT ->
-// NON_SIMPLICIAL, any other non-validating outcome -> ALEXANDROV.
-void run_cubic_alexandrov(const Triangulation& T, CubicPipeline& CP) {
-    AlexandrovIDTCubic AC;
-    try {
-        CP.cone_vertex_positions = AC.solve(T);
-    } catch (const std::exception& e) {
-        throw StageError(Stage::IDT_COMPUTE,
-            std::string("eisenstein_paint::prepare_cubic: AlexandrovIDTCubic: ")
-            + e.what());
-    }
-    CP.cone_triangle = AC.cone_triangle;
-
-    if (!AC.solver.valid()) {
-        using VS = AlexandrovSolver::ValidationStatus;
-        const std::string detail = std::string("AlexandrovIDTCubic: ")
-                                 + AlexandrovSolver::status_str(AC.solver.stats_status);
-        const Stage st = (AC.solver.stats_status == VS::FAIL_NOT_SIMPLE)
-                           ? Stage::NON_SIMPLICIAL
-                           : Stage::ALEXANDROV;
-        throw StageError(st, "eisenstein_paint::prepare_cubic: " + detail);
-    }
-    if (CP.cone_vertex_positions.size() != CP.cone_triangle.size())
-        throw StageError(Stage::ALEXANDROV,
-            "eisenstein_paint::prepare_cubic: AlexandrovIDTCubic returned "
-            + std::to_string(CP.cone_vertex_positions.size()) + " positions for "
-            + std::to_string(CP.cone_triangle.size()) + " cones");
-
-    CP.P.cone_positions = pentagon_anchors(T, CP.P.perm,
-                                           CP.cone_vertex_positions,
-                                           CP.cone_triangle);
-}
-
-}  // namespace
-
-CubicPipeline prepare_cubic(const Triangulation& T) {
-    CubicPipeline CP;
-    sort_and_compute_idt(T, CP.P);
-    require_embeddable_idt(CP.P.D, "eisenstein_paint::prepare_cubic");
-    run_cubic_alexandrov(T, CP);
-    return CP;
+DelaunayTriangulation dual_idt(const SortedDual& S) {
+    DelaunayTriangulation D = compute_dual_idt(S, "eisenstein_paint::dual_idt");
+    require_chartable_idt(D, "eisenstein_paint::dual_idt");
+    return D;
 }
 
 // =====================================================================
@@ -240,7 +144,7 @@ int direction_of_unit(Eisenstein z) {
 
 // Derive k0 (frame offset) at vertex w given a neighbour `nbr` of w
 // whose position relative to w is along lattice direction `d`.
-int derive_k0(const Triangulation& T, int w, int nbr, int d) {
+int derive_k0(const TriangulationView& T, int w, int nbr, int d) {
     const auto& nbrs = T[w];
     const int deg = (int)nbrs.size();
     for (int j = 0; j < deg; ++j)
@@ -252,7 +156,7 @@ int derive_k0(const Triangulation& T, int w, int nbr, int d) {
 // wins so we keep the earliest position/k0 on the walk).  Derives each
 // vertex's k0 from one of its face-neighbours via its unit-direction
 // displacement.
-bool extract_walk_vertices(const Triangulation& T,
+bool extract_walk_vertices(const TriangulationView& T,
                            const WalkResult& wr,
                            std::unordered_map<int, std::pair<Eisenstein, int>>& out)
 {
@@ -280,13 +184,13 @@ struct WalkVertices {
     std::unordered_map<int, std::pair<Eisenstein, int>> by_id;
 };
 
-// A cone vertex (id < 12) at any STRICT interior step of wr.walk means
+// A cone vertex (id < n_cones) at any STRICT interior step of wr.walk means
 // the directed line passes through a cone -- and at a cone the
 // angular structure is undefined, so a geodesic cannot pass through
 // one.  Trivially false when gcd(target_rel) == 1.
-bool walks_through_cone(const WalkResult& wr) {
+bool walks_through_cone(const WalkResult& wr, int n_cones) {
     for (size_t k = 1; k + 1 < wr.walk.size(); ++k)
-        if (wr.walk[k].second < 12) return true;
+        if (wr.walk[k].second < n_cones) return true;
     return false;
 }
 
@@ -296,7 +200,7 @@ bool walks_through_cone(const WalkResult& wr) {
 // corners, so any OTHER cone landing strictly interior means the walk
 // developed the wrong same-length geodesic (a split-prime multi-edge whose
 // wrong branch wraps a neighbouring cone into the strip) or a reflected
-// corridor -- both non-embeddings that the atlas later rejects.
+// corridor -- both non-embeddings that the charts later reject.
 bool strictly_inside_meta(Eisenstein p, Eisenstein FP0, Eisenstein FP1, Eisenstein FP2) {
     return wedge(FP1 - FP0, p - FP0) > 0
         && wedge(FP2 - FP1, p - FP1) > 0
@@ -331,7 +235,7 @@ bool strictly_inside_meta(Eisenstein p, Eisenstein FP0, Eisenstein FP1, Eisenste
 // non-thin cell each edge yields exactly one development and the search is a
 // single trivially-consistent triple.
 std::vector<WalkVertices>
-find_chains(const Triangulation& T_sorted,
+find_chains(const TriangulationView& T_sorted, int n_cones,
            int start_vertex, int target_vertex, Eisenstein target_rel,
            Eisenstein start_pos, Eisenstein FP0, Eisenstein FP1, Eisenstein FP2)
 {
@@ -372,7 +276,7 @@ find_chains(const Triangulation& T_sorted,
                 const auto itv = V.by_id.find(target_vertex);
                 if (itu == V.by_id.end() || itu->second.first != Eisenstein(0, 0)) continue;
                 if (itv == V.by_id.end() || itv->second.first != endpoint)         continue;
-                if (walks_through_cone(wr)) continue;
+                if (walks_through_cone(wr, n_cones)) continue;
 
                 for (auto& [vid, pk] : V.by_id) {
                     pk.first = back.apply(pk.first);
@@ -390,7 +294,7 @@ find_chains(const Triangulation& T_sorted,
                 // interior and need no special-casing.
                 bool folds_cone = false;
                 for (const auto& [vid, pk] : V.by_id) {
-                    if (vid >= 12) continue;                                     // hex
+                    if (vid >= n_cones) continue;                                // hex
                     if (vid == start_vertex || vid == target_vertex) continue;   // this edge's cones
                     if (strictly_inside_meta(pk.first + start_pos, FP0, FP1, FP2)) {
                         folds_cone = true; break;
@@ -457,13 +361,13 @@ bool clip_to_meta_by_scanline(const WalkVertices& V,
 // chain qualifies or none survives the clip.  embed_cell picks the one strip
 // per edge that is mutually consistent across the three edges.
 std::vector<EdgeStrip>
-frame_walker_candidates(const Triangulation& T_sorted,
+frame_walker_candidates(const TriangulationView& T_sorted, int n_cones,
                         int start_vertex, Eisenstein start_pos,
                         int target_vertex, Eisenstein target_pos,
                         Eisenstein FP0, Eisenstein FP1, Eisenstein FP2)
 {
     std::vector<EdgeStrip> out;
-    const auto chains = find_chains(T_sorted, start_vertex, target_vertex,
+    const auto chains = find_chains(T_sorted, n_cones, start_vertex, target_vertex,
                                     target_pos - start_pos,
                                     start_pos, FP0, FP1, FP2);
     for (const WalkVertices& chain : chains) {
@@ -534,15 +438,27 @@ enumerate_corner_candidates(double L20, double alpha_0,
     return out;
 }
 
+// The cone count of the charted complex: cones are the sorted labels
+// whose T_sorted degree != 6.  They are sorted FIRST, so the count is
+// the first index with degree 6 (or N if none).  O(n_cones) and purely
+// combinatorial -- keeps the per-cell primitives' signatures free of a
+// redundant n_cones parameter.
+int count_cones(const TriangulationView& T_sorted) {
+    int n = 0;
+    while (n < (int)T_sorted.N && T_sorted.degree(n) != 6) ++n;
+    return n;
+}
+
 }  // namespace
 
 Cell embed_cell(const DelaunayTriangulation& D,
-                const Triangulation& T_sorted,
+                const TriangulationView& T_sorted,
                 int cell_id)
 {
     Cell F;
     F.cell_id = cell_id;
     if (cell_id < 0 || cell_id >= D.nf || D.f_he[cell_id] < 0) return F;
+    const int n_cones = count_cones(T_sorted);
 
     const int h0 = D.f_he[cell_id];
     const int h1 = D.he_next[h0];
@@ -575,11 +491,11 @@ Cell embed_cell(const DelaunayTriangulation& D,
     // 2 corner candidates; only one matches the surface geodesics.
     for (const CornerCandidate& C : candidates) {
         const std::vector<EdgeStrip> cand01 =
-            frame_walker_candidates(T_sorted, F.c0, C.P0, F.c1, C.P1, C.P0, C.P1, C.P2);
+            frame_walker_candidates(T_sorted, n_cones, F.c0, C.P0, F.c1, C.P1, C.P0, C.P1, C.P2);
         const std::vector<EdgeStrip> cand12 =
-            frame_walker_candidates(T_sorted, F.c1, C.P1, F.c2, C.P2, C.P0, C.P1, C.P2);
+            frame_walker_candidates(T_sorted, n_cones, F.c1, C.P1, F.c2, C.P2, C.P0, C.P1, C.P2);
         const std::vector<EdgeStrip> cand20 =
-            frame_walker_candidates(T_sorted, F.c2, C.P2, F.c0, C.P0, C.P0, C.P1, C.P2);
+            frame_walker_candidates(T_sorted, n_cones, F.c2, C.P2, F.c0, C.P0, C.P0, C.P1, C.P2);
         if (cand01.empty() || cand12.empty() || cand20.empty()) continue;
 
         bool placed = false;
@@ -607,7 +523,7 @@ Cell embed_cell(const DelaunayTriangulation& D,
 }
 
 std::vector<Cell> embed_all_cells(const DelaunayTriangulation& D,
-                                   const Triangulation& T_sorted)
+                                  const TriangulationView& T_sorted)
 {
     std::vector<Cell> cells(D.nf);
 #ifdef _OPENMP
@@ -647,7 +563,7 @@ struct VertexK0 { int vertex; int k0; };
 // One east-direction (dir 0) lattice step along T_sorted.  Throws on
 // cone-gap (deg-5 vertex with nbr_idx == 5) or asymmetric T_sorted
 // neighbour list.
-VertexK0 east_step(const Triangulation& T_sorted,
+VertexK0 east_step(const TriangulationView& T_sorted,
                    VertexK0 cur, int cell_id, int b, int a)
 {
     const int nbr_idx = ((0 - cur.k0) % 6 + 6) % 6;
@@ -675,7 +591,7 @@ VertexK0 east_step(const Triangulation& T_sorted,
 }  // namespace
 
 LatticeMap enumerate_cell_lattice(const Cell& F,
-                                   const Triangulation& T_sorted)
+                                  const TriangulationView& T_sorted)
 {
     LatticeMap out;
     out.cell_id = F.cell_id;
@@ -713,48 +629,13 @@ LatticeMap enumerate_cell_lattice(const Cell& F,
 }
 
 // =====================================================================
-// interpolate_cell: barycentric paint into pos3d.
-// =====================================================================
-
-void interpolate_cell(const Cell& F,
-                      const LatticeMap& lmap,
-                      const std::vector<coord3d>& cone_positions,
-                      std::vector<coord3d>& pos3d)
-{
-    if (!F.ok)
-        paint_throw("eisenstein_paint::interpolate_cell: F.ok=false");
-    if (cone_positions.size() != 12)
-        paint_throw("eisenstein_paint::interpolate_cell: cone_positions size %zu != 12",
-                    cone_positions.size());
-    const long g = wedge(F.P1 - F.P0, F.P2 - F.P0);
-    if (g <= 0)
-        paint_throw("eisenstein_paint::interpolate_cell(cell %d): g=%ld <= 0",
-                    F.cell_id, g);
-    const coord3d& C0 = cone_positions[F.c0];
-    const coord3d& C1 = cone_positions[F.c1];
-    const coord3d& C2 = cone_positions[F.c2];
-
-    for (const auto& [p, vid] : lmap.entries) {
-        if (vid < 12) continue;       // cone -- pre-painted
-        const IntBary bw = integer_barycentric(p, F.P0, F.P1, F.P2);
-        if (bw.n0 < 0 || bw.n1 < 0 || bw.n2 < 0 || bw.denom != g)
-            paint_throw("eisenstein_paint::interpolate_cell(cell %d): bad "
-                        "barycentric for vertex %d at pos=(%d,%d): "
-                        "(n0=%ld n1=%ld n2=%ld, denom=%ld, g=%ld)",
-                        F.cell_id, vid, p.first, p.second,
-                        bw.n0, bw.n1, bw.n2, bw.denom, g);
-        pos3d[vid] = barycentric_combine(reduce_to_lowest_terms(bw), C0, C1, C2);
-    }
-}
-
-// =====================================================================
-// run: full pipeline orchestrator.
+// parametrize: charts + coverage + occurrences.
 // =====================================================================
 
 namespace {
 
 std::vector<Cell>
-embed_all_or_stage(const DelaunayTriangulation& D, const Triangulation& T_sorted)
+embed_all_or_stage(const DelaunayTriangulation& D, const TriangulationView& T_sorted)
 {
     std::vector<Cell> cells;
     try {
@@ -777,7 +658,7 @@ embed_all_or_stage(const DelaunayTriangulation& D, const Triangulation& T_sorted
 }
 
 std::vector<LatticeMap>
-lmaps_or_stage(const std::vector<Cell>& cells, const Triangulation& T_sorted)
+lmaps_or_stage(const std::vector<Cell>& cells, const TriangulationView& T_sorted)
 {
     std::vector<LatticeMap> lmaps(cells.size());
     try {
@@ -791,150 +672,45 @@ lmaps_or_stage(const std::vector<Cell>& cells, const Triangulation& T_sorted)
     return lmaps;
 }
 
-struct Coverage { int unclaimed = 0; int three_plus = 0; };
-
-Coverage hex_coverage(const std::vector<Cell>& cells,
-                      const std::vector<LatticeMap>& lmaps,
-                      int Nv_sorted)
-{
-    std::vector<int> claim(Nv_sorted, 0);
-    for (size_t fi = 0; fi < cells.size(); ++fi) {
-        if (!cells[fi].ok) continue;
-        for (const auto& [p, vid] : lmaps[fi].entries) {
-            if (vid < 12) continue;
-            ++claim[vid];
-        }
-    }
-    Coverage c;
-    for (int v = 12; v < Nv_sorted; ++v) {
-        const int n = claim[v];
-        if      (n == 0) ++c.unclaimed;
-        else if (n >= 3) ++c.three_plus;
-    }
-    return c;
-}
-
-void check_coverage_or_stage(const std::vector<Cell>& cells,
-                             const std::vector<LatticeMap>& lmaps,
-                             int Nv_sorted)
-{
-    const Coverage c = hex_coverage(cells, lmaps, Nv_sorted);
-    if (c.unclaimed == 0 && c.three_plus == 0) return;
-    throw StageError(Stage::COVERAGE,
-        "coverage(unclaimed=" + std::to_string(c.unclaimed) +
-        ",three_plus="        + std::to_string(c.three_plus) + ")");
-}
-
-std::vector<coord3d>
-interpolate_pos3d(const std::vector<Cell>& cells,
-                  const std::vector<LatticeMap>& lmaps,
-                  const std::vector<coord3d>& cone_positions,
-                  int Nv_sorted)
-{
-    // Cones are written directly; interpolate_cell skips them
-    // ("pre-painted" contract).  Hex slots are written by interpolation,
-    // on-edge hex idempotently from both adjacent cells.
-    std::vector<coord3d> pos3d(Nv_sorted);
-    for (int c = 0; c < 12; ++c) pos3d[c] = cone_positions[c];
-    try {
-        for (size_t fi = 0; fi < cells.size(); ++fi)
-            if (cells[fi].ok)
-                interpolate_cell(cells[fi], lmaps[fi], cone_positions, pos3d);
-    } catch (const std::exception& e) {
-        throw StageError(Stage::INTERPOLATE,
-            std::string("interpolate_throw: ") + e.what());
-    }
-    return pos3d;
-}
-
-// perm[u_orig] = u_sorted, so the position written at sorted vertex
-// perm[u_orig] is u_orig's 3D coordinate.
-std::vector<coord3d>
-back_permute(const std::vector<coord3d>& pos_sorted,
-             const Permutation&          perm,
-             int                         Nv_orig)
-{
-    std::vector<coord3d> out(Nv_orig);
-    for (int u = 0; u < Nv_orig; ++u)
-        out[u] = pos_sorted[perm[u]];
-    return out;
-}
-
-// The metric-independent paint core: embed every cell of P.D, scan +
-// interpolate against P.cone_positions, back-permute to original labels.
-std::vector<coord3d> paint_dual(const Pipeline& P, int Nv_orig) {
-    auto cells = embed_all_or_stage(P.D, P.T_sorted);
-    auto lmaps = lmaps_or_stage    (cells, P.T_sorted);
-    check_coverage_or_stage(cells, lmaps, P.T_sorted.N);
-    auto pos3d_sorted = interpolate_pos3d(cells, lmaps,
-                                          P.cone_positions, P.T_sorted.N);
-    return back_permute(pos3d_sorted, P.perm, Nv_orig);
-}
-
-// Cubic vertex U = dual triangle T.triangles()[U] (the dual_graph()
-// labelling).  Position: centroid of the painted dual corners, then
-// exact polytope positions for the pentagon-incident cubic vertices.
-std::vector<coord3d>
-assemble_cubic(const Triangulation& T,
-               const std::vector<coord3d>& dual_coords,
-               const std::vector<coord3d>& cone_vertex_positions,
-               const std::vector<tri_t>&   cone_triangle)
-{
-    const std::vector<tri_t> tris = T.triangles();
-    IDCounter<tri_t> tri_numbers;
-    for (const tri_t& t : tris) tri_numbers.insert(t.sorted());
-
-    std::vector<coord3d> cubic(tris.size());
-    for (size_t U = 0; U < tris.size(); ++U)
-        cubic[U] = tris[U].centroid(dual_coords);
-
-    for (size_t i = 0; i < cone_triangle.size(); ++i) {
-        const auto it = tri_numbers.find(cone_triangle[i].sorted());
-        if (it == tri_numbers.end())
-            paint_throw("eisenstein_paint::assemble_cubic: cone %zu's dual "
-                        "triangle (%d,%d,%d) not in T.triangles()",
-                        i, cone_triangle[i][0], cone_triangle[i][1],
-                        cone_triangle[i][2]);
-        cubic[it->second] = cone_vertex_positions[i];
-    }
-    return cubic;
-}
-
 }  // namespace
 
-Result run(const Triangulation& T) {
-    Result R;
-    try {
-        Pipeline P = prepare(T);
-        R.coords   = paint_dual(P, T.N);
-        R.stage    = Stage::OK;
-    } catch (const StageError& e) {
-        R.stage = e.stage;
-        R.why   = e.what();
-    } catch (const std::exception& e) {
-        R.stage = Stage::UNEXPECTED;
-        R.why   = std::string("unexpected: ") + e.what();
+SurfaceParametrization parametrize(const DelaunayTriangulation& D,
+                                   const SortedDual& S)
+{
+    SurfaceParametrization P;
+    P.D       = &D;
+    P.T       = S.T;
+    P.n_cones = S.n_cones;
+    P.cells   = embed_all_or_stage(D, S.T);
+    P.lmaps   = lmaps_or_stage(P.cells, S.T);
+
+    // Occurrences: one entry per (cell, lattice claim).  Coverage on the
+    // non-cone vertices: claimed by 1 cell (interior) or 2 (on a shared
+    // iDT edge, idempotent); 0 or >= 3 is a chart fold.
+    P.occurrences.assign(S.T.N, {});
+    for (size_t fi = 0; fi < P.cells.size(); ++fi) {
+        if (!P.cells[fi].ok) continue;
+        for (const auto& [pos, vid] : P.lmaps[fi].entries)
+            P.occurrences[vid].push_back({ (int)fi, pos });
     }
-    return R;
+    int unclaimed = 0, three_plus = 0;
+    for (int v = S.n_cones; v < (int)S.T.N; ++v) {
+        const int n = (int)P.occurrences[v].size();
+        if      (n == 0) ++unclaimed;
+        else if (n >= 3) ++three_plus;
+    }
+    if (unclaimed != 0 || three_plus != 0)
+        throw StageError(Stage::COVERAGE,
+            "coverage(unclaimed=" + std::to_string(unclaimed) +
+            ",three_plus="        + std::to_string(three_plus) + ")");
+    return P;
 }
 
-CubicResult run_cubic(const Triangulation& T) {
-    CubicResult R;
-    try {
-        CubicPipeline CP = prepare_cubic(T);
-        R.dual_coords    = paint_dual(CP.P, T.N);
-        R.cubic_coords   = assemble_cubic(T, R.dual_coords,
-                                          CP.cone_vertex_positions,
-                                          CP.cone_triangle);
-        R.stage = Stage::OK;
-    } catch (const StageError& e) {
-        R.stage = e.stage;
-        R.why   = e.what();
-    } catch (const std::exception& e) {
-        R.stage = Stage::UNEXPECTED;
-        R.why   = std::string("unexpected: ") + e.what();
-    }
-    return R;
+Occurrence locate_vertex(const SurfaceParametrization& P, int v) {
+    if (v < 0 || v >= (int)P.occurrences.size() || P.occurrences[v].empty())
+        throw std::logic_error("eisenstein_paint::locate_vertex: vertex "
+                               + std::to_string(v) + " unclaimed by any cell");
+    return P.occurrences[v].front();
 }
 
 // =====================================================================
@@ -947,7 +723,7 @@ using tikz::BBox;
 }  // namespace
 
 void dump_cell_tikz(const Cell& F,
-                    const Triangulation& T_sorted,
+                    const TriangulationView& T_sorted,
                     std::ostream& os,
                     double scale)
 {
@@ -1040,7 +816,7 @@ void dump_cell_tikz(const Cell& F,
 
 void dump_lattice_map_tikz(const Cell& F,
                            const LatticeMap& lmap,
-                           const Triangulation& T_sorted,
+                           const TriangulationView& T_sorted,
                            std::ostream& os,
                            double scale,
                            int highlight_vertex_id)

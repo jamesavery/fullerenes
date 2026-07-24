@@ -1444,7 +1444,7 @@ bool AlexandrovSolver::has_self_intersection(const DelaunayTriangulation& T,
 // AlexandrovIDTCubic: the cubic polyhedral metric
 // ============================================================================
 
-AlexandrovIDTCubic::KisMetric AlexandrovIDTCubic::kis_metric(const Triangulation& T)
+AlexandrovIDTCubic::KisMetric AlexandrovIDTCubic::kis_metric(const TriangulationView& T)
 {
   KisMetric M;
   M.Nv = T.N;
@@ -1511,7 +1511,7 @@ DelaunayTriangulation::EdgeLengthFn AlexandrovIDTCubic::KisMetric::edge_length_f
   };
 }
 
-void AlexandrovIDTCubic::build(const Triangulation& T)
+void AlexandrovIDTCubic::build(const TriangulationView& T)
 {
   KisMetric M = kis_metric(T);
 
@@ -1546,21 +1546,21 @@ void AlexandrovIDTCubic::build(const Triangulation& T)
   solver.D = std::move(D);
 }
 
-std::vector<coord3d> AlexandrovIDTCubic::solve(const Triangulation& T)
+std::vector<coord3d> AlexandrovIDTCubic::solve(const TriangulationView& T)
 {
   build(T);
   return solver.solve();
 }
 
 AlexandrovSolver::AlexandrovPolytope
-AlexandrovIDTCubic::solve_polytope(const Triangulation& T)
+AlexandrovIDTCubic::solve_polytope(const TriangulationView& T)
 {
   build(T);
   return solver.solve_polytope();   // default labels = cone index (identity)
 }
 
 AlexandrovIDTCubic::FlatFaceCensus
-AlexandrovIDTCubic::flat_face_census(const Triangulation& T,
+AlexandrovIDTCubic::flat_face_census(const TriangulationView& T,
                                      const CanonicalTesselation& tess) const
 {
   // Cells as sorted cone-label sets.

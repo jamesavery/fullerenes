@@ -84,27 +84,23 @@ inline std::array<Eisenstein, 3> develop_face_on_edge(const tri_t& t, int k_arc,
 // be cited phase by phase (A.D / A.T are set before any phase runs).
 // ---------------------------------------------------------------------------
 
-// Phase 1: Tier-3 cells + lattice claims + per-vertex occurrences.
-void build_cells_and_claims(CellAtlas& A) {
-  const Triangulation& T = *A.T;
+// Phase 1: index the parametrization's charts into hash form.  No chart
+// is recomputed -- the walkers and scans ran once, in parametrize().
+void build_cells_and_claims(CellAtlas& A, const SurfaceParametrization& P) {
   const DelaunayTriangulation& D = *A.D;
-  std::vector<Cell> cells = embed_all_cells(D, T);
-  A.cells.resize(cells.size());
-  A.occurrences.assign(T.N, {});
-  for (int f = 0; f < (int)cells.size(); f++) {
+  A.cells.resize(P.cells.size());
+  for (int f = 0; f < (int)P.cells.size(); f++) {
     if (D.f_he[f] < 0) continue;
-    const Cell& C = cells[f];
-    if (!C.ok) fail("embed_cell failed on live cell " + std::to_string(f));
+    const Cell& C = P.cells[f];
+    if (!C.ok) fail("live cell " + std::to_string(f) + " not charted");
     AtlasCell& R = A.cells[f];
     R.ok = true;
     R.corners = { C.c0, C.c1, C.c2 };
     R.P       = { C.P0, C.P1, C.P2 };
-    LatticeMap lm = enumerate_cell_lattice(C, T);
+    const LatticeMap& lm = P.lmaps[f];
     R.claim.reserve(lm.entries.size() * 2);
-    for (const auto& [pos, vid] : lm.entries) {
+    for (const auto& [pos, vid] : lm.entries)
       R.claim.emplace(pos, vid);
-      A.occurrences[vid].push_back({ f, pos });
-    }
   }
 }
 
@@ -133,7 +129,7 @@ void build_transitions(CellAtlas& A) {
 
 // Phase 3: T_sorted face / edge tables.
 void build_face_edge_tables(CellAtlas& A) {
-  const Triangulation& T = *A.T;
+  const TriangulationView& T = A.T;
   A.tface = T.triangles();
   for (int i = 0; i < (int)A.tface.size(); i++) {
     const tri_t& t = A.tface[i];
@@ -177,8 +173,9 @@ void anchor_edges(CellAtlas& A) {
                "its iDT geodesic triangle does not embed flat (a folded development). "
                "This is a residual non-embedding of certain obtuse iDT faces, seen on "
                "both simplicial and non-simplicial raw iDTs; it is NOT specific to "
-               "multi-edges. Realise the metric via the Alexandrov-prepared iDT "
-               "(eisenstein_paint::prepare) instead of the raw iDT for this isomer");
+               "multi-edges. Parametrize the Alexandrov-realized iDT "
+               "(eisenstein_paint::realize_dual) instead of the raw dual_idt "
+               "for this isomer");
         if (A.anchor_of_edge[eit->second] >= 0) continue;
         A.anchor_of_edge[eit->second] = (int)A.anchors.size();
         A.anchors.push_back({ f, u, v, p, p + d });
@@ -227,11 +224,11 @@ LatticeIsometry CellAtlas::transition(int f_from, int f_to) const {
   return it->second;
 }
 
-CellAtlas build_atlas(const Pipeline& P) {
+CellAtlas build_atlas(const SurfaceParametrization& P) {
   CellAtlas A;
-  A.D = &P.D;
-  A.T = &P.T_sorted;
-  build_cells_and_claims(A);
+  A.D = P.D;
+  A.T = P.T;
+  build_cells_and_claims(A, P);
   build_transitions(A);
   build_face_edge_tables(A);
   anchor_edges(A);
@@ -366,13 +363,6 @@ CellPoint locate_sample(CellAtlas& A, int fi, long a, long b, long c, long den) 
   const EisensteinRational q(num, den);
   CellTrace out = trace_segment(A, R.cell, R.anchor, q);
   return { out.cell, out.pos };
-}
-
-CellPoint locate_vertex(const CellAtlas& A, int vid) {
-  if (A.occurrences[vid].empty())
-    fail("dual vertex " + std::to_string(vid) + " unclaimed by any cell");
-  const Occurrence& o = A.occurrences[vid].front();
-  return { o.cell, EisensteinRational(o.pos) };
 }
 
 }  // namespace eisenstein_paint

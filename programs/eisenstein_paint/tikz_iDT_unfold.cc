@@ -13,7 +13,7 @@
 //   <prefix>.tex    TikZ standalone of the spanning-tree unfolding
 //   <prefix>.txt    debug report (placed cells, tears, missing hexes)
 
-#include "fullerenes/eisenstein_paint.hh"
+#include "fullerenes/eisenstein_paint_geometry.hh"
 #include "fullerenes/delaunay_unfold.hh"
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/delaunay.hh"
@@ -54,7 +54,10 @@ int main(int argc, char** argv) {
     }
     if (T.N == 0) { std::fprintf(stderr, "isomer not found\n"); return 1; }
 
-    auto [T_sorted, D] = ep::prepare_inputs(T);
+    ep::SortedDual S_d = ep::sorted_dual(T);
+    ep::DualPolytope Pl = ep::realize_dual(S_d);
+    const Triangulation& T_sorted = S_d.T;
+    const DelaunayTriangulation& D = Pl.D;
     auto cells_em      = ep::embed_all_cells(D, T_sorted);
     std::vector<ep::LatticeMap> lmaps(cells_em.size());
     for (size_t fi = 0; fi < cells_em.size(); ++fi)
