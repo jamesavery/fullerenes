@@ -33,6 +33,7 @@
 #include "fullerenes/delaunay.hh"   // DelaunayTriangulation, DiskMetric, tri_t
 
 #include <array>
+#include <span>
 #include <vector>
 
 // How pi/3 is distributed WITHIN each geodesic disk (see header comment); the
@@ -61,6 +62,15 @@ struct ConePrescription {
 // R-disks (disk_metric), and confine all 4*pi of Gaussian curvature into them (mode
 // sets the within-disk distribution). Purely intrinsic; `surface` is consumed into the
 // returned ConePrescription (the caller moves it in).
+//
+// per_cone (default empty) sets a PER-CONE curvature budget in place of the uniform
+// pi/3 per disk. Empty  -> every disk carries pi/3 (the 12-cone fullerene default; Sigma =
+// 4*pi via 12 * pi/3). Non-empty -> per_cone[k] is disk k's target (disks are 1:1 with
+// `cones` order, geodesic_disks preserves it); it must have one entry per cone and sum to
+// 4*pi (Gauss-Bonnet), both checked. This is the cubic-metric path: 20..60 cones with
+// deficits k*pi/15 (Sigma k = 60 => Sigma = 4*pi). The within-disk distribution (mode) is
+// unchanged; only the per-disk total differs.
 ConePrescription confine_curvature(DelaunayTriangulation surface,
                                    const std::vector<ConeSite>& cones,
-                                   double R, CurvatureMode mode, DiskMetric disk_metric);
+                                   double R, CurvatureMode mode, DiskMetric disk_metric,
+                                   std::span<const double> per_cone = {});

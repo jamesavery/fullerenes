@@ -221,8 +221,10 @@ struct FullereneGraphView : CubicGraphView {
     // respects the intrinsic global shape (nanotubes come out
     // elongated, not sphere-wrapped), edge lengths ~ bond_length.
     // Throws std::runtime_error when the paint pipeline fails (rare:
-    // e.g. non-simplicial 12-cone iDT); callers wanting a total start
-    // geometry catch and fall back to zero_order_geometry.
+    // e.g. a non-embeddable iDT -- self-loop / non-triangle face -- or a
+    // cubic metric that will not realize as a simple convex polytope);
+    // callers wanting a total start geometry catch and fall back to
+    // zero_order_geometry.
     vector<coord3d> eisenstein_paint_geometry(double bond_length=1.44) const;
 
     // Force-field geometry optimization (Wu / extended Wu, harmonic) --

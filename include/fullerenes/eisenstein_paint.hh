@@ -91,7 +91,9 @@ struct Result {
         OK,
         IDT_COMPUTE,           // DelaunayTriangulation::compute throw or D.nv != 12
         ALEXANDROV,            // AlexandrovSolver: any non-validating outcome
-        NON_SIMPLICIAL,        // iDT carries multi-edges / self-loops / non-triangle face
+        NON_SIMPLICIAL,        // non-embeddable iDT (self-loop / non-triangle face), or
+                               // Alexandrov FAIL_NOT_SIMPLE (metric not realizable as a
+                               // simple convex polytope). Multi-edges are ACCEPTED.
         EMBED,                 // some cell's embed_cell returned ok=false (or lmap throw)
         COVERAGE,              // some hex vertex unclaimed or claimed >= 3 times
         INTERPOLATE,           // interpolate_cell threw
@@ -136,7 +138,7 @@ struct CubicResult {
 struct Pipeline {
     Triangulation         T_sorted;          // input with cones first (degree != 6 first)
     Permutation           perm;              // perm[u_orig] = u_sorted; .inverse() back-permutes
-    DelaunayTriangulation D;                  // iDT on T_sorted (post-Alexandrov, simplicial)
+    DelaunayTriangulation D;                  // iDT on T_sorted (post-Alexandrov simplicial in run(); RAW iDT in the cubic path)
     std::vector<coord3d>  cone_positions;    // 12 entries from Alexandrov, indexed in T_sorted
 };
 
