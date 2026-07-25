@@ -35,7 +35,7 @@ struct AlexandrovSolver {
   // as valid Alexandrov-polytope coordinates.
   enum class ValidationStatus {
     OK,                          // valid output: simple, well-formed, convex
-    FAIL_KAPPA_NOT_CONVERGED,    // |κ| > 0.01: continuation + Newton didn't reach κ = 0
+    FAIL_KAPPA_NOT_CONVERGED,    // Newton polish didn't reach its κ < 1e-10 target
     FAIL_NOT_SIMPLE,             // T̄(0) has multi-edges in cells, or F < 3
     FAIL_RECONSTRUCT,            // Gram-BFS yielded NaN (negative perp²)
     FAIL_VOLUME_DEGENERATE,      // vol_norm < 0.01 (drum-cap or near-flat)

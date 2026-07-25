@@ -100,7 +100,7 @@ public:
     return C;
   }
 
-  matrix operator*(const matrix& B)
+  matrix operator*(const matrix& B) const
   {
     assert(n == B.m);
     matrix C(m,B.n);

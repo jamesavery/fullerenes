@@ -201,6 +201,7 @@ V matvec(const matrix<double>& A, const V& v)
   return r;
 }
 
+
 // --- Symmetric truncated pseudoinverse ---
 
 namespace SymEigen {
