@@ -215,9 +215,10 @@ struct FullereneGraphView : CubicGraphView {
     vector<coord3d> zero_order_geometry(double scalerad=4) const;
 
     // Warm-start 3D geometry from the cubic-metric Eisenstein paint
-    // (eisenstein_paint::run_cubic): AlexandrovIDTCubic realizes the
+    // (eisenstein_paint::cubic_geometry): AlexandrovIDTCubic realizes the
     // cubic polyhedral metric's 20..60 pentagon-incident vertices
-    // exactly, the integer paint interpolates the rest.  Deterministic,
+    // exactly, the integer paint interpolates the rest over the realized
+    // dual polytope's flat cells.  Deterministic,
     // respects the intrinsic global shape (nanotubes come out
     // elongated, not sphere-wrapped), edge lengths ~ bond_length.
     // Throws std::runtime_error when the paint pipeline fails (rare:

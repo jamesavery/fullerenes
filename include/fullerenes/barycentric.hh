@@ -40,3 +40,12 @@ coord3d barycentric_combine(ReducedBary b,
                             const coord3d& C0,
                             const coord3d& C1,
                             const coord3d& C2);
+
+// The same affine combination for an already-normalized double triple
+// (b0 + b1 + b2 == 1): v = b0*C0 + b1*C1 + b2*C2.  The FP-barycentric
+// counterpart used by the (non-Loeschian) cubic transport path, so both
+// number systems name the one "interpolate a triangle" operation.
+coord3d barycentric_combine(const double b[3],
+                            const coord3d& C0,
+                            const coord3d& C1,
+                            const coord3d& C2);

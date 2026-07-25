@@ -13,7 +13,7 @@
 //   <prefix>.tex    TikZ standalone of the spanning-tree unfolding
 //   <prefix>.txt    debug report (placed cells, tears, missing hexes)
 
-#include "fullerenes/eisenstein_paint.hh"
+#include "fullerenes/eisenstein_paint_geometry.hh"
 #include "fullerenes/delaunay_unfold.hh"
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/delaunay.hh"
@@ -54,7 +54,10 @@ int main(int argc, char** argv) {
     }
     if (T.N == 0) { std::fprintf(stderr, "isomer not found\n"); return 1; }
 
-    auto [T_sorted, D] = ep::prepare_inputs(T);
+    ep::SortedDual S_d = ep::sorted_dual(T);
+    ep::DualPolytope Pl = ep::realize_dual(S_d);
+    const Triangulation& T_sorted = S_d.T;
+    const DelaunayTriangulation& D = Pl.D;
     auto cells_em      = ep::embed_all_cells(D, T_sorted);
     std::vector<ep::LatticeMap> lmaps(cells_em.size());
     for (size_t fi = 0; fi < cells_em.size(); ++fi)
@@ -66,8 +69,8 @@ int main(int argc, char** argv) {
     std::vector<CellPlacement> cells(cells_em.size());
     for (size_t fi = 0; fi < cells_em.size(); ++fi) {
         const ep::Cell& F = cells_em[fi];
-        cells[fi] = { F.cell_id, F.c0, F.c1, F.c2,
-                      F.P0, F.P1, F.P2,
+        cells[fi] = { F.cell_id, F.corners[0], F.corners[1], F.corners[2],
+                      F.P[0], F.P[1], F.P[2],
                       F.ok ? lmaps[fi].entries
                            : std::vector<std::pair<Eisenstein, int>>{},
                       F.ok };

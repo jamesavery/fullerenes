@@ -63,14 +63,15 @@ struct ConePrescription {
 // sets the within-disk distribution). Purely intrinsic; `surface` is consumed into the
 // returned ConePrescription (the caller moves it in).
 //
-// per_cone (default empty) sets a PER-CONE curvature budget in place of the uniform
-// pi/3 per disk. Empty  -> every disk carries pi/3 (the 12-cone fullerene default; Sigma =
-// 4*pi via 12 * pi/3). Non-empty -> per_cone[k] is disk k's target (disks are 1:1 with
-// `cones` order, geodesic_disks preserves it); it must have one entry per cone and sum to
-// 4*pi (Gauss-Bonnet), both checked. This is the cubic-metric path: 20..60 cones with
-// deficits k*pi/15 (Sigma k = 60 => Sigma = 4*pi). The within-disk distribution (mode) is
-// unchanged; only the per-disk total differs.
+// `deficits`, if given, overrides the default equal pi/3-per-disk split: deficits[i] is
+// the total curvature confined into cones[i]'s disk (in place of the fixed pi/3), so
+// disks may carry unequal shares -- e.g. a measured cubic metric whose cones carry a
+// varying number of incident pentagons. Must be empty or the same size as `cones`, and
+// (when non-empty) must sum to 4*pi (Gauss-Bonnet) -- both are checked, throwing
+// otherwise. The Sigma K* = 4*pi rescale still runs afterwards, a no-op up to FP drift
+// since the deficits already sum to 4*pi (as they do by construction for the
+// per-pentagon-count case).
 ConePrescription confine_curvature(DelaunayTriangulation surface,
                                    const std::vector<ConeSite>& cones,
                                    double R, CurvatureMode mode, DiskMetric disk_metric,
-                                   std::span<const double> per_cone = {});
+                                   std::span<const double> deficits = {});

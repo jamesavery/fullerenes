@@ -80,37 +80,41 @@ inline std::array<Eisenstein, 3> develop_face_on_edge(const tri_t& t, int k_arc,
 }
 
 // ---------------------------------------------------------------------------
-// build_atlas phases.  Each mutates A in place; named so the construction can
-// be cited phase by phase (A.D / A.T are set before any phase runs).
+// build_atlas: a composition of five value-producing constructions.  Each
+// takes exactly the values it depends on, so the dependency order is the
+// argument flow -- enforced by the compiler, not by call-order convention.
 // ---------------------------------------------------------------------------
 
-// Phase 1: Tier-3 cells + lattice claims + per-vertex occurrences.
-void build_cells_and_claims(CellAtlas& A) {
-  const Triangulation& T = *A.T;
-  const DelaunayTriangulation& D = *A.D;
-  std::vector<Cell> cells = embed_all_cells(D, T);
-  A.cells.resize(cells.size());
-  A.occurrences.assign(T.N, {});
-  for (int f = 0; f < (int)cells.size(); f++) {
+// The hash index of the parametrization's charts: an AtlasCell is the
+// chart's corner identity plus its claim map re-indexed for O(1) position
+// lookup.  No chart is recomputed -- the walkers and scans ran once, in
+// parametrize().
+std::vector<AtlasCell> index_charts(const SurfaceParametrization& P) {
+  const DelaunayTriangulation& D = *P.D;
+  std::vector<AtlasCell> cells(P.cells.size());
+  for (int f = 0; f < (int)P.cells.size(); f++) {
     if (D.f_he[f] < 0) continue;
-    const Cell& C = cells[f];
-    if (!C.ok) fail("embed_cell failed on live cell " + std::to_string(f));
-    AtlasCell& R = A.cells[f];
+    const Cell& C = P.cells[f];
+    if (!C.ok) fail("live cell " + std::to_string(f) + " not charted");
+    AtlasCell& R = cells[f];
     R.ok = true;
-    R.corners = { C.c0, C.c1, C.c2 };
-    R.P       = { C.P0, C.P1, C.P2 };
-    LatticeMap lm = enumerate_cell_lattice(C, T);
+    R.corners = C.corners;
+    R.P       = C.P;
+    const LatticeMap& lm = P.lmaps[f];
     R.claim.reserve(lm.entries.size() * 2);
-    for (const auto& [pos, vid] : lm.entries) {
+    for (const auto& [pos, vid] : lm.entries)
       R.claim.emplace(pos, vid);
-      A.occurrences[vid].push_back({ f, pos });
-    }
   }
+  return cells;
 }
 
-// Phase 2: chart transitions across every D edge, both directions.
-void build_transitions(CellAtlas& A) {
-  const DelaunayTriangulation& D = *A.D;
+// The chart transition across every D edge, both directions: the unique
+// orientation-preserving lattice isometry matching the shared edge's cone
+// corners across the two charts (Lemma: transitions are exact).
+std::unordered_map<long long, LatticeIsometry>
+chart_transitions(const DelaunayTriangulation& D,
+                  const std::vector<AtlasCell>& cells) {
+  std::unordered_map<long long, LatticeIsometry> trans;
   auto corner_pos = [&](const AtlasCell& R, int cid) -> Eisenstein {
     for (int k = 0; k < 3; k++)
       if (R.corners[k] == cid) return R.P[k];
@@ -120,101 +124,131 @@ void build_transitions(CellAtlas& A) {
     if (!D.alive(h)) continue;
     const int f = D.he_face[h], g = D.he_face[D.twin(h)];
     const int a = D.he_origin[h], b = D.dest(h);
-    const AtlasCell& Rf = A.cells[f];
-    const AtlasCell& Rg = A.cells[g];
-    A.trans[CellAtlas::arc_key(g, f)] =
+    const AtlasCell& Rf = cells[f];
+    const AtlasCell& Rg = cells[g];
+    trans[CellAtlas::arc_key(g, f)] =
         isometry_from_segments(corner_pos(Rg, a), corner_pos(Rg, b),
                                corner_pos(Rf, a), corner_pos(Rf, b));
-    A.trans[CellAtlas::arc_key(f, g)] =
+    trans[CellAtlas::arc_key(f, g)] =
         isometry_from_segments(corner_pos(Rf, a), corner_pos(Rf, b),
                                corner_pos(Rg, a), corner_pos(Rg, b));
   }
+  return trans;
 }
 
-// Phase 3: T_sorted face / edge tables.
-void build_face_edge_tables(CellAtlas& A) {
-  const Triangulation& T = *A.T;
-  A.tface = T.triangles();
-  for (int i = 0; i < (int)A.tface.size(); i++) {
-    const tri_t& t = A.tface[i];
-    A.arc_face[CellAtlas::arc_key(t[0], t[1])] = i;
-    A.arc_face[CellAtlas::arc_key(t[1], t[2])] = i;
-    A.arc_face[CellAtlas::arc_key(t[2], t[0])] = i;
+// The T_sorted face/edge combinatorics: faces CCW, arc -> face-left,
+// undirected edges with ids, and each edge's two incident faces.
+struct FaceEdgeTables {
+  std::vector<tri_t>                 tface;
+  std::unordered_map<long long, int> arc_face;
+  std::vector<std::array<int, 2>>    tedge;
+  std::unordered_map<long long, int> edge_id;
+  std::vector<std::array<int, 2>>    edge_faces;
+};
+
+FaceEdgeTables face_edge_tables(const TriangulationView& T) {
+  FaceEdgeTables tab;
+  tab.tface = T.triangles();
+  for (int i = 0; i < (int)tab.tface.size(); i++) {
+    const tri_t& t = tab.tface[i];
+    tab.arc_face[CellAtlas::arc_key(t[0], t[1])] = i;
+    tab.arc_face[CellAtlas::arc_key(t[1], t[2])] = i;
+    tab.arc_face[CellAtlas::arc_key(t[2], t[0])] = i;
   }
   for (int u = 0; u < T.N; u++)
     for (int v : T[u])
       if (u < v) {
-        const int id = (int)A.tedge.size();
-        A.tedge.push_back({ u, v });
-        A.edge_id[CellAtlas::edge_key(u, v)] = id;
-        const auto itf = A.arc_face.find(CellAtlas::arc_key(u, v));
-        const auto itg = A.arc_face.find(CellAtlas::arc_key(v, u));
-        if (itf == A.arc_face.end() || itg == A.arc_face.end())
+        const int id = (int)tab.tedge.size();
+        tab.tedge.push_back({ u, v });
+        tab.edge_id[CellAtlas::edge_key(u, v)] = id;
+        const auto itf = tab.arc_face.find(CellAtlas::arc_key(u, v));
+        const auto itg = tab.arc_face.find(CellAtlas::arc_key(v, u));
+        if (itf == tab.arc_face.end() || itg == tab.arc_face.end())
           fail("T_sorted arc without a face (graph not closed/oriented)");
-        A.edge_faces.push_back({ itf->second, itg->second });
+        tab.edge_faces.push_back({ itf->second, itg->second });
       }
+  return tab;
 }
 
-// Phase 4: anchored edges -- two ADJACENT lattice points claimed by one cell
-// (their unit segment lies inside the closed convex cell, so their relative
-// chart positions are ground truth).
-void anchor_edges(CellAtlas& A) {
-  A.anchor_of_edge.assign(A.tedge.size(), -1);
+// Anchored edges: two ADJACENT lattice points claimed by one cell.  Their
+// unit segment lies inside the closed convex cell, so their relative chart
+// positions are ground truth (the Anchoring lemma).
+struct AnchoredEdges {
+  std::vector<int>                        anchor_of_edge;   // edge id -> anchors index, or -1
+  std::vector<CellAtlas::AnchorEdge>      anchors;
+};
+
+AnchoredEdges anchored_edges(const std::vector<AtlasCell>& cells,
+                             const FaceEdgeTables& tab) {
+  AnchoredEdges out;
+  out.anchor_of_edge.assign(tab.tedge.size(), -1);
   const Eisenstein half_dirs[3] = { Eisenstein(1, 0), Eisenstein(0, 1), Eisenstein(-1, 1) };
-  for (int f = 0; f < (int)A.cells.size(); f++) {
-    const AtlasCell& R = A.cells[f];
+  for (int f = 0; f < (int)cells.size(); f++) {
+    const AtlasCell& R = cells[f];
     if (!R.ok) continue;
     for (const auto& [p, vid] : R.claim) {
       for (const Eisenstein d : half_dirs) {
         const auto it = R.claim.find(p + d);
         if (it == R.claim.end()) continue;
         const int u = vid, v = it->second;
-        const auto eit = A.edge_id.find(CellAtlas::edge_key(u, v));
-        if (eit == A.edge_id.end())
+        const auto eit = tab.edge_id.find(CellAtlas::edge_key(u, v));
+        if (eit == tab.edge_id.end())
           fail("cell " + std::to_string(f) + " developed vertices "
                + std::to_string(u) + " and " + std::to_string(v)
                + " -- which are NOT a mesh edge -- onto adjacent lattice positions: "
                "its iDT geodesic triangle does not embed flat (a folded development). "
                "This is a residual non-embedding of certain obtuse iDT faces, seen on "
                "both simplicial and non-simplicial raw iDTs; it is NOT specific to "
-               "multi-edges. Realise the metric via the Alexandrov-prepared iDT "
-               "(eisenstein_paint::prepare) instead of the raw iDT for this isomer");
-        if (A.anchor_of_edge[eit->second] >= 0) continue;
-        A.anchor_of_edge[eit->second] = (int)A.anchors.size();
-        A.anchors.push_back({ f, u, v, p, p + d });
+               "multi-edges. Parametrize the Alexandrov-realized iDT "
+               "(eisenstein_paint::realize_dual) instead of the raw dual_idt "
+               "for this isomer");
+        if (out.anchor_of_edge[eit->second] >= 0) continue;
+        out.anchor_of_edge[eit->second] = (int)out.anchors.size();
+        out.anchors.push_back({ f, u, v, p, p + d });
       }
     }
   }
+  return out;
 }
 
-// Phase 5: multi-source BFS over the edge graph (edges adjacent iff they
-// share a face), routing every T_sorted edge back to an anchored edge.
-void route_edges_to_anchors(CellAtlas& A) {
-  const int ne = (int)A.tedge.size();
-  A.bfs_parent_edge.assign(ne, -2);   // -2 unvisited, -1 root
-  A.bfs_via_face.assign(ne, -1);
+// The routing forest: a multi-source BFS over the edge graph (edges
+// adjacent iff they share a face) from the anchored edges, so every
+// T_sorted edge has a parent chain of via-face midpoint hops back to
+// ground truth.
+struct AnchorRouting {
+  std::vector<int> parent_edge;   // edge id -> parent edge (-1 root, from an anchor)
+  std::vector<int> via_face;      // edge id -> face shared with parent
+};
+
+AnchorRouting route_to_anchors(const FaceEdgeTables& tab,
+                               const std::vector<int>& anchor_of_edge) {
+  const int ne = (int)tab.tedge.size();
+  AnchorRouting out;
+  out.parent_edge.assign(ne, -2);   // -2 unvisited, -1 root
+  out.via_face.assign(ne, -1);
   std::vector<int> queue;
   queue.reserve(ne);
   for (int e = 0; e < ne; e++)
-    if (A.anchor_of_edge[e] >= 0) { A.bfs_parent_edge[e] = -1; queue.push_back(e); }
+    if (anchor_of_edge[e] >= 0) { out.parent_edge[e] = -1; queue.push_back(e); }
   if (queue.empty()) fail("no anchored edge anywhere (no cell claims two adjacent vertices)");
   auto face_edge = [&](int fi, int k) {
-    const tri_t& t = A.tface[fi];
-    return A.edge_id.at(CellAtlas::edge_key(t[k], t[(k + 1) % 3]));
+    const tri_t& t = tab.tface[fi];
+    return tab.edge_id.at(CellAtlas::edge_key(t[k], t[(k + 1) % 3]));
   };
   for (size_t qi = 0; qi < queue.size(); qi++) {
     const int e = queue[qi];
-    for (const int fi : A.edge_faces[e])
+    for (const int fi : tab.edge_faces[e])
       for (int k = 0; k < 3; k++) {
         const int e2 = face_edge(fi, k);
-        if (A.bfs_parent_edge[e2] != -2) continue;
-        A.bfs_parent_edge[e2] = e;
-        A.bfs_via_face[e2] = fi;
+        if (out.parent_edge[e2] != -2) continue;
+        out.parent_edge[e2] = e;
+        out.via_face[e2] = fi;
         queue.push_back(e2);
       }
   }
   for (int e = 0; e < ne; e++)
-    if (A.bfs_parent_edge[e] == -2) fail("edge graph not covered by anchored-edge BFS");
+    if (out.parent_edge[e] == -2) fail("edge graph not covered by anchored-edge BFS");
+  return out;
 }
 
 }  // namespace
@@ -227,15 +261,27 @@ LatticeIsometry CellAtlas::transition(int f_from, int f_to) const {
   return it->second;
 }
 
-CellAtlas build_atlas(const Pipeline& P) {
+CellAtlas build_atlas(const SurfaceParametrization& P) {
+  auto cells = index_charts(P);
+  auto trans = chart_transitions(*P.D, cells);
+  auto tab   = face_edge_tables(P.T);
+  auto anch  = anchored_edges(cells, tab);
+  auto route = route_to_anchors(tab, anch.anchor_of_edge);
+
   CellAtlas A;
-  A.D = &P.D;
-  A.T = &P.T_sorted;
-  build_cells_and_claims(A);
-  build_transitions(A);
-  build_face_edge_tables(A);
-  anchor_edges(A);
-  route_edges_to_anchors(A);
+  A.D              = P.D;
+  A.T              = P.T;
+  A.cells          = std::move(cells);
+  A.trans          = std::move(trans);
+  A.tface          = std::move(tab.tface);
+  A.arc_face       = std::move(tab.arc_face);
+  A.tedge          = std::move(tab.tedge);
+  A.edge_id        = std::move(tab.edge_id);
+  A.edge_faces     = std::move(tab.edge_faces);
+  A.anchor_of_edge = std::move(anch.anchor_of_edge);
+  A.anchors        = std::move(anch.anchors);
+  A.bfs_parent_edge = std::move(route.parent_edge);
+  A.bfs_via_face    = std::move(route.via_face);
   A.resolved.assign(A.tface.size(), {});
   return A;
 }
@@ -366,13 +412,6 @@ CellPoint locate_sample(CellAtlas& A, int fi, long a, long b, long c, long den) 
   const EisensteinRational q(num, den);
   CellTrace out = trace_segment(A, R.cell, R.anchor, q);
   return { out.cell, out.pos };
-}
-
-CellPoint locate_vertex(const CellAtlas& A, int vid) {
-  if (A.occurrences[vid].empty())
-    fail("dual vertex " + std::to_string(vid) + " unclaimed by any cell");
-  const Occurrence& o = A.occurrences[vid].front();
-  return { o.cell, EisensteinRational(o.pos) };
 }
 
 }  // namespace eisenstein_paint

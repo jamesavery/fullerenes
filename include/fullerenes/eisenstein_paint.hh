@@ -1,80 +1,63 @@
 #pragma once
 
 // =====================================================================
-// Eisenstein-paint: deterministic warm-start geometry for fullerene
-// dual triangulations.
+// Eisenstein-paint, Layer I: INTRINSIC surface parametrization of a
+// fullerene dual triangulation.  Everything in this header lives in the
+// flat cone metric -- integer/combinatorial data only.  No function or
+// type here mentions a 3D coordinate; realizing the parametrization in
+// R^3 is Layer II (eisenstein_paint_geometry.hh).
 //
-// Algorithm:
-//   1. Sort the dual triangulation T cones-first (deg != 6 first) to
-//      get T_sorted; record the permutation for back-mapping.
-//   2. Compute the intrinsic Delaunay triangulation D = iDT(T_sorted).
-//   3. Run the Bobenko-Izmestiev Alexandrov solver on D to obtain the
-//      12 cone-vertex 3D positions; D is mutated to its post-flip
-//      simplicial form.
-//   4. For every iDT 2-cell F (= live face of D), embed F into its
-//      own Eisenstein-lattice frame: place corners (P0, P1, P2) from
-//      iDT lengths + interior angle, then walk T_sorted in F's frame
-//      along each CCW arc to fill F's edge strips.
-//   5. Enumerate every Z[w] lattice point inside F's polygon and map
-//      it to its T_sorted vertex id (Abrash polygon scan + per-row
-//      east walker seeded from the edge strips).
-//   6. For each lattice point, evaluate its 3D position by integer
-//      barycentric interpolation of the 3 cone corner positions
-//      (with gcd-reduction on edge points so the two adjacent cells
-//      produce bit-identical 3D output across the shared edge).
-//   7. Back-permute the per-vertex 3D coords to T's original labels.
+// Pipeline (intrinsic part):
+//   1. sorted_dual(T): relabel the dual triangulation cones-first
+//      (deg != 6 first); record the permutation for back-mapping.
+//   2. dual_idt(S): the intrinsic Delaunay triangulation of the cone
+//      metric.  A delta-complex: multi-edges between one cone pair are
+//      legitimate and accepted (the walker's cone-interiority + cross-
+//      edge discriminators develop them correctly); what is rejected is
+//      what the cell machinery genuinely cannot chart -- a self-loop
+//      (a face with a repeated corner; see refactor-debt entry
+//      2026-07-24-paint-repeated-corner-cells for lifting this).
+//   3. Per iDT 2-cell F: embed F's three corners into F's own
+//      Eisenstein-lattice frame from iDT lengths + interior angle, then
+//      walk T_sorted in F's frame along each CCW arc to fill F's edge
+//      strips (embed_cell).
+//   4. Enumerate every Z[w] lattice point inside F's triangle and map
+//      it to its T_sorted vertex id -- Abrash polygon scan + per-row
+//      east walker seeded from the edge strips (enumerate_cell_lattice).
+//   5. parametrize(D, S) bundles 3-4 over all live cells, checks
+//      coverage (every non-cone vertex claimed by 1 or 2 cells), and
+//      records every (cell, position) occurrence per vertex.
 //
-// Tier 1   `eisenstein_paint::run(T)`            full pipeline -> Result.
-// Tier 1'  `eisenstein_paint::run_cubic(T)`      cubic-metric variant -> CubicResult.
-// Tier 2   `eisenstein_paint::prepare(T)`        prelude (sort + iDT + Alexandrov)
-// Tier 2'  `eisenstein_paint::prepare_iDT(T)`    iDT only, no Alexandrov (~20x faster)
-// Tier 2'' `eisenstein_paint::prepare_inputs(T)` slim return for diagnostic tools
-// Tier 2c  `eisenstein_paint::prepare_cubic(T)`  cubic prelude (sort + iDT + IDTCubic)
+// The result is a chart-wise integer parametrization of the surface:
+// each vertex has exact integer barycentric coordinates w.r.t. its
+// cell's corners (via integer_barycentric, barycentric.hh).  Pure
+// surface computations (the exact cross-cell atlas eisenstein_atlas.hh,
+// unfoldings, surface sampling) build on this with no embedding at all.
 //
-// Cubic-metric variant (run_cubic): same integer paint machinery, but
-// the three cell-corner 3D anchors come from the AlexandrovIDTCubic
-// polytope (the convex realization of the CUBIC polyhedral metric --
-// flat unit pentagons/hexagons, kappa = k*pi/15 at the 20..60
-// pentagon-incident cubic vertices) instead of the 12-cone dual-metric
-// polytope.  M_cubic = sqrt(3) * M_dual outside 12 constant-size
-// pentagon caps (see delaunay_alexandrov.hh), so the dual-metric
-// barycentric weights remain geometrically faithful there, and the
-// weights are scale-free per cell.  Construction:
+// The intrinsic layer works on any intrinsically-Delaunay cone complex
+// whose cells are Eisenstein-realisable; it is curvature-sign-agnostic
+// (nothing assumes cone degree < 6).  Cone vertices are the sorted
+// labels < S.n_cones (= 12 for fullerene duals).
 //
-//   c1. AlexandrovIDTCubic::solve(T) -> exact 3D positions of the
-//       20..60 pentagon-incident cubic vertices (= dual triangles).
-//   c2. Anchor each of the 12 dual cones at the centroid of its
-//       pentagon's 5 surrounding cone vertices (the pentagon is
-//       intrinsically flat; the centroid is its exact center whenever
-//       the pentagon is realized flat on the polytope).
-//   c3. Paint the dual vertices with the standard integer pipeline
-//       (raw iDT of the dual metric; anchors from c2).
-//   c4. Cubic vertex U (= dual triangle U in T.triangles() /
-//       T.dual_graph() order) = centroid of its painted dual corners;
-//       pentagon-incident cubic vertices are then overwritten with
-//       their exact polytope positions from c1.
+// Failure handling: the composable functions throw PaintError(code,
+// msg) -- one channel, typed at the throw site.  The Layer-II facades
+// convert to a Status value; callers of the composable functions let
+// PaintError propagate.
 //
-// The result is a warm start for the cubic-graph force-field optimizer
-// with the global shape of the cubic metric (edge lengths ~1 bond).
-//
-// Per-cell primitives (Tier 3, for callers that want to inspect or
-// drive individual phases): `embed_cell`, `embed_all_cells`,
-// `enumerate_cell_lattice`, `interpolate_cell`.
-//
-// Failure handling: Result.stage names where the pipeline stopped,
-// with Result.why carrying a free-form detail string.  Internal stage
-// helpers throw StageError(stage, msg); run() converts to Result.
-// Callers that want to catch directly may invoke the prepare* /
-// per-cell primitives and let StageError propagate.
+// GPU note: read-only triangulation parameters are TriangulationView
+// (non-owning, span-based) so the interfaces survive the move to batch
+// GPU execution (parallel-primitives).  DelaunayTriangulation has no
+// view type yet; when spanify reaches the DCEL, the pointer members
+// below become views.
 // =====================================================================
 
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/delaunay.hh"
 #include "fullerenes/permutation.hh"
-#include "fullerenes/geometry.hh"
 #include "fullerenes/eisenstein.hh"
 #include "fullerenes/delaunay_strip.hh"      // StripVertex, Strip
 
+#include <array>
 #include <iosfwd>
 #include <stdexcept>
 #include <string>
@@ -83,107 +66,66 @@
 namespace eisenstein_paint {
 
 // =====================================================================
-// Result of run(T): coords + a stage discriminator if anything failed.
+// Failure vocabulary, shared by both layers: a closed set of named
+// failure REASONS (style-failures.md's Code/metadata shape).
 // =====================================================================
 
-struct Result {
-    enum class Stage {
-        OK,
-        IDT_COMPUTE,           // DelaunayTriangulation::compute throw or D.nv != 12
-        ALEXANDROV,            // AlexandrovSolver: any non-validating outcome
-        NON_SIMPLICIAL,        // non-embeddable iDT (self-loop / non-triangle face), or
-                               // Alexandrov FAIL_NOT_SIMPLE (metric not realizable as a
-                               // simple convex polytope). Multi-edges are ACCEPTED.
-        EMBED,                 // some cell's embed_cell returned ok=false (or lmap throw)
-        COVERAGE,              // some hex vertex unclaimed or claimed >= 3 times
-        INTERPOLATE,           // interpolate_cell threw
-        UNEXPECTED,            // unrecognised std::exception escaped the pipeline
-    };
-
-    std::vector<coord3d> coords;             // size T.N (original labels) on OK; empty otherwise
-    Stage                stage = Stage::OK;
-    std::string          why;
-
-    bool        ok()         const { return stage == Stage::OK; }
-    const char* stage_name() const;
+enum class Code {
+    OK,
+    IDT_COMPUTE,           // DelaunayTriangulation::compute threw
+    ALEXANDROV,            // Layer II: any non-validating solver outcome
+    NON_SIMPLICIAL,        // non-embeddable iDT: self-loop / non-triangle face, or
+                           // Alexandrov FAIL_NOT_SIMPLE (metric not realizable as a
+                           // simple convex polytope). Multi-edges are ACCEPTED.
+    EMBED,                 // some cell admits no consistent chart (or lmap threw)
+    COVERAGE,              // some non-cone vertex claimed 0 or >= 3 times
+    INTERPOLATE,           // Layer II: interpolate_cell threw
+    UNEXPECTED,            // unrecognised std::exception escaped a facade
 };
 
-// Convenience alias: callers write `eisenstein_paint::Stage::EMBED`
-// instead of the full `Result::Stage::EMBED`.
-using Stage = Result::Stage;
+// Code discriminator -> lowercase name ("ok", "alexandrov", ...).
+// (The emitted strings are sweep-output-stable; do not change them.)
+const char* code_name(Code c);
 
-// Stage discriminator -> lowercase name ("ok", "alexandrov", ...).
-const char* stage_name(Stage s);
+// Failure value carried by the Layer-II facade results.
+struct Status {
+    Code        code = Code::OK;
+    std::string why;
 
-// Result of run_cubic(T): warm-start coordinates for the CUBIC graph.
-// cubic_coords[U] is the 3D position of cubic vertex U in the
-// T.dual_graph() labelling, i.e. U indexes the dual triangle
-// T.triangles()[U] (compute_faces_oriented order).  dual_coords is the
-// painted dual (size T.N, original labels), kept for diagnostics and
-// for deltahedron-side consumers.
-struct CubicResult {
-    std::vector<coord3d> cubic_coords;   // size 2*T.N - 4 on OK; empty otherwise
-    std::vector<coord3d> dual_coords;    // size T.N (original labels) on OK
-    Stage                stage = Stage::OK;
-    std::string          why;
-
-    bool        ok()         const { return stage == Stage::OK; }
-    const char* stage_name() const;
+    bool        ok()   const { return code == Code::OK; }
+    const char* name() const { return code_name(code); }
 };
 
-// =====================================================================
-// Prelude state, shared by run() and the prepare* tier-2 entry points.
-// =====================================================================
-
-struct Pipeline {
-    Triangulation         T_sorted;          // input with cones first (degree != 6 first)
-    Permutation           perm;              // perm[u_orig] = u_sorted; .inverse() back-permutes
-    DelaunayTriangulation D;                  // iDT on T_sorted (post-Alexandrov simplicial in run(); RAW iDT in the cubic path)
-    std::vector<coord3d>  cone_positions;    // 12 entries from Alexandrov, indexed in T_sorted
-};
-
-// Slim return for callers needing only T_sorted and the iDT.
-// Designed for one-line structured binding:
-//
-//     auto [T_sorted, D] = eisenstein_paint::prepare_inputs(T);
-struct Inputs {
-    Triangulation         T_sorted;
-    DelaunayTriangulation D;
-};
-
-// Single discriminated failure type for the prelude / paint stages.
-class StageError : public std::runtime_error {
+// Single discriminated failure type thrown by the composable functions.
+class PaintError : public std::runtime_error {
 public:
-    Stage stage;
-    StageError(Stage s, std::string msg)
-        : std::runtime_error(std::move(msg)), stage(s) {}
+    Code code;
+    PaintError(Code c, std::string msg)
+        : std::runtime_error(std::move(msg)), code(c) {}
 };
-
-// Tier 1 -- full pipeline; never throws.
-Result run(const Triangulation& T);
-
-// Tier 1' -- cubic-metric variant (see banner); never throws.
-CubicResult run_cubic(const Triangulation& T);
-
-// Tier 2 -- prelude only; throws StageError on failure.
-Pipeline prepare       (const Triangulation& T);   // sort + iDT + Alexandrov
-Pipeline prepare_iDT   (const Triangulation& T);   // sort + iDT only (no Alexandrov)
-Inputs   prepare_inputs(const Triangulation& T);   // structured-binding shortcut
-
-// Tier 2c -- cubic prelude: sort + raw iDT + AlexandrovIDTCubic +
-// pentagon-center anchor derivation.  P.cone_positions holds the 12
-// anchors (T_sorted labels); the exact polytope data is kept alongside
-// so run_cubic / diagnostics can overwrite the pentagon-incident cubic
-// vertices with their true positions.  Throws StageError on failure.
-struct CubicPipeline {
-    Pipeline             P;                       // D is the RAW dual iDT (no dual Alexandrov)
-    std::vector<coord3d> cone_vertex_positions;   // one per AlexandrovIDTCubic cone (20..60)
-    std::vector<tri_t>   cone_triangle;           // per cone: dual triangle, T ORIGINAL labels (CCW)
-};
-CubicPipeline prepare_cubic(const Triangulation& T);
 
 // =====================================================================
-// Per-cell types and primitives (Tier 3).
+// sorted_dual: the cones-first relabelling of the input dual.
+// =====================================================================
+
+// Owns the relabelled triangulation (the allocation point of the
+// pipeline); everything downstream reads it through TriangulationView.
+struct SortedDual {
+    Triangulation T;         // input with cones first (degree != 6 first)
+    Permutation   perm;      // perm[u_orig] = u_sorted; .inverse() back-permutes
+    int           n_cones = 0;   // # vertices with degree != 6 (12 for fullerene duals)
+};
+
+SortedDual sorted_dual(const TriangulationView& T);
+
+// The intrinsic Delaunay triangulation of S's cone metric -- a
+// delta-complex in general (multi-edges accepted).  Throws PaintError
+// (IDT_COMPUTE on compute failure; NON_SIMPLICIAL on a self-loop or a
+// malformed face, which the cell machinery cannot chart).
+DelaunayTriangulation dual_idt(const SortedDual& S);
+
+// =====================================================================
+// Per-cell types and primitives.
 // =====================================================================
 
 // Half of one edge's Strip, scanline-indexed in a Cell's frame.
@@ -200,19 +142,16 @@ struct EdgeStrip {
     bool empty() const { return b_max < b_min; }
 };
 
-// One iDT 2-cell embedded into its own Eisenstein-lattice frame.
+// One iDT 2-cell embedded into its own Eisenstein-lattice frame -- the
+// cell's CHART.  Corner k sits at P[k]; arc k runs corners[k] ->
+// corners[(k+1)%3] and carries edge strip edge[k].  (Array form shared
+// with the atlas's AtlasCell, so parallel structure stays visibly
+// parallel.)
 struct Cell {
-    int        cell_id = -1;
-    int        c0 = -1, c1 = -1, c2 = -1;       // CCW corner T_sorted vertex ids
-    Eisenstein P0{0, 0};                         // = (0, 0)
-    Eisenstein P1{0, 0};
-    Eisenstein P2{0, 0};
-
-    // Per-edge strips, in the cell's own frame, scanline-indexed.
-    // edge_01 covers the arc c0 -> c1, etc.
-    EdgeStrip edge_01;
-    EdgeStrip edge_12;
-    EdgeStrip edge_20;
+    int                         cell_id = -1;
+    std::array<int, 3>          corners{ -1, -1, -1 };  // CCW T_sorted vertex ids
+    std::array<Eisenstein, 3>   P{};                    // corner positions; P[0] == (0,0)
+    std::array<EdgeStrip, 3>    edge{};                 // strip of arc k: corners[k] -> corners[k+1]
 
     bool ok = false;
 };
@@ -228,13 +167,13 @@ struct Cell {
 // Throws on contract violations (iDT angle/length not realisable in
 // the Eisenstein lattice; walker cannot reach a target from its start).
 Cell embed_cell(const DelaunayTriangulation& D,
-                const Triangulation& T_sorted,
+                const TriangulationView& T_sorted,
                 int cell_id);
 
 // Embed every live iDT cell in parallel.  Returns a vector of size
 // D.nf; dead slots have ok == false.
 std::vector<Cell> embed_all_cells(const DelaunayTriangulation& D,
-                                   const Triangulation& T_sorted);
+                                  const TriangulationView& T_sorted);
 
 // (F-frame lattice pos) -> T_sorted vertex_id, for every Z[w] lattice
 // point inside F's polygon.  Computed by polygon scan + per-scanline
@@ -247,26 +186,46 @@ struct LatticeMap {
 };
 
 LatticeMap enumerate_cell_lattice(const Cell& F,
-                                  const Triangulation& T_sorted);
-
-// Interpolate cone positions over F's lattice via integer barycentric,
-// writing into pos3d[vertex_id] for every non-cone entry.  Idempotent
-// on shared on-edge hex (one barycentric weight is 0 -> reduce by gcd
-// of the other two before computing, eliminating the cell-wedge
-// denominator from the FP arithmetic so both adjacent cells produce
-// bit-identical 3D output across the shared edge).
-//
-// Preconditions:
-//   - F.ok == true
-//   - cone_positions.size() == 12 with finite values
-//   - pos3d.size() >= T_sorted.N
-void interpolate_cell(const Cell& F,
-                      const LatticeMap& lmap,
-                      const std::vector<coord3d>& cone_positions,
-                      std::vector<coord3d>& pos3d);
+                                  const TriangulationView& T_sorted);
 
 // =====================================================================
-// TikZ visualisations (diagnostic only).
+// SurfaceParametrization: every cell charted, every vertex located.
+// =====================================================================
+
+// One appearance of a T_sorted vertex in some cell's chart.
+struct Occurrence { int cell; Eisenstein pos; };
+
+// The intrinsic product of the pipeline: all live cells embedded and
+// scanned, coverage-checked, with a per-vertex index of chart
+// appearances.  Non-owning views of the inputs (the caller keeps D and
+// S alive; same contract as the atlas).
+struct SurfaceParametrization {
+    const DelaunayTriangulation* D = nullptr;   // the charted complex
+    TriangulationView            T;             // T_sorted
+    int                          n_cones = 0;   // = SortedDual::n_cones
+
+    std::vector<Cell>       cells;              // indexed by D face id
+    std::vector<LatticeMap> lmaps;              //   "     "  (empty on dead slots)
+    std::vector<std::vector<Occurrence>> occurrences;  // per T_sorted vertex
+};
+
+// Chart all live cells of D and check coverage: every non-cone vertex
+// (id >= S.n_cones) must appear in exactly 1 or 2 charts (2 = on a
+// shared iDT edge).  Throws PaintError(EMBED) when a live cell fails to
+// embed or scan, PaintError(COVERAGE) on a coverage violation.
+//
+// Works on any intrinsically-Delaunay D over S.T -- the raw dual_idt(S)
+// or Layer II's realized DualPolytope::D alike.
+SurfaceParametrization parametrize(const DelaunayTriangulation& D,
+                                   const SortedDual& S);
+
+// A T_sorted vertex is itself a lattice point: locate it via its first
+// recorded occurrence.  Throws std::logic_error if v is unclaimed
+// (impossible on a parametrize() output: coverage checked).
+Occurrence locate_vertex(const SurfaceParametrization& P, int v);
+
+// =====================================================================
+// TikZ visualisations (diagnostic only; intrinsic -- lattice pictures).
 // =====================================================================
 
 // Self-contained TikZ standalone document of one Cell.  Draws F's
@@ -276,7 +235,7 @@ void interpolate_cell(const Cell& F,
 // squares, interior strip vertices as circles colour-coded by source
 // edge (edge_01 blue, edge_12 green, edge_20 orange).
 void dump_cell_tikz(const Cell& F,
-                    const Triangulation& T_sorted,
+                    const TriangulationView& T_sorted,
                     std::ostream& os,
                     double scale = 0.7);
 
@@ -290,7 +249,7 @@ void dump_cell_tikz(const Cell& F,
 // map, draw it with a thick red outline.
 void dump_lattice_map_tikz(const Cell& F,
                            const LatticeMap& lmap,
-                           const Triangulation& T_sorted,
+                           const TriangulationView& T_sorted,
                            std::ostream& os,
                            double scale = 0.7,
                            int highlight_vertex_id = -1);

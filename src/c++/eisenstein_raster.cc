@@ -23,7 +23,7 @@ int igcd(int a, int b) {
 
 // Primitive walk_line: gcd(endpoint.a, endpoint.b) == 1.  The line
 // passes through no intermediate lattice points.
-WalkResult walk_line_primitive(const Triangulation& T,
+WalkResult walk_line_primitive(const TriangulationView& T,
                                int u, int v, int w,
                                int dir_uv,
                                Eisenstein endpoint)
@@ -143,7 +143,7 @@ struct NextFace {
     bool ok;
 };
 
-NextFace find_next_face_at_hex(const Triangulation& T,
+NextFace find_next_face_at_hex(const TriangulationView& T,
                                int V,
                                Eisenstein P_V,
                                const std::array<int, 3>& prev_face_verts,
@@ -203,7 +203,7 @@ NextFace find_next_face_at_hex(const Triangulation& T,
 
 }  // anonymous namespace
 
-WalkResult walk_line(const Triangulation& T, int u, int v, int w,
+WalkResult walk_line(const TriangulationView& T, int u, int v, int w,
                      int dir_uv, Eisenstein endpoint)
 {
     int g = igcd(endpoint.first, endpoint.second);

@@ -11,7 +11,7 @@
 //   <prefix>_f<id>_lmap.tex
 //   <prefix>_f<id>_unfolded.tex
 
-#include "fullerenes/eisenstein_paint.hh"
+#include "fullerenes/eisenstein_paint_geometry.hh"
 #include "fullerenes/delaunay_unfold.hh"
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/delaunay.hh"
@@ -46,7 +46,10 @@ int main(int argc, char** argv) {
     }
     if (T.N == 0) { std::fprintf(stderr, "isomer not found\n"); return 1; }
 
-    auto [T_sorted, D] = ep::prepare_inputs(T);
+    ep::SortedDual S_d = ep::sorted_dual(T);
+    ep::DualPolytope Pl = ep::realize_dual(S_d);
+    const Triangulation& T_sorted = S_d.T;
+    const DelaunayTriangulation& D = Pl.D;
     auto cells         = ep::embed_all_cells(D, T_sorted);
 
     if (cell_id < 0) {
@@ -68,8 +71,8 @@ int main(int argc, char** argv) {
     // type the unfold tools consume.
     auto to_placement = [](const ep::Cell& F, const ep::LatticeMap& lmap) {
         return CellPlacement{
-            F.cell_id, F.c0, F.c1, F.c2,
-            F.P0, F.P1, F.P2,
+            F.cell_id, F.corners[0], F.corners[1], F.corners[2],
+            F.P[0], F.P[1], F.P[2],
             F.ok ? lmap.entries : std::vector<std::pair<Eisenstein, int>>{},
             F.ok };
     };
@@ -92,10 +95,10 @@ int main(int argc, char** argv) {
 
     std::printf("cell %d: c0=%d c1=%d c2=%d  P0=(%d,%d) P1=(%d,%d) P2=(%d,%d)  "
                 "%zu lattice pts\n",
-                F.cell_id, F.c0, F.c1, F.c2,
-                F.P0.first, F.P0.second,
-                F.P1.first, F.P1.second,
-                F.P2.first, F.P2.second,
+                F.cell_id, F.corners[0], F.corners[1], F.corners[2],
+                F.P[0].first, F.P[0].second,
+                F.P[1].first, F.P[1].second,
+                F.P[2].first, F.P[2].second,
                 F_lmap.entries.size());
     for (int k = 0; k < 3; ++k) {
         const auto& nd = neighbours[k];
