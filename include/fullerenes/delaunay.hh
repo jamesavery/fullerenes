@@ -3,48 +3,11 @@
 
 #include "triangulation.hh"
 #include "geometry.hh"
+#include "delaunay_view.hh"   // DelaunayView, Diamond, dcel_capacities
 
 #include <array>
 #include <cstdio>       // FILE* for the .idt serialization (to_ascii / from_ascii)
 #include <functional>
-
-
-// Diamond: the local geometry around an edge in a metrized triangulation.
-//
-//      B
-//     / \          upper triangle: sides (e, a, b)
-//    a   b         a = side adjacent to u, b = side adjacent to v
-//   /     \  .
-//  u---e---v       e = diagonal being tested/flipped
-//   \     /
-//    c   d         lower triangle: sides (e, c, d)
-//     \ /          c = side adjacent to u, d = side adjacent to v
-//      D
-//
-// All geometric predicates (Delaunay, convexity, flipped length) depend only
-// on these five edge lengths.  No vertex IDs or topology needed.
-struct Diamond {
-  double e, a, b, c, d;
-
-  bool   is_delaunay()    const;  // cot(angle_B) + cot(angle_D) >= 0
-  bool   is_convex()      const;  // angle sum < pi at both u and v
-  double flipped_length() const;  // length of BD (the other diagonal)
-
-  // Cocircular ("tight") test: cot(angle_B) + cot(angle_D) == 0 exactly,
-  // i.e. the four points u, v, B, D are concyclic on the surface.  In this
-  // case both triangulations of the diamond are equally-valid Delaunay
-  // refinements of the same cell.  Uses exact integer arithmetic on
-  // length-squared (valid when all five lengths square to non-negative
-  // integers, e.g. equilateral triangulations and their flips).
-  // See CANONICAL-TESSELATION.md for the derivation.
-  bool is_cocircular() const;
-
-  // Floating-point cocircular test for general (non-equilateral) metrics,
-  // where length-squared is not integer so the exact predicate above does not
-  // apply: tight iff |cot(angle_B) + cot(angle_D)| < tol. Scale-invariant
-  // (cotangents are dimensionless), so tol is a pure angle threshold.
-  bool is_cocircular(double tol) const;
-};
 
 // ============================================================================
 // Canonical Delaunay tesselation
@@ -104,104 +67,209 @@ struct GeodesicDisk {
 };
 
 // ============================================================================
+// Point tracker (optional; flip-tape transport).
+// See claude-projects/delaunay-fillin/DESIGN-cubic-exact-paint.md.  When
+// active, flip_edge and the flat-vertex removal transport the tracked
+// points through each operation's isometric planar development, so a point
+// recorded anywhere on the surface keeps a valid (face, barycentric)
+// location as the triangulation changes.  compact_vertices renumbers only
+// vertices, so tracked state is untouched by it; the tracker is NOT
+// serialized by to_ascii/from_ascii.  Inactive by default: every hook is a
+// single branch -- zero cost and zero behavior change for non-tracking use.
+//
+// Barycentrics are anchored to HALF-EDGE SLOTS, never vertex ids: slot i of
+// face f is the origin of the i-th half-edge of the cycle starting at
+// f_he[f].  Delta-complex faces may repeat corner labels (self-loop and
+// bigon faces arise transiently); slots are always unambiguous.
+//
+// Failure contract: transport-detected failures (the clamp band below, a
+// degenerate development) throw BEFORE the operation mutates anything --
+// flip_edge and remove_flat_vertex compute every placement first and only
+// then commit, so complex and tracker are unchanged on such a throw.  A
+// throw from the DCEL surgery itself (splice_fan deep invariants) poisons
+// complex and tracker alike, per the file's deep-invariant convention.
+// bisect_multi_edges and split_face are NOT transport-hooked and throw
+// when tracking is active.  Copies of a tracking complex snapshot the
+// tracker: transport applies only to the copy you mutate.
+//
+// Seeding through remove_flat_vertices requires the removed vertices to be
+// flat to roughly CLAMP_TOL precision (their star development must close);
+// the loose flat_tol regime (~1e-2, CEPS metrics) is incompatible with
+// tracking -- the seed placement throws rather than proceeding.
+// ============================================================================
+struct DelaunayTrackedPoint {
+  int    label = -1;              // caller's id (opaque to the DCEL)
+  int    face  = -1;              // containing live face
+  double b[3]  = {0, 0, 0};       // barycentric per slot; b >= 0, sum == 1
+};
+
+struct DelaunayPointTracker {
+  bool active = false;
+  // @inv partition: by_face[f] == { i : points[i].face == f } -- every
+  //      point indexed exactly once, under its own (live) face.  Holds
+  //      after every hooked operation; asserted by the transport tests.
+  std::vector<DelaunayTrackedPoint> points;
+  std::vector<std::vector<int>>     by_face;   // face -> indices into points
+  // FP policy: after transport, a barycentric in [-CLAMP_TOL, 0) is clamped
+  // to 0 and the triple renormalized (accounted below); below -CLAMP_TOL
+  // transport throws -- that is a wrong-side transport bug, not roundoff.
+  // Never widen the band to make a case pass.
+  static constexpr double CLAMP_TOL = 1e-9;
+  long   n_clamped = 0;
+  double max_clamp = 0;
+
+  // The by_face bucket of face f, growing the index when alloc_face has
+  // extended nf.
+  std::vector<int>& bucket(int f);
+};
+
+// ============================================================================
+// DelaunayStorage: everything DelaunayTriangulation OWNS -- the nine vectors
+// backing the view's spans, the free lists, the tracker, the diagnostics
+// flag.  A plain struct so the compiler-generated memberwise copy/move is
+// complete BY CONSTRUCTION: a member added here is copied, moved, and (via
+// owned_tuple's arity assert) repointed, with no hand-written list to forget
+// it in.
+// ============================================================================
+struct DelaunayStorage {
+  std::vector<int>    owned_he_next, owned_he_origin, owned_he_face;
+  std::vector<double> owned_he_length, owned_he_angle;
+  std::vector<int>    owned_v_out;
+  std::vector<double> owned_v_cone_angle;
+  std::vector<int>    owned_v_orig_degree;
+  std::vector<int>    owned_f_he;
+
+  vector<int> free_edges;  // recycled edge slots (half-edge id / 2)
+  vector<int> free_faces;  // recycled face slots
+
+  DelaunayPointTracker tracker;   // value member: copies/moves with the complex
+
+  // If > 0, remove_flat_vertices prints live-vertex progress to stderr every
+  // this-many removed vertices (and a header/footer). 0 = silent. Output is
+  // flushed each line so it is visible even on a slow run.
+  int verbose_removal = 0;
+
+  // The nine backing vectors in the view's canonical field order
+  // (DelaunayView::to_tuple) -- the zip repoint() folds over.
+  auto owned_tuple() {
+    return std::forward_as_tuple(owned_he_next, owned_he_origin, owned_he_face,
+                                 owned_he_length, owned_he_angle,
+                                 owned_v_out, owned_v_cone_angle,
+                                 owned_v_orig_degree, owned_f_he);
+  }
+};
+
+// ============================================================================
 // DCEL-based intrinsic Delaunay triangulation (delta-complex).
 //
 // Half-edge (DCEL) representation that correctly handles multi-edges and
 // self-loops.  Every edge is identified by a half-edge index, so flip_edge(h)
 // is unambiguous even when multiple edges connect the same vertex pair.
 //
-// Twin convention: half-edges 2k and 2k+1 are always twins.
-// Face orientation: he_next traverses each face CCW.
-// Vertex circulation: cw(h) rotates CW around origin(h).
+// The counts, SoA arrays, navigation, and intrinsic-geometry methods live on
+// the inherited DelaunayView (delaunay_view.hh); the vectors behind the spans
+// live on the inherited DelaunayStorage.  The aliasing contract, stated once:
+//
+//   @inv bound:  each view span is exactly the span over its storage vector
+//                (same data pointer, same size) -- established by repoint(),
+//                which folds the two field tuples together.
+//   @inv sized:  he_*.size() == nh, v_*.size() >= nv, f_he.size() == nf.
+//
+// Resizer inventory (everything that may reallocate, each ending in
+// repoint()): the monotone ensure_* helpers (post-build growth),
+// build_topology / from_ascii (construction, which establish the arrays
+// wholesale), and compact_vertices (the one shrinking operation).  Everything
+// else mutates in place through the spans.
+//
+// Why not Owned<View> (owned.hh): that template is specialized to the RSR
+// adjacency layout (neighbours/deg/twin + optional points); a tuple-driven
+// generalization could subsume this type and SpanVector, and should, the day
+// a third owner-with-repoint appears -- this is the second.
+//
+// MOVED-FROM STATE: a moved-from complex is the valid EMPTY complex
+// (nv = nh = nf = 0, spans re-bound to its emptied vectors -- never
+// dangling).  Consistency predicates pass it vacuously; it is
+// indistinguishable from a genuinely empty complex by design.
 // ============================================================================
 
-struct DelaunayTriangulation {
-  // --- Counts ---
-  int nv = 0;   // live vertices
-  int nh = 0;   // allocated half-edges (including dead slots)
-  int nf = 0;   // allocated faces (including dead slots)
+struct DelaunayTriangulation : DelaunayView, DelaunayStorage {
+  // Backward-compatible spellings of the hoisted tracker types.
+  using TrackedPoint = DelaunayTrackedPoint;
+  using PointTracker = DelaunayPointTracker;
 
-  // --- Half-edge topology (indexed 0..nh-1) ---
-  vector<int>    he_next;    // next half-edge CCW in same face
-  vector<int>    he_origin;  // origin vertex (-1 = dead)
-  vector<int>    he_face;    // face to the left
+  // Re-bind the inherited spans to the owned vectors (the @inv bound
+  // establisher).  Must run after any owned_* reallocation and in every
+  // copy/move; folds the view's field tuple onto the storage's, so the
+  // field list exists in exactly two places (the two tuples), whose arity
+  // equality is asserted below the class.
+  void repoint() {
+    auto v = DelaunayView::to_tuple();
+    auto s = owned_tuple();
+    [&]<std::size_t... I>(std::index_sequence<I...>) {
+      ((std::get<I>(v) = std::get<I>(s)), ...);
+    }(std::make_index_sequence<n_fields>{});
+  }
 
-  // --- Metric (indexed 0..nh-1) ---
-  vector<double> he_length;  // edge length (same for h and twin(h))
-  vector<double> he_angle;   // angle at origin(h) in face(h)
+  // --- Growth (owner-only; the view never resizes) ---
+  // Monotone: ensure the array family holds at least `need` slots; never
+  // shrinks.  New slots carry the DEAD-SLOT REPRESENTATION the predicates
+  // read (-1 = dead half-edge / dead vertex / unassigned face; metric 0),
+  // and every call ends in repoint().
+  void ensure_halfedges(int need) {
+    if (need <= (int)owned_he_next.size()) return;
+    owned_he_next.resize(need, -1);
+    owned_he_origin.resize(need, -1);
+    owned_he_face.resize(need, -1);
+    owned_he_length.resize(need, 0);
+    owned_he_angle.resize(need, 0);
+    repoint();
+  }
+  void ensure_faces(int need) {
+    if (need <= (int)owned_f_he.size()) return;
+    owned_f_he.resize(need, -1);
+    repoint();
+  }
+  void ensure_vertices(int need) {
+    if (need <= (int)owned_v_out.size()) return;
+    owned_v_out.resize(need, -1);
+    owned_v_cone_angle.resize(need, 0.0);
+    owned_v_orig_degree.resize(need, 0);
+    repoint();
+  }
 
-  // --- Per-vertex (indexed 0..nv-1) ---
-  vector<int>    v_out;          // one outgoing half-edge (-1 = dead vertex)
-  vector<double> v_cone_angle;   // cone angle = total vertex angle (deg*pi/3 when equilateral)
-  vector<int>    v_orig_degree;  // degree in original triangulation
-
-  // --- Diagnostics ---
-  // If > 0, remove_flat_vertices prints live-vertex progress to stderr every
-  // this-many removed vertices (and a header/footer). 0 = silent. Output is
-  // flushed each line so it is visible even on a slow run.
-  int verbose_removal = 0;
-
-  // --- Per-face (indexed 0..nf-1) ---
-  vector<int> f_he;        // one boundary half-edge (-1 = dead face)
-
-  // --- Free lists ---
-  vector<int> free_edges;  // recycled edge slots (half-edge id / 2)
-  vector<int> free_faces;  // recycled face slots
-
-  // --- Point tracker (optional; flip-tape transport) ---
-  // See claude-projects/delaunay-fillin/DESIGN-cubic-exact-paint.md.  When
-  // active, flip_edge and the flat-vertex removal transport the tracked
-  // points through each operation's isometric planar development, so a point
-  // recorded anywhere on the surface keeps a valid (face, barycentric)
-  // location as the triangulation changes.  compact_vertices renumbers only
-  // vertices, so tracked state is untouched by it; the tracker is NOT
-  // serialized by to_ascii/from_ascii.  Inactive by default: every hook is a
-  // single branch -- zero cost and zero behavior change for non-tracking use.
-  //
-  // Barycentrics are anchored to HALF-EDGE SLOTS, never vertex ids: slot i of
-  // face f is the origin of the i-th half-edge of the cycle starting at
-  // f_he[f].  Delta-complex faces may repeat corner labels (self-loop and
-  // bigon faces arise transiently); slots are always unambiguous.
-  //
-  // Failure contract: transport-detected failures (the clamp band below, a
-  // degenerate development) throw BEFORE the operation mutates anything --
-  // flip_edge and remove_flat_vertex compute every placement first and only
-  // then commit, so complex and tracker are unchanged on such a throw.  A
-  // throw from the DCEL surgery itself (splice_fan deep invariants) poisons
-  // complex and tracker alike, per the file's deep-invariant convention.
-  // bisect_multi_edges and split_face are NOT transport-hooked and throw
-  // when tracking is active.  Copies of a tracking complex snapshot the
-  // tracker: transport applies only to the copy you mutate.
-  //
-  // Seeding through remove_flat_vertices requires the removed vertices to be
-  // flat to roughly CLAMP_TOL precision (their star development must close);
-  // the loose flat_tol regime (~1e-2, CEPS metrics) is incompatible with
-  // tracking -- the seed placement throws rather than proceeding.
-  struct TrackedPoint {
-    int    label = -1;              // caller's id (opaque to the DCEL)
-    int    face  = -1;              // containing live face
-    double b[3]  = {0, 0, 0};       // barycentric per slot; b >= 0, sum == 1
-  };
-  struct PointTracker {
-    bool active = false;
-    // @inv partition: by_face[f] == { i : points[i].face == f } -- every
-    //      point indexed exactly once, under its own (live) face.  Holds
-    //      after every hooked operation; asserted by the transport tests.
-    std::vector<TrackedPoint>     points;
-    std::vector<std::vector<int>> by_face;   // face -> indices into points
-    // FP policy: after transport, a barycentric in [-CLAMP_TOL, 0) is clamped
-    // to 0 and the triple renormalized (accounted below); below -CLAMP_TOL
-    // transport throws -- that is a wrong-side transport bug, not roundoff.
-    // Never widen the band to make a case pass.
-    static constexpr double CLAMP_TOL = 1e-9;
-    long   n_clamped = 0;
-    double max_clamp = 0;
-
-    // The by_face bucket of face f, growing the index when alloc_face has
-    // extended nf.
-    std::vector<int>& bucket(int f);
-  };
-  PointTracker tracker;   // value member: copies/moves with the complex
+  // --- Rule of 5 ---
+  // A defaulted copy would leave the new object's spans aliasing the
+  // SOURCE's vectors, so every copy/move re-binds via repoint().  The
+  // storage base carries all owned state memberwise (see its banner), so
+  // these are one-liners; copy assignment is copy-and-swap for the strong
+  // guarantee (a throwing vector copy must not leave half-assigned storage
+  // under live spans).
+  DelaunayTriangulation() = default;
+  DelaunayTriangulation(const DelaunayTriangulation& o)
+      : DelaunayView(o), DelaunayStorage(o) { repoint(); }
+  DelaunayTriangulation(DelaunayTriangulation&& o) noexcept
+      : DelaunayView(o), DelaunayStorage(std::move(o)) {
+    repoint();
+    o.nv = o.nh = o.nf = 0;   // leave the source as the empty complex
+    o.repoint();
+  }
+  DelaunayTriangulation& operator=(const DelaunayTriangulation& o) {
+    if (this != &o) {
+      DelaunayTriangulation tmp(o);
+      *this = std::move(tmp);
+    }
+    return *this;
+  }
+  DelaunayTriangulation& operator=(DelaunayTriangulation&& o) noexcept {
+    if (this != &o) {
+      DelaunayView::operator=(o);
+      DelaunayStorage::operator=(std::move(o));
+      repoint();
+      o.nv = o.nh = o.nf = 0;
+      o.repoint();
+    }
+    return *this;
+  }
 
   // Activate transport (sizes the per-face index).  Call before the
   // operations whose points you want carried (e.g. before
@@ -219,67 +287,9 @@ struct DelaunayTriangulation {
   // @throws std::runtime_error on any violated precondition.
   int track_point(int label, int face, double b0, double b1, double b2);
 
-  // --- Clean accessors ---
-  int  twin(int h)  const { return h ^ 1; }
-  int  edge(int h)  const { return h >> 1; }
-  int  prev(int h)  const { return he_next[he_next[h]]; }  // only for triangulations
-  int  dest(int h)  const { return he_origin[twin(h)]; }
-  bool alive(int h) const { return he_origin[h] >= 0; }
-  // Bigon edge: both half-edges of h bound the same face.  Arises in
-  // Δ-complexes around low-degree cone vertices (an i–j edge of an "iji"
-  // face); dihedral quantities across such an edge are undefined.
-  bool is_bigon(int h) const { return he_face[h] == he_face[twin(h)]; }
-
-  // CW rotation around origin(h): next outgoing half-edge clockwise.
-  int cw(int h) const { return he_next[twin(h)]; }
-
-  // CCW rotation around origin(h): next outgoing half-edge counterclockwise.
-  int ccw(int h) const { return twin(prev(h)); }
-
-  // The three half-edges of (triangular) face f, in he_next order starting
-  // from its representative.  Pre: f is live (f_he[f] >= 0).
-  std::array<int,3> face_halfedges(int f) const {
-    const int h = f_he[f];
-    return {h, he_next[h], prev(h)};
-  }
-  // The three corner vertices of face f, CCW (origins of face_halfedges(f)).
-  std::array<int,3> face_vertices(int f) const {
-    const auto h = face_halfedges(f);
-    return {he_origin[h[0]], he_origin[h[1]], he_origin[h[2]]};
-  }
-
-  int vertex_degree(int v) const;  // count outgoing half-edges from v
-
-  // Range over the outgoing half-edges of v (the cw ring from v_out[v]); empty if v
-  // has no incident live edge. The canonical vertex traversal.
-  struct IncidentHalfEdges {
-    const DelaunayTriangulation& D; int v;
-    struct iterator {
-      const DelaunayTriangulation* D; int start, h; bool done;
-      int       operator*()  const { return h; }
-      iterator& operator++()       { h = D->cw(h); done = (h == start); return *this; }
-      bool      operator!=(const iterator&) const { return !done; }
-    };
-    iterator begin() const { int h0 = D.v_out[v]; return {&D, h0, h0, h0 < 0}; }
-    iterator end()   const { return {}; }
-  };
-  IncidentHalfEdges incident(int v) const { return {*this, v}; }
-
-  // Range over one (even) half-edge per live edge. The canonical edge
-  // traversal, skipping dead slots.
-  struct LiveEdges {
-    const DelaunayTriangulation& D;
-    struct iterator {
-      const DelaunayTriangulation* D; int h;
-      void advance() { while (h < D->nh && !D->alive(h)) h += 2; }
-      int       operator*()  const { return h; }
-      iterator& operator++()       { h += 2; advance(); return *this; }
-      bool      operator!=(const iterator& o) const { return h != o.h; }
-    };
-    iterator begin() const { iterator it{&D, 0}; it.advance(); return it; }
-    iterator end()   const { return {&D, D.nh}; }
-  };
-  LiveEdges edges() const { return {*this}; }
+  // (Navigation -- twin/edge/prev/dest/alive/is_bigon/cw/ccw, face_halfedges/
+  // face_vertices, vertex_degree, and the incident()/edges() ranges -- is
+  // inherited from DelaunayView.)
 
   // --- Construction ---
 
@@ -298,33 +308,9 @@ struct DelaunayTriangulation {
   static DelaunayTriangulation from_intrinsic_metric(const Triangulation& T,
                                                      const EdgeLengthFn& length);
 
-  // --- Geometry ---
-  Diamond diamond(int h) const;
-  void recompute_face_angles(int f);
-  // Recompute he_angle for every face, then refresh the v_cone_angle cache.
-  // THE entry point for restoring angle coherence after a metric (length) change.
-  void recompute_all_angles();
-  // Recompute he_angle for every face only (no cone-cache refresh) -- for hot
-  // callers that read just he_angle; pair with recompute_cone_angles when needed.
-  void recompute_all_face_angles();
-  // Refresh only the v_cone_angle cache from the current he_angle. Cone angle is
-  // flip-invariant, so flips do not need this; a length change does.
-  void recompute_cone_angles();
-
-  // Total angle at vertex v = sum of incident corner angles. The Gaussian
-  // curvature / angle defect is 2*pi - vertex_angle_sum(v); a flat vertex
-  // has angle sum 2*pi. Requires angles current (call recompute_all_angles
-  // after changing any length).
-  double vertex_angle_sum(int v) const;
-
-  // A vertex is flat (zero cone curvature, hence removable) iff its cone
-  // angle is 2*pi to within flat_tol. Metric-based replacement for the
-  // equilateral-only "degree == 6" test. flat_tol must lie above the input
-  // metric's curvature noise floor and below the smallest real cone curvature:
-  // 1e-6 suits exact (equilateral) metrics; a numerically solved metric (e.g.
-  // a CEPS conformal solve, whose layout-cut seams leave ~5e-4 spurious
-  // curvature at genuinely flat vertices) needs ~1e-2.
-  bool is_flat(int v, double flat_tol = 1e-6) const;
+  // (Intrinsic geometry -- diamond, recompute_face_angles/recompute_all_angles/
+  // recompute_all_face_angles/recompute_cone_angles, vertex_angle_sum, and
+  // is_flat -- is inherited from DelaunayView.)
 
   // Discrete Gaussian curvature K(v) = 2*pi - cone angle, per live vertex (the angle
   // defect). Reads the cached v_cone_angle, so requires it current.
@@ -613,8 +599,8 @@ struct DelaunayTriangulation {
       const std::vector<int>& vertex_labels,
       const std::vector<bool>& tight) const;
 
-  // --- Validation ---
-  bool check_consistency() const;
+  // (check_consistency -- the nine numbered class invariants -- is
+  // inherited from DelaunayView.)
 
   // --- Serialization (.idt) ---
   // Text round-trip of the intrinsic Delaunay delta-complex (the ".idt" format, magic
@@ -635,5 +621,15 @@ struct DelaunayTriangulation {
   static DelaunayTriangulation from_ascii(FILE* file);
 };
 
+// ---------------------------------------------------------------------------
+// Contract sanity: the storage tuple's arity must match the view's field
+// count (repoint() folds them index-by-index), and the inheritance edges of
+// the owner pattern must hold.
+// ---------------------------------------------------------------------------
+static_assert(std::tuple_size_v<decltype(std::declval<DelaunayStorage>().owned_tuple())>
+                  == DelaunayView::n_fields,
+              "DelaunayStorage::owned_tuple arity must equal DelaunayView::n_fields");
+static_assert(std::is_base_of_v<DelaunayView, DelaunayTriangulation>);
+static_assert(std::is_base_of_v<DelaunayStorage, DelaunayTriangulation>);
 
 #endif

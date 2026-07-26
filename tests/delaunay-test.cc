@@ -994,3 +994,167 @@ TEST(DCELSymEmbed, C60_AllIsomers) {
             << worst_sym   << " at #" << worst_idx_sym << std::endl;
 }
 
+
+// ============================================================================
+// DCELOwnership: the owner's span/storage aliasing contract.
+//
+// Each test states one claim about the Owned-view pattern (delaunay.hh
+// banner): copies are independent under in-place mutation, every owned field
+// survives a copy, moves steal storage and leave the empty complex, growth
+// re-binds every span.  These are the surfaces the compute() byte gates
+// cannot see (reduction never grows, and no gate copies-then-mutates-both).
+// ============================================================================
+
+// The equality relation on owned DCEL state: counts, the nine arrays (folded
+// over the canonical field tuple, so a field added in stage 3 is compared
+// automatically), free lists, and the tracker's points.
+static bool same_dcel_state(const DelaunayTriangulation& A,
+                            const DelaunayTriangulation& B) {
+  if (A.nv != B.nv || A.nh != B.nh || A.nf != B.nf) return false;
+  bool eq = true;
+  auto ta = A.to_tuple(), tb = B.to_tuple();
+  auto spans_equal = [](auto sa, auto sb) {
+    return sa.size() == sb.size() && std::equal(sa.begin(), sa.end(), sb.begin());
+  };
+  [&]<std::size_t... I>(std::index_sequence<I...>) {
+    ((eq = eq && spans_equal(std::get<I>(ta), std::get<I>(tb))), ...);
+  }(std::make_index_sequence<DelaunayView::n_fields>{});
+  if (!eq) return false;
+  if (A.free_edges != B.free_edges || A.free_faces != B.free_faces) return false;
+  if (A.tracker.points.size() != B.tracker.points.size()) return false;
+  for (size_t i = 0; i < A.tracker.points.size(); i++) {
+    const auto& p = A.tracker.points[i];
+    const auto& q = B.tracker.points[i];
+    if (p.label != q.label || p.face != q.face ||
+        p.b[0] != q.b[0] || p.b[1] != q.b[1] || p.b[2] != q.b[2]) return false;
+  }
+  return true;
+}
+
+// The repoint() postcondition (@inv sized) as a named predicate.
+static bool array_sizes_match_counts(const DelaunayTriangulation& D) {
+  return (int)D.he_next.size()   == D.nh && (int)D.he_origin.size()     == D.nh
+      && (int)D.he_face.size()   == D.nh && (int)D.he_length.size()     == D.nh
+      && (int)D.he_angle.size()  == D.nh
+      && (int)D.v_out.size()     >= D.nv && (int)D.v_cone_angle.size()  >= D.nv
+      && (int)D.v_orig_degree.size() >= D.nv
+      && (int)D.f_he.size()      == D.nf;
+}
+
+// A copy must be independent under in-place mutation.  Flips are the ONE
+// mutation shape that can expose span aliasing: they rewire without ever
+// allocating, so a copy whose spans alias the source keeps aliasing it for
+// the whole operation (growth would self-heal via repoint).  This is exactly
+// the Alexandrov trial-step shape (T_trial = T; flip; accept/reject).
+TEST(DCELOwnership, CopyIsIndependentUnderInPlaceMutation) {
+  Triangulation T = make_dual(60, 0);
+  auto D  = DelaunayTriangulation::compute(T);
+  auto D2 = D;
+  ASSERT_TRUE(same_dcel_state(D, D2));
+  ASSERT_NE(D.he_next.data(), D2.he_next.data());   // deep copy, repointed
+
+  int flipped = -1;
+  for (int h : D2.edges())
+    if (D2.flip_edge(h)) { flipped = h; break; }
+  ASSERT_GE(flipped, 0) << "no flippable edge on the C60 iDT";
+
+  auto D_fresh = DelaunayTriangulation::compute(T);  // compute is deterministic
+  EXPECT_TRUE(same_dcel_state(D, D_fresh)) << "mutating the copy changed the source";
+  EXPECT_FALSE(same_dcel_state(D2, D)) << "the flip did not change the copy";
+}
+
+// Every owned field -- arrays, free lists, tracker points -- survives a copy,
+// on a complex where all of them are populated (metric compute with
+// track_removed: dead slots, recycled free-list entries, tracked points).
+// Pins the documented "copies snapshot the tracker" postcondition.
+TEST(DCELOwnership, CopyPreservesEveryField) {
+  Triangulation T = make_dual(60, 0);
+  auto unit = [](node_t, node_t) { return 1.0; };
+  std::vector<int> n2o;
+  auto D = DelaunayTriangulation::compute(T, unit, 1e-6, &n2o, /*track_removed=*/true);
+  ASSERT_FALSE(D.free_edges.empty());               // reduction recycled slots
+  ASSERT_FALSE(D.tracker.points.empty());           // removals were tracked
+
+  auto D2 = D;
+  EXPECT_TRUE(same_dcel_state(D, D2));
+  EXPECT_NE(D.he_next.data(), D2.he_next.data());
+  EXPECT_TRUE(array_sizes_match_counts(D2));
+}
+
+// A move steals the storage (same data pointers) and leaves the source as
+// the documented empty complex: counts zero, spans re-bound (never dangling).
+TEST(DCELOwnership, MoveStealsStorageAndEmptiesSource) {
+  auto D = DelaunayTriangulation::compute(make_dual(60, 0));
+  const int* p = D.he_next.data();
+  auto D2 = std::move(D);
+  EXPECT_EQ(D2.he_next.data(), p);                  // storage stolen, repointed
+  EXPECT_TRUE(D2.check_consistency());
+  EXPECT_EQ(D.nv, 0);
+  EXPECT_EQ(D.nh, 0);
+  EXPECT_EQ(D.nf, 0);
+  EXPECT_TRUE(D.he_next.empty());                   // re-bound to emptied vector
+}
+
+TEST(DCELOwnership, SelfAssignmentIsIdentity) {
+  auto D  = DelaunayTriangulation::compute(make_dual(60, 0));
+  auto D2 = D;
+  DelaunayTriangulation& alias = D;
+  D = alias;                                        // self copy-assign
+  EXPECT_TRUE(same_dcel_state(D, D2));
+  D = std::move(alias);                             // self move-assign
+  EXPECT_TRUE(same_dcel_state(D, D2));
+  EXPECT_TRUE(D.check_consistency());
+}
+
+// Growth must re-bind every span.  A FRESH build has exact-size arrays and
+// EMPTY free lists, so face-splitting is forced through all three ensure_*
+// helpers (vertex, edge, and face growth).  Note a post-compute complex
+// cannot exercise this: reduction stocks the free lists, and subsequent
+// surgery allocates from them without growing.
+TEST(DCELOwnership, GrowthRepointsEveryArray) {
+  Triangulation T = make_dual(20, 0);
+  auto D = DelaunayTriangulation::from_triangulation(T);
+  ASSERT_TRUE(D.free_edges.empty());                // fresh build: nothing recycled
+  const int nv0 = D.nv, nh0 = D.nh, nf0 = D.nf;
+
+  int P = D.split_face(D.f_he[0], {1.0, 1.0, 1.0});
+  EXPECT_EQ(P, nv0);                                // the appended vertex
+  EXPECT_EQ(D.nv, nv0 + 1);
+  EXPECT_EQ(D.nh, nh0 + 6);                         // three new edges
+  EXPECT_EQ(D.nf, nf0 + 2);                         // 1 face -> 3 (one slot recycled)
+  EXPECT_TRUE(array_sizes_match_counts(D));         // every span re-bound
+  EXPECT_TRUE(D.check_consistency());
+
+  // And the recycled-slot surgery path stays consistent on a reduced complex
+  // (bisect allocates from the free lists; no growth, byte-gated elsewhere).
+  // Multi-edge isomers are found by predicate, not by index: enumeration
+  // orders differ between IsomerDB and BuckyGen, so a hardcoded index names
+  // different isomers in different tests.
+  bool found_multi = false;
+  for (int idx = 0; idx < 1812; idx++) {
+    auto R = DelaunayTriangulation::compute(make_dual(60, idx));
+    if (R.is_simplicial()) continue;
+    found_multi = true;
+    ASSERT_FALSE(R.free_edges.empty());
+    EXPECT_GT(R.bisect_multi_edges(), 0);
+    EXPECT_TRUE(array_sizes_match_counts(R));
+    EXPECT_TRUE(R.check_consistency());
+    break;
+  }
+  ASSERT_TRUE(found_multi) << "no multi-edge C60 iDT found";
+}
+
+// The capacity formulas are BUILD-TIME quantities: dcel_capacities takes the
+// pre-reduction vertex count nv0, never the live nv of a reduced complex.
+TEST(DCELOwnership, CapacitiesAreBuildTime) {
+  Triangulation T = make_dual(60, 0);
+  const DcelCapacities cap = dcel_capacities(T.N);
+  auto B = DelaunayTriangulation::from_triangulation(T);
+  EXPECT_EQ(cap.nh_cap, (long)B.he_next.size());
+  EXPECT_EQ(cap.nf_cap, (long)B.f_he.size());
+
+  auto D = DelaunayTriangulation::compute(T);
+  EXPECT_EQ(D.nv, 12);                              // reduced to the cones
+  EXPECT_EQ((long)D.he_next.size(), cap.nh_cap);    // arrays keep build size
+  EXPECT_NE(cap.nh_cap, dcel_capacities(D.nv).nh_cap) << "live nv is the wrong argument";
+}

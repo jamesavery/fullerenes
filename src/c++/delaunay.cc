@@ -12,112 +12,10 @@
 #include <sstream>
 #include <cstdio>
 
-// ============================================================================
-// Intrinsic geometry primitives
-// ============================================================================
-
-// Heron product: H(a,b,c) = (a+b+c)(-a+b+c)(a-b+c)(a+b-c) = 16*Area^2.
-// Returns 0 if triangle inequality is violated.
-static double heron_product(double a, double b, double c)
-{
-  double s1 = -a + b + c;
-  double s2 =  a - b + c;
-  double s3 =  a + b - c;
-  if (s1 < 0 || s2 < 0 || s3 < 0) return 0;
-  return (a + b + c) * s1 * s2 * s3;
-}
-
-// Cotangent of angle opposite side `opp` in triangle with sides (opp, b, c).
-// cot(alpha) = (b^2 + c^2 - opp^2) / sqrt(H).
-static double cot_opposite(double opp, double b, double c)
-{
-  double H = heron_product(opp, b, c);
-  double num = b*b + c*c - opp*opp;
-  if (H <= 0) return (num >= 0) ? 1e15 : -1e15;
-  return num / sqrt(H);
-}
-
-// Angle of the corner adjacent to sides `adj1`, `adj2` in a triangle
-// whose opposite side is `opp`.  Law of cosines, clamped for floating-point
-// safety at triangle-inequality boundaries.
-static double triangle_angle(double adj1, double adj2, double opp)
-{
-  double c = (adj1*adj1 + adj2*adj2 - opp*opp) / (2 * adj1 * adj2);
-  return acos(std::clamp(c, -1.0, 1.0));
-}
-
-// ============================================================================
-// Diamond geometry
-// ============================================================================
-
-bool Diamond::is_delaunay() const
-{
-  return cot_opposite(e, a, b) + cot_opposite(e, c, d) >= -1e-10;
-}
-
-bool Diamond::is_convex() const
-{
-  // sin(angle_at_u) proportional to sqrt(Ha)*Q + P*sqrt(Hd), must be > 0.
-  // sin(angle_at_v) proportional to sqrt(Ha)*Qv + Pv*sqrt(Hd), must be > 0.
-  double e2 = e*e;
-  double Ha = heron_product(e, a, b), Hd = heron_product(e, c, d);
-  double sHa = (Ha > 0) ? sqrt(Ha) : 0;
-  double sHd = (Hd > 0) ? sqrt(Hd) : 0;
-
-  double Pu = e2 + a*a - b*b, Qu = e2 + c*c - d*d;
-  if (sHa * Qu + Pu * sHd <= 1e-12) return false;
-
-  double Pv = e2 + b*b - a*a, Qv = e2 + d*d - c*c;
-  return sHa * Qv + Pv * sHd > 1e-12;
-}
-
-double Diamond::flipped_length() const
-{
-  // f^2 = a^2 + c^2 - (PQ - sqrt(Ha*Hd)) / (2e^2)
-  double e2 = e*e, a2 = a*a, b2 = b*b, c2 = c*c, d2 = d*d;
-  double P = e2 + a2 - b2;
-  double Q = e2 + c2 - d2;
-  double Ha = heron_product(e, a, b), Hd = heron_product(e, c, d);
-  double sqrtHH = (Ha > 0 && Hd > 0) ? sqrt(Ha * Hd) : 0;
-  double f2 = a2 + c2 - (P * Q - sqrtHH) / (2 * e2);
-  return (f2 > 0) ? sqrt(f2) : 0;
-}
-
-bool Diamond::is_cocircular() const
-{
-  // Tight Delaunay: cot(angle_B) + cot(angle_D) == 0 exactly.  Equivalent
-  // to s1 * area_2 + s2 * area_1 = 0 where s1 = a^2+b^2-e^2, s2 = c^2+d^2-e^2.
-  // Squaring after sign-check: tight iff sign(s1) != sign(s2) and
-  // s1^2 * H2 == s2^2 * H1 (with H = 16*area^2).  Or: both s1, s2 == 0.
-  // Done in integer length-squared arithmetic so the predicate is exact for
-  // equilateral triangulations and any sequence of flips.
-  long long Le = (long long)std::llround(e * e);
-  long long La = (long long)std::llround(a * a);
-  long long Lb = (long long)std::llround(b * b);
-  long long Lc = (long long)std::llround(c * c);
-  long long Ld = (long long)std::llround(d * d);
-  long long s1 = La + Lb - Le;
-  long long s2 = Lc + Ld - Le;
-  if (s1 == 0 && s2 == 0) return true;
-  if (s1 == 0 || s2 == 0) return false;
-  if ((s1 > 0) == (s2 > 0)) return false;          // same sign: not tight
-  auto H = [](long long x, long long y, long long z) {
-    return 2*(x*y + y*z + x*z) - (x*x + y*y + z*z); // 16 * area^2
-  };
-  return s1 * s1 * H(Le, Lc, Ld) == s2 * s2 * H(Le, La, Lb);
-}
-
-bool Diamond::is_cocircular(double tol) const
-{
-  // Float tight-Delaunay test for non-equilateral metrics: cot(angle_B) +
-  // cot(angle_D) == 0, where angle_B is opposite e in triangle (e,a,b) and
-  // angle_D opposite e in (e,c,d). cot_opposite returns +/-1e15 on a
-  // degenerate triangle, which never lands within a sane tol, so degenerate
-  // diamonds are correctly reported non-tight.
-  double cotB = cot_opposite(e, a, b);
-  double cotD = cot_opposite(e, c, d);
-  return std::abs(cotB + cotD) < tol;
-}
+// The intrinsic geometry primitives (heron_product / cot_opposite /
+// triangle_angle) and the Diamond predicates are header-inline in
+// delaunay_view.hh (delaunay_detail::).  The one remaining caller here:
+using delaunay_detail::triangle_angle;
 
 // Old adjacency-list FulleroidDelaunay + IDTAudit implementation retired to
 // src/c++/attic/delaunay_old.cc.attic (superseded by the DCEL
@@ -125,6 +23,7 @@ bool Diamond::is_cocircular(double tol) const
 
 // ============================================================================
 // DelaunayTriangulation — DCEL-based iDT (delta-complex)
+// (The Rule of 5 is header-inline: one-liners over the DelaunayStorage base.)
 // ============================================================================
 
 // --- Allocation ---
@@ -138,11 +37,7 @@ int DelaunayTriangulation::alloc_edge()
   } else {
     eid = nh / 2;
     nh += 2;
-    he_next.resize(nh, -1);
-    he_origin.resize(nh, -1);
-    he_face.resize(nh, -1);
-    he_length.resize(nh, 0);
-    he_angle.resize(nh, 0);
+    ensure_halfedges(nh);   // dead-slot fill, then repoint
   }
   he_origin[2*eid] = -1;
   he_origin[2*eid+1] = -1;
@@ -157,7 +52,7 @@ int DelaunayTriangulation::alloc_face()
     free_faces.pop_back();
   } else {
     fid = nf++;
-    f_he.push_back(-1);
+    ensure_faces(nf);       // == the historical f_he.push_back(-1)
   }
   f_he[fid] = -1;
   return fid;
@@ -200,13 +95,6 @@ int DelaunayTriangulation::wire_triangle(int h0, int h1, int h2)
   f_he[fid] = h0;
   recompute_face_angles(fid);
   return fid;
-}
-
-int DelaunayTriangulation::vertex_degree(int v) const
-{
-  int deg = 0;
-  for ([[maybe_unused]] int h : incident(v)) deg++;   // empty range when v_out[v] < 0
-  return deg;
 }
 
 // ============================================================================
@@ -307,11 +195,8 @@ static DelaunayTriangulation build_topology(const Triangulation& T)
   }
 
   D.nh = 2 * eid;
-  D.he_next.resize(D.nh);
-  D.he_origin.resize(D.nh);
-  D.he_face.resize(D.nh, -1);
-  D.he_length.resize(D.nh);   // metric: caller fills
-  D.he_angle.resize(D.nh);    // metric: caller fills (recompute_all_angles)
+  D.ensure_halfedges(D.nh);   // dead-slot fill; every slot in [0, nh) is
+                              // overwritten by phases 2-3 + the metric fill
 
   // Phase 2: Set origins (origin(arc u->*) = u).
   for (node_t u = 0; u < T.N; u++) {
@@ -326,7 +211,7 @@ static DelaunayTriangulation build_topology(const Triangulation& T)
   //   arc u->v is in face (u, v, w) where w = next neighbor after v.
   //   next(u->v) = v->w.
   D.nf = 0;
-  D.v_out.assign(D.nv, -1);
+  D.ensure_vertices(D.nv);   // v_out all -1 (dead), cone/degree 0 (filled below)
 
   for (node_t u = 0; u < T.N; u++) {
     auto row = T[u];
@@ -344,15 +229,15 @@ static DelaunayTriangulation build_topology(const Triangulation& T)
         D.he_face[h_uv] = fid;
         D.he_face[h_vw] = fid;
         D.he_face[h_wu] = fid;
-        D.f_he.push_back(h_uv);
+        D.owned_f_he.push_back(h_uv);   // face count discovered here:
+                                        // construction, repointed below
       }
     }
     if (deg > 0) D.v_out[u] = he_of_arc[T.arcid(u, 0)];
   }
+  D.repoint();               // re-bind f_he after the push_backs
 
   // Per-vertex original degree (topological; metric-independent).
-  D.v_orig_degree.resize(D.nv);
-  D.v_cone_angle.resize(D.nv);  // caller fills
   for (node_t v = 0; v < T.N; v++) D.v_orig_degree[v] = T.degree(v);
 
   return D;
@@ -364,10 +249,7 @@ DelaunayTriangulation DelaunayTriangulation::from_triangulation(const Triangulat
   // deg*pi/3. (The special case length == 1 of from_intrinsic_metric, kept
   // explicit because the constants are exact and this is the hot path.)
   DelaunayTriangulation D = build_topology(T);
-  D.he_length.assign(D.nh, 1.0);
-  D.he_angle.assign(D.nh, M_PI / 3.0);
-  for (node_t v = 0; v < D.nv; v++)
-    D.v_cone_angle[v] = D.v_orig_degree[v] * M_PI / 3.0;
+  D.set_equilateral_metric();
   return D;
 }
 
@@ -387,96 +269,9 @@ DelaunayTriangulation::from_intrinsic_metric(const Triangulation& T,
   return D;
 }
 
-// --- Geometry ---
-
-Diamond DelaunayTriangulation::diamond(int h) const
-{
-  // h: u->v.  Face left of h has third vertex B = dest(next(h)).
-  // Twin face has third vertex D = dest(next(twin(h))).
-  int t = twin(h);
-  int u = he_origin[h], v = he_origin[t];
-  int B = dest(he_next[h]);
-  int D = dest(he_next[t]);
-
-  double e_len = he_length[h];
-  // a = edge from u to B, b = edge from v to B (in face of h)
-  int h_vB = he_next[h];          // v->B
-  int h_Bu = he_next[h_vB];       // B->u
-  double a = he_length[h_Bu];     // side adjacent to u (B-u)
-  double b = he_length[h_vB];     // side adjacent to v (v-B)
-
-  // c = edge from u to D, d = edge from v to D (in face of twin)
-  int h_uD = he_next[t];          // u->D
-  int h_Dv = he_next[h_uD];       // D->v
-  double c = he_length[h_uD];     // side adjacent to u (u-D)
-  double d = he_length[h_Dv];     // side adjacent to v (D-v)
-
-  return {e_len, a, b, c, d};
-}
-
-void DelaunayTriangulation::recompute_face_angles(int f)
-{
-  if (f_he[f] < 0) return;
-  // h_i: u_i -> u_{i+1} with length L_i.  Angle at origin(h_i) is the
-  // corner between sides L_i (outgoing) and L_{i-1} (incoming), opposite
-  // to L_{i+1}.
-  const auto h = face_halfedges(f);
-  double L[3] = { he_length[h[0]], he_length[h[1]], he_length[h[2]] };
-  for (int i = 0; i < 3; i++)
-    he_angle[h[i]] = triangle_angle(L[i], L[(i + 2) % 3], L[(i + 1) % 3]);
-}
-
-// Recompute every corner angle (he_angle) from the current edge lengths, then
-// refresh the per-vertex cone-angle cache (v_cone_angle) that curvature() /
-// is_flat() / remove_flat_vertices() read. Both are derived from he_length, so
-// this is THE entry point that re-establishes angle coherence after any change
-// to the metric (e.g. a conformal rescale of the lengths). Delaunay flips do NOT
-// need it: the cone angle is flip-invariant (the quad's interior angle at each
-// diamond vertex is independent of which diagonal is present), so flip_edge keeps
-// v_cone_angle correct on its own.
-void DelaunayTriangulation::recompute_all_angles()
-{
-  recompute_all_face_angles();
-  recompute_cone_angles();
-}
-
-// Recompute he_angle for every face, WITHOUT refreshing the v_cone_angle cache.
-// For a hot caller (a line search) that reads only he_angle per trial; pair with
-// recompute_cone_angles once the kept metric needs the cone cache.
-void DelaunayTriangulation::recompute_all_face_angles()
-{
-  for (int f = 0; f < nf; f++)
-    recompute_face_angles(f);
-}
-
-// Refresh the cone-angle cache v_cone_angle[v] = vertex_angle_sum(v) for every
-// live vertex. Requires he_angle current (call after recompute_face_angles /
-// recompute_all_angles). O(sum of degrees) = O(nh).
-void DelaunayTriangulation::recompute_cone_angles()
-{
-  for (int v = 0; v < nv; v++)
-    if (v_out[v] >= 0)
-      v_cone_angle[v] = vertex_angle_sum(v);
-}
-
-double DelaunayTriangulation::vertex_angle_sum(int v) const
-{
-  // Sum the corner angle at v over all incident faces. he_angle[h] is the
-  // angle at origin(h) in face(h): one corner per outgoing half-edge.
-  // incident(v) is empty when v_out[v] < 0.
-  double sum = 0.0;
-  for (int h : incident(v)) sum += he_angle[h];
-  return sum;
-}
-
-bool DelaunayTriangulation::is_flat(int v, double flat_tol) const
-{
-  // Flat == zero cone curvature == cone angle 2*pi. flat_tol must separate the
-  // metric's noise floor from the smallest real cone curvature (pi/3 ~ 1.047);
-  // for the equilateral metric any tol in (0, pi/3) agrees exactly with the
-  // degree-6 test (deg-6 cone angle = 6*pi/3 = 2*pi).
-  return std::abs(v_cone_angle[v] - 2 * M_PI) < flat_tol;
-}
+// (The intrinsic-geometry methods -- diamond, recompute_face_angles /
+// recompute_all_angles / recompute_all_face_angles / recompute_cone_angles,
+// vertex_angle_sum, is_flat -- are header-inline on DelaunayView.)
 
 // ============================================================================
 // Point transport (flip-tape) helpers
@@ -618,7 +413,7 @@ void commit_relocations(DelaunayTriangulation& D,
 
 }  // namespace
 
-std::vector<int>& DelaunayTriangulation::PointTracker::bucket(int f)
+std::vector<int>& DelaunayPointTracker::bucket(int f)
 {
   if ((int)by_face.size() <= f) by_face.resize(f + 1);
   return by_face[f];
@@ -1442,10 +1237,11 @@ std::vector<int> DelaunayTriangulation::compact_vertices()
     ncone[w] = v_cone_angle[o];
     ndeg[w]  = v_orig_degree[o];
   }
-  v_out = std::move(nout);
-  v_cone_angle = std::move(ncone);
-  v_orig_degree = std::move(ndeg);
+  owned_v_out = std::move(nout);
+  owned_v_cone_angle = std::move(ncone);
+  owned_v_orig_degree = std::move(ndeg);
   nv = nlive;
+  repoint();
   return new_to_old;
 }
 
@@ -1780,15 +1576,10 @@ int DelaunayTriangulation::bisect_multi_edges() {
 
 int DelaunayTriangulation::alloc_vertex(double cone_angle, int orig_degree) {
   int v = nv++;
-  if (v >= (int)v_out.size()) {
-    v_out.push_back(-1);
-    v_cone_angle.push_back(cone_angle);
-    v_orig_degree.push_back(orig_degree);
-  } else {
-    v_out[v] = -1;
-    v_cone_angle[v] = cone_angle;
-    v_orig_degree[v] = orig_degree;
-  }
+  ensure_vertices(nv);
+  v_out[v] = -1;
+  v_cone_angle[v] = cone_angle;
+  v_orig_degree[v] = orig_degree;
   return v;
 }
 
@@ -1814,7 +1605,7 @@ int DelaunayTriangulation::split_face(int h0, std::array<double,3> spokes) {
   v_out[a] = twin(sa); v_out[b] = twin(sb); v_out[c] = twin(sc);
   // wire_triangle set the new faces' angles; refresh the cached cone angle at the four
   // vertices whose incident faces changed.
-  for (int v : {P, a, b, c}) v_cone_angle[v] = vertex_angle_sum(v);
+  for (int v : {P, a, b, c}) recompute_cone_angle(v);
   return P;
 }
 
@@ -1822,7 +1613,7 @@ int DelaunayTriangulation::split_face(int h0, std::array<double,3> spokes) {
 
 std::vector<double> DelaunayTriangulation::curvature() const {
   std::vector<double> K(nv);
-  for (int v = 0; v < nv; v++) K[v] = 2.0 * M_PI - v_cone_angle[v];
+  for (int v = 0; v < nv; v++) K[v] = DelaunayView::curvature(v);
   return K;
 }
 
@@ -1889,56 +1680,8 @@ DelaunayTriangulation::geodesic_disks(const std::vector<int>& sources, double R,
 }
 
 // --- Validation ---
-
-bool DelaunayTriangulation::check_consistency() const
-{
-  // 1. Twin pairs: twin(twin(h)) == h.
-  for (int h = 0; h < nh; h++)
-    if (alive(h) && twin(h) >= nh) return false;
-
-  // 2. Next-cycle closure: following next 3 times returns to start (triangulation).
-  for (int h = 0; h < nh; h++)
-    if (alive(h) && he_next[he_next[he_next[h]]] != h) return false;
-
-  // 3. dest(h) == origin(next(h)).
-  for (int h = 0; h < nh; h++)
-    if (alive(h) && dest(h) != he_origin[he_next[h]]) return false;
-
-  // 4. Face consistency: all half-edges in a face have the same face ID.
-  for (int h = 0; h < nh; h++)
-    if (alive(h) && he_face[he_next[h]] != he_face[h]) return false;
-
-  // 5. v_out: for each live vertex, v_out points to a live outgoing half-edge.
-  for (int v = 0; v < nv; v++)
-    if (v_out[v] >= 0 && (!alive(v_out[v]) || he_origin[v_out[v]] != v))
-      return false;
-
-  // 6. f_he: for each live face, f_he points to a half-edge in that face.
-  for (int f = 0; f < nf; f++)
-    if (f_he[f] >= 0 && (!alive(f_he[f]) || he_face[f_he[f]] != f))
-      return false;
-
-  // 7. Positive edge lengths for live half-edges.
-  for (int h = 0; h < nh; h++)
-    if (alive(h) && he_length[h] <= 0) return false;
-
-  // 8. Twin length consistency.
-  for (int h = 0; h < nh; h += 2)
-    if (alive(h) && he_length[h] != he_length[twin(h)]) return false;
-
-  // 9. Triangle inequality on every live face.
-  for (int h = 0; h < nh; h++) {
-    if (!alive(h)) continue;
-    int h1 = he_next[h], h2 = he_next[h1];
-    double L0 = he_length[h], L1 = he_length[h1], L2 = he_length[h2];
-    double eps = 1e-9 * (L0 + L1 + L2);
-    if (L0 > L1 + L2 + eps) return false;
-    if (L1 > L0 + L2 + eps) return false;
-    if (L2 > L0 + L1 + eps) return false;
-  }
-
-  return true;
-}
+// (check_consistency is header-inline on DelaunayView: the nine numbered
+// class invariants, allocation-free.)
 
 // ============================================================================
 // Serialization -- the ".idt" text format
@@ -2000,9 +1743,7 @@ DelaunayTriangulation DelaunayTriangulation::from_ascii(FILE* file)
 
   DelaunayTriangulation D;
   D.nv = nv;
-  D.v_out.assign(nv, -1);
-  D.v_cone_angle.assign(nv, 0.0);
-  D.v_orig_degree.resize(nv);
+  D.ensure_vertices(nv);      // v_out -1, cone 0, degree 0 (read below)
   for (int v = 0; v < nv; v++)
     if (std::fscanf(file, "%d", &D.v_orig_degree[v]) != 1 || D.v_orig_degree[v] < 0)
       throw std::runtime_error("DelaunayTriangulation::from_ascii: bad vertex table (truncated or "
@@ -2010,11 +1751,7 @@ DelaunayTriangulation DelaunayTriangulation::from_ascii(FILE* file)
 
   const int nh = 2 * ne;
   D.nh = nh;
-  D.he_origin.assign(nh, -1);
-  D.he_next.assign(nh, -1);
-  D.he_face.assign(nh, -1);
-  D.he_length.assign(nh, 0.0);
-  D.he_angle.assign(nh, 0.0);
+  D.ensure_halfedges(nh);     // dead-slot fill == the historical assigns
   auto in_verts = [&](int x) { return x >= 0 && x < nv; };
   auto in_hes   = [&](int x) { return x >= 0 && x < nh; };
   for (int k = 0; k < ne; k++) {
@@ -2030,11 +1767,11 @@ DelaunayTriangulation DelaunayTriangulation::from_ascii(FILE* file)
   }
 
   // Faces: each he_next cycle is one face. Assign he_face + a representative f_he per cycle.
-  D.f_he.clear();
+  D.owned_f_he.clear();
   for (int h = 0; h < nh; h++) {
     if (D.he_face[h] >= 0) continue;
-    const int f = (int)D.f_he.size();
-    D.f_he.push_back(h);
+    const int f = (int)D.owned_f_he.size();
+    D.owned_f_he.push_back(h);
     int g = h, steps = 0;
     do {
       D.he_face[g] = f;
@@ -2044,7 +1781,8 @@ DelaunayTriangulation DelaunayTriangulation::from_ascii(FILE* file)
                                  + std::to_string(h) + " did not close");
     } while (g != h);
   }
-  D.nf = (int)D.f_he.size();
+  D.nf = (int)D.owned_f_he.size();
+  D.repoint();
   if (D.nf != nf)
     throw std::runtime_error("DelaunayTriangulation::from_ascii: derived " + std::to_string(D.nf)
                              + " faces but header declared " + std::to_string(nf));
