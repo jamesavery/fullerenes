@@ -393,7 +393,8 @@ struct DelaunayTriangulation : DelaunayView, DelaunayStorage {
   // --- Vertex removal ---
   void remove_flat_vertex(int v);
   // Remove every flat vertex (is_flat(v, flat_tol)), leaving the cones. See
-  // is_flat for choosing flat_tol (1e-6 exact, ~1e-2 for a CEPS metric).
+  // is_flat for choosing flat_tol (1e-6 for an equilateral-derived metric,
+  // ~1e-2 for a CEPS metric).
   //
   // Observer hook: if `on_pop` is non-empty, it is invoked as on_pop(v) at
   // EVERY work-list pop of a live flat vertex v -- after the live/flat guard
@@ -418,6 +419,22 @@ struct DelaunayTriangulation : DelaunayView, DelaunayStorage {
   //         survives the fixed-point rounds (same scope note as above).
   void remove_flat_vertices(double flat_tol = 1e-6,
                             const std::function<void(int)>& on_pop = {});
+
+  // The exact-regime removal driver (paper sec:exactness): derives the Lsq
+  // carry from the current he_length values and instantiates
+  // ExactIntegerMetric, so every decision -- flips, ears, flatness (the
+  // integer cone excess eps_v == 0), and the tie-break side order -- is a
+  // function of integer arithmetic alone.  The equilateral compute(T)
+  // calls this; the banded remove_flat_vertices above remains the
+  // general-metric driver.
+  // Throws as remove_flat_vertices, plus InvariantViolated on a corrupt
+  // Lsq carry (lattice development or flip placement).
+  // @throws std::runtime_error when the current metric is not an exact one:
+  //         a live he_length that does not square to a positive in-envelope
+  //         integer, or a live vertex whose float curvature disagrees with
+  //         its integer cone excess (e.g. split_face / bisect-inserted
+  //         vertices) -- loud, never a silently wrong reduction.
+  void remove_flat_vertices_exact(const std::function<void(int)>& on_pop = {});
 
   // Renumber the live vertices to 0..n_live-1 (dropping removed ones) and
   // shrink nv, rewriting he_origin and the per-vertex arrays. Needed after a
@@ -451,18 +468,33 @@ struct DelaunayTriangulation : DelaunayView, DelaunayStorage {
   // around cone vertices (deg-2 cones) -- all valid iDT features.
   // On sphere input with minimum vertex degree 3 (any cubic-polyhedron
   // dual, fullerene duals included) success is unconditional
-  // (paper thm:main).
+  // (paper thm:main).  Runs the EXACT integer metric (paper sec:exactness):
+  // every decision through the reduction -- the tie-break side order
+  // included -- is a function of integer arithmetic alone, and every
+  // output he_length is the square root of an integer.  The Lsq carry is
+  // transient: post-compute owner surgery (flip_edge / lawson_sweep /
+  // bisect_multi_edges / split_face) runs the banded predicates on the
+  // sqrt-of-integer lengths.
   // @post result.nv == number of deg != 6 vertices of T, all live
   // @post result.is_delaunay()
   static DelaunayTriangulation compute(const Triangulation& T);
 
-  // As compute(T), but for a PRESCRIBED intrinsic metric `length(u,v)`.
-  // Flat vertices are identified by cone angle (is_flat), not degree, so it
-  // works on any surface whose flat vertices need not be degree-6. Removes
-  // the flat vertices, leaving the cone vertices in a delta-complex iDT
-  // ready for AlexandrovSolver. Equivalent to compute(T) when length == 1.
-  // flat_tol sets the cone/flat threshold (see is_flat): 1e-6 for an exact
-  // metric, ~1e-2 for a numerically solved one.
+  // compute(T) with the general-metric (banded float) predicates applied
+  // to the same equilateral input.  The frozen cross-reference for the
+  // parallel-primitives mirrors and the exact-vs-banded corpus verdict;
+  // production callers use compute(T).
+  static DelaunayTriangulation compute_banded(const Triangulation& T);
+
+  // As compute(T), but for a PRESCRIBED intrinsic metric `length(u,v)`,
+  // running the BANDED float regime.  Flat vertices are identified by cone
+  // angle (is_flat), not degree, so it works on any surface whose flat
+  // vertices need not be degree-6. Removes the flat vertices, leaving the
+  // cone vertices in a delta-complex iDT ready for AlexandrovSolver.  On
+  // unit lengths it agrees with compute(T) wherever the tolerance slivers
+  // are empty (the corpus-verified case); the regimes differ, so agreement
+  // is an empirical verdict, not an identity.
+  // flat_tol sets the cone/flat threshold (see is_flat): 1e-6 for an
+  // equilateral-derived metric, ~1e-2 for a numerically solved one.
   // If new_to_old is non-null it receives compact_vertices()' map: the
   // original T-label of each surviving cone vertex 0..nv-1.
   // With track_removed, point tracking is enabled before the reduction and
@@ -586,10 +618,14 @@ struct DelaunayTriangulation : DelaunayView, DelaunayStorage {
   // True iff edge h is cocircular ("tight"): the diamond's four cone points
   // share a common circumcircle, so flipping h yields an equally-valid
   // Delaunay triangulation.  Both half-edges of an edge return the same value.
+  // Exact-integer predicate, valid on the Eisenstein-lattice domain
+  // (equilateral metrics and their reductions); a diamond whose faces fit
+  // no lattice answers FALSE -- use the tol overload for general metrics.
   bool is_cocircular_edge(int h) const;
 
   // Per-half-edge cocircular mask: tight[h] == tight[twin(h)]; dead half-edges
-  // are false.  O(num_edges) integer-arithmetic predicates.
+  // are false.  O(num_edges) integer-arithmetic predicates (lattice domain,
+  // as is_cocircular_edge).
   std::vector<bool> cocircular_edges() const;
 
   // Float cocircular mask for general metrics (Diamond::is_cocircular(tol)).

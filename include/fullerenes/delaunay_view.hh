@@ -4,9 +4,15 @@
 //
 // The owning type is DelaunayTriangulation (delaunay.hh), which inherits this
 // view and points the spans into its own vectors (the graphview.hh migration
-// pattern).  Everything here is device-includable: no <vector>, no
-// <functional>, no exceptions, no I/O -- a GPU translation unit includes this
-// header alone.
+// pattern).  The view's OWN code allocates nothing, throws nothing, and does
+// no I/O.  Since the exact-metric landing it includes eisenstein.hh (via
+// delaunay_geometry.hh), which is NOT yet device-clean -- it brings <vector>,
+// throwing host conveniences, and a global using-directive, though every
+// primitive the view actually calls is scalar, header-inline, and
+// exception-free.  Splitting the device-clean Eisenstein core is queued
+// refactor debt (parallel-primitives refactor-debt.md,
+// 2026-07-26-eisenstein-device-core); until it lands, a GPU translation unit
+// cannot include this header alone.
 //
 // Twin convention:      twin(h) = h^1  (half-edges 2k, 2k+1 are twins).
 // Face orientation:     he_next traverses each face CCW.
@@ -22,10 +28,14 @@
 // predicates, the capacity formulas, check_consistency, the canonical field
 // order -- and the whole mutation machinery (allocation over the bounded
 // free lists, flips, sweeps, vertex removal) over DelaunayWorkspace, with
-// the Status latch as the run-path error channel and the Transport policy
-// carrying the point tracker's hooks.  Owner-level (delaunay.hh): storage,
-// growth, the tracked TrackerTransport policy, serialization, and every
-// allocating convenience.
+// the Status latch as the run-path error channel, the Transport policy
+// carrying the point tracker's hooks, and the Metric policy selecting the
+// predicate regime (exact integer vs banded float).  Owner-level
+// (delaunay.hh): storage, growth, the tracked TrackerTransport policy,
+// serialization, and every allocating convenience.
+//
+// (See the device caveat in the banner above: eisenstein.hh, reached via
+// delaunay_geometry.hh, is the one non-device-clean include.)
 
 #include <algorithm>
 #include <array>
@@ -33,6 +43,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <numbers>
+#include <optional>
 #include <span>
 #include <tuple>
 #include <type_traits>
@@ -45,7 +56,9 @@
 static_assert(std::is_same_v<int, std::int32_t>,
     "DelaunayView assumes int is the lib's 32-bit index type");
 
-#include "fullerenes/delaunay_geometry.hh"  // Diamond, FanPolygon, delaunay_detail
+#include "fullerenes/delaunay_geometry.hh"  // Diamond, DiamondSq, FanPolygon, delaunay_detail
+#include "fullerenes/eisenstein.hh"         // Eisenstein, wedge, apex_factor,
+                                            // place_third_eis_total (exact metric)
 
 // ============================================================================
 // dcel_capacities(nv0): the workspace sizes a bounded DCEL over a closed
@@ -92,9 +105,11 @@ static_assert(dcel_capacities(0).nh_cap == 0 && dcel_capacities(2).nh_cap == 0,
 struct DelaunayWorkspace {
   int k_max = 0;
 
-  // Fan scratch (extract_fan / ear_clip_fan) -- capacity k_max.
+  // Fan scratch (extract_fan / ear_clip_fan) -- capacity k_max.  fan.P is
+  // the exact lattice development (develop_fan_lattice; exact metric only).
   FanPolygon fan;
-  std::span<int> poly;        // [k_max]     ear-clip working polygon
+  std::span<int> poly;        // [k_max]     ear-clip working polygon; also the
+                              //             tie-break's sector-arc scratch
   std::span<int> rpoly;       // [k_max]     residual-polygon scratch
   FanTriangulation tri;       // diagonals/triangles, both capacity k_max
 
@@ -159,6 +174,7 @@ struct DelaunayWorkspace {
       ws.fan.spokes    = c.take<double>(k_max);
       ws.fan.rims      = c.take<double>(k_max);
       ws.fan.cum       = c.take<double>(k_max + 1);
+      ws.fan.P         = c.take<Eisenstein>(k_max);
       ws.poly          = c.take<int>(k_max);
       ws.rpoly         = c.take<int>(k_max);
       ws.tri.diagonals = c.take<FanTriangulation::Diagonal>(k_max);
@@ -216,6 +232,26 @@ struct NoRemovalObserver {
   void on_pop(int /*v*/) {}
   void on_removed(int /*v*/) {}
 };
+
+// ============================================================================
+// Metric policy: compile-time selection of the predicate regime, threaded
+// beside Transport through the flip/sweep/removal machinery (paper
+// sec:exactness).  Each policy carries the COMPLETE predicate-and-length
+// vocabulary the machinery consults -- flatness, the three edge
+// predicates, the flipped length, the ear acceptance, the star
+// preparation, the tie-break side order, and the edge-length write -- so
+// the algorithms contain no regime branches at all; the two regimes are
+// two small objects a proof can cite separately.  Definitions follow
+// DelaunayView (their operations read it).
+//
+// The pipeline entry point is the selector -- compute(T) (equilateral
+// input) instantiates ExactIntegerMetric, compute(T, lengths)
+// BandedFloatMetric -- so the exact predicates are not callable by
+// convention on a metric they do not apply to; the exact owner driver
+// additionally derives and VERIFIES its carry (remove_flat_vertices_exact).
+// ============================================================================
+struct BandedFloatMetric;
+struct ExactIntegerMetric;
 
 // ============================================================================
 // DelaunayView: span SoA view of the half-edge DCEL.
@@ -356,26 +392,31 @@ struct DelaunayView {
   // Intrinsic geometry.
   // -------------------------------------------------------------------------
 
+  // The five half-edges whose lengths form the diamond of h, with the same
+  // field roles as Diamond.  h: u->v; face left of h has third vertex
+  // B = dest(next(h)); the twin face has D = dest(next(twin(h))).
+  struct DiamondArcs { int e, a, b, c, d; };
+  DiamondArcs diamond_arcs(int h) const {
+    int t = twin(h);
+    int h_vB = he_next[h];          // v->B  (side b, adjacent to v)
+    int h_Bu = he_next[h_vB];       // B->u  (side a, adjacent to u)
+    int h_uD = he_next[t];          // u->D  (side c, adjacent to u)
+    int h_Dv = he_next[h_uD];       // D->v  (side d, adjacent to v)
+    return {h, h_Bu, h_vB, h_uD, h_Dv};
+  }
+
   // The five-length local geometry around edge h.
   Diamond diamond(int h) const {
-    // h: u->v.  Face left of h has third vertex B = dest(next(h)).
-    // Twin face has third vertex D = dest(next(twin(h))).
-    int t = twin(h);
+    auto A = diamond_arcs(h);
+    return {he_length[A.e], he_length[A.a], he_length[A.b],
+            he_length[A.c], he_length[A.d]};
+  }
 
-    double e_len = he_length[h];
-    // a = edge from u to B, b = edge from v to B (in face of h)
-    int h_vB = he_next[h];          // v->B
-    int h_Bu = he_next[h_vB];       // B->u
-    double a = he_length[h_Bu];     // side adjacent to u (B-u)
-    double b = he_length[h_vB];     // side adjacent to v (v-B)
-
-    // c = edge from u to D, d = edge from v to D (in face of twin)
-    int h_uD = he_next[t];          // u->D
-    int h_Dv = he_next[h_uD];       // D->v
-    double c = he_length[h_uD];     // side adjacent to u (u-D)
-    double d = he_length[h_Dv];     // side adjacent to v (D-v)
-
-    return {e_len, a, b, c, d};
+  // The same diamond in exact squared-length coordinates, read from the
+  // metric's Lsq carry (never from rounded doubles).
+  DiamondSq diamond_sq(int h, std::span<const long long> Lsq) const {
+    auto A = diamond_arcs(h);
+    return {Lsq[A.e], Lsq[A.a], Lsq[A.b], Lsq[A.c], Lsq[A.d]};
   }
 
   // Recompute the three corner angles of face f from its edge lengths.
@@ -475,6 +516,29 @@ struct DelaunayView {
   bool is_flat(int v, double flat_tol = 1e-6) const {
     return std::abs(curvature(v)) < flat_tol;
   }
+
+  // Integer cone excess at v: eps_v = 6 - deg0(v), the curvature in units
+  // of pi/3 (kappa_v = eps_v * pi/3 on the equilateral metric): +1 per
+  // pentagon, 0 per hexagon, -1 per heptagon.  Exact through the WHOLE
+  // reduction: cone angle is flip-invariant (paper lem:coneflip) and only
+  // eps = 0 vertices are ever removed, so v_orig_degree stays the
+  // authority.  @pre equilateral regime (v_orig_degree meaningful).
+  int cone_excess(int v) const { return 6 - v_orig_degree[v]; }
+
+  // Integer Gauss-Bonnet: Sigma eps_v = 12 on any closed genus-0 complex
+  // ("a fullerene has twelve pentagons") -- the exact-regime form of
+  // total_curvature, an integer identity rather than a 4*pi float check.
+  int total_cone_excess() const {
+    int sum = 0;
+    for (int v = 0; v < nv; v++)
+      if (v_out[v] >= 0) sum += cone_excess(v);
+    return sum;
+  }
+
+  // (Metric-dispatched flatness lives on the policies: ExactIntegerMetric
+  // decides by the integer cone excess -- no tolerance at all, provably
+  // identical to the banded test for any tol in (0, pi/3) -- and
+  // BandedFloatMetric by the curvature band it carries.)
 
   // -------------------------------------------------------------------------
   // Allocation over the free lists (capacity-guarded; the view never grows --
@@ -596,6 +660,10 @@ struct DelaunayView {
     return count;
   }
 
+  // (Exact-regime Delaunay verdicts on a finished complex go through
+  // Diamond::squared() -- the carry is transient, so no ExactIntegerMetric
+  // survives compute(); see the corpus tests for the shape.)
+
   // Smallest degree among live vertices, or INT32_MAX if none.
   int min_live_degree() const {
     int m = INT32_MAX;
@@ -615,10 +683,15 @@ struct DelaunayView {
   //                 place of h; only the two diamond faces are rewired; the
   //                 surface metric is unchanged (paper thm:metric-invariance).
   // @post on false: the complex is untouched.
+  // @error InvariantViolated (exact regime, via m.flipped): a convex
+  //        diamond without a lattice diagonal, or a diagonal past the
+  //        exact envelope -- both mean the Lsq carry is corrupt.
   // The transport policy's plan hook runs before the first write (it may
-  // throw with everything untouched); commit after the rewire.
-  template <class Transport = NoTransport>
-  bool flip_edge(int h, Transport&& tr = Transport{}) {
+  // throw with everything untouched); commit after the rewire.  The metric
+  // policy decides convexity and the new diagonal's length in both
+  // coordinates (Length), and owns the paired he_length / Lsq write.
+  template <class Metric = BandedFloatMetric, class Transport = NoTransport>
+  bool flip_edge(int h, Metric&& m = Metric{}, Transport&& tr = Transport{}) {
     if (status != Status::Ok) return false;
 
     int t = twin(h);
@@ -627,10 +700,9 @@ struct DelaunayView {
     int u = he_origin[h],  v = he_origin[t];
     int B = he_origin[h2], D = he_origin[h5];
 
-    Diamond dm = diamond(h);
-    if (!dm.is_convex()) return false;
-    double f_len = dm.flipped_length();
-    if (!std::isfinite(f_len) || f_len <= 0) return false;
+    if (!m.convex(*this, h)) return false;
+    auto f = m.flipped(*this, h);
+    if (!f) return false;
 
     // Rewire the diagonal: h becomes B->D, t becomes D->B.  Reuse the two
     // face slots fh, ft by rewiring in place (avoids dealloc/realloc).
@@ -639,7 +711,7 @@ struct DelaunayView {
 
     he_origin[h] = B;
     he_origin[t] = D;
-    he_length[h] = he_length[t] = f_len;
+    m.set_edge_length(*this, h, *f);
 
     // Face left of h: (B, D, v) via half-edges h -> h5 -> h1 (origins B, D, v).
     he_next[h]  = h5;  he_next[h5] = h1;  he_next[h1] = h;
@@ -670,9 +742,9 @@ struct DelaunayView {
   // discrete Dirichlet energy strictly decreases on every flip (paper
   // thm:lawson-converge), so the sweep terminates; the 200*nv budget is a
   // fail-loud backstop, not part of the algorithm.
-  template <class Transport = NoTransport>
+  template <class Metric = BandedFloatMetric, class Transport = NoTransport>
   int lawson_sweep_drain(Spanify::SpanStack<int>& S, Spanify::BitSpan& in_stack,
-                         Transport&& tr = Transport{}) {
+                         Metric&& m = Metric{}, Transport&& tr = Transport{}) {
     if (status != Status::Ok) return 0;
     int flips = 0;
     int budget = 200 * nv;
@@ -686,13 +758,13 @@ struct DelaunayView {
       int h = S.back(); S.pop_back();
       in_stack.clear(edge(h));
 
-      if (!alive(h) || is_delaunay_edge(h)) continue;
+      if (!alive(h) || m.delaunay(*this, h)) continue;
 
       // Record rim edges before flipping (they'll be checked next).
       int h1 = he_next[h], h2 = he_next[h1];
       int h4 = he_next[twin(h)], h5 = he_next[h4];
 
-      if (!flip_edge(h, tr)) {
+      if (!flip_edge(h, m, tr)) {
         trip(Status::InvariantViolated,
              "lawson_sweep: flip_edge rejected a non-Delaunay edge (paper lem:ndimpliesconvex)", h);
         return flips;
@@ -718,9 +790,10 @@ struct DelaunayView {
   // order with in_stack dedup -- the same seed set, in the same order, the
   // historical collect-then-sweep produced, without materializing it.
   // @pre  as the seeded lawson_sweep below.
-  template <class Transport = NoTransport>
+  template <class Metric = BandedFloatMetric, class Transport = NoTransport>
   int lawson_sweep_around(std::span<const int> rim, Spanify::SpanStack<int>& S,
-                          Spanify::BitSpan& in_stack, Transport&& tr = Transport{}) {
+                          Spanify::BitSpan& in_stack,
+                          Metric&& m = Metric{}, Transport&& tr = Transport{}) {
     if (status != Status::Ok) return 0;
     S.clear();
     for (int w : rim) {
@@ -736,7 +809,7 @@ struct DelaunayView {
         }
       }
     }
-    return lawson_sweep_drain(S, in_stack, tr);
+    return lawson_sweep_drain(S, in_stack, m, tr);
   }
 
   // Seeded Lawson: restore Delaunay from a frontier of edges, propagating to
@@ -746,9 +819,10 @@ struct DelaunayView {
   // @pre  seeded: every non-Delaunay edge is in seed_edges or arises on the
   //       rim of a seed cascade (paper lem:seeded-sweep).
   // @post is_delaunay() on Ok.
-  template <class Transport = NoTransport>
+  template <class Metric = BandedFloatMetric, class Transport = NoTransport>
   int lawson_sweep(std::span<const int> seed_edges, Spanify::SpanStack<int>& S,
-                   Spanify::BitSpan& in_stack, Transport&& tr = Transport{}) {
+                   Spanify::BitSpan& in_stack,
+                   Metric&& m = Metric{}, Transport&& tr = Transport{}) {
     if (status != Status::Ok) return 0;
     S.clear();
     for (int h : seed_edges)
@@ -761,14 +835,14 @@ struct DelaunayView {
           }
         }
       }
-    return lawson_sweep_drain(S, in_stack, tr);
+    return lawson_sweep_drain(S, in_stack, m, tr);
   }
 
   // Global Delaunay restore: seed with every live edge, in edge order.
   // @post is_delaunay() on Ok (paper thm:lawson-converge).
-  template <class Transport = NoTransport>
+  template <class Metric = BandedFloatMetric, class Transport = NoTransport>
   int flip_to_delaunay(Spanify::SpanStack<int>& S, Spanify::BitSpan& in_stack,
-                       Transport&& tr = Transport{}) {
+                       Metric&& m = Metric{}, Transport&& tr = Transport{}) {
     if (status != Status::Ok) return 0;
     S.clear();
     for (int h : edges()) {
@@ -780,7 +854,7 @@ struct DelaunayView {
         }
       }
     }
-    return lawson_sweep_drain(S, in_stack, tr);
+    return lawson_sweep_drain(S, in_stack, m, tr);
   }
 
   // -------------------------------------------------------------------------
@@ -819,10 +893,49 @@ struct DelaunayView {
                                                      fan.rims[i]);
   }
 
+  // Exact isometric development of the extracted fan onto Z[w] (exact
+  // regime): apex v at the origin, ws.fan.P[i] the lattice position of
+  // nb[i].  Face i is placed over base origin -> P[i] by the lattice apex
+  // construction (place_third_eis_total, chirality +1 = the face's CCW
+  // orientation) -- the same third-vertex placement the paint/atlas layer
+  // uses.
+  //
+  // The anchor P[0] must lie in the UNIT ORBIT the star's chart actually
+  // uses: distinct sector-0 representatives of the same norm are not
+  // lattice-equivalent (split primes), and anchoring in the wrong orbit
+  // rotates the whole star off the lattice.  So the anchor scans
+  // Sector0Reps in the deterministic b-order and takes the first that
+  // develops fully -- ANY complete development is a valid isometric
+  // development: chirality-fixed placement makes every completing anchor a
+  // pure ROTATION of the canonical chart, and every downstream predicate
+  // (wedge, dot2, norm) is rotation-invariant.  Because the apex is
+  // EXACTLY flat (eps = 0), a complete development must CLOSE -- replaying
+  // face k-1 must reproduce P[0] -- so a complete unclosed development, or
+  // no completing representative at all, means the Lsq carry is corrupt ->
+  // InvariantViolated.
+  // @pre extract_fan(v, ws) done; Lsq in the inductive envelope (so the
+  // int narrowing inside is exact).  (Defined after ExactIntegerMetric.)
+  inline void develop_fan_lattice(int v, DelaunayWorkspace& ws,
+                                  const ExactIntegerMetric& m);
+
+  // The tie-break's side order, exact (paper thm:tie-break): the theorem's
+  // side is the one subtending at most pi at the flat vertex.  The two
+  // sides partition the cone angle 2*pi exactly, so theta_0 <= theta_1 iff
+  // theta_0 <= pi -- decided by developing side 0's sector onto the
+  // lattice (the same anchored development as the fan, without closure)
+  // and testing the boundary wedge.  Returns 0 or 1; trips on a corrupt
+  // carry.  (Defined after ExactIntegerMetric.)
+  inline int lattice_first_tie_side(int h_loop, DelaunayWorkspace& ws,
+                                    const ExactIntegerMetric& m);
+
   // Ear-clip the fan polygon into triangles.  By Meisters' theorem a simple
   // polygon with k >= 4 always has an ear; a pass with no ear is a theorem
   // counterexample -> InvariantViolated, never a silent partial result.
-  void ear_clip_fan(DelaunayWorkspace& ws) {
+  // The ear acceptance test is the metric's (m.ear): exact wedge signs and
+  // lattice norms over the development ws.fan.P (@pre m.prepare_star done),
+  // or the banded float test over the polar coordinates.
+  template <class Metric = BandedFloatMetric>
+  void ear_clip_fan(DelaunayWorkspace& ws, Metric&& mt = Metric{}) {
     if (status != Status::Ok) return;
     const FanPolygon& fan = ws.fan;
     FanTriangulation& tri = ws.tri;
@@ -840,8 +953,9 @@ struct DelaunayView {
 
       for (int j = 0; j < n; j++) {
         int pp = ws.poly[(j - 1 + n) % n], pi = ws.poly[j], pn = ws.poly[(j + 1) % n];
-        double len = delaunay_detail::ear_length_if_acceptable(fan, pp, pi, pn);
-        if (len <= 0) continue;
+        Length len = mt.ear(*this, fan, pp, pi, pn);
+        if (status != Status::Ok) return;
+        if (len.len <= 0) continue;
         tri.diagonals[tri.n_diagonals++] = {pp, pi, pn, len};
         for (int m = j; m < poly_n - 1; m++) ws.poly[m] = ws.poly[m + 1];
         poly_n--;
@@ -887,7 +1001,8 @@ struct DelaunayView {
   // ws.new_faces (wire_triangle pins f_he to its first argument, so face
   // slot i of a new face is fan index t.vi -- the anchoring the point
   // transport uses).
-  void splice_fan(int v, DelaunayWorkspace& ws) {
+  template <class Metric = BandedFloatMetric>
+  void splice_fan(int v, DelaunayWorkspace& ws, Metric&& m = Metric{}) {
     if (status != Status::Ok) return;
     const FanPolygon& fan = ws.fan;
     const FanTriangulation& tri = ws.tri;
@@ -915,8 +1030,9 @@ struct DelaunayView {
 
     for (int di = 0; di < tri.n_diagonals; di++) {
       const FanTriangulation::Diagonal& d = tri.diagonals[di];
-      int h_d = alloc_directed_edge(fan.nb[d.from], fan.nb[d.to], d.length);
+      int h_d = alloc_directed_edge(fan.nb[d.from], fan.nb[d.to], d.len.len);
       if (status != Status::Ok) return;
+      m.set_edge_length(*this, h_d, d.len);   // the metric's paired write
       diag_he[di] = h_d;
     }
 
@@ -965,9 +1081,13 @@ struct DelaunayView {
 
   // Remove one flat vertex (deg >= 4: ear clipping + surgery; deg == 3:
   // direct merge; deg < 3: not removable here -- the driver's restructure
-  // rounds handle it).  Transport plan hooks run before the surgery.
-  template <class Transport = NoTransport>
-  void remove_flat_vertex(int v, DelaunayWorkspace& ws, Transport&& tr = Transport{}) {
+  // rounds handle it).  Transport plan hooks run before the surgery.  Under
+  // the exact metric the star is developed onto the lattice first and the
+  // ear machinery runs on wedge signs and norms (deg == 3 allocates no new
+  // edge, so it needs no development).
+  template <class Metric = BandedFloatMetric, class Transport = NoTransport>
+  void remove_flat_vertex(int v, DelaunayWorkspace& ws,
+                          Metric&& m = Metric{}, Transport&& tr = Transport{}) {
     if (status != Status::Ok) return;
     int deg = vertex_degree(v);
     if (deg < 3) return;
@@ -980,13 +1100,15 @@ struct DelaunayView {
     if constexpr (tracking) tr.plan_star(v, ws.fan);
 
     if (deg >= 4) {
-      ear_clip_fan(ws);
+      m.prepare_star(*this, ws, v);   // exact: lattice development; banded: no-op
+      if (status != Status::Ok) return;
+      ear_clip_fan(ws, m);
       if (status != Status::Ok) return;
     }
     if constexpr (tracking) tr.plan_charts(ws.fan, ws.tri, deg);
 
     ws.new_faces.clear();
-    if (deg >= 4) splice_fan(v, ws);
+    if (deg >= 4) splice_fan(v, ws, m);
     else          remove_degree3(v, ws);
     if (status != Status::Ok) return;
 
@@ -997,10 +1119,14 @@ struct DelaunayView {
   // angle = pi) is resolved by flipping a side-fan spoke whose diamond is
   // exactly cocircular (energy-neutral, Delaunay-preserving), keeping the
   // flip only if it convexifies the loop (cocircular flips are involutive).
-  // Smaller-theta side first (the theorem's side, paper thm:tie-break).
-  template <class Transport = NoTransport>
+  // Smaller-theta side first (the theorem's side, paper thm:tie-break) --
+  // the side ORDER, like every other decision, is the metric's: the exact
+  // regime decides it by the lattice sector test (lattice_first_tie_side),
+  // so the exact pipeline's output is a function of integer arithmetic
+  // alone; the banded regime compares the accumulated float angles.
+  template <class Metric = BandedFloatMetric, class Transport = NoTransport>
   bool tie_break_self_loop(int v, int h_loop, DelaunayWorkspace& ws,
-                           Transport&& tr = Transport{}) {
+                           Metric&& m = Metric{}, Transport&& tr = Transport{}) {
     if (status != Status::Ok) return false;
     const int slots[2] = {h_loop, h_loop ^ 1};
     double theta[2] = {0.0, 0.0};
@@ -1019,16 +1145,17 @@ struct DelaunayView {
           return trip(Status::InvariantViolated, "tie_break_self_loop: ring walk overran", h_loop);
       }
     }
-    const int first = (theta[0] <= theta[1]) ? 0 : 1;
+    const int first = m.first_tie_side(*this, ws, h_loop, theta);
+    if (status != Status::Ok) return false;
     for (int pass = 0; pass < 2; pass++) {
       const int i = (pass == 0) ? first : 1 - first;
       const std::span<const int> side = ws.tie_side[i].live();
       for (int s = 0; s < (int)side.size(); s++) {
         const int g = side[s];
-        if (!diamond(g).is_cocircular(delaunay_detail::tie_cocircular_tol)) continue;
-        if (!flip_edge(g, tr)) continue;    // inscribed quad: convex, but stay guarded
-        if (diamond(h_loop).is_convex()) return true;
-        flip_edge(g, tr);                   // undo: not the theorem's spoke
+        if (!m.cocircular(*this, g)) continue;
+        if (!flip_edge(g, m, tr)) continue; // inscribed quad: convex, but stay guarded
+        if (m.convex(*this, h_loop)) return true;
+        flip_edge(g, m, tr);                // undo: not the theorem's spoke
       }
     }
     return false;
@@ -1042,8 +1169,9 @@ struct DelaunayView {
   // cocircular pathology into a loud status instead of a hang; a surviving
   // self-loop is InvariantViolated (provably dead on exact min-degree-3
   // sphere input, paper thm:main).
-  template <class Transport = NoTransport>
-  void flip_away_self_loops(int v, DelaunayWorkspace& ws, Transport&& tr = Transport{}) {
+  template <class Metric = BandedFloatMetric, class Transport = NoTransport>
+  void flip_away_self_loops(int v, DelaunayWorkspace& ws,
+                            Metric&& m = Metric{}, Transport&& tr = Transport{}) {
     if (status != Status::Ok) return;
     if (v_out[v] < 0) return;
     int budget = 8 * (vertex_degree(v) + 4);
@@ -1057,8 +1185,8 @@ struct DelaunayView {
       flipped_any = false;
       for (int h : incident(v)) {
         if (dest(h) != v) continue;
-        if (flip_edge(h, tr) || flip_edge(h ^ 1, tr) ||
-            tie_break_self_loop(v, h, ws, tr)) {
+        if (flip_edge(h, m, tr) || flip_edge(h ^ 1, m, tr) ||
+            tie_break_self_loop(v, h, ws, m, tr)) {
           flipped_any = true;
           break;                  // the ring changed: restart the scan
         }
@@ -1073,10 +1201,12 @@ struct DelaunayView {
       }
   }
 
-  // Remove every flat vertex (|kappa| < flat_tol), leaving the cones: the
-  // work-list driver with per-removal seeded Delaunay restore, restructure
-  // rounds, and the stuck-reduction fail-loud guard.  See is_flat for
-  // choosing flat_tol.  Returns the status (Ok iff fully reduced).
+  // Remove every flat vertex, leaving the cones: the work-list driver with
+  // per-removal seeded Delaunay restore, restructure rounds, and the
+  // stuck-reduction fail-loud guard.  Flatness is the metric's: the exact
+  // regime removes eps_v == 0 vertices (integer, no tolerance), the banded
+  // regime |kappa_v| < flat_tol (see is_flat for choosing the band).
+  // Returns the status (Ok iff fully reduced).
   //
   // @ref  alg:idt (the driver), cor:local-restore (per-removal restore),
   //       thm:full-scan-term (termination), cor:stuck-diagnosis (loud stop).
@@ -1086,7 +1216,7 @@ struct DelaunayView {
   //       cor:local-restore.
   // @variant n_live_flat strictly decreases on each successful removal, and
   //       a restructure round that removes nothing ends the fixed point.
-  // @post on Ok: no live v has |kappa_v| < flat_tol, and is_delaunay().
+  // @post on Ok: no live v is flat under the metric, and is_delaunay().
   //
   // Flatness is isometric-invariant, so a removal only changes the
   // REMOVABILITY of star neighbours -- each vertex is touched O(deg) times
@@ -1094,8 +1224,10 @@ struct DelaunayView {
   // cannot reach, hence the outer restructure rounds: (a) a flat made
   // removable by a seeded-sweep flip OUTSIDE the rim; (b) a deg <= 2 flat
   // that only a global restructure lifts to deg >= 3 (paper lem:flat-deg3).
-  template <class Transport = NoTransport, class Observer = NoRemovalObserver>
-  Status remove_flat_vertices(DelaunayWorkspace& ws, double flat_tol = 1e-6,
+  template <class Metric = BandedFloatMetric, class Transport = NoTransport,
+            class Observer = NoRemovalObserver>
+  Status remove_flat_vertices(DelaunayWorkspace& ws,
+                              Metric&& m = Metric{},
                               Transport&& tr = Transport{},
                               Observer&& obs = Observer{}) {
     if (status != Status::Ok) return status;
@@ -1111,7 +1243,7 @@ struct DelaunayView {
     // re-seed.  Returns whether v was newly admitted.
     auto enqueue = [&](int v) -> bool {
       if (status != Status::Ok) return false;
-      if (v < 0 || v >= nv || v_out[v] < 0 || !is_flat(v, flat_tol)) return false;
+      if (v < 0 || v >= nv || v_out[v] < 0 || !m.is_flat(*this, v)) return false;
       if (ws.on_queue.test_and_set(v)) return false;
       if (!ws.work.push_back(v))
         return trip(Status::CapacityExceeded, "remove_flat_vertices: work list", v);
@@ -1124,7 +1256,7 @@ struct DelaunayView {
     // only changes the REMOVABILITY of star neighbours.
     auto try_remove = [&](int v) -> bool {
       if (status != Status::Ok) return false;
-      if (v < 0 || v >= nv || v_out[v] < 0 || !is_flat(v, flat_tol)) return false;
+      if (v < 0 || v >= nv || v_out[v] < 0 || !m.is_flat(*this, v)) return false;
       obs.on_pop(v);
       // Collect the star rim on BOTH sides of the self-loop cleanup (its
       // flips perturb the pre-flip ring; the removal re-triangulates the
@@ -1135,14 +1267,14 @@ struct DelaunayView {
         if (!ws.ring.push_back(dest(h)))
           return trip(Status::CapacityExceeded, "remove_flat_vertices: ring", (int)ws.ring.size());
       }
-      flip_away_self_loops(v, ws, tr);
+      flip_away_self_loops(v, ws, m, tr);
       if (status != Status::Ok) return false;
       for (int h : incident(v)) {
         if (!ws.ring.push_back(dest(h)))
           return trip(Status::CapacityExceeded, "remove_flat_vertices: ring", (int)ws.ring.size());
       }
 
-      remove_flat_vertex(v, ws, tr);
+      remove_flat_vertex(v, ws, m, tr);
       if (status != Status::Ok) return false;
       const bool removed_v = (v_out[v] < 0);
       if (removed_v)
@@ -1152,7 +1284,7 @@ struct DelaunayView {
       // (deg <= 2): the cleanup may have flipped, and every pop must see a
       // globally-Delaunay mesh for the seeded restore to be exact
       // (paper cor:local-restore).
-      lawson_sweep_around(ws.ring.live(), ws.lawson_stack, ws.sweep_in_stack, tr);
+      lawson_sweep_around(ws.ring.live(), ws.lawson_stack, ws.sweep_in_stack, m, tr);
       if (status != Status::Ok) return false;
       if (!removed_v) return false;
 
@@ -1182,7 +1314,7 @@ struct DelaunayView {
 
     // Establish the iDT up front so every per-removal seeded restore starts
     // from a globally-Delaunay mesh.
-    flip_to_delaunay(ws.lawson_stack, ws.sweep_in_stack, tr);
+    flip_to_delaunay(ws.lawson_stack, ws.sweep_in_stack, m, tr);
     if (status != Status::Ok) return status;
 
     seed_all_flats();
@@ -1193,7 +1325,7 @@ struct DelaunayView {
     // Restructure rounds: a global sweep can unblock deg <= 2 stragglers
     // and expose flats the local re-push missed.
     while (true) {
-      flip_to_delaunay(ws.lawson_stack, ws.sweep_in_stack, tr);
+      flip_to_delaunay(ws.lawson_stack, ws.sweep_in_stack, m, tr);
       if (status != Status::Ok) return status;
       if (!seed_all_flats()) break;   // no flats remain -> done
       if (status != Status::Ok) return status;
@@ -1204,7 +1336,7 @@ struct DelaunayView {
     // Fail loud on a stuck reduction: returning a partial reduction silently
     // would hand callers a non-cone iDT.
     for (int v = 0; v < nv; v++)
-      if (v_out[v] >= 0 && is_flat(v, flat_tol)) {
+      if (v_out[v] >= 0 && m.is_flat(*this, v)) {
         trip(Status::InvariantViolated,
              "remove_flat_vertices: stuck with live flat vertex (paper cor:stuck-diagnosis)", v);
         return status;
@@ -1213,7 +1345,7 @@ struct DelaunayView {
     // Final Lawson: the output is globally Delaunay regardless of removal
     // order (paper thm:lawson-converge; a B == D self-loop-creating flip's
     // new loop is strictly Delaunay by paper lem:selfloop-delaunay).
-    flip_to_delaunay(ws.lawson_stack, ws.sweep_in_stack, tr);
+    flip_to_delaunay(ws.lawson_stack, ws.sweep_in_stack, m, tr);
     return status;
   }
 
@@ -1324,3 +1456,179 @@ static_assert(std::is_trivially_copyable_v<DelaunayView>,
 static_assert(std::tuple_size_v<decltype(std::declval<DelaunayView>().to_tuple())>
                   == DelaunayView::n_fields,
               "to_tuple arity must equal n_fields");
+
+// ============================================================================
+// The two metric policies (declared before DelaunayView; banner there).
+// Each is the complete vocabulary of one regime -- flatness, the three edge
+// predicates, the flipped length, the ear acceptance, the star preparation,
+// the tie-break side order, and the paired edge-length write.
+// ============================================================================
+
+// General metrics: the float Diamond predicates with the named tolerance
+// bands (delaunay_detail), absorbing FP noise.  Carries the flatness band.
+struct BandedFloatMetric {
+  double flat_tol = delaunay_detail::default_flat_tol;
+
+  bool is_flat(const DelaunayView& V, int v) const { return V.is_flat(v, flat_tol); }
+  bool delaunay(const DelaunayView& V, int h) const { return V.diamond(h).is_delaunay(); }
+  bool convex(const DelaunayView& V, int h) const { return V.diamond(h).is_convex(); }
+  bool cocircular(const DelaunayView& V, int h) const {
+    return V.diamond(h).is_cocircular(delaunay_detail::tie_cocircular_tol);
+  }
+  std::optional<Length> flipped(DelaunayView& V, int h) const {
+    double f = V.diamond(h).flipped_length();
+    if (!std::isfinite(f) || f <= 0) return std::nullopt;
+    return Length{f, 0};
+  }
+  void set_edge_length(DelaunayView& V, int h, Length l) const {
+    V.he_length[h] = V.he_length[V.twin(h)] = l.len;
+  }
+  void prepare_star(DelaunayView&, DelaunayWorkspace&, int /*v*/) const {}
+  Length ear(DelaunayView&, const FanPolygon& fan, int pp, int pi, int pn) const {
+    return {delaunay_detail::ear_length_if_acceptable(fan, pp, pi, pn), 0};
+  }
+  int first_tie_side(DelaunayView&, DelaunayWorkspace&, int /*h_loop*/,
+                     const double theta[2]) const {
+    return (theta[0] <= theta[1]) ? 0 : 1;
+  }
+};
+
+// Equilateral metrics and everything flips and flat-vertex removals produce
+// from them: every face stays an Eisenstein-lattice triangle, so every
+// decision is an integer sign (DiamondSq's tau form), flip and ear
+// diagonals are lattice norms carried in Lsq, flatness is the integer cone
+// excess eps_v == 0, and the tie-break side order is the lattice sector
+// test -- the whole reduction is a function of integer arithmetic alone.
+// Corruption of the carry trips InvariantViolated through the view's latch;
+// nothing here throws.
+// @inv envelope: every live Lsq entry is in [1, exact_lsq_max] -- holds at
+//       entry (the owner driver derives and verifies the carry) and is
+//       maintained inductively by the two guarded write sites below.
+struct ExactIntegerMetric {
+  std::span<long long> Lsq;   // squared length per half-edge (the carry)
+
+  bool is_flat(const DelaunayView& V, int v) const { return V.cone_excess(v) == 0; }
+  bool delaunay(const DelaunayView& V, int h) const {
+    return V.diamond_sq(h, Lsq).is_delaunay();
+  }
+  bool convex(const DelaunayView& V, int h) const {
+    return V.diamond_sq(h, Lsq).is_convex();
+  }
+  bool cocircular(const DelaunayView& V, int h) const {
+    return V.diamond_sq(h, Lsq).is_cocircular();
+  }
+  std::optional<Length> flipped(DelaunayView& V, int h) const {
+    auto fsq = V.diamond_sq(h, Lsq).flipped_length_sq();
+    if (!fsq) {
+      V.trip(DelaunayView::Status::InvariantViolated,
+             "flip_edge: convex diamond without a lattice diagonal (Lsq corrupt or out of envelope)", h);
+      return std::nullopt;
+    }
+    if (*fsq <= 0) return std::nullopt;       // geometrically degenerate diagonal
+    if (*fsq > exact_lsq_max) {
+      V.trip(DelaunayView::Status::InvariantViolated,
+             "flip_edge: flipped Lsq exceeds the exact envelope", h);
+      return std::nullopt;
+    }
+    return Length{std::sqrt((double)*fsq), *fsq};
+  }
+  void set_edge_length(DelaunayView& V, int h, Length l) const {
+    const int t = V.twin(h);
+    V.he_length[h] = V.he_length[t] = l.len;
+    Lsq[h] = Lsq[t] = l.sq;
+  }
+  void prepare_star(DelaunayView& V, DelaunayWorkspace& ws, int v) const {
+    V.develop_fan_lattice(v, ws, *this);
+  }
+  Length ear(DelaunayView& V, const FanPolygon& fan, int pp, int pi, int pn) const {
+    const long long dsq = delaunay_detail::ear_diag_sq_if_acceptable(fan.P, pp, pi, pn);
+    if (dsq == 0) return {0, 0};
+    if (dsq > exact_lsq_max) {
+      V.trip(DelaunayView::Status::InvariantViolated,
+             "ear_clip_fan: ear Lsq exceeds the exact envelope", pi);
+      return {0, 0};
+    }
+    return {std::sqrt((double)dsq), dsq};
+  }
+  int first_tie_side(DelaunayView& V, DelaunayWorkspace& ws, int h_loop,
+                     const double* /*theta*/) const {
+    return V.lattice_first_tie_side(h_loop, ws, *this);
+  }
+};
+
+// ---------------------------------------------------------------------------
+// Exact lattice developments (bodies here: they read ExactIntegerMetric).
+// ---------------------------------------------------------------------------
+
+inline void DelaunayView::develop_fan_lattice(int v, DelaunayWorkspace& ws,
+                                              const ExactIntegerMetric& m) {
+  if (status != Status::Ok) return;
+  const FanPolygon& fan = ws.fan;
+  const int k = fan.k;
+  auto Ls = [&](int i) { return (int)m.Lsq[fan.spoke_he[i]]; };
+  auto Lr = [&](int i) { return (int)m.Lsq[fan.inner_rim[i]]; };
+
+  auto attempt = [&](Eisenstein P0) -> Development {
+    fan.P[0] = P0;
+    for (int i = 0; i < k; i++) {
+      auto C = place_third_eis_total({0, 0}, fan.P[i],
+                                     Ls(i), Ls((i + 1) % k), Lr(i), +1);
+      if (!C) return Development::OffLattice;
+      if (i + 1 < k) fan.P[i + 1] = *C;
+      else if (!(*C == fan.P[0])) return Development::Unclosed;
+    }
+    return Development::Closed;
+  };
+
+  for (Eisenstein z : Sector0Reps(Ls(0))) {
+    switch (attempt(z)) {
+      case Development::Closed:     return;
+      case Development::OffLattice: continue;   // wrong orbit: next representative
+      case Development::Unclosed:
+        trip(Status::InvariantViolated,
+             "develop_fan_lattice: complete development fails to close at a flat apex", v);
+        return;
+    }
+  }
+  trip(Status::InvariantViolated,
+       "develop_fan_lattice: no closing lattice development for the star", v);
+}
+
+inline int DelaunayView::lattice_first_tie_side(int h_loop, DelaunayWorkspace& ws,
+                                                const ExactIntegerMetric& m) {
+  // Side 0's sector arcs, directly in CCW order: the outgoing arcs from
+  // h_loop round to twin(h_loop), inclusive (the CW walk the tie-break's
+  // theta accumulation runs is exactly this walk reversed).  The face
+  // between CCW-consecutive arcs A_t, A_{t+1} is face(A_t), with spoke Lsq
+  // at the arcs and rim Lsq at he_next(A_t) -- the same per-face shape
+  // develop_fan_lattice places, and the same anchor-independence argument:
+  // any completing anchor is a pure rotation of the canonical chart, and
+  // wedge / dot2 are rotation-invariant, so the sector verdict does not
+  // depend on the representative found.
+  int n = 0;
+  for (int g = h_loop; ; g = ccw(g)) {
+    if (n >= (int)ws.poly.size()) {
+      trip(Status::CapacityExceeded, "lattice_first_tie_side: sector-arc scratch", n);
+      return 0;
+    }
+    ws.poly[n++] = g;
+    if (g == twin(h_loop)) break;
+  }
+  auto Ls = [&](int t) { return (int)m.Lsq[ws.poly[t]]; };
+  auto Lr = [&](int t) { return (int)m.Lsq[he_next[ws.poly[t]]]; };
+
+  for (Eisenstein z : Sector0Reps(Ls(0))) {
+    Eisenstein P0 = z, Pt = z;
+    bool on_lattice = true;
+    for (int t = 0; t + 1 < n && on_lattice; t++) {
+      auto C = place_third_eis_total({0, 0}, Pt, Ls(t), Ls(t + 1), Lr(t), +1);
+      if (!C) on_lattice = false;
+      else    Pt = *C;
+    }
+    if (on_lattice)
+      return delaunay_detail::lattice_sector_at_most_pi(P0, Pt) ? 0 : 1;
+  }
+  trip(Status::InvariantViolated,
+       "lattice_first_tie_side: no lattice development for the tie sector", h_loop);
+  return 0;
+}

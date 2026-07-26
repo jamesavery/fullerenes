@@ -488,6 +488,462 @@ TEST(DCEL, DISABLED_Plantri15_AllTriangulations) {
 }
 
 // ============================================================================
+// DCELExact: the exact-integer predicate layer (paper sec:exactness).
+//
+// On lattice triangles H = 3*tau^2 (the Heron-Eisenstein identity), so the
+// Delaunay form F is sqrt(3) times the INTEGER s_upper*tau_lower +
+// s_lower*tau_upper.  The falsifiers pin lattice_tau, the form's argument
+// pairing, and the named diamonds; the corpus sweeps assert the exact
+// predicates agree with the banded float predicates on every diamond both
+// BEFORE reduction (where non-Delaunay edges exist) and after (a
+// disagreement is not a test bug, it is the documented sliver and must be
+// examined); the trip falsifiers pin every new exact failure mode loudly.
+// ============================================================================
+
+TEST(DCELExact, LatticeTauCases) {
+  // The unit triangle: H = 3, tau = 1.
+  EXPECT_EQ(lattice_tau(1, 1, 1), 1);
+  // The (1,1,3) triangle (unit sides, sqrt(3) base): H = 3, tau = 1.
+  EXPECT_EQ(lattice_tau(3, 1, 1), 1);
+  // A larger lattice triangle: sides^2 (4, 4, 4) -> H = 48 = 3*16, tau = 4.
+  EXPECT_EQ(lattice_tau(4, 4, 4), 4);
+  // Degenerate: sides 2, 1, 1 (squared 4, 1, 1) are collinear -> tau = 0.
+  EXPECT_EQ(lattice_tau(4, 1, 1), 0);
+  // Triangle inequality violated: H < 0 -> not a triangle at all.
+  EXPECT_EQ(lattice_tau(9, 1, 1), -1);
+  // A right isoceles triangle (squared sides 2, 1, 1): H = 4, not divisible
+  // by 3 -- a Euclidean triangle that fits NO lattice (so the unit-square
+  // diamond below is outside the exact regime's domain).
+  EXPECT_EQ(lattice_tau(2, 1, 1), -1);
+  // Larger H = 3*(perfect square) cases: (7,7,7) -> H = 147 = 3*49; and
+  // (5,5,5) -> H = 75 = 3*25 -- tau exists although 5 is NOT a Loeschian
+  // norm: the condition is necessary, not sufficient (the doc's caveat).
+  EXPECT_EQ(lattice_tau(7, 7, 7), 7);
+  EXPECT_EQ(lattice_tau(5, 5, 5), 5);
+  // H divisible by 3 but H/3 not a perfect square: (2,2,3) -> H = 15.
+  EXPECT_EQ(lattice_tau(2, 2, 3), -1);
+}
+
+TEST(DCELExact, SplitPrimeOrbits) {
+  // Norm 7 is a split prime: two sector-0 representatives, (2,1) and (1,2),
+  // in DISTINCT unit orbits -- they are not lattice-equivalent, which is
+  // why the fan development must scan representatives (the orbit-anchor
+  // discovery).  Pin the phenomenon with the (7, 1, 3) lattice triangle:
+  // its CCW apex (apex_factor(7,1,3,+1) = 2+w) lands on the lattice over
+  // exactly ONE of the two base choices.  (An equilateral triangle would
+  // NOT discriminate: its apex is a 60-degree rotation, lattice over any
+  // base.)
+  auto reps = sector0_reps_of_norm(7);
+  ASSERT_EQ(reps.size(), 2u);
+  int n_placed = 0;
+  for (Eisenstein z : reps)
+    if (place_third_eis_total({0, 0}, z, 7, 1, 3, +1)) n_placed++;
+  EXPECT_EQ(n_placed, 1) << "expected exactly one orbit to admit the CCW apex";
+}
+
+TEST(DCELExact, EquilateralDiamonds) {
+  // The unit rhombus (two unit equilateral triangles glued along the unit
+  // diagonal): apex angles 60 degrees, cot-sum 2/sqrt(3) > 0 -- strictly
+  // Delaunay and strictly convex (60 + 60 = 120 < 180 at each endpoint).
+  DiamondSq unit{1, 1, 1, 1, 1};
+  ASSERT_TRUE(unit.delaunay_form().has_value());
+  EXPECT_GT(*unit.delaunay_form(), 0);
+  EXPECT_TRUE(unit.is_delaunay());
+  EXPECT_FALSE(unit.is_cocircular());
+  EXPECT_TRUE(unit.is_convex());
+  // The same rhombus around its LONG diagonal sqrt(3): apex angles 120,
+  // cot-sum negative -- must flip (and may: 30 + 30 = 60 < 180, convex).
+  DiamondSq long_diag{3, 1, 1, 1, 1};
+  EXPECT_LT(*long_diag.delaunay_form(), 0);
+  EXPECT_FALSE(long_diag.is_delaunay());
+  EXPECT_TRUE(long_diag.is_convex());
+  // ... and its exact flipped diagonal is the unit one (and vice versa: the
+  // unit rhombus flips to the long diagonal).
+  ASSERT_TRUE(long_diag.flipped_length_sq().has_value());
+  EXPECT_EQ(*long_diag.flipped_length_sq(), 1);
+  EXPECT_EQ(*unit.flipped_length_sq(), 3);
+  // A genuinely cocircular LATTICE diamond: two (2, sqrt(3), 1) right
+  // triangles glued along the diameter e = 2 (squared sides 4, 3, 1;
+  // tau = 2).  Right apex angles, cot-sum exactly 0: F' = 0 in integers.
+  DiamondSq cocirc{4, 3, 1, 3, 1};
+  ASSERT_TRUE(cocirc.delaunay_form().has_value());
+  EXPECT_EQ(*cocirc.delaunay_form(), 0);
+  EXPECT_TRUE(cocirc.is_delaunay());
+  EXPECT_TRUE(cocirc.is_cocircular());
+  // The unit square around a diagonal sqrt(2) is concyclic in the
+  // EUCLIDEAN sense (the float predicate says so), but its faces are
+  // right-isoceles (2,1,1) triangles that fit no lattice -- it is OUTSIDE
+  // the exact regime's domain, and the tau form refuses it rather than
+  // answering for a diamond the regime cannot contain.
+  DiamondSq square{2, 1, 1, 1, 1};
+  EXPECT_FALSE(square.delaunay_form().has_value());
+  EXPECT_FALSE(square.is_cocircular());
+  EXPECT_FALSE(square.is_delaunay());
+  EXPECT_FALSE(square.is_convex());
+  EXPECT_TRUE((Diamond{std::sqrt(2.0), 1, 1, 1, 1}
+                   .is_cocircular(delaunay_detail::tie_cocircular_tol)));
+  // The ARGUMENT PAIRING regression guard (the one transposition the
+  // symmetric diamonds above cannot catch): an asymmetric diamond, upper
+  // triangle (e,a,b) = (1,1,1) vs lower (e,c,d) = (1,4,3).  cot(B) =
+  // 1/sqrt(3); the lower triangle has s_lower = 4+3-1 = 6, H_lower =
+  // 2(4+12+3)-(1+16+9) = 12, tau_lower = 2, so F/sqrt(3) = s_upper*
+  // tau_lower + s_lower*tau_upper = 1*2 + 6*1 = 8 > 0.  A transposed
+  // pairing would give 1*1 + 6*2 = 13 -- also positive, so pin the VALUE.
+  DiamondSq asym{1, 1, 1, 4, 3};
+  EXPECT_EQ(*asym.delaunay_form(), 8);
+  // Outside the predicates' domain: both triangles degenerate (tau = 0).
+  // A degenerate diamond is NONE of Delaunay / cocircular / convex --
+  // matching the float path's cot_degenerate convention and the historical
+  // integer cocircularity predicate.  A live complex never contains such a
+  // diamond (positive angles are a class invariant), so this is the carry-
+  // corruption verdict, not a geometry verdict.
+  DiamondSq degenerate{4, 1, 1, 1, 1};
+  EXPECT_FALSE(degenerate.delaunay_form().has_value());
+  EXPECT_FALSE(degenerate.is_delaunay());
+  EXPECT_FALSE(degenerate.is_cocircular());
+  EXPECT_FALSE(degenerate.is_convex());
+}
+
+// The corpus verdict of the exact switch (paper sec:exactness): the exact
+// pipeline must make the SAME decisions as the banded pipeline everywhere
+// the tolerance slivers are empty -- and over THIS corpus (all C20-C60 +
+// C80-IPR + C128#0) they are.  Integer state (topology, counts, free
+// lists) must be byte-equal; the float state (he_length = sqrt of the
+// exact integer vs the float flip/development formulas) may differ only at
+// rounding level.  max_lsq records how much envelope headroom the corpus
+// actually uses (exact_lsq_max scope-honesty).
+static void expect_exact_matches_banded(const Triangulation& T, const std::string& label,
+                                        long long& n_isomers, double& worst_rel,
+                                        long long& max_lsq) {
+  auto E = DelaunayTriangulation::compute(T);          // exact metric
+  auto B = DelaunayTriangulation::compute_banded(T);   // banded float metric
+  n_isomers++;
+
+  ASSERT_EQ(E.nv, B.nv) << label;
+  ASSERT_EQ(E.nh, B.nh) << label;
+  ASSERT_EQ(E.nf, B.nf) << label;
+  // ALL NINE fields via the canonical tuple fold (the field-list contract):
+  // integer fields byte-equal -- v_orig_degree included, the exact
+  // flatness predicate's own input -- and the three double fields within
+  // the rounding band (same reals, two arithmetics).
+  {
+    auto te = E.to_tuple(), tb = B.to_tuple();
+    bool ok = true;
+    [&]<std::size_t... I>(std::index_sequence<I...>) {
+      auto cmp = [&](auto se, auto sb) {
+        ASSERT_EQ(se.size(), sb.size()) << label;
+        for (std::size_t i = 0; i < se.size() && ok; i++) {
+          using T = std::remove_cvref_t<decltype(se[0])>;
+          if constexpr (std::is_same_v<T, double>) {
+            double d = std::abs(se[i] - sb[i]);
+            if (!(d <= 1e-9 * std::max(1.0, std::abs(sb[i])))) {
+              ok = false;
+              ADD_FAILURE() << label << " double field diverges at " << i;
+            }
+          } else if (se[i] != sb[i]) {
+            ok = false;
+            ADD_FAILURE() << label << " integer field diverges at " << i;
+          }
+        }
+      };
+      (cmp(std::get<I>(te), std::get<I>(tb)), ...);
+    }(std::make_index_sequence<DelaunayView::n_fields>{});
+    if (!ok) return;
+  }
+  auto el = E.free_edges.live(), bl = B.free_edges.live();
+  ASSERT_TRUE(el.size() == bl.size() && std::equal(el.begin(), el.end(), bl.begin()))
+      << label << " free_edges";
+  auto ef = E.free_faces.live(), bf = B.free_faces.live();
+  ASSERT_TRUE(ef.size() == bf.size() && std::equal(ef.begin(), ef.end(), bf.begin()))
+      << label << " free_faces";
+
+  // Float state: same reals computed two ways (exact sqrt-of-integer vs the
+  // float flip/development formulas).  he_length must agree to rounding
+  // level, and the exact value must be EXACTLY the root of an integer --
+  // the discriminator that pins compute(T) actually running the exact
+  // regime (the banded flipped_length drifts off sqrt-of-integer).
+  for (int h = 0; h < E.nh; h++) {
+    if (!E.alive(h)) continue;
+    double le = E.he_length[h], lb = B.he_length[h];
+    double rel = std::abs(le - lb) / lb;
+    worst_rel = std::max(worst_rel, rel);
+    ASSERT_LT(rel, 1e-9) << label << " he_length h=" << h;
+    long long n = (long long)std::llround(le * le);
+    max_lsq = std::max(max_lsq, n);
+    ASSERT_EQ(le, std::sqrt((double)n)) << label
+        << " exact he_length is not the root of an integer, h=" << h;
+  }
+
+  // The canonical-tesselation seed must agree; the integer Gauss-Bonnet
+  // must hold on both results; and the equilateral curvature label must
+  // agree with the integer cone excess (kappa = eps*pi/3) at every cone --
+  // the identity the exact flatness predicate rests on.
+  EXPECT_EQ(E.cocircular_edges(), B.cocircular_edges()) << label;
+  EXPECT_EQ(E.total_cone_excess(), 12) << label;
+  EXPECT_EQ(B.total_cone_excess(), 12) << label;
+  constexpr double pi_3 = std::numbers::pi_v<double> / 3.0;
+  for (int v = 0; v < E.nv; v++)
+    if (E.v_out[v] >= 0)
+      EXPECT_NEAR(E.DelaunayView::curvature(v), E.cone_excess(v) * pi_3, 1e-9)
+          << label << " v=" << v;
+}
+
+TEST(DCELExact, PipelineMatchesBandedOnCorpus) {
+  long long n_isomers = 0, max_lsq = 0;
+  double worst_rel = 0;
+  for (int N = 20; N <= 60; N += 2) {
+    if (N == 22) continue;
+    BuckyGen::buckygen_queue Q = BuckyGen::start(N, false, false);
+    Triangulation T;
+    int idx = 0;
+    while (BuckyGen::next_fullerene(Q, T)) {
+      expect_exact_matches_banded(T, "C" + std::to_string(N) + " #" + std::to_string(idx),
+                                  n_isomers, worst_rel, max_lsq);
+      if (::testing::Test::HasFatalFailure()) { BuckyGen::stop(Q); return; }
+      idx++;
+    }
+    BuckyGen::stop(Q);
+  }
+  // The IPR C80s and the non-simplicial C128 (multi-edge paths).  NOTE the
+  // tie-break (and so lattice_first_tie_side) fires on NO isomer of the
+  // C20-C60 + C80-IPR + C128 corpus (ephemeral instrumented probe of the
+  // review round: 0 calls in those 5,778 isomers; for the large-N leg
+  // below the byte-equality is consistent with no-firing OR
+  // firing-with-agreeing-orders), so its correctness rests on the two
+  // independent derivations recorded in the stage-3 review round; the
+  // constructed-tie falsifier (the delaunay sub-project's tied-tube
+  // articles) is the queued follow-up.
+  {
+    BuckyGen::buckygen_queue Q = BuckyGen::start(80, true, false);
+    Triangulation T;
+    int idx = 0;
+    while (BuckyGen::next_fullerene(Q, T)) {
+      expect_exact_matches_banded(T, "C80-IPR #" + std::to_string(idx),
+                                  n_isomers, worst_rel, max_lsq);
+      if (::testing::Test::HasFatalFailure()) { BuckyGen::stop(Q); return; }
+      idx++;
+    }
+    BuckyGen::stop(Q);
+  }
+  {
+    BuckyGen::buckygen_queue Q = BuckyGen::start(128, false, false);
+    Triangulation T;
+    if (BuckyGen::next_fullerene(Q, T))
+      expect_exact_matches_banded(T, "C128 #0", n_isomers, worst_rel, max_lsq);
+    BuckyGen::stop(Q);
+    if (::testing::Test::HasFatalFailure()) return;
+  }
+  // A thin large-N leg (first 50 isomers of C100 / C140 / C160): the
+  // consumers re-based by the regime switch (paint, the sub-project
+  // validators) run far past C60, so the A/B evidence should not stop
+  // there.
+  for (int N : {100, 140, 160}) {
+    BuckyGen::buckygen_queue Q = BuckyGen::start(N, false, false);
+    Triangulation T;
+    int idx = 0;
+    while (idx < 50 && BuckyGen::next_fullerene(Q, T)) {
+      expect_exact_matches_banded(T, "C" + std::to_string(N) + " #" + std::to_string(idx),
+                                  n_isomers, worst_rel, max_lsq);
+      if (::testing::Test::HasFatalFailure()) { BuckyGen::stop(Q); return; }
+      idx++;
+    }
+    BuckyGen::stop(Q);
+  }
+  // worst_rel > 0 certifies the two pipelines really computed the lengths
+  // by different arithmetic (a 0 would mean the A/B compared one
+  // computation with itself).
+  EXPECT_GT(worst_rel, 0.0);
+  std::cout << "DCELExact pipeline verdict: " << n_isomers
+            << " isomers, integer state byte-equal, worst he_length rel dev = "
+            << worst_rel << ", max Lsq = " << max_lsq
+            << " (envelope " << exact_lsq_max << ")" << std::endl;
+}
+
+// Exact vs banded predicate agreement over every diamond of every C60 iDT,
+// in BOTH decision directions: the iDT's own diamonds (all Delaunay by
+// @post), and their FLIPPED counterparts {f^2, b, d, a, c} -- the diamond
+// around the other diagonal, which is non-Delaunay wherever the original
+// is strictly Delaunay, so the must-flip direction is genuinely exercised
+// on real corpus geometry.  (The pre-reduction complex is all-unit --
+// every diamond {1,1,1,1,1} -- and proves nothing.)  A disagreement is the
+// documented tolerance sliver and must be examined, never silenced.
+static void expect_predicates_agree(const DelaunayTriangulation& D, const std::string& label,
+                                    long long& n_edges, long long& n_disagree) {
+  auto agree = [&](const DiamondSq& ds, const Diamond& dm, int h, const char* which) {
+    n_edges++;
+    if (ds.is_delaunay() != dm.is_delaunay() || ds.is_convex() != dm.is_convex()) {
+      if (++n_disagree <= 5)
+        ADD_FAILURE() << label << " h=" << h << " (" << which
+                      << "): exact/banded disagree (sliver hit)"
+                      << " del " << ds.is_delaunay() << "/" << dm.is_delaunay()
+                      << " cvx " << ds.is_convex() << "/" << dm.is_convex();
+    }
+  };
+  for (int h : D.edges()) {
+    Diamond dm = D.diamond(h);
+    auto ds = dm.squared();
+    ASSERT_TRUE(ds.has_value()) << label << " h=" << h
+        << ": equilateral-derived length fails integrality";
+    agree(*ds, dm, h, "idt");
+    // The flipped diamond is a GENUINE lattice object only when the
+    // original is convex (a performable flip); on non-convex originals the
+    // formal flipped tuple is unrealizable and the exact regime refuses it
+    // (tau <= 0) while the float regime evaluates it as Euclidean data --
+    // a domain difference, not a sliver.
+    if (!ds->is_convex()) continue;
+    auto fsq = ds->flipped_length_sq();
+    if (fsq && *fsq > 0) {
+      DiamondSq fds{*fsq, ds->b, ds->d, ds->a, ds->c};
+      Diamond   fdm{dm.flipped_length(), dm.b, dm.d, dm.a, dm.c};
+      agree(fds, fdm, h, "flipped");
+    }
+  }
+}
+
+TEST(DCELExact, CorpusPredicateAgreement) {
+  BuckyGen::buckygen_queue Q = BuckyGen::start(60, false, false);
+  Triangulation T;
+  long long n_edges = 0, n_disagree = 0;
+  int idx = 0;
+  while (BuckyGen::next_fullerene(Q, T)) {
+    auto D = DelaunayTriangulation::compute(T);
+    expect_predicates_agree(D, "C60 #" + std::to_string(idx), n_edges, n_disagree);
+    if (::testing::Test::HasFatalFailure()) { BuckyGen::stop(Q); return; }
+    idx++;
+  }
+  BuckyGen::stop(Q);
+  EXPECT_EQ(n_disagree, 0);
+  std::cout << "DCELExact corpus: " << idx << " isomers, " << n_edges
+            << " diamonds (idt + flipped), exact == banded on every predicate"
+            << std::endl;
+}
+
+// ============================================================================
+// DCELExactStatus: the REACHABLE exact-regime failure modes trip the latch
+// loudly (the falsifier pattern of the DCELStatus suite).  Simple carry
+// corruptions surface at the SWEEP (the tau-domain guards make the corrupt
+// diamond non-Delaunay-and-unflippable), so the development's and
+// tie-side's own trips sit behind it as defense in depth -- reachable only
+// through corruptions that keep every diamond lattice-valid, which no
+// simple injection produces.  A corrupt carry must never crash and never
+// return a silently wrong reduction.
+// ============================================================================
+
+// A C60 iDT complex plus a workspace and a hand-corruptible carry.
+struct ExactRig {
+  DelaunayTriangulation D;
+  HostDelaunayWorkspace ws;
+  std::vector<long long> Lsq;
+  ExactRig()
+    : D(DelaunayTriangulation::compute(make_dual(60, 0))),
+      ws({.nv0 = D.nv, .k_max = D.nh, .nh_explicit = D.nh}),
+      Lsq((std::size_t)D.nh_cap, 0) {
+    for (int h = 0; h < D.nh; h++)
+      if (D.alive(h)) Lsq[h] = (long long)std::llround(D.he_length[h] * D.he_length[h]);
+  }
+  ExactIntegerMetric metric() { return {std::span<long long>(Lsq)}; }
+};
+
+TEST(DCELExactStatus, CorruptCarryRejectsFlipQuietly) {
+  // A zero squared length was the historical SIGFPE value (division by the
+  // base norm).  The tau-domain guards close that hole STRUCTURALLY: the
+  // corrupted diamond is degenerate, so convexity fails and the flip is
+  // rejected with the complex untouched -- no crash, no trip, no write.
+  ExactRig rig;
+  int h = *rig.D.edges().begin();
+  rig.Lsq[h] = rig.Lsq[h ^ 1] = 0;
+  EXPECT_FALSE(rig.D.DelaunayView::flip_edge(h, rig.metric()));
+  EXPECT_EQ(rig.D.status, DelaunayView::Status::Ok);
+}
+
+TEST(DCELExactStatus, CorruptCarryTripsSweep) {
+  // The same corruption under the SWEEP is loud: the zero-carry edge is
+  // non-Delaunay under the exact predicate but unflippable, which is the
+  // drain's lem:ndimpliesconvex contradiction -> InvariantViolated.
+  ExactRig rig;
+  int h = *rig.D.edges().begin();
+  rig.Lsq[h] = rig.Lsq[h ^ 1] = 0;
+  rig.ws.sweep_in_stack.clear_all();
+  rig.D.DelaunayView::flip_to_delaunay(rig.ws.lawson_stack, rig.ws.sweep_in_stack,
+                                       rig.metric());
+  EXPECT_EQ(rig.D.status, DelaunayView::Status::InvariantViolated);
+  ASSERT_NE(rig.D.status_site, nullptr);
+  EXPECT_NE(std::string(rig.D.status_site).find("lawson_sweep"), std::string::npos);
+}
+
+TEST(DCELExactStatus, OverflowingCarryTripsLoudly) {
+  // A whole diamond scaled past the envelope still passes convexity (it is
+  // a genuine scaled lattice shape), so the flip reaches the length
+  // computation -- where flipped_length_sq's INPUT envelope check refuses
+  // it and the no-lattice-diagonal trip fires.  Never a silent overflow.
+  ExactRig rig;
+  int h = *rig.D.edges().begin();
+  auto A = rig.D.diamond_arcs(h);
+  for (int arc : {A.e, A.a, A.b, A.c, A.d})
+    rig.Lsq[arc] = rig.Lsq[arc ^ 1] = exact_lsq_max + 1;   // scaled unit rhombus
+  rig.D.DelaunayView::flip_edge(h, rig.metric());
+  EXPECT_EQ(rig.D.status, DelaunayView::Status::InvariantViolated);
+  ASSERT_NE(rig.D.status_site, nullptr);
+  EXPECT_NE(std::string(rig.D.status_site).find("flip_edge"), std::string::npos);
+}
+
+TEST(DCELExactStatus, FlippedDiagonalPastEnvelopeTrips) {
+  // The OUTPUT envelope branch: a tall in-envelope diamond whose flipped
+  // diagonal exceeds the envelope.  With M = 498169 (4M - 1 = 3*815^2),
+  // the diamond {1, M, M, M, M} has tau = 815 both sides, is convex
+  // (P = Q = 1), all five inputs pass the input guard, and the flipped
+  // diagonal is norm2((-407,815) - (408,-815)) / 1 = 3*815^2 = 1992675
+  // > exact_lsq_max -- the policy's envelope trip must fire.
+  ExactRig rig;
+  int h = *rig.D.edges().begin();
+  auto A = rig.D.diamond_arcs(h);
+  rig.Lsq[A.e] = rig.Lsq[A.e ^ 1] = 1;
+  for (int arc : {A.a, A.b, A.c, A.d})
+    rig.Lsq[arc] = rig.Lsq[arc ^ 1] = 498169;
+  DiamondSq tall{1, 498169, 498169, 498169, 498169};
+  ASSERT_EQ(*tall.flipped_length_sq(), 1992675);
+  rig.D.DelaunayView::flip_edge(h, rig.metric());
+  EXPECT_EQ(rig.D.status, DelaunayView::Status::InvariantViolated);
+  ASSERT_NE(rig.D.status_site, nullptr);
+  EXPECT_NE(std::string(rig.D.status_site).find("exceeds the exact envelope"),
+            std::string::npos);
+}
+
+TEST(DCELExactStatus, CorruptCarryTripsDriver) {
+  // A lying carry entry (he_length says 1, the carry says sqrt(5)) makes
+  // the corrupted edge non-Delaunay-and-unflippable: the removal driver
+  // must trip loudly (at the initial sweep or the development), never
+  // return a partial reduction.
+  auto D = DelaunayTriangulation::from_triangulation(make_dual(60, 0));
+  HostDelaunayWorkspace ws({.nv0 = D.nv, .k_max = D.nh, .nh_explicit = D.nh});
+  std::vector<long long> Lsq((std::size_t)D.nh_cap, 1);
+  Lsq[0] = Lsq[1] = 5;
+  auto st = D.DelaunayView::remove_flat_vertices(ws, ExactIntegerMetric{std::span<long long>(Lsq)});
+  EXPECT_EQ(st, DelaunayView::Status::InvariantViolated);
+}
+
+TEST(DCELExactStatus, ExactDriverRejectsNonExactMetric) {
+  // The owner entry derives its carry and must throw, loudly, on a metric
+  // that is not an exact one (the fabricated-carry hole).
+  auto D = DelaunayTriangulation::from_intrinsic_metric(
+      make_dual(60, 0), [](node_t, node_t) { return 1.1; });
+  EXPECT_THROW(D.remove_flat_vertices_exact(), std::runtime_error);
+}
+
+TEST(DCELExactStatus, ExactDriverRejectsInsertedVertices) {
+  // split_face inserts a flat vertex with a non-equilateral orig_degree
+  // label: float curvature says flat, integer cone excess says cone.  The
+  // exact driver must refuse the mislabeled complex rather than silently
+  // leave the vertex in place.
+  auto D = DelaunayTriangulation::compute(make_dual(60, 0));
+  int f = -1;
+  for (int i = 0; i < D.nf; i++) if (D.f_he[i] >= 0) { f = i; break; }
+  ASSERT_GE(f, 0);
+  D.split_face(D.f_he[f], {1.0, 1.0, 1.0});
+  EXPECT_THROW(D.remove_flat_vertices_exact(), std::runtime_error);
+}
+
+// ============================================================================
 // DCELOwnership: the owner's span/storage aliasing contract.
 //
 // Each test states one claim about the Owned-view pattern (delaunay.hh
@@ -742,12 +1198,12 @@ TEST(DCELWorkspace, LayoutFitsAndSpansDisjoint) {
     if (!sp.empty()) blocks.push_back({sp.data(), sp.data() + sp.size()});
   };
   add(ws.fan.nb); add(ws.fan.spoke_he); add(ws.fan.inner_rim);
-  add(ws.fan.spokes); add(ws.fan.rims); add(ws.fan.cum);
+  add(ws.fan.spokes); add(ws.fan.rims); add(ws.fan.cum); add(ws.fan.P);
   add(ws.poly); add(ws.rpoly);
   add(ws.tri.diagonals); add(ws.tri.triangles);
   // (The SpanStack/BitSpan members expose only their live prefixes, so the
-  // fit/disjointness canary covers the ten raw spans -- all fields come from
-  // the ONE layout list, so drift in any field moves these too.)
+  // fit/disjointness canary covers the eleven raw spans -- all fields come
+  // from the ONE layout list, so drift in any field moves these too.)
   const void* lo = arena.data();
   const void* hi = arena.data() + l.bytes();
   for (auto& b : blocks) {

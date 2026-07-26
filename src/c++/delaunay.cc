@@ -539,10 +539,12 @@ struct TrackerTransport {
 
 bool DelaunayTriangulation::flip_edge(int h)
 {
+  // Owner wrappers serve the general (float-metric) API surface -- weighted
+  // flips, post-reduction surgery -- so they instantiate the banded policy.
   bool r;
   if (tracker.active) {
     TrackerTransport tr{*this};
-    r = DelaunayView::flip_edge(h, tr);
+    r = DelaunayView::flip_edge(h, BandedFloatMetric{}, tr);
   } else {
     r = DelaunayView::flip_edge(h);
   }
@@ -558,7 +560,8 @@ int DelaunayTriangulation::lawson_sweep()
   int flips;
   if (tracker.active) {
     TrackerTransport tr{*this};
-    flips = DelaunayView::flip_to_delaunay(ws.lawson_stack, ws.sweep_in_stack, tr);
+    flips = DelaunayView::flip_to_delaunay(ws.lawson_stack, ws.sweep_in_stack,
+                                           BandedFloatMetric{}, tr);
   } else {
     flips = DelaunayView::flip_to_delaunay(ws.lawson_stack, ws.sweep_in_stack);
   }
@@ -594,7 +597,7 @@ void DelaunayTriangulation::remove_flat_vertex(int v)
   HostDelaunayWorkspace ws({.nv0 = nv, .k_max = nh, .nh_explicit = nh});
   if (tracker.active) {
     TrackerTransport tr{*this};
-    DelaunayView::remove_flat_vertex(v, ws, tr);
+    DelaunayView::remove_flat_vertex(v, ws, BandedFloatMetric{}, tr);
   } else {
     DelaunayView::remove_flat_vertex(v, ws);
   }
@@ -603,20 +606,24 @@ void DelaunayTriangulation::remove_flat_vertex(int v)
 
 // (Self-loop cleanup + cocircular tie-break: header-inline on DelaunayView.)
 
-void DelaunayTriangulation::remove_flat_vertices(double flat_tol,
-                                                 const std::function<void(int)>& on_pop)
+namespace {
+
+// The shared owner glue of the removal driver, for BOTH metric regimes: the
+// work-list driver itself is header-inline on DelaunayView (see its doc for
+// the algorithm and fixed-point structure).  This materializes the
+// workspace, selects the transport policy by tracker.active, adapts the
+// on_pop / verbose_removal diagnostics to the observer policy, and converts
+// a non-Ok status to the documented throws.
+template <class Metric>
+void run_flat_removal(DelaunayTriangulation& D, Metric&& m,
+                      const std::function<void(int)>& on_pop)
 {
-  // The work-list driver is header-inline on DelaunayView (see its doc for
-  // the algorithm and fixed-point structure).  This wrapper materializes the
-  // workspace, selects the transport policy by tracker.active, adapts the
-  // on_pop / verbose_removal diagnostics to the observer policy, and
-  // converts a non-Ok status to the documented throws.
   auto count_live = [&]() {
     int n = 0;
-    for (int v = 0; v < nv; v++) if (v_out[v] >= 0) n++;
+    for (int v = 0; v < D.nv; v++) if (D.v_out[v] >= 0) n++;
     return n;
   };
-  if (verbose_removal) {
+  if (D.verbose_removal) {
     std::fprintf(stderr, "[remove_flat] start: %d live vertices\n", count_live());
     std::fflush(stderr);
   }
@@ -635,22 +642,73 @@ void DelaunayTriangulation::remove_flat_vertices(double flat_tol,
         std::fflush(stderr);
       }
     }
-  } obs{*this, on_pop};
+  } obs{D, on_pop};
 
-  HostDelaunayWorkspace ws({.nv0 = nv, .k_max = nh, .nh_explicit = nh});
-  if (tracker.active) {
-    TrackerTransport tr{*this};
-    DelaunayView::remove_flat_vertices(ws, flat_tol, tr, obs);
+  HostDelaunayWorkspace ws({.nv0 = D.nv, .k_max = D.nh, .nh_explicit = D.nh});
+  if (D.tracker.active) {
+    TrackerTransport tr{D};
+    D.DelaunayView::remove_flat_vertices(ws, m, tr, obs);
   } else {
-    DelaunayView::remove_flat_vertices(ws, flat_tol, NoTransport{}, obs);
+    D.DelaunayView::remove_flat_vertices(ws, m, NoTransport{}, obs);
   }
-  throw_on_status("remove_flat_vertices");
+  D.throw_on_status("remove_flat_vertices");
 
-  if (verbose_removal) {
+  if (D.verbose_removal) {
     std::fprintf(stderr, "[remove_flat] done: removed %lld, %d live remain\n",
                  obs.removed, count_live());
     std::fflush(stderr);
   }
+}
+
+}  // namespace
+
+void DelaunayTriangulation::remove_flat_vertices(double flat_tol,
+                                                 const std::function<void(int)>& on_pop)
+{
+  run_flat_removal(*this, BandedFloatMetric{flat_tol}, on_pop);
+}
+
+void DelaunayTriangulation::remove_flat_vertices_exact(const std::function<void(int)>& on_pop)
+{
+  // The exact-regime driver (paper sec:exactness).  The Lsq carry is
+  // DERIVED from the current metric and VERIFIED -- entering the exact
+  // regime on a metric it does not describe would be a silent wrong answer,
+  // so both preconditions are loud:
+  //   - every live he_length must square to a positive in-envelope integer
+  //     within the integrality band (a from_intrinsic_metric complex, or
+  //     the half-lengths bisect_multi_edges introduces, fail here);
+  //   - the float curvature must agree with the integer cone excess at
+  //     every live vertex (a complex with split_face / bisect-inserted
+  //     vertices fails here: their v_orig_degree is not the equilateral
+  //     labeling the exact flatness predicate reads).
+  // The carry is transient (sized nh_cap: the machinery may allocate up to
+  // capacity): the surviving he_length values are square roots of integers,
+  // which the post-hoc utilities (canonical tesselation) recover exactly
+  // through the same integrality boundary.
+  using delaunay_detail::lsq_integrality_band;
+  const double pi_3 = std::numbers::pi_v<double> / 3.0;
+  std::vector<long long> Lsq((std::size_t)nh_cap, 0);
+  for (int h = 0; h < nh; h++) {
+    if (!alive(h)) continue;
+    const double sq = he_length[h] * he_length[h];
+    const long long n = std::llround(sq);
+    if (n < 1 || n > exact_lsq_max ||
+        std::abs(sq - (double)n) > lsq_integrality_band * std::max(1.0, sq))
+      throw std::runtime_error(
+          "remove_flat_vertices_exact: he_length[" + std::to_string(h) +
+          "] does not square to a positive in-envelope integer (not an exact metric)");
+    Lsq[h] = n;
+  }
+  for (int v = 0; v < nv; v++) {
+    if (v_out[v] < 0) continue;
+    // DelaunayView:: qualification: the owner's vector-returning curvature()
+    // name-hides the view's per-vertex form.
+    if (std::abs(DelaunayView::curvature(v) - cone_excess(v) * pi_3) > 1e-6)
+      throw std::runtime_error(
+          "remove_flat_vertices_exact: curvature at v=" + std::to_string(v) +
+          " disagrees with its integer cone excess (not the equilateral labeling)");
+  }
+  run_flat_removal(*this, ExactIntegerMetric{std::span<long long>(Lsq)}, on_pop);
 }
 
 std::vector<int> DelaunayTriangulation::compact_vertices()
@@ -710,6 +768,15 @@ bool DelaunayTriangulation::is_well_formed() const
   return DelaunayView::is_well_formed(visited);
 }
 
+// The shared prelude of both equilateral pipelines: flat vertices sorted
+// last, DCEL built with the unit metric.
+static DelaunayTriangulation equilateral_seed(const Triangulation& T)
+{
+  Triangulation sorted = T;
+  sorted.apply_permutation(T.sort_flat_last());
+  return DelaunayTriangulation::from_triangulation(sorted);
+}
+
 DelaunayTriangulation DelaunayTriangulation::compute(const Triangulation& T)
 {
   // Sort flat vertices last, then build DCEL and run the algorithm.
@@ -720,9 +787,24 @@ DelaunayTriangulation DelaunayTriangulation::compute(const Triangulation& T)
   // legitimate features of the iDT object.  Callers that need a
   // strictly simplicial output should query min_live_degree() and
   // post-process (e.g. via bisect_multi_edges()) when needed.
-  Triangulation sorted = T;
-  sorted.apply_permutation(T.sort_flat_last());
-  DelaunayTriangulation D = from_triangulation(sorted);
+  //
+  // Equilateral input selects the EXACT integer metric: every decision
+  // through the reduction -- flips, ears, flatness, the tie-break side
+  // order included -- is a function of integer arithmetic alone, and the
+  // output he_length values are square roots of integers.
+  DelaunayTriangulation D = equilateral_seed(T);
+  D.remove_flat_vertices_exact();
+  return D;
+}
+
+DelaunayTriangulation DelaunayTriangulation::compute_banded(const Triangulation& T)
+{
+  // The general-metric (banded float) predicates applied to equilateral
+  // input: the identical prelude, the float regime throughout.  The frozen
+  // cross-reference for the parallel-primitives mirrors (which pin the
+  // banded machinery byte-for-byte) and for the exact-vs-banded corpus
+  // verdict; production callers use compute(T).
+  DelaunayTriangulation D = equilateral_seed(T);
   D.remove_flat_vertices();
   return D;
 }
@@ -764,7 +846,7 @@ DelaunayTriangulation DelaunayTriangulation::compute(const Triangulation& T,
 bool DelaunayTriangulation::is_cocircular_edge(int h) const
 {
   if (!alive(h)) return false;
-  return diamond(h).is_cocircular();
+  return diamond(h).is_cocircular_exact();
 }
 
 // Per-half-edge mask from a per-edge predicate, symmetric on twins.
@@ -779,7 +861,7 @@ static vector<bool> edge_mask(const DelaunayTriangulation& D, Pred pred)
 
 vector<bool> DelaunayTriangulation::cocircular_edges() const
 {
-  return edge_mask(*this, [&](int h) { return diamond(h).is_cocircular(); });
+  return edge_mask(*this, [&](int h) { return diamond(h).is_cocircular_exact(); });
 }
 
 vector<bool> DelaunayTriangulation::cocircular_edges(double tol) const
