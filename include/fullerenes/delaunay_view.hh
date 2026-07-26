@@ -18,19 +18,19 @@
 // the complex is no longer a compile error.  Const-ness of a view is
 // documentation, stated here because the compiler no longer states it.
 //
-// Scope (stage 2 of the span-DCEL promotion, PROMOTION-DESIGN.md): the SoA
-// arrays, navigation, the intrinsic-geometry methods, the Diamond
-// predicates, the capacity formulas, check_consistency, and the canonical
-// field order.  Owner-level today and scheduled to move here in stage 3
-// with the bounded workspace: the mutation machinery (allocation over free
-// lists, flips, sweeps, vertex removal) AND the remaining allocation-free
-// readers that ride with it (is_delaunay_edge, is_delaunay,
-// count_non_delaunay, min_live_degree, is_well_formed over caller bits) --
-// their staying put is sequencing, not design.
+// Scope: the SoA arrays, navigation, the intrinsic geometry, the Diamond
+// predicates, the capacity formulas, check_consistency, the canonical field
+// order -- and the whole mutation machinery (allocation over the bounded
+// free lists, flips, sweeps, vertex removal) over DelaunayWorkspace, with
+// the Status latch as the run-path error channel and the Transport policy
+// carrying the point tracker's hooks.  Owner-level (delaunay.hh): storage,
+// growth, the tracked TrackerTransport policy, serialization, and every
+// allocating convenience.
 
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <numbers>
 #include <span>
@@ -38,166 +38,14 @@
 #include <type_traits>
 #include <utility>
 
+#include "fullerenes/span_vector.hh"   // Spanify::SpanStack, Spanify::BitSpan
+
 // The DCEL's element type is int, bound as the lib's 32-bit index width
 // (PROMOTION-DESIGN.md Q4): machine-check the premise where the arrays live.
 static_assert(std::is_same_v<int, std::int32_t>,
     "DelaunayView assumes int is the lib's 32-bit index type");
 
-// ============================================================================
-// Intrinsic geometry primitives.
-// ============================================================================
-namespace delaunay_detail {
-
-inline constexpr double two_pi = 2 * std::numbers::pi_v<double>;
-
-// Tolerance bands of the floating-point predicates.  These absorb FP noise
-// in the cotangent/Heron evaluations, nothing else: the mathematics is
-// is_delaunay <=> cot-sum >= 0 and strict convexity <=> both endpoint forms
-// > 0.  Never widen a band to make a case pass.
-inline constexpr double delaunay_band   = -1e-10;  // accept near-tight as tight
-inline constexpr double convexity_band  =  1e-12;  // strictness margin
-inline constexpr double cot_degenerate  =  1e15;   // sentinel for a degenerate triangle
-
-// Heron product: H(a,b,c) = (a+b+c)(-a+b+c)(a-b+c)(a+b-c) = 16*Area^2.
-// Returns 0 if the triangle inequality is violated.
-inline double heron_product(double a, double b, double c) {
-  double s1 = -a + b + c;
-  double s2 =  a - b + c;
-  double s3 =  a + b - c;
-  if (s1 < 0 || s2 < 0 || s3 < 0) return 0;
-  return (a + b + c) * s1 * s2 * s3;
-}
-
-// The Heron product in SQUARED-length coordinates, exact over the integers:
-// for squared sides x = a^2, y = b^2, z = c^2,
-//   H(x,y,z) = 2(xy + yz + zx) - (x^2 + y^2 + z^2) = 16*Area^2.
-// The integer form the exact cocircularity predicate rationalizes over.
-inline long long heron_product_sq(long long x, long long y, long long z) {
-  return 2*(x*y + y*z + x*z) - (x*x + y*y + z*z);
-}
-
-// Cotangent of the angle opposite side `opp` in a triangle with sides
-// (opp, b, c): cot(alpha) = (b^2 + c^2 - opp^2) / sqrt(H).
-// Returns +/-cot_degenerate on a degenerate triangle (H <= 0) -- a value no
-// sane tolerance ever brackets, so degenerate diamonds classify as
-// non-tight rather than tripping the tight test.
-inline double cot_opposite(double opp, double b, double c) {
-  double H = heron_product(opp, b, c);
-  double num = b*b + c*c - opp*opp;
-  if (H <= 0) return (num >= 0) ? cot_degenerate : -cot_degenerate;
-  return num / std::sqrt(H);
-}
-
-// Angle of the corner adjacent to sides `adj1`, `adj2` in a triangle whose
-// opposite side is `opp`.  Law of cosines, clamped for floating-point safety
-// at triangle-inequality boundaries.
-inline double triangle_angle(double adj1, double adj2, double opp) {
-  double c = (adj1*adj1 + adj2*adj2 - opp*opp) / (2 * adj1 * adj2);
-  return std::acos(std::clamp(c, -1.0, 1.0));
-}
-
-}  // namespace delaunay_detail
-
-// ============================================================================
-// Diamond: the local geometry around an edge in a metrized triangulation.
-//
-//      B
-//     / \          upper triangle: sides (e, a, b)
-//    a   b         a = side adjacent to u, b = side adjacent to v
-//   /     \  .
-//  u---e---v       e = diagonal being tested/flipped
-//   \     /
-//    c   d         lower triangle: sides (e, c, d)
-//     \ /          c = side adjacent to u, d = side adjacent to v
-//      D
-//
-// All geometric predicates (Delaunay, convexity, flipped length) depend only
-// on these five edge lengths.  No vertex IDs or topology needed.
-// ============================================================================
-struct Diamond {
-  double e, a, b, c, d;
-
-  // cot(angle_B) + cot(angle_D) >= 0, within delaunay_band.
-  bool is_delaunay() const {
-    using namespace delaunay_detail;
-    return cot_opposite(e, a, b) + cot_opposite(e, c, d) >= delaunay_band;
-  }
-
-  // Angle sum < pi at both u and v, strictly (convexity_band margin).
-  // The two endpoints are the SAME half-predicate applied to the two ends of
-  // the diagonal (the diamond read from v swaps a<->b, c<->d): sin(angle) is
-  // proportional to sqrt(Ha)*Q + P*sqrt(Hd), with (P, Q) the endpoint's two
-  // law-of-cosines numerators.  Both tests share one evaluation of the two
-  // Heron roots, so the arithmetic per endpoint is identical.
-  bool is_convex() const {
-    using namespace delaunay_detail;
-    double e2 = e*e;
-    double Ha = heron_product(e, a, b), Hd = heron_product(e, c, d);
-    double sHa = (Ha > 0) ? std::sqrt(Ha) : 0;
-    double sHd = (Hd > 0) ? std::sqrt(Hd) : 0;
-    auto convex_at = [&](double P, double Q) {
-      return sHa * Q + P * sHd > convexity_band;
-    };
-    return convex_at(e2 + a*a - b*b, e2 + c*c - d*d)      // at u
-        && convex_at(e2 + b*b - a*a, e2 + d*d - c*c);     // at v
-  }
-
-  // Length of BD, the other diagonal.
-  double flipped_length() const {
-    using delaunay_detail::heron_product;
-    // f^2 = a^2 + c^2 - (PQ - sqrt(Ha*Hd)) / (2e^2)
-    double e2 = e*e, a2 = a*a, b2 = b*b, c2 = c*c, d2 = d*d;
-    double P = e2 + a2 - b2;
-    double Q = e2 + c2 - d2;
-    double Ha = heron_product(e, a, b), Hd = heron_product(e, c, d);
-    double sqrtHH = (Ha > 0 && Hd > 0) ? std::sqrt(Ha * Hd) : 0;
-    double f2 = a2 + c2 - (P * Q - sqrtHH) / (2 * e2);
-    return (f2 > 0) ? std::sqrt(f2) : 0;
-  }
-
-  // Cocircular ("tight") test: cot(angle_B) + cot(angle_D) == 0 exactly,
-  // i.e. the four points u, v, B, D are concyclic on the surface.  In this
-  // case both triangulations of the diamond are equally-valid Delaunay
-  // refinements of the same cell.  Uses exact integer arithmetic on
-  // length-squared (valid when all five lengths square to non-negative
-  // integers, e.g. equilateral triangulations and their flips).
-  // See CANONICAL-TESSELATION.md for the derivation.
-  bool is_cocircular() const {
-    // Tight Delaunay: cot(angle_B) + cot(angle_D) == 0 exactly.  Equivalent
-    // to s1 * area_2 + s2 * area_1 = 0 where s1 = a^2+b^2-e^2, s2 = c^2+d^2-e^2.
-    // Squaring after sign-check: tight iff sign(s1) != sign(s2) and
-    // s1^2 * H2 == s2^2 * H1 (with H = heron_product_sq = 16*area^2).  Or:
-    // both s1, s2 == 0.  Done in integer length-squared arithmetic so the
-    // predicate is exact for equilateral triangulations and any sequence of
-    // flips.
-    using delaunay_detail::heron_product_sq;
-    long long Le = (long long)std::llround(e * e);
-    long long La = (long long)std::llround(a * a);
-    long long Lb = (long long)std::llround(b * b);
-    long long Lc = (long long)std::llround(c * c);
-    long long Ld = (long long)std::llround(d * d);
-    long long s1 = La + Lb - Le;
-    long long s2 = Lc + Ld - Le;
-    if (s1 == 0 && s2 == 0) return true;
-    if (s1 == 0 || s2 == 0) return false;
-    if ((s1 > 0) == (s2 > 0)) return false;          // same sign: not tight
-    return s1 * s1 * heron_product_sq(Le, Lc, Ld)
-        == s2 * s2 * heron_product_sq(Le, La, Lb);
-  }
-
-  // Floating-point cocircular test for general (non-equilateral) metrics,
-  // where length-squared is not integer so the exact predicate above does not
-  // apply: tight iff |cot(angle_B) + cot(angle_D)| < tol.  Scale-invariant
-  // (cotangents are dimensionless), so tol is a pure angle threshold.
-  // cot_opposite returns +/-1e15 on a degenerate triangle, which never lands
-  // within a sane tol, so degenerate diamonds are correctly reported non-tight.
-  bool is_cocircular(double tol) const {
-    using delaunay_detail::cot_opposite;
-    double cotB = cot_opposite(e, a, b);
-    double cotD = cot_opposite(e, c, d);
-    return std::abs(cotB + cotD) < tol;
-  }
-};
+#include "fullerenes/delaunay_geometry.hh"  // Diamond, FanPolygon, delaunay_detail
 
 // ============================================================================
 // dcel_capacities(nv0): the workspace sizes a bounded DCEL over a closed
@@ -237,13 +85,174 @@ static_assert(dcel_capacities(0).nh_cap == 0 && dcel_capacities(2).nh_cap == 0,
               "dcel_capacities must guard nv0 < 3");
 
 // ============================================================================
+// DelaunayWorkspace: the bounded scratch the mutation machinery runs over.
+// Pure aggregate of spans and counts; carve from one arena via Factory, or
+// host-own via DelaunayWorkspaceOwner (delaunay.hh).
+// ============================================================================
+struct DelaunayWorkspace {
+  int k_max = 0;
+
+  // Fan scratch (extract_fan / ear_clip_fan) -- capacity k_max.
+  FanPolygon fan;
+  std::span<int> poly;        // [k_max]     ear-clip working polygon
+  std::span<int> rpoly;       // [k_max]     residual-polygon scratch
+  FanTriangulation tri;       // diagonals/triangles, both capacity k_max
+
+  // Driver scratch (remove_flat_vertices).  Every collector is a SpanStack,
+  // so capacity guarding and the calibration peak() are uniform.
+  Spanify::SpanStack<int> work;            // cap nv0
+  Spanify::BitSpan        on_queue;        // nv0 bits
+  Spanify::SpanStack<int> ring;            // cap 2*k_max (both sides of cleanup)
+  Spanify::SpanStack<int> tie_side[2];     // cap 2*k_max each (tie-break side fans)
+  Spanify::SpanStack<int> new_faces;       // cap k_max: the surgery's face list
+  Spanify::SpanStack<int> lawson_stack;    // cap nh0/2
+  Spanify::BitSpan        sweep_in_stack;  // nh0/2 bits
+
+  // ------------------------------------------------------------------------
+  // Layout: the workspace's shape -- three sizes and the one function that
+  // lays the fields over a cursor.  Carves one workspace from a caller byte
+  // arena
+  // (device-legal, no allocation).  k_max bounds the star degree seen during
+  // reduction; on a delta-complex deg(v) can reach the outgoing-arc count,
+  // so k_max = nh0 is the always-sufficient (and, with the O(k) layout,
+  // cheap) choice; k_max = 0 suffices for sweep-only use.
+  //
+  // ONE layout list: lay() carves the fields in order over a Carve cursor.
+  // A counting cursor (null base) yields the exact byte total; a real arena
+  // yields the workspace, bounds-checked -- bytes() and make() cannot drift.
+  // ------------------------------------------------------------------------
+  struct Layout {
+    int  nv0   = 0;   // vertex count of the input triangulation
+    int  k_max = 0;   // star-degree capacity (see banner)
+    long nh_explicit = -1;   // override for complexes grown past the build
+                             // size (bisect/split); -1 = the Euler formula
+
+    long nh0() const {
+      return nh_explicit >= 0 ? nh_explicit : dcel_capacities(nv0).nh_cap;
+    }
+
+    // Bump cursor over one arena; null base = counting mode.
+    struct Carve {
+      std::byte*  base = nullptr;
+      std::size_t off  = 0, cap = 0;
+      bool        ok   = true;
+      template <class T> std::span<T> take(long n) {
+        off = (off + alignof(T) - 1) / alignof(T) * alignof(T);
+        std::byte* q = base ? base + off : nullptr;
+        off += (std::size_t)n * sizeof(T);
+        ok = ok && (!base || off <= cap);
+        return {reinterpret_cast<T*>(q), (std::size_t)n};
+      }
+    };
+
+    // THE field layout (the only list).
+    DelaunayWorkspace lay(Carve& c) const {
+      const long lawson_cap     = nh0() / 2;
+      const long on_queue_words = Spanify::BitSpan::words_for(nv0);
+      const long sweep_words    = Spanify::BitSpan::words_for(lawson_cap);
+
+      DelaunayWorkspace ws;
+      ws.k_max = k_max;
+      ws.fan.nb        = c.take<int>(k_max);
+      ws.fan.spoke_he  = c.take<int>(k_max);
+      ws.fan.inner_rim = c.take<int>(k_max);
+      ws.fan.spokes    = c.take<double>(k_max);
+      ws.fan.rims      = c.take<double>(k_max);
+      ws.fan.cum       = c.take<double>(k_max + 1);
+      ws.poly          = c.take<int>(k_max);
+      ws.rpoly         = c.take<int>(k_max);
+      ws.tri.diagonals = c.take<FanTriangulation::Diagonal>(k_max);
+      ws.tri.triangles = c.take<FanTriangulation::Triangle>(k_max);
+      ws.work          = Spanify::SpanStack<int>(c.take<int>(nv0));
+      ws.on_queue      = Spanify::BitSpan(c.take<std::uint64_t>(on_queue_words));
+      ws.ring          = Spanify::SpanStack<int>(c.take<int>(2L * k_max));
+      ws.tie_side[0]   = Spanify::SpanStack<int>(c.take<int>(2L * k_max));
+      ws.tie_side[1]   = Spanify::SpanStack<int>(c.take<int>(2L * k_max));
+      ws.new_faces     = Spanify::SpanStack<int>(c.take<int>(k_max));
+      ws.lawson_stack  = Spanify::SpanStack<int>(c.take<int>(lawson_cap));
+      ws.sweep_in_stack = Spanify::BitSpan(c.take<std::uint64_t>(sweep_words));
+      return ws;
+    }
+
+    std::size_t bytes() const {
+      Carve c;
+      lay(c);
+      return c.off;
+    }
+
+    // On an undersized arena the carve fails loudly: the returned workspace
+    // has k_max = 0, so the first fan extraction trips CapacityExceeded.
+    DelaunayWorkspace make(std::span<std::byte> arena) const {
+      Carve c{arena.data(), 0, arena.size()};
+      DelaunayWorkspace ws = lay(c);
+      return c.ok ? ws : DelaunayWorkspace{};
+    }
+  };
+};
+
+// ============================================================================
+// Transport policy: the point-tracker's hook points on the two
+// topology-changing operations.  NoTransport (the default, and the only
+// policy device code sees) is a set of empty inline no-ops -- the
+// instantiated bodies are the untracked operations exactly.  The owner's
+// tracked path supplies a host-side policy (TrackerTransport, delaunay.cc)
+// reproducing the flip-tape transport through the same surgery bodies.
+// Plan hooks run BEFORE any mutation and may throw (host policies only);
+// commit hooks run after the surgery and must not fail.
+// ============================================================================
+struct NoTransport {
+  static constexpr bool tracking() { return false; }
+  void plan_flip(int /*h*/, int /*fh*/, int /*ft*/) {}
+  void commit_flip(int /*fh*/, int /*ft*/) {}
+  void plan_star(int /*v*/, const FanPolygon&) {}
+  void plan_charts(const FanPolygon&, const FanTriangulation&, int /*deg*/) {}
+  void commit_removal(std::span<const int> /*new_faces*/, int /*seed_label*/) {}
+};
+
+// Observer policy for remove_flat_vertices: on_pop fires at every live-flat
+// work-list pop (the documented observation hook), on_removed after each
+// successful removal (the diagnostics hook).  Must not mutate the mesh.
+struct NoRemovalObserver {
+  void on_pop(int /*v*/) {}
+  void on_removed(int /*v*/) {}
+};
+
+// ============================================================================
 // DelaunayView: span SoA view of the half-edge DCEL.
 // ============================================================================
 struct DelaunayView {
+  // The run-path error channel: a sticky first-failure latch (the view never
+  // throws).  First failure wins; every mutating operation below early-outs
+  // once status != Ok, so one bad operation cannot cascade into corrupted
+  // state or clobber the original diagnostic.  The owner converts a non-Ok
+  // status to its documented throws at its boundary.
+  enum class Status : int { Ok, CapacityExceeded, BudgetExceeded, InvariantViolated };
+  Status      status         = Status::Ok;
+  const char* status_site    = nullptr;   // string literal at the trip site
+  int         status_witness = -1;        // offending h / v / size
+
+  // Latch the first failure together with the obligation it violated; later
+  // trips never clobber the original diagnostic (first-failure-wins is
+  // structural, not by-inspection).  Returns false so guard sites can
+  // `return trip(...)`.  A non-Ok status is TERMINAL for the complex: no
+  // reset exists; recover by re-assigning from a clean complex (which copies
+  // the clean status).
+  bool trip(Status s, const char* site, int witness = -1) {
+    if (status == Status::Ok) {
+      status = s;
+      status_site = site;
+      status_witness = witness;
+    }
+    return false;
+  }
+
   // --- Counts (dead slots included in nh/nf) ---
   int nv = 0;   // live vertices
   int nh = 0;   // allocated half-edges (including dead slots)
   int nf = 0;   // allocated faces (including dead slots)
+
+  // --- Capacities (fixed at bind time; the view never resizes) ---
+  int nv_cap = 0, nh_cap = 0, nf_cap = 0;
 
   // --- Half-edge topology (indexed 0..nh-1) ---
   std::span<int>    he_next;    // next half-edge CCW in same face
@@ -261,6 +270,13 @@ struct DelaunayView {
 
   // --- Per-face (indexed 0..nf-1) ---
   std::span<int>    f_he;       // one boundary half-edge (-1 = dead face)
+
+  // --- Free lists (bounded LIFO == the historical vectors' LIFO use;
+  //     capacity one entry per edge / per face -- DcelCapacities'
+  //     free_*_cap -- so overflow is unreachable in contract, loud if
+  //     reached) ---
+  Spanify::SpanStack<int> free_edges;  // recycled edge slots (half-edge id / 2)
+  Spanify::SpanStack<int> free_faces;  // recycled face slots
 
   // -------------------------------------------------------------------------
   // Navigation.
@@ -461,6 +477,766 @@ struct DelaunayView {
   }
 
   // -------------------------------------------------------------------------
+  // Allocation over the free lists (capacity-guarded; the view never grows --
+  // an owner pre-ensures capacity for genuine growth, and during reduction
+  // the free lists always cover demand, so the guards are dead in contract).
+  // -------------------------------------------------------------------------
+  int alloc_edge() {
+    if (status != Status::Ok) return -1;
+    int eid;
+    if (!free_edges.empty()) {
+      eid = free_edges.back();
+      free_edges.pop_back();
+    } else {
+      eid = nh / 2;
+      if (nh + 2 > nh_cap) {
+        trip(Status::CapacityExceeded, "alloc_edge: half-edge capacity", nh);
+        return -1;
+      }
+      nh += 2;
+      he_next[2*eid] = -1;   he_next[2*eid+1] = -1;
+      he_origin[2*eid] = -1; he_origin[2*eid+1] = -1;
+      he_face[2*eid] = -1;   he_face[2*eid+1] = -1;
+      he_length[2*eid] = 0;  he_length[2*eid+1] = 0;
+      he_angle[2*eid] = 0;   he_angle[2*eid+1] = 0;
+    }
+    he_origin[2*eid] = -1;
+    he_origin[2*eid+1] = -1;
+    return 2 * eid;
+  }
+
+  int alloc_face() {
+    if (status != Status::Ok) return -1;
+    int fid;
+    if (!free_faces.empty()) {
+      fid = free_faces.back();
+      free_faces.pop_back();
+    } else {
+      if (nf + 1 > nf_cap) {
+        trip(Status::CapacityExceeded, "alloc_face: face capacity", nf);
+        return -1;
+      }
+      fid = nf++;
+      f_he[fid] = -1;
+    }
+    f_he[fid] = -1;
+    return fid;
+  }
+
+  void dealloc_edge(int h) {
+    if (status != Status::Ok) return;
+    int eid = edge(h);
+    he_origin[2*eid] = -1;
+    he_origin[2*eid+1] = -1;
+    he_next[2*eid] = -1;
+    he_next[2*eid+1] = -1;
+    he_face[2*eid] = -1;
+    he_face[2*eid+1] = -1;
+    he_length[2*eid] = 0;
+    he_length[2*eid+1] = 0;
+    if (!free_edges.push_back(eid))
+      trip(Status::CapacityExceeded, "dealloc_edge: free-list overflow (double dealloc?)", eid);
+  }
+
+  void dealloc_face(int f) {
+    if (status != Status::Ok) return;
+    f_he[f] = -1;
+    if (!free_faces.push_back(f))
+      trip(Status::CapacityExceeded, "dealloc_face: free-list overflow (double dealloc?)", f);
+  }
+
+  // Allocate an edge and set its endpoints and length.  Returns the
+  // half-edge h with origin(h) = u, origin(twin h) = v, length L on both
+  // sides; faces remain unassigned.
+  int alloc_directed_edge(int u, int v, double L) {
+    if (status != Status::Ok) return -1;
+    int h = alloc_edge();
+    if (h < 0) return h;
+    he_origin[h]     = u;
+    he_origin[twin(h)] = v;
+    he_length[h] = he_length[twin(h)] = L;
+    return h;
+  }
+
+  // Wire three half-edges into a CCW triangle face and compute its angles
+  // from the stored edge lengths.  Returns the new face id.
+  // @pre h0, h1, h2 have origin and length set; their endpoints chain.
+  int wire_triangle(int h0, int h1, int h2) {
+    if (status != Status::Ok) return -1;
+    // The historical local_arc.at() threw on a missing arc; a dead arc here
+    // would otherwise write he_next[-1] (paper lem:wire-triangle scope).
+    if (h0 < 0 || h1 < 0 || h2 < 0) {
+      trip(Status::InvariantViolated, "wire_triangle: dead arc handle", std::min({h0, h1, h2}));
+      return -1;
+    }
+    int fid = alloc_face();
+    if (fid < 0) return fid;
+    he_next[h0] = h1; he_next[h1] = h2; he_next[h2] = h0;
+    he_face[h0] = he_face[h1] = he_face[h2] = fid;
+    f_he[fid] = h0;
+    recompute_face_angles(fid);
+    return fid;
+  }
+
+  // -------------------------------------------------------------------------
+  // Delaunay operations.
+  // -------------------------------------------------------------------------
+  bool is_delaunay_edge(int h) const { return diamond(h).is_delaunay(); }
+
+  bool is_delaunay() const {
+    for (int h : edges())
+      if (!is_delaunay_edge(h)) return false;
+    return true;
+  }
+
+  int count_non_delaunay() const {
+    int count = 0;
+    for (int h : edges())
+      if (!is_delaunay_edge(h)) count++;
+    return count;
+  }
+
+  // Smallest degree among live vertices, or INT32_MAX if none.
+  int min_live_degree() const {
+    int m = INT32_MAX;
+    for (int v = 0; v < nv; v++) {
+      if (v_out[v] < 0) continue;
+      int d = vertex_degree(v);
+      if (d < m) m = d;
+    }
+    return m;
+  }
+
+  // Flip the diagonal of the diamond around edge h.  Accepts any edge with a
+  // strictly convex diamond and a positive flipped length, including the
+  // B == D case, which produces a self-loop edge at B (strictly Delaunay
+  // when the flipped edge was non-Delaunay; paper lem:selfloop-delaunay).
+  // @post on true:  the DCEL invariants hold with the new diagonal B-D in
+  //                 place of h; only the two diamond faces are rewired; the
+  //                 surface metric is unchanged (paper thm:metric-invariance).
+  // @post on false: the complex is untouched.
+  // The transport policy's plan hook runs before the first write (it may
+  // throw with everything untouched); commit after the rewire.
+  template <class Transport = NoTransport>
+  bool flip_edge(int h, Transport&& tr = Transport{}) {
+    if (status != Status::Ok) return false;
+
+    int t = twin(h);
+    int h1 = he_next[h], h2 = he_next[h1];
+    int h4 = he_next[t], h5 = he_next[h4];
+    int u = he_origin[h],  v = he_origin[t];
+    int B = he_origin[h2], D = he_origin[h5];
+
+    Diamond dm = diamond(h);
+    if (!dm.is_convex()) return false;
+    double f_len = dm.flipped_length();
+    if (!std::isfinite(f_len) || f_len <= 0) return false;
+
+    // Rewire the diagonal: h becomes B->D, t becomes D->B.  Reuse the two
+    // face slots fh, ft by rewiring in place (avoids dealloc/realloc).
+    int fh = he_face[h], ft = he_face[t];
+    tr.plan_flip(h, fh, ft);
+
+    he_origin[h] = B;
+    he_origin[t] = D;
+    he_length[h] = he_length[t] = f_len;
+
+    // Face left of h: (B, D, v) via half-edges h -> h5 -> h1 (origins B, D, v).
+    he_next[h]  = h5;  he_next[h5] = h1;  he_next[h1] = h;
+    he_face[h]  = he_face[h5] = he_face[h1] = fh;
+    f_he[fh] = h;
+
+    // Face left of t: (D, B, u) via half-edges t -> h2 -> h4 (origins D, B, u).
+    he_next[t]  = h2;  he_next[h2] = h4;  he_next[h4] = t;
+    he_face[t]  = he_face[h2] = he_face[h4] = ft;
+    f_he[ft] = t;
+
+    recompute_face_angles(fh);
+    recompute_face_angles(ft);
+
+    // u and v lost their incident diagonal; find a new outgoing half-edge.
+    if (v_out[u] == h) v_out[u] = h4;
+    if (v_out[v] == t) v_out[v] = h1;
+    // B == D case: h and t are now self-loops at B.  he_origin[h5] is never
+    // reassigned by the flip and equals D == B; h5 is wired into face fh
+    // above -- a valid outgoing half-edge from B.
+    if (B == D) v_out[B] = h5;
+
+    tr.commit_flip(fh, ft);
+    return true;
+  }
+
+  // Shared drain of the seeded Lawson sweep.  The Bobenko-Springborn
+  // discrete Dirichlet energy strictly decreases on every flip (paper
+  // thm:lawson-converge), so the sweep terminates; the 200*nv budget is a
+  // fail-loud backstop, not part of the algorithm.
+  template <class Transport = NoTransport>
+  int lawson_sweep_drain(Spanify::SpanStack<int>& S, Spanify::BitSpan& in_stack,
+                         Transport&& tr = Transport{}) {
+    if (status != Status::Ok) return 0;
+    int flips = 0;
+    int budget = 200 * nv;
+    while (!S.empty()) {
+      if (budget <= 0) {
+        trip(Status::BudgetExceeded,
+             "lawson_sweep: 200*nv flip budget (paper thm:lawson-converge precludes this)", nv);
+        return flips;
+      }
+
+      int h = S.back(); S.pop_back();
+      in_stack.clear(edge(h));
+
+      if (!alive(h) || is_delaunay_edge(h)) continue;
+
+      // Record rim edges before flipping (they'll be checked next).
+      int h1 = he_next[h], h2 = he_next[h1];
+      int h4 = he_next[twin(h)], h5 = he_next[h4];
+
+      if (!flip_edge(h, tr)) {
+        trip(Status::InvariantViolated,
+             "lawson_sweep: flip_edge rejected a non-Delaunay edge (paper lem:ndimpliesconvex)", h);
+        return flips;
+      }
+      flips++; budget--;
+
+      for (int rim : {h1, h2, h4, h5}) {
+        int eid = edge(rim);
+        if (!in_stack.test(eid)) {
+          if (!S.push_back(rim & ~1)) {
+            trip(Status::CapacityExceeded, "lawson_sweep: rim push", rim);
+            return flips;
+          }
+          in_stack.set(eid);
+        }
+      }
+    }
+    return flips;
+  }
+
+  // The seeded restore around a surgery rim (paper cor:local-restore): the
+  // frontier is every edge incident to a live rim vertex, pushed in ring
+  // order with in_stack dedup -- the same seed set, in the same order, the
+  // historical collect-then-sweep produced, without materializing it.
+  // @pre  as the seeded lawson_sweep below.
+  template <class Transport = NoTransport>
+  int lawson_sweep_around(std::span<const int> rim, Spanify::SpanStack<int>& S,
+                          Spanify::BitSpan& in_stack, Transport&& tr = Transport{}) {
+    if (status != Status::Ok) return 0;
+    S.clear();
+    for (int w : rim) {
+      if (w < 0 || w >= nv || v_out[w] < 0) continue;
+      for (int h : incident(w)) {
+        if (!alive(h)) continue;
+        int eid = edge(h);
+        if (!in_stack.test_and_set(eid)) {
+          if (!S.push_back(eid << 1)) {
+            trip(Status::CapacityExceeded, "lawson_sweep_around: seed push", eid);
+            return 0;
+          }
+        }
+      }
+    }
+    return lawson_sweep_drain(S, in_stack, tr);
+  }
+
+  // Seeded Lawson: restore Delaunay from a frontier of edges, propagating to
+  // each flip's rim.  in_stack is the caller-owned stack-membership scratch
+  // (sized nh/2 bits); @pre all-false on entry, @post all-false on normal
+  // (non-status-tripped) return.
+  // @pre  seeded: every non-Delaunay edge is in seed_edges or arises on the
+  //       rim of a seed cascade (paper lem:seeded-sweep).
+  // @post is_delaunay() on Ok.
+  template <class Transport = NoTransport>
+  int lawson_sweep(std::span<const int> seed_edges, Spanify::SpanStack<int>& S,
+                   Spanify::BitSpan& in_stack, Transport&& tr = Transport{}) {
+    if (status != Status::Ok) return 0;
+    S.clear();
+    for (int h : seed_edges)
+      if (alive(h)) {
+        int eid = edge(h);
+        if (!in_stack.test_and_set(eid)) {
+          if (!S.push_back(eid << 1)) {
+            trip(Status::CapacityExceeded, "lawson_sweep: seed push", eid);
+            return 0;
+          }
+        }
+      }
+    return lawson_sweep_drain(S, in_stack, tr);
+  }
+
+  // Global Delaunay restore: seed with every live edge, in edge order.
+  // @post is_delaunay() on Ok (paper thm:lawson-converge).
+  template <class Transport = NoTransport>
+  int flip_to_delaunay(Spanify::SpanStack<int>& S, Spanify::BitSpan& in_stack,
+                       Transport&& tr = Transport{}) {
+    if (status != Status::Ok) return 0;
+    S.clear();
+    for (int h : edges()) {
+      int eid = edge(h);
+      if (!in_stack.test_and_set(eid)) {
+        if (!S.push_back(eid << 1)) {
+          trip(Status::CapacityExceeded, "flip_to_delaunay: seed push", eid);
+          return 0;
+        }
+      }
+    }
+    return lawson_sweep_drain(S, in_stack, tr);
+  }
+
+  // -------------------------------------------------------------------------
+  // Vertex removal machinery.
+  // -------------------------------------------------------------------------
+
+  // Extract the fan polygon around v into ws.fan.  The ONE chokepoint for
+  // fan-degree overflow: every downstream fan buffer is sized to the same
+  // k_max, so once this check passes the rest is safe by construction.
+  void extract_fan(int v, DelaunayWorkspace& ws) {
+    if (status != Status::Ok) return;
+    FanPolygon& fan = ws.fan;
+
+    fan.k = vertex_degree(v);
+    if (fan.k > (int)fan.nb.size()) {
+      trip(Status::CapacityExceeded, "extract_fan: star degree exceeds k_max", fan.k);
+      return;
+    }
+
+    fan.spoke_he[0] = v_out[v];
+    for (int i = 1; i < fan.k; i++)
+      fan.spoke_he[i] = ccw(fan.spoke_he[i-1]);
+
+    for (int i = 0; i < fan.k; i++) {
+      fan.nb[i]        = dest(fan.spoke_he[i]);
+      fan.spokes[i]    = he_length[fan.spoke_he[i]];
+      fan.inner_rim[i] = he_next[fan.spoke_he[i]];
+      fan.rims[i]      = he_length[fan.inner_rim[i]];
+    }
+
+    fan.cum[0] = 0;
+    for (int i = 0; i < fan.k; i++)
+      fan.cum[i+1] = fan.cum[i]
+                   + delaunay_detail::triangle_angle(fan.spokes[i],
+                                                     fan.spokes[(i+1) % fan.k],
+                                                     fan.rims[i]);
+  }
+
+  // Ear-clip the fan polygon into triangles.  By Meisters' theorem a simple
+  // polygon with k >= 4 always has an ear; a pass with no ear is a theorem
+  // counterexample -> InvariantViolated, never a silent partial result.
+  void ear_clip_fan(DelaunayWorkspace& ws) {
+    if (status != Status::Ok) return;
+    const FanPolygon& fan = ws.fan;
+    FanTriangulation& tri = ws.tri;
+    int k = fan.k;
+
+    tri.n_diagonals = 0;
+    tri.n_triangles = 0;
+
+    int poly_n = k;
+    for (int i = 0; i < k; i++) ws.poly[i] = i;
+
+    while (poly_n > 3) {
+      int n = poly_n;
+      bool clipped = false;
+
+      for (int j = 0; j < n; j++) {
+        int pp = ws.poly[(j - 1 + n) % n], pi = ws.poly[j], pn = ws.poly[(j + 1) % n];
+        double len = delaunay_detail::ear_length_if_acceptable(fan, pp, pi, pn);
+        if (len <= 0) continue;
+        tri.diagonals[tri.n_diagonals++] = {pp, pi, pn, len};
+        for (int m = j; m < poly_n - 1; m++) ws.poly[m] = ws.poly[m + 1];
+        poly_n--;
+        clipped = true;
+        break;
+      }
+
+      if (!clipped) {
+        trip(Status::InvariantViolated,
+             "ear_clip_fan: no acceptable ear (paper thm:two-ears violated)", poly_n);
+        return;
+      }
+    }
+
+    // Compose diagonals into the triangle list, appending the base triangle.
+    int rpoly_n = k;
+    for (int i = 0; i < k; i++) ws.rpoly[i] = i;
+    for (int di = 0; di < tri.n_diagonals; di++) {
+      const FanTriangulation::Diagonal& ear = tri.diagonals[di];
+      tri.triangles[tri.n_triangles++] = {ear.from, ear.ear, ear.to};
+      int fpos = -1;
+      for (int m = 0; m < rpoly_n; m++) if (ws.rpoly[m] == ear.ear) { fpos = m; break; }
+      if (fpos < 0) {
+        trip(Status::InvariantViolated,
+             "ear_clip_fan: clipped ear absent from residual polygon", ear.ear);
+        return;
+      }
+      for (int m = fpos; m < rpoly_n - 1; m++) ws.rpoly[m] = ws.rpoly[m + 1];
+      rpoly_n--;
+    }
+    if (rpoly_n != 3) {
+      trip(Status::InvariantViolated, "ear_clip_fan: residual polygon size != 3", rpoly_n);
+      return;
+    }
+    tri.triangles[tri.n_triangles++] = {ws.rpoly[0], ws.rpoly[1], ws.rpoly[2]};
+  }
+
+  // Replace v's star with the ear triangulation.  Arcs are keyed by polygon
+  // POSITIONS (so repeated vertex ids in a delta-complex fan stay
+  // unambiguous), resolved by formula -- arc (i, i+1) is inner_rim[i] -- or
+  // by scanning the <= k-3 recorded diagonals (O(k) per triangle, no k x k
+  // matrix and no per-call reset).  The new faces are pushed onto
+  // ws.new_faces (wire_triangle pins f_he to its first argument, so face
+  // slot i of a new face is fan index t.vi -- the anchoring the point
+  // transport uses).
+  void splice_fan(int v, DelaunayWorkspace& ws) {
+    if (status != Status::Ok) return;
+    const FanPolygon& fan = ws.fan;
+    const FanTriangulation& tri = ws.tri;
+    int k = fan.k;
+    // diag_he[di] = the allocated half-edge of diagonal di, from -> to.
+    // tri.diagonals has capacity k_max >= k, so reuse ws.poly as the
+    // parallel handle array (ear_clip_fan is done with it).
+    std::span<int> diag_he = ws.poly;
+    auto arc = [&](int i, int j) -> int {
+      if (j == (i + 1) % k) return fan.inner_rim[i];
+      for (int di = 0; di < tri.n_diagonals; di++) {
+        const FanTriangulation::Diagonal& d = tri.diagonals[di];
+        if (d.from == i && d.to == j) return diag_he[di];
+        if (d.to == i && d.from == j) return twin(diag_he[di]);
+      }
+      return -1;   // caught by wire_triangle's dead-arc guard
+    };
+
+    for (int i = 0; i < k; i++) {
+      dealloc_face(he_face[fan.spoke_he[i]]);
+      dealloc_edge(fan.spoke_he[i]);
+    }
+    v_out[v] = -1;
+    if (status != Status::Ok) return;
+
+    for (int di = 0; di < tri.n_diagonals; di++) {
+      const FanTriangulation::Diagonal& d = tri.diagonals[di];
+      int h_d = alloc_directed_edge(fan.nb[d.from], fan.nb[d.to], d.length);
+      if (status != Status::Ok) return;
+      diag_he[di] = h_d;
+    }
+
+    for (int ti = 0; ti < tri.n_triangles; ti++) {
+      const FanTriangulation::Triangle& t = tri.triangles[ti];
+      int f = wire_triangle(arc(t.v0, t.v1), arc(t.v1, t.v2), arc(t.v2, t.v0));
+      if (status != Status::Ok) return;
+      if (!ws.new_faces.push_back(f)) {
+        trip(Status::CapacityExceeded, "splice_fan: new-face list", f);
+        return;
+      }
+    }
+
+    // Restore each rim vertex's outgoing pointer from a known-live local
+    // edge: inner_rim[i] originates at nb[i], is never deallocated (only
+    // spokes are), and was just re-wired into an ear triangle.
+    for (int i = 0; i < k; i++) v_out[fan.nb[i]] = fan.inner_rim[i];
+  }
+
+  // Remove a degree-3 vertex: three fan faces merge into one triangle,
+  // pushed onto ws.new_faces.
+  void remove_degree3(int v, DelaunayWorkspace& ws) {
+    if (status != Status::Ok) return;
+    int h0 = v_out[v], h1 = ccw(h0), h2 = ccw(h1);
+    int f0 = he_face[h0], f1 = he_face[h1], f2 = he_face[h2];
+    int inner0 = he_next[h0], inner1 = he_next[h1], inner2 = he_next[h2];
+
+    // Snapshot the neighbour ids BEFORE deallocation (dest reads the twin's
+    // origin, which dealloc_edge clears).
+    int nb0 = dest(h0), nb1 = dest(h1), nb2 = dest(h2);
+
+    dealloc_face(f0); dealloc_face(f1); dealloc_face(f2);
+    dealloc_edge(h0); dealloc_edge(h1); dealloc_edge(h2);
+    v_out[v] = -1;
+    if (status != Status::Ok) return;
+
+    int f = wire_triangle(inner0, inner1, inner2);
+    if (status != Status::Ok) return;
+    if (!ws.new_faces.push_back(f)) {
+      trip(Status::CapacityExceeded, "remove_degree3: new-face list", f);
+      return;
+    }
+
+    v_out[nb0] = inner0; v_out[nb1] = inner1; v_out[nb2] = inner2;
+  }
+
+  // Remove one flat vertex (deg >= 4: ear clipping + surgery; deg == 3:
+  // direct merge; deg < 3: not removable here -- the driver's restructure
+  // rounds handle it).  Transport plan hooks run before the surgery.
+  template <class Transport = NoTransport>
+  void remove_flat_vertex(int v, DelaunayWorkspace& ws, Transport&& tr = Transport{}) {
+    if (status != Status::Ok) return;
+    int deg = vertex_degree(v);
+    if (deg < 3) return;
+
+    constexpr bool tracking = std::remove_reference_t<Transport>::tracking();
+    if (tracking || deg >= 4) {
+      extract_fan(v, ws);
+      if (status != Status::Ok) return;
+    }
+    if constexpr (tracking) tr.plan_star(v, ws.fan);
+
+    if (deg >= 4) {
+      ear_clip_fan(ws);
+      if (status != Status::Ok) return;
+    }
+    if constexpr (tracking) tr.plan_charts(ws.fan, ws.tri, deg);
+
+    ws.new_faces.clear();
+    if (deg >= 4) splice_fan(v, ws);
+    else          remove_degree3(v, ws);
+    if (status != Status::Ok) return;
+
+    if constexpr (tracking) tr.commit_removal(ws.new_faces.live(), v);
+  }
+
+  // The t = 1 cocircular tie-break: an exactly tied self-loop diamond (end
+  // angle = pi) is resolved by flipping a side-fan spoke whose diamond is
+  // exactly cocircular (energy-neutral, Delaunay-preserving), keeping the
+  // flip only if it convexifies the loop (cocircular flips are involutive).
+  // Smaller-theta side first (the theorem's side, paper thm:tie-break).
+  template <class Transport = NoTransport>
+  bool tie_break_self_loop(int v, int h_loop, DelaunayWorkspace& ws,
+                           Transport&& tr = Transport{}) {
+    if (status != Status::Ok) return false;
+    const int slots[2] = {h_loop, h_loop ^ 1};
+    double theta[2] = {0.0, 0.0};
+    for (int i = 0; i < 2; i++) {
+      ws.tie_side[i].clear();
+      const int start = cw(slots[i] ^ 1), stop = cw(slots[i]);
+      long guard = 0;
+      for (int g = start; g != stop; g = cw(g)) {
+        theta[i] += he_angle[g];
+        if (dest(g) != v) {
+          if (!ws.tie_side[i].push_back(g))
+            return trip(Status::CapacityExceeded, "tie_break_self_loop: side-fan capacity",
+                        (int)ws.tie_side[i].size());
+        }
+        if (++guard > nh)
+          return trip(Status::InvariantViolated, "tie_break_self_loop: ring walk overran", h_loop);
+      }
+    }
+    const int first = (theta[0] <= theta[1]) ? 0 : 1;
+    for (int pass = 0; pass < 2; pass++) {
+      const int i = (pass == 0) ? first : 1 - first;
+      const std::span<const int> side = ws.tie_side[i].live();
+      for (int s = 0; s < (int)side.size(); s++) {
+        const int g = side[s];
+        if (!diamond(g).is_cocircular(delaunay_detail::tie_cocircular_tol)) continue;
+        if (!flip_edge(g, tr)) continue;    // inscribed quad: convex, but stay guarded
+        if (diamond(h_loop).is_convex()) return true;
+        flip_edge(g, tr);                   // undo: not the theorem's spoke
+      }
+    }
+    return false;
+  }
+
+  // Flip away all self-loops at flat vertex v (they must be cleared before
+  // removal, else splice_fan would wire a live edge to the dead vertex).
+  // By the half-angle lemma every self-loop at a flat vertex in a Delaunay
+  // state has diamond ends <= pi; strict convexity fails only on an EXACT
+  // tie, which the tie-break resolves.  The pass budget converts unforeseen
+  // cocircular pathology into a loud status instead of a hang; a surviving
+  // self-loop is InvariantViolated (provably dead on exact min-degree-3
+  // sphere input, paper thm:main).
+  template <class Transport = NoTransport>
+  void flip_away_self_loops(int v, DelaunayWorkspace& ws, Transport&& tr = Transport{}) {
+    if (status != Status::Ok) return;
+    if (v_out[v] < 0) return;
+    int budget = 8 * (vertex_degree(v) + 4);
+    bool flipped_any = true;
+    while (flipped_any) {
+      if (--budget < 0) {
+        trip(Status::BudgetExceeded,
+             "flip_away_self_loops: pass budget (cocircular pathology guard)", v);
+        return;
+      }
+      flipped_any = false;
+      for (int h : incident(v)) {
+        if (dest(h) != v) continue;
+        if (flip_edge(h, tr) || flip_edge(h ^ 1, tr) ||
+            tie_break_self_loop(v, h, ws, tr)) {
+          flipped_any = true;
+          break;                  // the ring changed: restart the scan
+        }
+        if (status != Status::Ok) return;
+      }
+    }
+    for (int h : incident(v))
+      if (dest(h) == v) {
+        trip(Status::InvariantViolated,
+             "flip_away_self_loops: self-loop survives the tie-break (paper thm:main scope)", v);
+        return;
+      }
+  }
+
+  // Remove every flat vertex (|kappa| < flat_tol), leaving the cones: the
+  // work-list driver with per-removal seeded Delaunay restore, restructure
+  // rounds, and the stuck-reduction fail-loud guard.  See is_flat for
+  // choosing flat_tol.  Returns the status (Ok iff fully reduced).
+  //
+  // @ref  alg:idt (the driver), cor:local-restore (per-removal restore),
+  //       thm:full-scan-term (termination), cor:stuck-diagnosis (loud stop).
+  // @inv  delaunay: at every work-list pop the complex is globally Delaunay
+  //       -- established by the initial flip_to_delaunay, re-established by
+  //       each removal's seeded restore; the hypothesis of
+  //       cor:local-restore.
+  // @variant n_live_flat strictly decreases on each successful removal, and
+  //       a restructure round that removes nothing ends the fixed point.
+  // @post on Ok: no live v has |kappa_v| < flat_tol, and is_delaunay().
+  //
+  // Flatness is isometric-invariant, so a removal only changes the
+  // REMOVABILITY of star neighbours -- each vertex is touched O(deg) times
+  // per round, O(N) total.  The two effects the local re-push provably
+  // cannot reach, hence the outer restructure rounds: (a) a flat made
+  // removable by a seeded-sweep flip OUTSIDE the rim; (b) a deg <= 2 flat
+  // that only a global restructure lifts to deg >= 3 (paper lem:flat-deg3).
+  template <class Transport = NoTransport, class Observer = NoRemovalObserver>
+  Status remove_flat_vertices(DelaunayWorkspace& ws, double flat_tol = 1e-6,
+                              Transport&& tr = Transport{},
+                              Observer&& obs = Observer{}) {
+    if (status != Status::Ok) return status;
+
+    // Reused across the per-removal seeded sweeps: each sweep leaves it
+    // all-false on normal return, so the zero-fill happens once.
+    ws.sweep_in_stack.clear_all();
+    ws.work.clear();
+    ws.on_queue.clear_all();
+
+    // Admit v to the work list iff it is a live flat not already queued --
+    // THE admission predicate, shared by the local re-push and the global
+    // re-seed.  Returns whether v was newly admitted.
+    auto enqueue = [&](int v) -> bool {
+      if (status != Status::Ok) return false;
+      if (v < 0 || v >= nv || v_out[v] < 0 || !is_flat(v, flat_tol)) return false;
+      if (ws.on_queue.test_and_set(v)) return false;
+      if (!ws.work.push_back(v))
+        return trip(Status::CapacityExceeded, "remove_flat_vertices: work list", v);
+      return true;
+    };
+    auto push = [&](int v) { enqueue(v); };
+
+    // Attempt one removal; on success restore Delaunay locally and re-push
+    // the affected rim flats.  Flatness is isometric-invariant, so a removal
+    // only changes the REMOVABILITY of star neighbours.
+    auto try_remove = [&](int v) -> bool {
+      if (status != Status::Ok) return false;
+      if (v < 0 || v >= nv || v_out[v] < 0 || !is_flat(v, flat_tol)) return false;
+      obs.on_pop(v);
+      // Collect the star rim on BOTH sides of the self-loop cleanup (its
+      // flips perturb the pre-flip ring; the removal re-triangulates the
+      // post-flip rim) -- a superset of the edges whose Delaunay status the
+      // surgery can change.
+      ws.ring.clear();
+      for (int h : incident(v)) {
+        if (!ws.ring.push_back(dest(h)))
+          return trip(Status::CapacityExceeded, "remove_flat_vertices: ring", (int)ws.ring.size());
+      }
+      flip_away_self_loops(v, ws, tr);
+      if (status != Status::Ok) return false;
+      for (int h : incident(v)) {
+        if (!ws.ring.push_back(dest(h)))
+          return trip(Status::CapacityExceeded, "remove_flat_vertices: ring", (int)ws.ring.size());
+      }
+
+      remove_flat_vertex(v, ws, tr);
+      if (status != Status::Ok) return false;
+      const bool removed_v = (v_out[v] < 0);
+      if (removed_v)
+        while (nv > 0 && v_out[nv - 1] < 0) nv--;
+
+      // Restore Delaunay from the rim even when the removal failed
+      // (deg <= 2): the cleanup may have flipped, and every pop must see a
+      // globally-Delaunay mesh for the seeded restore to be exact
+      // (paper cor:local-restore).
+      lawson_sweep_around(ws.ring.live(), ws.lawson_stack, ws.sweep_in_stack, tr);
+      if (status != Status::Ok) return false;
+      if (!removed_v) return false;
+
+      for (int w : ws.ring.live()) push(w);
+      obs.on_removed(v);
+      return true;
+    };
+
+    auto seed_all_flats = [&]() -> bool {
+      bool any = false;
+      for (int v = 0; v < nv; v++) {
+        if (status != Status::Ok) return any;
+        any |= enqueue(v);
+      }
+      return any;
+    };
+
+    auto drain = [&]() -> bool {
+      bool any = false;
+      while (!ws.work.empty()) {
+        int v = ws.work.back(); ws.work.pop_back(); ws.on_queue.clear(v);
+        if (try_remove(v)) any = true;
+        if (status != Status::Ok) return any;
+      }
+      return any;
+    };
+
+    // Establish the iDT up front so every per-removal seeded restore starts
+    // from a globally-Delaunay mesh.
+    flip_to_delaunay(ws.lawson_stack, ws.sweep_in_stack, tr);
+    if (status != Status::Ok) return status;
+
+    seed_all_flats();
+    if (status != Status::Ok) return status;
+    drain();
+    if (status != Status::Ok) return status;
+
+    // Restructure rounds: a global sweep can unblock deg <= 2 stragglers
+    // and expose flats the local re-push missed.
+    while (true) {
+      flip_to_delaunay(ws.lawson_stack, ws.sweep_in_stack, tr);
+      if (status != Status::Ok) return status;
+      if (!seed_all_flats()) break;   // no flats remain -> done
+      if (status != Status::Ok) return status;
+      if (!drain()) break;            // flats remain but none removable -> done
+      if (status != Status::Ok) return status;
+    }
+
+    // Fail loud on a stuck reduction: returning a partial reduction silently
+    // would hand callers a non-cone iDT.
+    for (int v = 0; v < nv; v++)
+      if (v_out[v] >= 0 && is_flat(v, flat_tol)) {
+        trip(Status::InvariantViolated,
+             "remove_flat_vertices: stuck with live flat vertex (paper cor:stuck-diagnosis)", v);
+        return status;
+      }
+
+    // Final Lawson: the output is globally Delaunay regardless of removal
+    // order (paper thm:lawson-converge; a B == D self-loop-creating flip's
+    // new loop is strictly Delaunay by paper lem:selfloop-delaunay).
+    flip_to_delaunay(ws.lawson_stack, ws.sweep_in_stack, tr);
+    return status;
+  }
+
+  // Structural well-formedness over caller-owned visited bits (>= nh):
+  // every live half-edge in exactly one he_next cycle, every cycle length 3.
+  bool is_well_formed(Spanify::BitSpan& visited) const {
+    visited.clear_all();
+    for (int h0 = 0; h0 < nh; h0++) {
+      if (!alive(h0) || visited.test(h0)) continue;
+      int h = h0;
+      for (int step = 0; step < 3; step++) {
+        if (!alive(h) || visited.test(h)) return false;
+        visited.set(h);
+        h = he_next[h];
+      }
+      if (h != h0) return false;
+    }
+    for (int h = 0; h < nh; h++)
+      if (alive(h) && !visited.test(h)) return false;
+    return true;
+  }
+
+  // -------------------------------------------------------------------------
   // Structural + metric validation: the DCEL class invariant, executable.
   // True iff all nine facts hold on every live element:
   //   @inv 1  twin closure: twin(h) < nh for live h
@@ -517,8 +1293,10 @@ struct DelaunayView {
   // -------------------------------------------------------------------------
   // Canonical field order.
   //
-  // to_tuple() lists the 9 SoA arrays in THE canonical order (the scalar
-  // counts nv/nh/nf are not fields):
+  // to_tuple() lists the 9 SoA arrays in THE canonical order.  Deliberately
+  // OUTSIDE the tuple: the counts nv/nh/nf, the capacities, the Status
+  // latch, and the free-list stacks -- allocation bookkeeping, not surface
+  // state (state comparators handle them separately and by name):
   //   { he_next, he_origin, he_face, he_length, he_angle,
   //     v_out, v_cone_angle, v_orig_degree, f_he }
   // This order is the contract the owner's repoint() fold and any field-wise

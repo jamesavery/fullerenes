@@ -5,6 +5,7 @@
 // over caller-owned memory -- SpanStack<T> (vector-LIFO semantics, loud
 // overflow) and BitSpan (vector<bool> flag-array semantics).
 
+#include <cassert>
 #include <cstdint>
 #include <iosfwd>
 #include <vector>
@@ -156,6 +157,15 @@ class SpanStack {
 public:
     SpanStack() = default;
     explicit SpanStack(std::span<T> b) : buf_(b) {}
+
+    // Re-bind the storage, keeping size/peak/latch: the owner repoint idiom
+    // (an owner whose backing vector reallocated re-binds the stack to the
+    // new storage; the live prefix was copied by the reallocation).
+    // @pre b.size() >= size() -- a shrink would orphan the live prefix.
+    void rebind(std::span<T> b) {
+      assert((long)b.size() >= n_);
+      buf_ = b;
+    }
 
     bool empty()      const { return n_ == 0; }
     long size()       const { return n_; }

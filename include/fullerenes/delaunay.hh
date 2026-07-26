@@ -139,8 +139,10 @@ struct DelaunayStorage {
   std::vector<int>    owned_v_orig_degree;
   std::vector<int>    owned_f_he;
 
-  vector<int> free_edges;  // recycled edge slots (half-edge id / 2)
-  vector<int> free_faces;  // recycled face slots
+  // Backing storage of the view's bounded free lists (the SpanStacks carry
+  // the counts; these carry the slots, capacity-managed by the ensure_*
+  // helpers: one entry per possible edge / face id).
+  std::vector<int> owned_free_edges, owned_free_faces;
 
   DelaunayPointTracker tracker;   // value member: copies/moves with the complex
 
@@ -156,6 +158,20 @@ struct DelaunayStorage {
                                  owned_he_length, owned_he_angle,
                                  owned_v_out, owned_v_cone_angle,
                                  owned_v_orig_degree, owned_f_he);
+  }
+};
+
+// ============================================================================
+// HostDelaunayWorkspace: a workspace that owns its storage -- a byte slab
+// sized by the layout, with the span workspace carved into it.  IS-A
+// DelaunayWorkspace, so it passes anywhere the view machinery wants one.
+// Host-only (allocates); device code carves DelaunayWorkspace from its own
+// arena via DelaunayWorkspace::Layout.
+// ============================================================================
+struct HostDelaunayWorkspace : DelaunayWorkspace {
+  std::vector<std::byte> slab;
+  explicit HostDelaunayWorkspace(DelaunayWorkspace::Layout l) : slab(l.bytes()) {
+    static_cast<DelaunayWorkspace&>(*this) = l.make(std::span<std::byte>(slab));
   }
 };
 
@@ -208,6 +224,11 @@ struct DelaunayTriangulation : DelaunayView, DelaunayStorage {
     [&]<std::size_t... I>(std::index_sequence<I...>) {
       ((std::get<I>(v) = std::get<I>(s)), ...);
     }(std::make_index_sequence<n_fields>{});
+    nv_cap = (int)owned_v_out.size();
+    nh_cap = (int)owned_he_next.size();
+    nf_cap = (int)owned_f_he.size();
+    free_edges.rebind(owned_free_edges);   // counts survive the rebind
+    free_faces.rebind(owned_free_faces);
   }
 
   // --- Growth (owner-only; the view never resizes) ---
@@ -222,11 +243,13 @@ struct DelaunayTriangulation : DelaunayView, DelaunayStorage {
     owned_he_face.resize(need, -1);
     owned_he_length.resize(need, 0);
     owned_he_angle.resize(need, 0);
+    owned_free_edges.resize(need / 2);   // DcelCapacities::free_edges_cap = nh/2
     repoint();
   }
   void ensure_faces(int need) {
     if (need <= (int)owned_f_he.size()) return;
     owned_f_he.resize(need, -1);
+    owned_free_faces.resize(need);       // DcelCapacities::free_faces_cap = nf
     repoint();
   }
   void ensure_vertices(int need) {
@@ -235,6 +258,28 @@ struct DelaunayTriangulation : DelaunayView, DelaunayStorage {
     owned_v_cone_angle.resize(need, 0.0);
     owned_v_orig_degree.resize(need, 0);
     repoint();
+  }
+
+  // Growth-shadowing allocators: the view's allocators are capacity-guarded
+  // and never grow; the owner pre-ensures capacity when the free lists are
+  // exhausted, then delegates.  During reduction the free lists always cover
+  // demand, so these grow only under post-build insertion (split_face,
+  // bisect_multi_edges, from_ascii).
+  int alloc_edge() {
+    if (free_edges.empty() && nh + 2 > nh_cap) ensure_halfedges(nh + 2);
+    return DelaunayView::alloc_edge();
+  }
+  int alloc_face() {
+    if (free_faces.empty() && nf + 1 > nf_cap) ensure_faces(nf + 1);
+    return DelaunayView::alloc_face();
+  }
+  int alloc_directed_edge(int u, int v, double L) {
+    if (free_edges.empty() && nh + 2 > nh_cap) ensure_halfedges(nh + 2);
+    return DelaunayView::alloc_directed_edge(u, v, L);
+  }
+  int wire_triangle(int h0, int h1, int h2) {
+    if (free_faces.empty() && nf + 1 > nf_cap) ensure_faces(nf + 1);
+    return DelaunayView::wire_triangle(h0, h1, h2);
   }
 
   // --- Rule of 5 ---
@@ -251,6 +296,11 @@ struct DelaunayTriangulation : DelaunayView, DelaunayStorage {
       : DelaunayView(o), DelaunayStorage(std::move(o)) {
     repoint();
     o.nv = o.nh = o.nf = 0;   // leave the source as the empty complex
+    o.free_edges.clear();     // counts over emptied storage
+    o.free_faces.clear();
+    o.status = Status::Ok;    // the empty complex is valid
+    o.status_site = nullptr;
+    o.status_witness = -1;
     o.repoint();
   }
   DelaunayTriangulation& operator=(const DelaunayTriangulation& o) {
@@ -266,6 +316,11 @@ struct DelaunayTriangulation : DelaunayView, DelaunayStorage {
       DelaunayStorage::operator=(std::move(o));
       repoint();
       o.nv = o.nh = o.nf = 0;
+      o.free_edges.clear();
+      o.free_faces.clear();
+      o.status = Status::Ok;
+      o.status_site = nullptr;
+      o.status_witness = -1;
       o.repoint();
     }
     return *this;
@@ -317,15 +372,15 @@ struct DelaunayTriangulation : DelaunayView, DelaunayStorage {
   std::vector<double> curvature() const;
 
   // --- Delaunay operations ---
-  bool is_delaunay_edge(int h) const;
-  // Flip the diagonal of the diamond around edge h.  Accepts any edge with a
-  // strictly convex diamond and a positive flipped length, including the
-  // B == D case, which produces a self-loop edge at B (strictly Delaunay
-  // when the flipped edge was non-Delaunay; paper lem:selfloop-delaunay).
-  // @post on true:  the DCEL invariants hold with the new diagonal B-D in
-  //                 place of h; only the two diamond faces are rewired; the
-  //                 surface metric is unchanged (paper thm:metric-invariance).
-  // @post on false: the complex is untouched.
+  // (is_delaunay_edge / is_delaunay / count_non_delaunay and the
+  // workspace-based sweeps are inherited from DelaunayView.  The wrappers
+  // below keep the historical allocation-free-caller-facing signatures:
+  // they materialize a workspace, select the transport policy by
+  // tracker.active, run the view machinery, and convert a non-Ok status to
+  // the documented throws.)
+
+  // Flip the diagonal of the diamond around edge h, transporting tracked
+  // points when the tracker is active.  @post as DelaunayView::flip_edge.
   bool flip_edge(int h);
   // Global Delaunay restore, seeding with every live edge.
   // @post is_delaunay()
@@ -333,20 +388,7 @@ struct DelaunayTriangulation : DelaunayView, DelaunayStorage {
   //         (impossible by the energy argument, paper thm:lawson-converge;
   //         fail-loud backstop).
   int  lawson_sweep();
-  // Seeded core: restore Delaunay starting from a frontier of edges (one half-edge id
-  // per edge), propagating to each flip's rim. For a hot caller that changed only a
-  // local region of an otherwise-Delaunay mesh; reaches the same iDT the no-arg global
-  // sweep would. `in_stack` (sized nh/2) is the caller-owned stack-membership scratch;
-  // it is left all-false on normal return, so a hot loop reuses one buffer without
-  // re-zeroing. The no-arg lawson_sweep() seeds with all live edges and its own scratch.
-  // @pre  seeded: every non-Delaunay edge is in seed_edges or arises on the
-  //       rim of a seed cascade (paper lem:seeded-sweep).
-  // @post is_delaunay()
-  // @throws std::runtime_error when the 200*nv flip budget is exhausted.
-  int  lawson_sweep(const vector<int>& seed_edges, vector<bool>& in_stack);
-  int  count_non_delaunay() const;
   int  flip_to_delaunay();
-  bool is_delaunay() const;
 
   // --- Vertex removal ---
   void remove_flat_vertex(int v);
@@ -386,27 +428,14 @@ struct DelaunayTriangulation : DelaunayView, DelaunayStorage {
   std::vector<int> compact_vertices();
 
   // --- Edge/face allocation ---
-  int  alloc_edge();         // returns half-edge id of first half-edge
-  int  alloc_face();         // returns face id
-  void dealloc_edge(int h);  // mark edge as dead, add to free list
-  void dealloc_face(int f);  // mark face as dead, add to free list
-
-  // Allocate an edge and set its endpoints and length.
-  // Returns the half-edge h with origin(h) = u, origin(twin h) = v,
-  // length = L on both sides.  Faces remain unassigned.
-  int  alloc_directed_edge(int u, int v, double L);
+  // (alloc_edge / alloc_face / alloc_directed_edge / wire_triangle are the
+  // growth-shadowing owner versions defined inline above; dealloc_edge /
+  // dealloc_face are inherited from DelaunayView.)
 
   // Allocate a vertex with the given cone angle and original degree, growing the
   // three per-vertex arrays (v_out, v_cone_angle, v_orig_degree) in lockstep.
   // Returns its id; v_out is left at -1 (the caller wires its edges).
   int  alloc_vertex(double cone_angle, int orig_degree);
-
-  // Wire three half-edges into a CCW triangle face and compute its angles
-  // from the stored edge lengths.  Returns the new face id.
-  // Preconditions: h0, h1, h2 already have their origin and length set;
-  // their endpoints form a triangle with origin(h0)=u, dest(h0)=v=origin(h1),
-  // dest(h1)=w=origin(h2), dest(h2)=u.
-  int  wire_triangle(int h0, int h1, int h2);
 
   // Split the face left of h0 (= a->b, with he_next giving b->c, c->a) into three
   // triangles fanning to a new flat vertex P, at spoke lengths {P->a, P->b, P->c}.
@@ -524,10 +553,9 @@ struct DelaunayTriangulation : DelaunayView, DelaunayStorage {
   // cutoffs in the surface-metric routines.  O((nv + alive_edges) log nv).
   double diameter_upper_bound() const;
 
-  // Smallest degree among live (non-removed) vertices, or INT_MAX if
-  // none.  A value below 3 is one (but not the only) non-simplicial
-  // signature -- use is_simplicial() for a complete check.
-  int min_live_degree() const;
+  // (min_live_degree is inherited from DelaunayView.  A value below 3 is
+  // one (but not the only) non-simplicial signature -- use is_simplicial()
+  // for a complete check.)
 
   // True iff the iDT's 1-skeleton is a simple graph: no self-loops,
   // no multi-edges.  Equivalently: the map h |-> (origin(h), dest(h))
@@ -601,6 +629,10 @@ struct DelaunayTriangulation : DelaunayView, DelaunayStorage {
 
   // (check_consistency -- the nine numbered class invariants -- is
   // inherited from DelaunayView.)
+
+  // Convert a non-Ok view status to the documented throws (the owner error
+  // boundary; message = status name + operation).  No-op on Ok.
+  void throw_on_status(const char* op) const;
 
   // --- Serialization (.idt) ---
   // Text round-trip of the intrinsic Delaunay delta-complex (the ".idt" format, magic

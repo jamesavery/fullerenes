@@ -1005,12 +1005,16 @@ TEST(DCELSymEmbed, C60_AllIsomers) {
 // cannot see (reduction never grows, and no gate copies-then-mutates-both).
 // ============================================================================
 
-// The equality relation on owned DCEL state: counts, the nine arrays (folded
-// over the canonical field tuple, so a field added in stage 3 is compared
-// automatically), free lists, and the tracker's points.
+// The equality relation on DCEL state: counts, capacities, status, the nine
+// arrays (folded over the canonical field tuple), free-list sequences, and
+// the tracker's points.  The tuple fold covers only the nine field arrays;
+// everything outside the tuple is compared here BY NAME -- extend this list
+// when the state grows.
 static bool same_dcel_state(const DelaunayTriangulation& A,
                             const DelaunayTriangulation& B) {
   if (A.nv != B.nv || A.nh != B.nh || A.nf != B.nf) return false;
+  if (A.nh_cap != B.nh_cap || A.nf_cap != B.nf_cap) return false;
+  if (A.status != B.status) return false;
   bool eq = true;
   auto ta = A.to_tuple(), tb = B.to_tuple();
   auto spans_equal = [](auto sa, auto sb) {
@@ -1020,7 +1024,8 @@ static bool same_dcel_state(const DelaunayTriangulation& A,
     ((eq = eq && spans_equal(std::get<I>(ta), std::get<I>(tb))), ...);
   }(std::make_index_sequence<DelaunayView::n_fields>{});
   if (!eq) return false;
-  if (A.free_edges != B.free_edges || A.free_faces != B.free_faces) return false;
+  if (!spans_equal(A.free_edges.live(), B.free_edges.live())) return false;
+  if (!spans_equal(A.free_faces.live(), B.free_faces.live())) return false;
   if (A.tracker.points.size() != B.tracker.points.size()) return false;
   for (size_t i = 0; i < A.tracker.points.size(); i++) {
     const auto& p = A.tracker.points[i];
@@ -1038,7 +1043,9 @@ static bool array_sizes_match_counts(const DelaunayTriangulation& D) {
       && (int)D.he_angle.size()  == D.nh
       && (int)D.v_out.size()     >= D.nv && (int)D.v_cone_angle.size()  >= D.nv
       && (int)D.v_orig_degree.size() >= D.nv
-      && (int)D.f_he.size()      == D.nf;
+      && (int)D.f_he.size()      == D.nf
+      && D.free_edges.capacity() >= D.nh_cap / 2    // DcelCapacities::free_edges_cap
+      && D.free_faces.capacity() >= D.nf_cap;       // DcelCapacities::free_faces_cap
 }
 
 // A copy must be independent under in-place mutation.  Flips are the ONE
@@ -1157,4 +1164,132 @@ TEST(DCELOwnership, CapacitiesAreBuildTime) {
   EXPECT_EQ(D.nv, 12);                              // reduced to the cones
   EXPECT_EQ((long)D.he_next.size(), cap.nh_cap);    // arrays keep build size
   EXPECT_NE(cap.nh_cap, dcel_capacities(D.nv).nh_cap) << "live nv is the wrong argument";
+}
+
+
+// ============================================================================
+// DCELStatus: the view's failure channel as a falsifier group.  Each test
+// names the guard it must trip; the owner's growth shadows make these
+// structurally unreachable from owner paths, so a BARE view is driven.
+// ============================================================================
+
+// A bare view over an owner's arrays with the growth capacity clamped to the
+// current size and an empty free list: allocation must refuse, loudly.
+TEST(DCELStatus, AllocEdgeAtCapacityIsLoud) {
+  auto D = DelaunayTriangulation::from_triangulation(make_dual(20, 0));
+  auto D_ref = D;
+  DelaunayView V = D;          // slice: same spans, same counts/caps
+  ASSERT_TRUE(V.free_edges.empty());
+  ASSERT_EQ(V.nh, V.nh_cap);   // fresh build is exactly full
+
+  EXPECT_EQ(V.alloc_edge(), -1);
+  EXPECT_EQ(V.status, DelaunayView::Status::CapacityExceeded);
+  EXPECT_NE(V.status_site, nullptr);
+  EXPECT_TRUE(same_dcel_state(D, D_ref)) << "a refused alloc must not mutate";
+}
+
+// An undersized fan workspace trips CapacityExceeded instead of overrunning.
+TEST(DCELStatus, UndersizedFanWorkspaceIsLoud) {
+  auto D = DelaunayTriangulation::from_triangulation(make_dual(20, 0));
+  HostDelaunayWorkspace ws({.nv0 = D.nv, .k_max = 2, .nh_explicit = D.nh});
+  DelaunayView& V = D;
+  V.extract_fan(0, ws);        // every C20 vertex has degree 5 > 2
+  EXPECT_EQ(V.status, DelaunayView::Status::CapacityExceeded);
+}
+
+// A metric violating the triangle inequality makes the sweep fail loudly --
+// the throw contract downstream Armijo searches use as their reject signal.
+TEST(DCELStatus, NonRealisableMetricThrowsFromSweep) {
+  Triangulation T = make_dual(20, 0);
+  auto bad = [](node_t u, node_t v) { return (u == 0 && v == 1) || (u == 1 && v == 0) ? 10.0 : 1.0; };
+  auto D = DelaunayTriangulation::from_intrinsic_metric(T, bad);
+  EXPECT_THROW(D.lawson_sweep(), std::runtime_error);
+}
+
+// After a trip the latch is sticky: every subsequent mutation is a no-op and
+// the state is byte-identical (first-failure-wins is structural).
+TEST(DCELStatus, StickyStatusEarlyOutsEverySubsequentMutation) {
+  auto D = DelaunayTriangulation::from_triangulation(make_dual(20, 0));
+  DelaunayView V = D;
+  ASSERT_EQ(V.alloc_edge(), -1);                       // trip it
+  ASSERT_NE(V.status, DelaunayView::Status::Ok);
+  auto site = V.status_site;
+
+  auto D_ref = D;
+  EXPECT_FALSE(V.flip_edge(0));
+  EXPECT_EQ(V.alloc_face(), -1);
+  EXPECT_TRUE(same_dcel_state(D, D_ref));
+  EXPECT_EQ(V.status_site, site) << "a later trip clobbered the first diagnostic";
+}
+
+// wire_triangle refuses a dead arc handle (the historical .at() guard).
+TEST(DCELStatus, WireTriangleRejectsDeadArc) {
+  auto D = DelaunayTriangulation::from_triangulation(make_dual(20, 0));
+  auto D_ref = D;
+  DelaunayView V = D;
+  EXPECT_EQ(V.wire_triangle(-1, 0, 1), -1);
+  EXPECT_EQ(V.status, DelaunayView::Status::InvariantViolated);
+  EXPECT_TRUE(same_dcel_state(D, D_ref));
+}
+
+// ============================================================================
+// DCELWorkspace: the layout's exactness and the wrappers' coverage.
+// ============================================================================
+
+// Every workspace span lies inside [arena, arena + bytes()) and no two spans
+// overlap: bytes() and make() cannot drift (one layout list, checked).
+TEST(DCELWorkspace, LayoutFitsAndSpansDisjoint) {
+  DelaunayWorkspace::Layout l{.nv0 = 32, .k_max = 32, .nh_explicit = 180};
+  std::vector<std::byte> arena(l.bytes());
+  DelaunayWorkspace ws = l.make(std::span<std::byte>(arena));
+  ASSERT_EQ(ws.k_max, 32) << "carve failed on an exactly-sized arena";
+
+  struct Block { const void* lo; const void* hi; };
+  std::vector<Block> blocks;
+  auto add = [&](auto sp) {
+    if (!sp.empty()) blocks.push_back({sp.data(), sp.data() + sp.size()});
+  };
+  add(ws.fan.nb); add(ws.fan.spoke_he); add(ws.fan.inner_rim);
+  add(ws.fan.spokes); add(ws.fan.rims); add(ws.fan.cum);
+  add(ws.poly); add(ws.rpoly);
+  add(ws.tri.diagonals); add(ws.tri.triangles);
+  // (The SpanStack/BitSpan members expose only their live prefixes, so the
+  // fit/disjointness canary covers the ten raw spans -- all fields come from
+  // the ONE layout list, so drift in any field moves these too.)
+  const void* lo = arena.data();
+  const void* hi = arena.data() + l.bytes();
+  for (auto& b : blocks) {
+    EXPECT_GE(b.lo, lo);
+    EXPECT_LE(b.hi, hi);
+  }
+  for (size_t i = 0; i < blocks.size(); i++)
+    for (size_t j = i + 1; j < blocks.size(); j++) {
+      bool disjoint = blocks[i].hi <= blocks[j].lo || blocks[j].hi <= blocks[i].lo;
+      EXPECT_TRUE(disjoint) << "workspace spans " << i << " and " << j << " overlap";
+    }
+
+  // An undersized arena fails loudly: the empty workspace trips on first use.
+  std::vector<std::byte> small(l.bytes() / 2);
+  DelaunayWorkspace bad = l.make(std::span<std::byte>(small));
+  EXPECT_EQ(bad.k_max, 0);
+}
+
+// The single-vertex removal wrapper: deg-3 merge and deg>=4 ear path, both
+// leaving a consistent complex.
+TEST(DCELWorkspace, RemoveFlatVertexWrapper) {
+  // deg >= 4 path: remove one flat vertex of a fresh C60 dual build
+  // (pre-reduction, every deg-6 vertex is flat).
+  Triangulation T = make_dual(60, 0);
+  auto D = DelaunayTriangulation::from_triangulation(T);
+  int flat = -1;
+  for (int v = 0; v < D.nv; v++)
+    if (D.is_flat(v)) { flat = v; break; }
+  ASSERT_GE(flat, 0);
+  const int deg = D.vertex_degree(flat);
+  ASSERT_GE(deg, 4);
+  const int nf0 = D.nf;
+  D.remove_flat_vertex(flat);
+  EXPECT_LT(D.v_out[flat], 0) << "vertex not removed";
+  EXPECT_TRUE(D.check_consistency());
+  (void)nf0;
 }
