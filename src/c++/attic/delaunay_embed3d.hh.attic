@@ -1,0 +1,53 @@
+// ============================================================================
+// MDS + trust-region 3D embedding of the iDT — archived 2026-07-26
+// ============================================================================
+//
+// Embeds the reduced (12-cone-point) intrinsic Delaunay triangulation in R^3
+// by classical MDS initialization followed by trust-region Steihaug-CG
+// optimization of edge-length and cone-angle matching, optionally with a
+// Reynolds-projected symmetric initialization.
+//
+// Archived because the scheme is not fail-safe: the plain (no-symmetry) MDS
+// initialization leaves the optimizer stuck at a non-embedding local minimum
+// on 861 of the 1812 C60 isomers, and no basin-escape mechanism exists.  The
+// Alexandrov solver (delaunay_alexandrov.cc) is the fail-safe replacement.
+// Preserved, with delaunay_embed3d.cc.attic, as a record of a scheme that
+// does not lead to a fail-safe algorithm; the accompanying analysis lives in
+// the delaunay-geometry sub-project's papers.
+//
+// Original locations before archival:
+//   - include/fullerenes/delaunay_embed3d.hh (this file)
+//   - src/c++/delaunay_embed3d.cc
+//   - tests/delaunay-test.cc: DCELEmbed + DCELSymEmbed suites
+// ============================================================================
+
+#ifndef DELAUNAY_EMBED3D_HH
+#define DELAUNAY_EMBED3D_HH
+
+#include "delaunay.hh"
+
+// Paired permutations + O(3) matrices for symmetry-constrained embedding.
+struct SymmetryConstraint {
+  vector<vector<int>> perms;
+  vector<matrix3d> matrices;
+  bool empty() const { return perms.empty(); }
+};
+
+// Embed the reduced triangulation in 3D to match intrinsic edge lengths.
+// MDS initialization + trust-region Steihaug CG optimization of
+// E_edge (distance matching) + E_cone (cone angle matching).
+// When symmetry is provided, uses Reynolds-projected MDS for initialization.
+vector<coord3d> embed_delaunay_3d(const DelaunayTriangulation& D,
+                                   const SymmetryConstraint& sym = {});
+
+// Restrict full-triangulation symmetry (permutations + O(3) matrices) to
+// iDT cone-point indices, maintaining the perm<->matrix pairing.
+// G: automorphisms (Symmetry::G), R: 3D matrices (Representation3D::R).
+SymmetryConstraint restrict_symmetry_to_cone_points(
+    const vector<vector<int>>& G, const vector<matrix3d>& R,
+    const Triangulation& T);
+
+// Compute vertex orbits from a group of permutations (union-find).
+vector<vector<int>> compute_orbits(int n, const vector<vector<int>>& G);
+
+#endif
