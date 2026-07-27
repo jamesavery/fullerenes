@@ -15,26 +15,36 @@
 // Vector arithmetic (v+w, v−w, v*s) is NOT defined here: the global
 // template operators in auxiliary.hh already provide it.
 
+#include "fullerenes/dense_linalg_view.hh"   // the allocation-free bodies
 #include "fullerenes/matrix.hh"
 
 #include <expected>
 #include <vector>
 
+// This header is the OWNER API: allocating conveniences over
+// matrix<double>/vector.  The algorithm bodies live at view level
+// (dense_linalg_view.hh: spans + row stride, allocation-free, device-legal,
+// written once); each function here is a thin wrapper around its view body,
+// and the failure-channel table in the view header maps every entry point's
+// singular behaviour.  The vector reductions (dot, norm, sum_sq, max_abs,
+// energy, is_usable_step, negate) have NO owner overloads: std::vector
+// converts implicitly to std::span, so the view functions serve owner
+// callers directly.  The symmetric-eigen family (jacobi_eig, SymEigen) is
+// owner-only.
+
 namespace LinAlg {
 
 using V = std::vector<double>;
 
-// --- Vector reductions ---
-double dot(const V& a, const V& b);
-double norm(const V& v);
-// max |v_i|; a NaN entry poisons the result to +inf, so a NaN residual
-// can never pass a "< tol" convergence test.
-double max_abs(const V& v);
-double sum_sq(const V& v);
-// Finite and not identically ~0 (guards a linear-solve output).
-bool   is_valid(const V& v);
-// Residual energy E = ½‖v‖².
-double energy(const V& v);
+// The live block of an owner matrix as a view (matrix<T> stores row-major
+// flat with stride n; empty matrices yield an empty view).
+inline MatConstView view_of(const matrix<double>& A) {
+  const std::size_t sz = (std::size_t)A.m * A.n;
+  return {std::span<const double>(sz ? A.data() : nullptr, sz), A.m, A.n, A.n};
+}
+
+// (Vector reductions: see the view header -- no owner overloads, vectors
+// convert to spans.)
 
 // --- Symmetric eigendecomposition (cyclic Jacobi) ---
 
@@ -72,10 +82,13 @@ std::expected<LuSolved, LuFail> solve_with_sign(const matrix<double>& A,
 // solve_with_sign does.
 double det(const matrix<double>& A);
 
-// Solve A·x = b.  Zero vector on failure.
+// Solve A·x = b.  Zero vector on failure (singular A).
+// @pre b.size() == A.m.  The result has A.m entries; historically the
+// pre-view implementation returned b.size() entries when b was longer --
+// no caller relied on it, and the size contract is now explicit.
 V solve(const matrix<double>& A, const V& b);
 
-// Solve (A + λI)·x = b.
+// Solve (A + λI)·x = b.  @pre b.size() == A.m.
 V solve_shifted(const matrix<double>& A, const V& b, double lambda);
 
 // Matrix-vector product A·v.

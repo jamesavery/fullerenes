@@ -456,25 +456,29 @@ namespace TrustRegion {
 V solve(const matrix<double>& J, const V& kappa, double Delta) {
   // Try pure Newton (λ=0) — identical to the pre-GN behaviour.
   auto delta = LinAlg::solve(J, -kappa);
-  if (LinAlg::is_valid(delta) && LinAlg::norm(delta) <= Delta)
+  if (LinAlg::is_usable_step(delta) && LinAlg::norm(delta) <= Delta)
     return delta;
 
   // J is symmetric bitwise (see jacobian() @post), so Jᵀ = J exactly
   // and the Gauss-Newton objects need no transpose:
-  const matrix<double> JtJ = J * J;                      // JᵀJ = J² (SPD)
+  // JᵀJ = J² (SPD), via THE view-level product (dense_linalg_view.hh's
+  // matmul -- the one bit-pinned i-j-k body, shared with the batch port;
+  // matrix.hh's generic operator* is no longer on any solver path).
+  const matrix<double> JtJ = J * J;   // JtJ = J^2 (SPD); operator* delegates
+                                      // to LinAlg::matmul (@ref matmul-ijk-order)
   const V minus_Jtk = -LinAlg::matvec(J, kappa);         // −Jᵀκ = −∇E
 
   // Bisect on λ to find (JᵀJ+λI)⁻¹(−Jᵀκ) with ||δ|| ≈ Δ
   double lo = 0, hi = LinAlg::max_abs(minus_Jtk) / Delta + 1.0;
   for (int probe = 0; probe < 10; probe++) {
     delta = LinAlg::solve_shifted(JtJ, minus_Jtk, hi);
-    if (LinAlg::is_valid(delta) && LinAlg::norm(delta) <= Delta) break;
+    if (LinAlg::is_usable_step(delta) && LinAlg::norm(delta) <= Delta) break;
     hi *= 4;
   }
   for (int bis = 0; bis < 20; bis++) {
     double mid = 0.5 * (lo + hi);
     delta = LinAlg::solve_shifted(JtJ, minus_Jtk, mid);
-    if (!LinAlg::is_valid(delta) || LinAlg::norm(delta) > Delta) lo = mid;
+    if (!LinAlg::is_usable_step(delta) || LinAlg::norm(delta) > Delta) lo = mid;
     else hi = mid;
   }
   return LinAlg::solve_shifted(JtJ, minus_Jtk, hi);
@@ -591,7 +595,7 @@ int flip_to_weighted_delaunay(DelaunayTriangulation& T, const vector<double>& r)
 namespace Continuation {
 
 // Homotopy velocity dr/dt = J⁻¹κ₁ along κ(r)=t·κ₁ (the un-normalized tangent
-// direction). Returns an invalid vector (LinAlg::is_valid == false) if J is
+// direction). Returns an invalid vector (LinAlg::is_usable_step == false) if J is
 // singular.
 V dr_dt(const matrix<double>& J, const V& kappa1) {
   return LinAlg::solve(J, kappa1);
@@ -649,7 +653,7 @@ int newton_correct(const DelaunayTriangulation& T, V& r, const V& target,
     V F = GCP::kappa(T, r) - target;
     if (LinAlg::max_abs(F) < tol) return nit;
     auto dr = LinAlg::solve(GCP::jacobian(T, r), F);
-    if (!LinAlg::is_valid(dr)) return -1;
+    if (!LinAlg::is_usable_step(dr)) return -1;
     r = r - dr;
   }
   return max_iter;
@@ -680,7 +684,7 @@ StepResult natural_step(const DelaunayTriangulation& T,
                         const matrix<double>& J, double dt) {
   double t1 = t0 - dt;
   auto v = dr_dt(J, kappa1);
-  if (!LinAlg::is_valid(v)) return {-1, t1, r0};
+  if (!LinAlg::is_usable_step(v)) return {-1, t1, r0};
   V r = r0 - v * dt;
   int nit = newton_correct(T, r, kappa1 * t1, CORRECTOR_TOL, CORRECTOR_MAX_ITER);
   return nit < 0 ? StepResult{-1, t1, r0} : StepResult{nit, t1, std::move(r)};

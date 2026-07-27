@@ -9,6 +9,7 @@
 #include <assert.h>
 
 #include "auxiliary.hh"
+#include "fullerenes/dense_linalg_view.hh"   // LinAlg::matmul (operator* delegates)
 
 using namespace std;
 
@@ -105,13 +106,23 @@ public:
     assert(n == B.m);
     matrix C(m,B.n);
 
-    for(int i=0;i<m;i++)
-      for(int j=0;j<B.n;j++){
-	T x = 0;
-	for(int k=0;k<n;k++) x += (*this)[i*n+k]*B[k*B.n+j];
-	C(i,j) = x;
-      }
-    return C;    
+    if constexpr (std::is_same_v<T, double>) {
+      // @ref matmul-ijk-order (dense_linalg_view.hh): the double product IS
+      // LinAlg::matmul -- ONE bit-pinned body shared with the solver family.
+      // Do not reintroduce a local loop here.
+      if (m > 0 && B.n > 0)
+        LinAlg::matmul({std::span<const double>(this->data(), (size_t)m * n), m, n, n},
+                       {std::span<const double>(B.data(), (size_t)B.m * B.n), B.m, B.n, B.n},
+                       std::span<double>(C.data(), (size_t)m * B.n));
+    } else {
+      for(int i=0;i<m;i++)
+        for(int j=0;j<B.n;j++){
+          T x = 0;
+          for(int k=0;k<n;k++) x += (*this)[i*n+k]*B[k*B.n+j];
+          C(i,j) = x;
+        }
+    }
+    return C;
   }
 
   matrix operator+(const matrix& B){ 
