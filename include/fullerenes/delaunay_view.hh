@@ -26,13 +26,14 @@
 //
 // Scope: the SoA arrays, navigation, the intrinsic geometry, the Diamond
 // predicates, the capacity formulas, check_consistency, the canonical field
-// order -- and the whole mutation machinery (allocation over the bounded
-// free lists, flips, sweeps, vertex removal) over DelaunayWorkspace, with
-// the Status latch as the run-path error channel, the Transport policy
-// carrying the point tracker's hooks, and the Metric policy selecting the
-// predicate regime (exact integer vs banded float).  Owner-level
-// (delaunay.hh): storage, growth, the tracked TrackerTransport policy,
-// serialization, and every allocating convenience.
+// order, the view-level build (build_topology / from_triangulation over a
+// caller-supplied arc-to-halfedge map) -- and the whole mutation machinery
+// (allocation over the bounded free lists, flips, sweeps, vertex removal)
+// over DelaunayWorkspace, with the Status latch as the run-path error
+// channel, the Transport policy carrying the point tracker's hooks, and the
+// Metric policy selecting the predicate regime (exact integer vs banded
+// float).  Owner-level (delaunay.hh): storage, growth, the tracked
+// TrackerTransport policy, serialization, and every allocating convenience.
 //
 // (See the device caveat in the banner above: eisenstein.hh, reached via
 // delaunay_geometry.hh, is the one non-device-clean include.)
@@ -40,6 +41,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <numbers>
@@ -96,6 +98,17 @@ static_assert(dcel_capacities(12).nh_cap == 60 && dcel_capacities(12).nf_cap == 
               "dcel_capacities must satisfy the Euler identity");
 static_assert(dcel_capacities(0).nh_cap == 0 && dcel_capacities(2).nh_cap == 0,
               "dcel_capacities must guard nv0 < 3");
+
+// The build sizes of the DCEL over ANY closed triangulation with degree sum
+// deg_sum = sum_v deg(v) = 2E: nh = 2E half-edge slots, nf = 2E/3 faces
+// (3F = 2E, every face a triangle).  dcel_capacities is this specialized to
+// the connected genus-0 class, where Euler fixes 2E = 6*nv0 - 12.
+constexpr DcelCapacities dcel_build_capacities(long deg_sum) {
+  return { deg_sum, deg_sum / 3, deg_sum / 2, deg_sum / 3 };
+}
+static_assert(dcel_build_capacities(6L * 12 - 12).nh_cap == dcel_capacities(12).nh_cap
+              && dcel_build_capacities(6L * 12 - 12).nf_cap == dcel_capacities(12).nf_cap,
+              "genus-0 specialization: degree sum 6*nv0-12 is dcel_capacities");
 
 // ============================================================================
 // DelaunayWorkspace: the bounded scratch the mutation machinery runs over.
@@ -252,6 +265,37 @@ struct NoRemovalObserver {
 // ============================================================================
 struct BandedFloatMetric;
 struct ExactIntegerMetric;
+
+// The input surface the view-level build reads: a triangulation presented
+// as a ROTATION SYSTEM -- row u is the CCW cyclic order of u's neighbours,
+// find(v,u) locates the reverse arc, and arcid(u,i) is the dense arc index
+// the build's arc-to-halfedge map is keyed by.  Satisfied by
+// TriangulationView and by a Triangulation owner; a concept rather than a
+// concrete parameter type so this header stays free of the graphview.hh
+// include set (the device-TU concern in the banner above).  The semantic
+// side -- rings CCW-consistent and closed -- is what
+// GraphView::is_consistently_oriented() checks; the build's guards catch
+// the violations it cannot assume (unpaired arcs, non-triangle corners),
+// not all of them.
+template<typename TriView>
+concept oriented_triangulation = requires(const TriView& T) {
+  T.N;  T.dmax;  T[0];
+  { T.find(0, 0) }  -> std::convertible_to<int>;
+  { T.arcid(0, 0) } -> std::convertible_to<std::size_t>;
+  { T.degree(0) }   -> std::convertible_to<int>;
+};
+
+// The dense arc-index space of T: arcid(u,i) ranges over [0, arc_space(T)).
+template<oriented_triangulation TriView>
+constexpr long arc_space(const TriView& T) { return (long)T.N * T.dmax; }
+
+// Degree sum 2E = sum_v deg(v): the DCEL's half-edge count for T.
+template<oriented_triangulation TriView>
+constexpr long degree_sum(const TriView& T) {
+  long s = 0;
+  for (int v = 0; v < (int)T.N; v++) s += T.degree(v);
+  return s;
+}
 
 // ============================================================================
 // DelaunayView: span SoA view of the half-edge DCEL.
@@ -640,6 +684,234 @@ struct DelaunayView {
     f_he[fid] = h0;
     recompute_face_angles(fid);
     return fid;
+  }
+
+  // -------------------------------------------------------------------------
+  // Construction (the view-level build; PROMOTION-DESIGN.md 1.4).
+  // -------------------------------------------------------------------------
+
+  // Reset to the empty complex at capacity: every slot carries the dead
+  // representation (-1 topology, 0 metric), counts zero, free lists empty.
+  // The single establisher of the fresh state over a caller arena whose
+  // previous contents are arbitrary.  (The free lists' calibration peaks
+  // are telemetry and deliberately survive -- outside the state contract.)
+  void reset_to_dead_slots() {
+    for (int h = 0; h < nh_cap; h++) {
+      he_next[h] = -1; he_origin[h] = -1; he_face[h] = -1;
+      he_length[h] = 0.0; he_angle[h] = 0.0;
+    }
+    for (int v = 0; v < nv_cap; v++) {
+      v_out[v] = -1; v_cone_angle[v] = 0.0; v_orig_degree[v] = 0;
+    }
+    for (int f = 0; f < nf_cap; f++) f_he[f] = -1;
+    nv = 0; nh = 0; nf = 0;
+    free_edges.clear();
+    free_faces.clear();
+  }
+
+  // Build phase 1: number the undirected edges 0..E-1, recording each
+  // arc's half-edge slot -- 2k for u->v, 2k+1 for v->u -- in the
+  // arc-to-halfedge map, the reverse arc located by T.find(v,u).  Ids are
+  // assigned in the canonical order (u ascending, v in u's ring order,
+  // counting only u<v arcs), so the numbering -- and every id derived from
+  // it -- is bit-identical to the historical owner-level build (frozen as
+  // the reference_build_topology oracle in tests/delaunay-test.cc).
+  // Sets nh.
+  // @post paired: the ids written form couples {2k, 2k+1} on mutually
+  //       reverse arc slots; -1 marks an arc still unassigned (what
+  //       phase 2 tests).
+  template<oriented_triangulation TriView>
+  void assign_halfedge_ids(const TriView& T, std::span<int> he_of_arc)
+  {
+    const long n_arcs = arc_space(T);
+    for (long a = 0; a < n_arcs; a++) he_of_arc[a] = -1;
+    int eid = 0;
+    for (int u = 0; u < (int)T.N; u++) {
+      auto row = T[u];
+      const int deg = (int)row.size();
+      for (int i = 0; i < deg; i++) {
+        const int v = row[i];
+        if (u < v) {
+          const int jr = T.find(v, u);   // position of u in v's row
+          if (jr < 0) {
+            trip(Status::InvariantViolated,
+                 "assign_halfedge_ids: u<v arc without reverse (not an "
+                 "oriented triangulation)", u);
+            return;
+          }
+          // Backstop: dead under build_topology's degree-sum prologue gate
+          // plus the simple-input @pre; a malformed ring can still reach it.
+          if (2 * eid + 2 > nh_cap) {
+            trip(Status::CapacityExceeded,
+                 "assign_halfedge_ids: half-edge capacity", 2 * eid);
+            return;
+          }
+          he_of_arc[T.arcid(u, i)]  = 2 * eid;
+          he_of_arc[T.arcid(v, jr)] = 2 * eid + 1;
+          eid++;
+        }
+      }
+    }
+    nh = 2 * eid;
+  }
+
+  // Build phase 2: origins (origin(arc u->*) = u).  The id lookup also
+  // catches the pairing failure phase 1 cannot see: an arc u->v with u > v
+  // whose reverse is absent was never assigned an id.  (The historical
+  // build wrote he_origin[-1] here.)
+  // @post total: every arc slot of T carries an id.  Together with
+  //       phase 1's `paired`, this is what lets phase 3 dereference w->u
+  //       unguarded.
+  template<oriented_triangulation TriView>
+  void set_origins(const TriView& T, std::span<int> he_of_arc)
+  {
+    for (int u = 0; u < (int)T.N; u++) {
+      auto row = T[u];
+      const int deg = (int)row.size();
+      for (int i = 0; i < deg; i++) {
+        const int h = he_of_arc[T.arcid(u, i)];
+        if (h < 0) {
+          trip(Status::InvariantViolated,
+               "set_origins: arc with larger origin unpaired (not an "
+               "oriented triangulation)", u);
+          return;
+        }
+        he_origin[h] = u;
+      }
+    }
+  }
+
+  // Build phase 3: next pointers, face assignments, and the per-vertex
+  // epilogue (v_out, v_orig_degree).  For vertex u with CCW neighbours
+  // [..., v, w, ...]: arc u->v lies in face (u, v, w) with w the next
+  // neighbour after v, and next(u->v) = v->w.  The corner needs arc v->w
+  // to exist (guarded: its absence means a face is not a triangle); w->u
+  // needs no guard by phase 1 `paired` + phase 2 `total`: u->w having an
+  // id forces its reverse w->u to have one.
+  //
+  // The CANONICAL CORNER of a face is the one whose apex is its smallest
+  // vertex; by the simple-input @pre exactly one of a face's three corners
+  // qualifies, so each face is created once and fids run in (smallest
+  // vertex, ring position) order -- the order the reference oracle freezes.
+  template<oriented_triangulation TriView>
+  void wire_faces(const TriView& T, std::span<int> he_of_arc)
+  {
+    for (int u = 0; u < (int)T.N; u++) {
+      auto row = T[u];
+      const int deg = (int)row.size();
+      for (int j = 0; j < deg; j++) {
+        const int v = row[j], w = row[(j + 1) % deg];
+        const int jw = T.find(v, w);
+        if (jw < 0) {
+          trip(Status::InvariantViolated,
+               "wire_faces: corner (u,v,w) missing arc v->w (input face "
+               "is not a triangle)", v);
+          return;
+        }
+        const int h_uv = he_of_arc[T.arcid(u, j)];
+        const int h_vw = he_of_arc[T.arcid(v, jw)];
+        he_next[h_uv] = h_vw;
+
+        if (u < v && u < w) {
+          // Backstop: dead under build_topology's prologue gate + @pre.
+          if (nf + 1 > nf_cap) {
+            trip(Status::CapacityExceeded, "wire_faces: face capacity", nf);
+            return;
+          }
+          const int fid = nf++;
+          const int h_wu = he_of_arc[T.arcid(w, T.find(w, u))];
+          he_face[h_uv] = fid;
+          he_face[h_vw] = fid;
+          he_face[h_wu] = fid;
+          f_he[fid] = h_uv;
+        }
+      }
+      if (deg > 0) v_out[u] = he_of_arc[T.arcid(u, 0)];
+      v_orig_degree[u] = deg;   // original degree: topological, metric-free
+    }
+  }
+
+  // Build the metric-independent half-edge topology from a combinatorial
+  // triangulation: the composition reset_to_dead_slots ->
+  // assign_halfedge_ids -> set_origins -> wire_faces.  The metric arrays
+  // (he_length, he_angle, v_cone_angle) are zeroed but left for the caller
+  // to fill -- the shared core of from_triangulation (equilateral) and the
+  // owner's from_intrinsic_metric (prescribed lengths).
+  //
+  // he_of_arc: the arc-to-halfedge map, dense over [0, arc_space(T)),
+  // caller-supplied.  The prologue gates ALL capacities against the
+  // input's own sizes -- nv_cap >= T.N, then dcel_build_capacities(
+  // degree_sum(T)); a connected genus-0 input meets dcel_capacities(T.N)
+  // with equality -- so every capacity failure refuses BEFORE touching the
+  // arena, and the in-phase capacity trips are backstops, dead under this
+  // prologue plus the @pre below.
+  //
+  // @pre each ring lists distinct neighbours (simple input; multi-edge
+  //      delta-complexes are built by from_ascii, never by this build).
+  //      The guards detect unpaired arcs and non-triangle corners, not
+  //      every malformed adjacency: an ASYMMETRIC duplicate (u twice in
+  //      v's ring, v once in u's) evades them.
+  // @post on Ok: check_consistency's @inv 1-6 (paper sec:dcel -- twin
+  //      closure, triangular faces, origin chaining, face agreement,
+  //      v_out / f_he witnesses) hold on the live prefix.  @inv 7-9 are
+  //      metric facts, so check_consistency() in full is the @post of
+  //      from_triangulation and of the owner's from_intrinsic_metric,
+  //      never of the bare topology build.
+  //
+  // Starting from reset_to_dead_slots(), an Ok build is a deterministic
+  // function of (T, capacities) alone, even on a reused batch arena.
+  // Failures latch the Status channel and are terminal for the binding:
+  // capacity refusals leave the arena untouched; an invariant trip leaves
+  // a partial build behind the latch, which gates every consumer.
+  template<oriented_triangulation TriView>
+  void build_topology(const TriView& T, std::span<int> he_of_arc)
+  {
+    if (status != Status::Ok) return;
+    if ((long)he_of_arc.size() < arc_space(T)) {
+      trip(Status::CapacityExceeded, "build_topology: he_of_arc workspace",
+           (int)he_of_arc.size());
+      return;
+    }
+    if (nv_cap < (int)T.N) {
+      trip(Status::CapacityExceeded, "build_topology: vertex capacity",
+           nv_cap);
+      return;
+    }
+    const DcelCapacities need = dcel_build_capacities(degree_sum(T));
+    if (nh_cap < need.nh_cap) {
+      trip(Status::CapacityExceeded, "build_topology: half-edge capacity",
+           nh_cap);
+      return;
+    }
+    if (nf_cap < need.nf_cap) {
+      trip(Status::CapacityExceeded, "build_topology: face capacity",
+           nf_cap);
+      return;
+    }
+
+    reset_to_dead_slots();
+    nv = T.N;
+
+    assign_halfedge_ids(T, he_of_arc);
+    if (status != Status::Ok) return;
+    set_origins(T, he_of_arc);
+    if (status != Status::Ok) return;
+    wire_faces(T, he_of_arc);
+  }
+
+  // The equilateral build: topology + unit metric (every edge length 1,
+  // every corner pi/3, cone angle deg*pi/3).  One call per isomer over a
+  // caller arena.  Static: the view's named constructor, mirroring the
+  // owner's DelaunayTriangulation::from_triangulation.
+  // @post on Ok: check_consistency() in full (topology @inv 1-6 from
+  //       build_topology, metric @inv 7-9 from the equilateral fill).
+  template<oriented_triangulation TriView>
+  static void from_triangulation(DelaunayView& D, const TriView& T,
+                                 std::span<int> he_of_arc)
+  {
+    D.build_topology(T, he_of_arc);
+    if (D.status != Status::Ok) return;
+    D.set_equilateral_metric();
   }
 
   // -------------------------------------------------------------------------

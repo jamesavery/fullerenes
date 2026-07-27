@@ -94,98 +94,20 @@ double DelaunayTriangulation::diameter_upper_bound() const
 
 // --- Construction ---
 
-// Build the metric-independent half-edge topology (connectivity + faces +
-// v_orig_degree) from a combinatorial triangulation. The metric arrays
-// (he_length, he_angle, v_cone_angle) are sized but left for the caller to
-// fill -- this is the shared core of from_triangulation (equilateral) and
-// from_intrinsic_metric (prescribed lengths).
-static DelaunayTriangulation build_topology(const Triangulation& T)
+// Owner storage for the view-level build (delaunay_view.hh carries the
+// algorithm), sized at dcel_build_capacities(degree_sum(T)) -- the input's
+// own sizes, byte-identical to the historical grow-as-discovered build for
+// every closed oriented input, connected genus-0 or not.  ensure_* pre-fills
+// the dead representation (its growth contract) and the build's reset
+// re-establishes it: the double pass is deliberate, keeping the two
+// contracts independent.
+static DelaunayTriangulation owner_sized_for_build(const Triangulation& T)
 {
+  const DcelCapacities c = dcel_build_capacities(degree_sum(T));
   DelaunayTriangulation D;
-  D.nv = T.N;
-
-  // Phase 1: Assign half-edge IDs to directed arcs.
-  // For each undirected edge {u,v} with u<v: half-edges 2k (u->v) and 2k+1 (v->u).
-  // he_of_arc replaces the old std::map<pair<int,int>,int>: it is a dense array
-  // indexed by the triangulation's own flat arc id (T.arcid(u,i) = u*dmax + i,
-  // the arc from u to its i-th neighbour), with the reverse arc located by
-  // T.find(v,u) -- the same dense-arc vocabulary TriangulationView uses in
-  // compute_faces_oriented.  Edge ids are still assigned in the SAME order
-  // (u ascending, v in u's ring order, counting only u<v arcs), so the
-  // half-edge numbering -- and every id derived from it -- is bit-identical to
-  // the previous map-based build.
-  std::vector<int> he_of_arc((size_t)T.N * T.dmax, -1);
-  int eid = 0;
-  for (node_t u = 0; u < T.N; u++) {
-    auto row = T[u];
-    int deg = row.size();
-    for (int i = 0; i < deg; i++) {
-      node_t v = row[i];
-      if (u < v) {
-        int jr = T.find(v, u);          // position of u in v's row (the reverse arc)
-        if (jr < 0)
-          throw std::runtime_error(
-              "build_topology: arc " + std::to_string(u) + "->" +
-              std::to_string(v) + " has no reverse arc " + std::to_string(v) +
-              "->" + std::to_string(u) + " (input is not a consistently "
-              "oriented triangulation)");
-        he_of_arc[T.arcid(u, i)]  = 2 * eid;
-        he_of_arc[T.arcid(v, jr)] = 2 * eid + 1;
-        eid++;
-      }
-    }
-  }
-
-  D.nh = 2 * eid;
-  D.ensure_halfedges(D.nh);   // dead-slot fill; every slot in [0, nh) is
-                              // overwritten by phases 2-3 + the metric fill
-
-  // Phase 2: Set origins (origin(arc u->*) = u).
-  for (node_t u = 0; u < T.N; u++) {
-    auto row = T[u];
-    int deg = row.size();
-    for (int i = 0; i < deg; i++)
-      D.he_origin[he_of_arc[T.arcid(u, i)]] = u;
-  }
-
-  // Phase 3: Set next pointers and face assignments.
-  // For vertex u with CCW neighbors [..., v, w, ...]:
-  //   arc u->v is in face (u, v, w) where w = next neighbor after v.
-  //   next(u->v) = v->w.
-  D.nf = 0;
-  D.ensure_vertices(D.nv);   // v_out all -1 (dead), cone/degree 0 (filled below)
-
-  for (node_t u = 0; u < T.N; u++) {
-    auto row = T[u];
-    int deg = row.size();
-    for (int j = 0; j < deg; j++) {
-      node_t v = row[j], w = row[(j+1) % deg];
-      int h_uv = he_of_arc[T.arcid(u, j)];
-      int h_vw = he_of_arc[T.arcid(v, T.find(v, w))];
-      D.he_next[h_uv] = h_vw;
-
-      // Assign face when u is the smallest vertex (canonical representative).
-      if (u < v && u < w) {
-        int fid = D.nf++;
-        int h_wu = he_of_arc[T.arcid(w, T.find(w, u))];
-        D.he_face[h_uv] = fid;
-        D.he_face[h_vw] = fid;
-        D.he_face[h_wu] = fid;
-        D.owned_f_he.push_back(h_uv);   // face count discovered here:
-                                        // construction, repointed below
-      }
-    }
-    if (deg > 0) D.v_out[u] = he_of_arc[T.arcid(u, 0)];
-  }
-  // Face-recycling storage: one slot per discovered face (edge slots were
-  // sized by ensure_halfedges).  The repoint re-binds f_he after the
-  // push_backs and the free stacks to their storage.
-  D.owned_free_faces.resize(D.owned_f_he.size());
-  D.repoint();
-
-  // Per-vertex original degree (topological; metric-independent).
-  for (node_t v = 0; v < T.N; v++) D.v_orig_degree[v] = T.degree(v);
-
+  D.ensure_vertices(T.N);
+  D.ensure_halfedges((int)c.nh_cap);
+  D.ensure_faces((int)c.nf_cap);
   return D;
 }
 
@@ -194,8 +116,10 @@ DelaunayTriangulation DelaunayTriangulation::from_triangulation(const Triangulat
   // Equilateral metric: every edge length 1, every angle pi/3, cone angle
   // deg*pi/3. (The special case length == 1 of from_intrinsic_metric, kept
   // explicit because the constants are exact and this is the hot path.)
-  DelaunayTriangulation D = build_topology(T);
-  D.set_equilateral_metric();
+  DelaunayTriangulation D = owner_sized_for_build(T);
+  std::vector<int> he_of_arc(arc_space(T));
+  DelaunayView::from_triangulation(D, T, he_of_arc);
+  D.throw_on_status("from_triangulation");
   return D;
 }
 
@@ -206,7 +130,10 @@ DelaunayTriangulation::from_intrinsic_metric(const Triangulation& T,
   // Prescribed intrinsic metric: edge lengths from `length`, angles and cone
   // angles derived. The topology is identical to the equilateral case; only
   // the metric differs.
-  DelaunayTriangulation D = build_topology(T);
+  DelaunayTriangulation D = owner_sized_for_build(T);
+  std::vector<int> he_of_arc(arc_space(T));
+  D.build_topology(T, he_of_arc);
+  D.throw_on_status("from_intrinsic_metric");
   for (int h = 0; h < D.nh; h += 2) {
     double L = length(D.he_origin[h], D.he_origin[D.twin(h)]);
     D.he_length[h] = D.he_length[D.twin(h)] = L;

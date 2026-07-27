@@ -1019,6 +1019,23 @@ TEST(DCELExactStatus, ExactDriverRejectsInsertedVertices) {
 // cannot see (reduction never grows, and no gate copies-then-mutates-both).
 // ============================================================================
 
+// Byte equality of two equal-sized spans (or span-like ranges).
+static bool spans_equal(auto sa, auto sb) {
+  return sa.size() == sb.size() && std::equal(sa.begin(), sa.end(), sb.begin());
+}
+
+// Byte equality of the nine canonical field arrays (the to_tuple fold) over
+// two views (the owner IS-A view) -- shared by same_dcel_state and the
+// view-build gates.
+static bool dcel_arrays_equal(const DelaunayView& A, const DelaunayView& B) {
+  bool eq = true;
+  auto ta = A.to_tuple(), tb = B.to_tuple();
+  [&]<std::size_t... I>(std::index_sequence<I...>) {
+    ((eq = eq && spans_equal(std::get<I>(ta), std::get<I>(tb))), ...);
+  }(std::make_index_sequence<DelaunayView::n_fields>{});
+  return eq;
+}
+
 // The equality relation on DCEL state: counts, capacities, status, the nine
 // arrays (folded over the canonical field tuple), free-list sequences, and
 // the tracker's points.  The tuple fold covers only the nine field arrays;
@@ -1029,15 +1046,7 @@ static bool same_dcel_state(const DelaunayTriangulation& A,
   if (A.nv != B.nv || A.nh != B.nh || A.nf != B.nf) return false;
   if (A.nh_cap != B.nh_cap || A.nf_cap != B.nf_cap) return false;
   if (A.status != B.status) return false;
-  bool eq = true;
-  auto ta = A.to_tuple(), tb = B.to_tuple();
-  auto spans_equal = [](auto sa, auto sb) {
-    return sa.size() == sb.size() && std::equal(sa.begin(), sa.end(), sb.begin());
-  };
-  [&]<std::size_t... I>(std::index_sequence<I...>) {
-    ((eq = eq && spans_equal(std::get<I>(ta), std::get<I>(tb))), ...);
-  }(std::make_index_sequence<DelaunayView::n_fields>{});
-  if (!eq) return false;
+  if (!dcel_arrays_equal(A, B)) return false;
   if (!spans_equal(A.free_edges.live(), B.free_edges.live())) return false;
   if (!spans_equal(A.free_faces.live(), B.free_faces.live())) return false;
   if (A.tracker.points.size() != B.tracker.points.size()) return false;
@@ -1244,6 +1253,360 @@ TEST(DCELStatus, WireTriangleRejectsDeadArc) {
   EXPECT_EQ(V.wire_triangle(-1, 0, 1), -1);
   EXPECT_EQ(V.status, DelaunayView::Status::InvariantViolated);
   EXPECT_TRUE(same_dcel_state(D, D_ref));
+}
+
+// ============================================================================
+// DCELViewBuild: the view-level build (PROMOTION-DESIGN.md 1.4).
+// The owner now ROUTES THROUGH the view build, so an owner-vs-view compare
+// cannot falsify the topology; the oracle below is a CODE-independent,
+// algorithm-identical replica of the pre-promotion owner build (delaunay.cc
+// as of 84d14bee) -- the conformance anchor for the half-edge numbering,
+// the face numbering, the v_out choice, and the equilateral constants.
+// The poisoned-arena gates then prove what the oracle cannot: the
+// fresh-fill contract (dead-slot establishment over reused / oversized
+// arenas) and the owner shell's input-derived sizing.
+// ============================================================================
+
+// The historical build, verbatim (dense arc array, eid order u-ascending /
+// ring order / u<v arcs, faces at their smallest vertex), producing plain
+// vectors sized exactly as discovered, plus the equilateral metric fill.
+// DO NOT modernize or route through library code: its value is being
+// frozen.  Valid corpus input only (no guards).
+struct ReferenceBuild {
+  int nv = 0, nh = 0, nf = 0;
+  std::vector<int>    he_next, he_origin, he_face, v_out, v_orig_degree, f_he;
+  std::vector<double> he_length, he_angle, v_cone_angle;
+};
+static ReferenceBuild reference_build_topology(const Triangulation& T) {
+  ReferenceBuild R;
+  R.nv = T.N;
+  std::vector<int> he_of_arc((size_t)T.N * T.dmax, -1);
+  int eid = 0;
+  for (node_t u = 0; u < T.N; u++) {
+    auto row = T[u];
+    for (int i = 0; i < (int)row.size(); i++) {
+      node_t v = row[i];
+      if (u < v) {
+        int jr = T.find(v, u);
+        he_of_arc[T.arcid(u, i)]  = 2 * eid;
+        he_of_arc[T.arcid(v, jr)] = 2 * eid + 1;
+        eid++;
+      }
+    }
+  }
+  R.nh = 2 * eid;
+  R.he_next.assign(R.nh, -1);  R.he_origin.assign(R.nh, -1);
+  R.he_face.assign(R.nh, -1);
+  R.he_length.assign(R.nh, 0.0); R.he_angle.assign(R.nh, 0.0);
+  R.v_out.assign(T.N, -1); R.v_cone_angle.assign(T.N, 0.0);
+  R.v_orig_degree.assign(T.N, 0);
+  for (node_t u = 0; u < T.N; u++) {
+    auto row = T[u];
+    for (int i = 0; i < (int)row.size(); i++)
+      R.he_origin[he_of_arc[T.arcid(u, i)]] = u;
+  }
+  R.nf = 0;
+  for (node_t u = 0; u < T.N; u++) {
+    auto row = T[u];
+    int deg = (int)row.size();
+    for (int j = 0; j < deg; j++) {
+      node_t v = row[j], w = row[(j + 1) % deg];
+      int h_uv = he_of_arc[T.arcid(u, j)];
+      int h_vw = he_of_arc[T.arcid(v, T.find(v, w))];
+      R.he_next[h_uv] = h_vw;
+      if (u < v && u < w) {
+        int fid = R.nf++;
+        int h_wu = he_of_arc[T.arcid(w, T.find(w, u))];
+        R.he_face[h_uv] = fid;
+        R.he_face[h_vw] = fid;
+        R.he_face[h_wu] = fid;
+        R.f_he.push_back(h_uv);
+      }
+    }
+    if (deg > 0) R.v_out[u] = he_of_arc[T.arcid(u, 0)];
+  }
+  for (node_t v = 0; v < T.N; v++) R.v_orig_degree[v] = T.degree(v);
+  for (int h = 0; h < R.nh; h++) {
+    R.he_length[h] = 1.0;
+    R.he_angle[h]  = M_PI / 3.0;
+  }
+  for (node_t v = 0; v < T.N; v++)
+    R.v_cone_angle[v] = T.degree(v) * M_PI / 3.0;
+  return R;
+}
+
+// Live-prefix equality of a built view against the oracle (whose vectors
+// are sized exactly as discovered): counts and all nine arrays.
+static void expect_matches_reference(const DelaunayView& V,
+                                     const ReferenceBuild& R) {
+  ASSERT_EQ(V.status, DelaunayView::Status::Ok);
+  EXPECT_EQ(V.nv, R.nv);
+  EXPECT_EQ(V.nh, R.nh);
+  EXPECT_EQ(V.nf, R.nf);
+  EXPECT_TRUE(spans_equal(V.he_next.first(R.nh),   std::span(R.he_next)));
+  EXPECT_TRUE(spans_equal(V.he_origin.first(R.nh), std::span(R.he_origin)));
+  EXPECT_TRUE(spans_equal(V.he_face.first(R.nh),   std::span(R.he_face)));
+  EXPECT_TRUE(spans_equal(V.he_length.first(R.nh), std::span(R.he_length)));
+  EXPECT_TRUE(spans_equal(V.he_angle.first(R.nh),  std::span(R.he_angle)));
+  EXPECT_TRUE(spans_equal(V.v_out.first(R.nv),     std::span(R.v_out)));
+  EXPECT_TRUE(spans_equal(V.v_cone_angle.first(R.nv),
+                          std::span(R.v_cone_angle)));
+  EXPECT_TRUE(spans_equal(V.v_orig_degree.first(R.nv),
+                          std::span(R.v_orig_degree)));
+  EXPECT_TRUE(spans_equal(V.f_he.first(R.nf),      std::span(R.f_he)));
+}
+
+// Caller-owned storage for a bare DelaunayView at explicit capacities
+// (default: dcel_capacities(T.N)), poisoned with values OUTSIDE every legal
+// range (ids are >= -1, metric values nonnegative), so a survivor is proof
+// a slot was never written.
+struct ViewBuildArena {
+  static constexpr int    kPoison  = -999;
+  static constexpr double kPoisonD = -999.0;
+  std::vector<int>    he_next, he_origin, he_face, v_out, v_orig_degree, f_he;
+  std::vector<double> he_length, he_angle, v_cone_angle;
+  std::vector<int>    free_edges, free_faces, he_of_arc;
+  DelaunayView V;
+
+  explicit ViewBuildArena(const Triangulation& T)
+      : ViewBuildArena(T, T.N, dcel_capacities(T.N).nh_cap,
+                       dcel_capacities(T.N).nf_cap) {}
+  ViewBuildArena(const Triangulation& T, int nv_cap, long nh_cap, long nf_cap) {
+    he_next.assign(nh_cap, kPoison);   he_origin.assign(nh_cap, kPoison);
+    he_face.assign(nh_cap, kPoison);
+    he_length.assign(nh_cap, kPoisonD); he_angle.assign(nh_cap, kPoisonD);
+    v_out.assign(nv_cap, kPoison);      v_cone_angle.assign(nv_cap, kPoisonD);
+    v_orig_degree.assign(nv_cap, kPoison);
+    f_he.assign(nf_cap, kPoison);
+    free_edges.assign(nh_cap / 2, kPoison);
+    free_faces.assign(nf_cap, kPoison);
+    he_of_arc.assign(arc_space(T), kPoison);
+    V.nv_cap = nv_cap; V.nh_cap = (int)nh_cap; V.nf_cap = (int)nf_cap;
+    // Bind the nine spans through the canonical tuple (the storage list
+    // mirrors to_tuple's order; an int/double order slip fails to compile
+    // for all but same-typed neighbours).
+    auto vt = V.to_tuple();
+    auto st = std::forward_as_tuple(he_next, he_origin, he_face, he_length,
+                                    he_angle, v_out, v_cone_angle,
+                                    v_orig_degree, f_he);
+    [&]<std::size_t... I>(std::index_sequence<I...>) {
+      ((std::get<I>(vt) = std::span(std::get<I>(st))), ...);
+    }(std::make_index_sequence<DelaunayView::n_fields>{});
+    V.free_edges = Spanify::SpanStack<int>(std::span<int>(free_edges));
+    V.free_faces = Spanify::SpanStack<int>(std::span<int>(free_faces));
+  }
+  // The spans alias this object's vectors: copying would alias two arenas.
+  ViewBuildArena(const ViewBuildArena&) = delete;
+  ViewBuildArena& operator=(const ViewBuildArena&) = delete;
+};
+
+// One isomer, both gates: the view build against the frozen oracle (the
+// falsifier) plus the executable invariants (validity, not just constancy),
+// then the owner against the oracle's counts and the view's bytes (the
+// shell's input-derived sizing).
+static void expect_view_build_conforms(const Triangulation& T) {
+  ReferenceBuild R = reference_build_topology(T);
+
+  ViewBuildArena a(T);
+  DelaunayView::from_triangulation(a.V, T, a.he_of_arc);
+  expect_matches_reference(a.V, R);
+  EXPECT_TRUE(a.V.check_consistency());
+  EXPECT_EQ(a.V.total_cone_excess(), 12);   // Gauss-Bonnet, integer form
+  EXPECT_TRUE(a.V.free_edges.live().empty());
+  EXPECT_TRUE(a.V.free_faces.live().empty());
+
+  auto O = DelaunayTriangulation::from_triangulation(T);
+  EXPECT_EQ(O.nv, R.nv);
+  EXPECT_EQ(O.nh, R.nh);
+  EXPECT_EQ(O.nf, R.nf);
+  EXPECT_EQ((long)O.he_next.size(), (long)R.nh);  // sizing == historical
+  EXPECT_EQ((long)O.f_he.size(),    (long)R.nf);
+  EXPECT_TRUE(dcel_arrays_equal(a.V, O));
+}
+
+TEST(DCELViewBuild, MatchesReference_C20) {
+  expect_view_build_conforms(make_dual(20, 0));
+}
+
+// The full C60 space (1812 duals): every isomer byte-equal to the oracle.
+TEST(DCELViewBuild, MatchesReference_C60_AllIsomers) {
+  BuckyGen::buckygen_queue Q = BuckyGen::start(60, false, false);
+  Triangulation T;
+  int idx = 0;
+  while (BuckyGen::next_fullerene(Q, T)) {
+    SCOPED_TRACE("C60 #" + std::to_string(idx));
+    expect_view_build_conforms(T);
+    idx++;
+  }
+  BuckyGen::stop(Q);
+  EXPECT_EQ(idx, 1812);
+}
+
+// An OVERSIZED arena -- the batch-driver shape, and the only shape whose
+// dead region is nonempty: live prefix equals the oracle, tail is exactly
+// the dead state (no poison survives anywhere).
+TEST(DCELViewBuild, OversizedArenaBuildsLivePrefixPlusDeadTail) {
+  Triangulation T = make_dual(20, 0);
+  const DcelCapacities c = dcel_capacities(T.N);
+  ViewBuildArena a(T, T.N + 3, c.nh_cap + 4, c.nf_cap + 2);
+  DelaunayView::from_triangulation(a.V, T, a.he_of_arc);
+  expect_matches_reference(a.V, reference_build_topology(T));
+  for (int h = a.V.nh; h < a.V.nh_cap; h++) {
+    EXPECT_EQ(a.V.he_next[h], -1);
+    EXPECT_EQ(a.V.he_origin[h], -1);
+    EXPECT_EQ(a.V.he_face[h], -1);
+    EXPECT_EQ(a.V.he_length[h], 0.0);
+    EXPECT_EQ(a.V.he_angle[h], 0.0);
+  }
+  for (int v = a.V.nv; v < a.V.nv_cap; v++) {
+    EXPECT_EQ(a.V.v_out[v], -1);
+    EXPECT_EQ(a.V.v_cone_angle[v], 0.0);
+    EXPECT_EQ(a.V.v_orig_degree[v], 0);
+  }
+  for (int f = a.V.nf; f < a.V.nf_cap; f++) EXPECT_EQ(a.V.f_he[f], -1);
+}
+
+// Rebuilding in a DIRTY arena -- stale counts, junk free lists, a poisoned
+// slot, and the PREVIOUS isomer's arc workspace -- must equal a fresh
+// build: the reuse case the fresh-fill contract exists for.
+TEST(DCELViewBuild, ArenaReuseEqualsFreshBuild) {
+  Triangulation TA = make_dual(60, 0), TB = make_dual(60, 1);
+  ViewBuildArena a(TA);
+  DelaunayView::from_triangulation(a.V, TA, a.he_of_arc);
+  ASSERT_EQ(a.V.status, DelaunayView::Status::Ok);
+  a.V.free_edges.push_back(7);
+  a.V.free_faces.push_back(3);
+  a.V.nh = 7;
+  a.V.nf = 3;
+  a.V.he_next[5] = ViewBuildArena::kPoison;
+
+  DelaunayView::from_triangulation(a.V, TB, a.he_of_arc);
+  expect_matches_reference(a.V, reference_build_topology(TB));
+
+  ViewBuildArena b(TB);
+  DelaunayView::from_triangulation(b.V, TB, b.he_of_arc);
+  EXPECT_TRUE(dcel_arrays_equal(a.V, b.V));
+  EXPECT_TRUE(a.V.free_edges.live().empty());
+  EXPECT_TRUE(a.V.free_faces.live().empty());
+}
+
+// --- The guard falsifiers.  Each names the trip site it must latch; the
+// --- two pre-arena guards additionally leave the arena untouched.
+
+TEST(DCELViewBuild, UndersizedArcWorkspaceIsLoud) {
+  Triangulation T = make_dual(20, 0);
+  ViewBuildArena a(T);
+  std::span<int> short_ws(a.he_of_arc.data(), a.he_of_arc.size() - 1);
+  a.V.build_topology(T, short_ws);
+  EXPECT_EQ(a.V.status, DelaunayView::Status::CapacityExceeded);
+  EXPECT_STREQ(a.V.status_site, "build_topology: he_of_arc workspace");
+  EXPECT_EQ(a.V.he_next[0], ViewBuildArena::kPoison);  // pre-arena refusal
+}
+
+TEST(DCELViewBuild, VertexCapacityIsLoud) {
+  Triangulation T = make_dual(20, 0);
+  const DcelCapacities c = dcel_capacities(T.N);
+  ViewBuildArena a(T, T.N - 1, c.nh_cap, c.nf_cap);
+  a.V.build_topology(T, a.he_of_arc);
+  EXPECT_EQ(a.V.status, DelaunayView::Status::CapacityExceeded);
+  EXPECT_STREQ(a.V.status_site, "build_topology: vertex capacity");
+  EXPECT_EQ(a.V.he_next[0], ViewBuildArena::kPoison);  // pre-arena refusal
+}
+
+TEST(DCELViewBuild, HalfEdgeCapacityIsLoud) {
+  Triangulation T = make_dual(20, 0);
+  const DcelCapacities c = dcel_capacities(T.N);
+  ViewBuildArena a(T, T.N, c.nh_cap - 2, c.nf_cap);
+  a.V.build_topology(T, a.he_of_arc);
+  EXPECT_EQ(a.V.status, DelaunayView::Status::CapacityExceeded);
+  EXPECT_STREQ(a.V.status_site, "build_topology: half-edge capacity");
+  EXPECT_EQ(a.V.he_next[0], ViewBuildArena::kPoison);  // pre-arena refusal
+}
+
+TEST(DCELViewBuild, FaceCapacityIsLoud) {
+  Triangulation T = make_dual(20, 0);
+  const DcelCapacities c = dcel_capacities(T.N);
+  ViewBuildArena a(T, T.N, c.nh_cap, c.nf_cap - 1);
+  a.V.build_topology(T, a.he_of_arc);
+  EXPECT_EQ(a.V.status, DelaunayView::Status::CapacityExceeded);
+  EXPECT_STREQ(a.V.status_site, "build_topology: face capacity");
+  EXPECT_EQ(a.V.he_next[0], ViewBuildArena::kPoison);  // pre-arena refusal
+}
+
+// Phase-1 guard: a u<v arc whose reverse is gone (the latch form of the
+// historical owner throw).  Constructed in the ring of the LARGEST vertex
+// so the smaller endpoint's phase-1 lookup fails.
+TEST(DCELViewBuild, ArcWithoutReverseTripsPhase1) {
+  Triangulation T = make_dual(20, 0);
+  const node_t v = T.N - 1;
+  auto row = T[v];
+  int i_min = 0;
+  for (int i = 1; i < (int)row.size(); i++)
+    if (row[i] < row[i_min]) i_min = i;
+  row[i_min] = row[(i_min + 1) % (int)row.size()];
+
+  ViewBuildArena a(T);
+  a.V.build_topology(T, a.he_of_arc);
+  EXPECT_EQ(a.V.status, DelaunayView::Status::InvariantViolated);
+  EXPECT_STREQ(a.V.status_site,
+               "assign_halfedge_ids: u<v arc without reverse (not an "
+               "oriented triangulation)");
+}
+
+// Phase-2 guard: drop a neighbour from vertex 0's ring; the dropped
+// neighbour's back-arc (larger origin) keeps no id, which phase 1 cannot
+// see.  The historical build wrote he_origin[-1] here.
+TEST(DCELViewBuild, UnpairedLargerOriginTripsPhase2) {
+  Triangulation T = make_dual(20, 0);
+  T[0][0] = T[0][1];
+
+  ViewBuildArena a(T);
+  a.V.build_topology(T, a.he_of_arc);
+  EXPECT_EQ(a.V.status, DelaunayView::Status::InvariantViolated);
+  EXPECT_STREQ(a.V.status_site,
+               "set_origins: arc with larger origin unpaired (not an "
+               "oriented triangulation)");
+}
+
+// Phase-3 guard: transpose two non-adjacent entries of a ring -- pairing
+// stays intact (same neighbour sets) but a corner (v,w) is no longer an
+// edge.  The historical build evaluated T.arcid(v,-1) here (a wild read at
+// v == 0).
+TEST(DCELViewBuild, NonTriangleCornerTripsPhase3) {
+  Triangulation T = make_dual(20, 0);
+  std::swap(T[0][1], T[0][3]);
+
+  ViewBuildArena a(T);
+  a.V.build_topology(T, a.he_of_arc);
+  EXPECT_EQ(a.V.status, DelaunayView::Status::InvariantViolated);
+  EXPECT_STREQ(a.V.status_site,
+               "wire_faces: corner (u,v,w) missing arc v->w (input face is "
+               "not a triangle)");
+}
+
+// The owner boundary converts the latch to its documented throw.
+TEST(DCELViewBuild, OwnerConvertsTripToThrow) {
+  Triangulation T = make_dual(20, 0);
+  const node_t v = T.N - 1;
+  auto row = T[v];
+  row[0] = row[1];
+  EXPECT_THROW(DelaunayTriangulation::from_triangulation(T),
+               std::runtime_error);
+}
+
+// A pre-tripped view refuses to build: first diagnostic preserved, arena
+// untouched (mirrors DCELStatus.StickyStatusEarlyOutsEverySubsequentMutation).
+TEST(DCELViewBuild, PreTrippedEntryIsUntouched) {
+  Triangulation T = make_dual(20, 0);
+  ViewBuildArena a(T);
+  std::span<int> short_ws(a.he_of_arc.data(), a.he_of_arc.size() - 1);
+  a.V.build_topology(T, short_ws);
+  ASSERT_EQ(a.V.status, DelaunayView::Status::CapacityExceeded);
+  const char* site = a.V.status_site;
+
+  a.V.build_topology(T, a.he_of_arc);   // full workspace
+  EXPECT_EQ(a.V.status_site, site);
+  EXPECT_EQ(a.V.he_next[0], ViewBuildArena::kPoison);
 }
 
 // ============================================================================

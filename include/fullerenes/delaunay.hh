@@ -192,10 +192,11 @@ struct HostDelaunayWorkspace : DelaunayWorkspace {
 //   @inv sized:  he_*.size() == nh, v_*.size() >= nv, f_he.size() == nf.
 //
 // Resizer inventory (everything that may reallocate, each ending in
-// repoint()): the monotone ensure_* helpers (post-build growth),
-// build_topology / from_ascii (construction, which establish the arrays
-// wholesale), and compact_vertices (the one shrinking operation).  Everything
-// else mutates in place through the spans.
+// repoint()): the monotone ensure_* helpers (post-build growth, and the
+// construction paths, which allocate through them before the view-level
+// build), from_ascii (which establishes the arrays wholesale), and
+// compact_vertices (the one shrinking operation).  Everything else mutates
+// in place through the spans.
 //
 // Why not Owned<View> (owned.hh): that template is specialized to the RSR
 // adjacency layout (neighbours/deg/twin + optional points); a tuple-driven
