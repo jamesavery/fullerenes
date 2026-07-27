@@ -502,14 +502,10 @@ struct TrackerTransport {
     }
   }
 
-  void plan_charts(const FanPolygon& fan, const FanTriangulation& tri, int deg) {
-    if (deg >= 4) {
-      for (int ti = 0; ti < tri.n_triangles; ti++)
-        new_tris.push_back({tri.triangles[ti].v0, tri.triangles[ti].v1,
-                            tri.triangles[ti].v2});
-    } else {
-      new_tris.push_back({0, 1, 2});
-    }
+  void plan_charts(const FanPolygon& fan, const FanTriangulation& tri) {
+    for (int ti = 0; ti < tri.n_triangles; ti++)
+      new_tris.push_back({tri.triangles[ti].v0, tri.triangles[ti].v1,
+                          tri.triangles[ti].v2});
     charts.reserve(new_tris.size());
     for (const auto& tv : new_tris)
       charts.push_back({fan.x(tv[0]), fan.y(tv[0]),
@@ -577,9 +573,9 @@ int DelaunayTriangulation::flip_to_delaunay()
 // ============================================================================
 // Vertex removal
 // (FanPolygon / FanTriangulation and the whole removal machinery --
-// extract_fan, ear clipping, splice_fan, remove_degree3, the cocircular
-// tie-break, flip_away_self_loops, and the remove_flat_vertices driver --
-// are header-inline on DelaunayView over DelaunayWorkspace; the owner
+// extract_fan, ear clipping, splice_fan, the cocircular tie-break,
+// flip_away_self_loops, and the remove_flat_vertices driver -- are
+// header-inline on DelaunayView over DelaunayWorkspace; the owner
 // wrappers below keep the historical signatures.)
 // ============================================================================
 

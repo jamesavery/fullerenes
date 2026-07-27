@@ -221,7 +221,7 @@ struct NoTransport {
   void plan_flip(int /*h*/, int /*fh*/, int /*ft*/) {}
   void commit_flip(int /*fh*/, int /*ft*/) {}
   void plan_star(int /*v*/, const FanPolygon&) {}
-  void plan_charts(const FanPolygon&, const FanTriangulation&, int /*deg*/) {}
+  void plan_charts(const FanPolygon&, const FanTriangulation&) {}
   void commit_removal(std::span<const int> /*new_faces*/, int /*seed_label*/) {}
 };
 
@@ -1052,64 +1052,32 @@ struct DelaunayView {
     for (int i = 0; i < k; i++) v_out[fan.nb[i]] = fan.inner_rim[i];
   }
 
-  // Remove a degree-3 vertex: three fan faces merge into one triangle,
-  // pushed onto ws.new_faces.
-  void remove_degree3(int v, DelaunayWorkspace& ws) {
-    if (status != Status::Ok) return;
-    int h0 = v_out[v], h1 = ccw(h0), h2 = ccw(h1);
-    int f0 = he_face[h0], f1 = he_face[h1], f2 = he_face[h2];
-    int inner0 = he_next[h0], inner1 = he_next[h1], inner2 = he_next[h2];
-
-    // Snapshot the neighbour ids BEFORE deallocation (dest reads the twin's
-    // origin, which dealloc_edge clears).
-    int nb0 = dest(h0), nb1 = dest(h1), nb2 = dest(h2);
-
-    dealloc_face(f0); dealloc_face(f1); dealloc_face(f2);
-    dealloc_edge(h0); dealloc_edge(h1); dealloc_edge(h2);
-    v_out[v] = -1;
-    if (status != Status::Ok) return;
-
-    int f = wire_triangle(inner0, inner1, inner2);
-    if (status != Status::Ok) return;
-    if (!ws.new_faces.push_back(f)) {
-      trip(Status::CapacityExceeded, "remove_degree3: new-face list", f);
-      return;
-    }
-
-    v_out[nb0] = inner0; v_out[nb1] = inner1; v_out[nb2] = inner2;
-  }
-
-  // Remove one flat vertex (deg >= 4: ear clipping + surgery; deg == 3:
-  // direct merge; deg < 3: not removable here -- the driver's restructure
-  // rounds handle it).  Transport plan hooks run before the surgery.  Under
-  // the exact metric the star is developed onto the lattice first and the
-  // ear machinery runs on wedge signs and norms (deg == 3 allocates no new
-  // edge, so it needs no development).
+  // Remove one flat vertex (deg < 3: not removable here -- the driver's
+  // restructure rounds handle it).  Degree 3 is the k = 3 instance of the
+  // general path: ear_clip_fan's scan loop is empty and the base triangle
+  // is the merged face, so splice_fan performs the direct three-face merge
+  // (no diagonal is allocated).  Transport plan hooks run before the
+  // surgery.  Under the exact metric the star is developed onto the
+  // lattice first and the ear machinery runs on wedge signs and norms.
   template <class Metric = BandedFloatMetric, class Transport = NoTransport>
   void remove_flat_vertex(int v, DelaunayWorkspace& ws,
                           Metric&& m = Metric{}, Transport&& tr = Transport{}) {
     if (status != Status::Ok) return;
-    int deg = vertex_degree(v);
-    if (deg < 3) return;
+    if (vertex_degree(v) < 3) return;
 
     constexpr bool tracking = std::remove_reference_t<Transport>::tracking();
-    if (tracking || deg >= 4) {
-      extract_fan(v, ws);
-      if (status != Status::Ok) return;
-    }
+    extract_fan(v, ws);
+    if (status != Status::Ok) return;
     if constexpr (tracking) tr.plan_star(v, ws.fan);
 
-    if (deg >= 4) {
-      m.prepare_star(*this, ws, v);   // exact: lattice development; banded: no-op
-      if (status != Status::Ok) return;
-      ear_clip_fan(ws, m);
-      if (status != Status::Ok) return;
-    }
-    if constexpr (tracking) tr.plan_charts(ws.fan, ws.tri, deg);
+    m.prepare_star(*this, ws, v);   // exact: lattice development; banded: no-op
+    if (status != Status::Ok) return;
+    ear_clip_fan(ws, m);
+    if (status != Status::Ok) return;
+    if constexpr (tracking) tr.plan_charts(ws.fan, ws.tri);
 
     ws.new_faces.clear();
-    if (deg >= 4) splice_fan(v, ws, m);
-    else          remove_degree3(v, ws);
+    splice_fan(v, ws, m);
     if (status != Status::Ok) return;
 
     if constexpr (tracking) tr.commit_removal(ws.new_faces.live(), v);
