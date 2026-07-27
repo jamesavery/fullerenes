@@ -575,6 +575,9 @@ apex_factor(int abs2, int acs2, int bcs2, int chirality) {
   const long long K   = (long long)acs2 + abs2 - bcs2;   // law of cosines
   const long long tau = lattice_tau(abs2, acs2, bcs2);   // 16*Area^2 = 3*tau^2
   const long long n   = chirality * tau;
+  // The parity guard is provably dead for tau >= 0: mod 2 the Heron
+  // polynomial collapses to x+y+z, so tau = tau^2 = H = K (mod 2) and
+  // K - n is always even (paper sec:exactness).  Kept as belt-and-braces.
   if (tau < 0 || (K - n) % 2) return std::nullopt;
   return Eisenstein((int)((K - n) / 2), (int)n);          // m + n*w
 }

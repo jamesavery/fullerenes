@@ -900,15 +900,17 @@ struct DelaunayView {
   // orientation) -- the same third-vertex placement the paint/atlas layer
   // uses.
   //
-  // The anchor P[0] must lie in the UNIT ORBIT the star's chart actually
-  // uses: distinct sector-0 representatives of the same norm are not
-  // lattice-equivalent (split primes), and anchoring in the wrong orbit
-  // rotates the whole star off the lattice.  So the anchor scans
-  // Sector0Reps in the deterministic b-order and takes the first that
-  // develops fully -- ANY complete development is a valid isometric
-  // development: chirality-fixed placement makes every completing anchor a
-  // pure ROTATION of the canonical chart, and every downstream predicate
-  // (wedge, dot2, norm) is rotation-invariant.  Because the apex is
+  // The anchor P[0] is found by scan: distinct sector-0 representatives
+  // of the same norm need not be lattice-equivalent (split primes), and
+  // an anchor in an orbit incompatible with the star's chart MAY fail
+  // with some apex off the lattice -- so the scan tries every
+  // Sector0Reps representative in the deterministic b-order and takes
+  // the first that develops fully.  Several orbits can complete (e.g.
+  // the all-norm-7 star develops from both conjugate orbits, paper
+  // lem:orbit-anchor); ANY complete development is a valid isometric
+  // development: chirality-fixed placement makes any two completing
+  // developments pure ROTATIONS of each other, and every downstream
+  // predicate (wedge, dot2, norm) is rotation-invariant.  Because the apex is
   // EXACTLY flat (eps = 0), a complete development must CLOSE -- replaying
   // face k-1 must reproduce P[0] -- so a complete unclosed development, or
   // no completing representative at all, means the Lsq carry is corrupt ->
@@ -1551,7 +1553,7 @@ inline void DelaunayView::develop_fan_lattice(int v, DelaunayWorkspace& ws,
   for (Eisenstein z : Sector0Reps(Ls(0))) {
     switch (attempt(z)) {
       case Development::Closed:     return;
-      case Development::OffLattice: continue;   // wrong orbit: next representative
+      case Development::OffLattice: continue;   // orbit fails here: next representative
       case Development::Unclosed:
         trip(Status::InvariantViolated,
              "develop_fan_lattice: complete development fails to close at a flat apex", v);
@@ -1570,7 +1572,7 @@ inline int DelaunayView::lattice_first_tie_side(int h_loop, DelaunayWorkspace& w
   // between CCW-consecutive arcs A_t, A_{t+1} is face(A_t), with spoke Lsq
   // at the arcs and rim Lsq at he_next(A_t) -- the same per-face shape
   // develop_fan_lattice places, and the same anchor-independence argument:
-  // any completing anchor is a pure rotation of the canonical chart, and
+  // any two completing developments are pure rotations of each other, and
   // wedge / dot2 are rotation-invariant, so the sector verdict does not
   // depend on the representative found.
   int n = 0;

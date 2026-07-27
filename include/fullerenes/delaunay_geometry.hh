@@ -98,9 +98,10 @@ inline double triangle_angle(double adj1, double adj2, double opp) {
 //     Eisenstein::operator* is int32) -- THE binding constraint, measured
 //     to first diverge near Lsq ~ 1.7e6 when violated;
 //   - the flipped diagonal's factor-difference norm (<= 19*M^2), int64.
-// The corpus-measured maxima are 27 (final iDT lengths) and 64
-// (intermediates, instrumented probe) -- four orders below this envelope;
-// a trip is loud, never silent.
+// The corpus-measured maxima are 57 (final iDT lengths, the exact-vs-
+// banded A/B corpus incl. its C100/C140/C160 leg) and 64 (intermediates,
+// instrumented probe) -- four orders below this envelope; a trip is
+// loud, never silent.
 // ============================================================================
 inline constexpr long long exact_lsq_max = 500'000;
 static_assert(3 * exact_lsq_max / 2 <= INT32_MAX,
