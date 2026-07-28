@@ -114,7 +114,7 @@ void interpolate_cell(CellFrame frame, CellCorners corners,
 
     for (const LatticePoint& e : entries) {
         if (e.vid < n_cones) continue;     // cone -- pre-painted
-        const Eisenstein p(e.a, e.b);
+        const Eisenstein p = e.pos();
         const IntBary bw = integer_barycentric(p, P0, P1, P2);
         if (bw.n0 < 0 || bw.n1 < 0 || bw.n2 < 0 || bw.denom != g)
             paint_throw("eisenstein_paint::interpolate_cell(cell %d): bad "
@@ -132,13 +132,13 @@ void interpolate_cell(const ParamTablesView& V, int f,
 {
     if (f < 0 || f >= V.nf || !V.cell_live(f))
         paint_throw("eisenstein_paint::interpolate_cell: cell %d not charted", f);
-    interpolate_cell(V.frames[f], V.cells[f], V.cell_entries(f),
-                     anchors, V.n_cones, pos3d, f);
+    const ChartView c = V.chart(f);
+    interpolate_cell(c.frame, CellCorners{c.corners[0], c.corners[1], c.corners[2]},
+                     c.entries, anchors, V.n_cones, pos3d, f);
 }
 
-std::vector<coord3d> evaluate(const SurfaceParametrization& A,
-                              const std::vector<coord3d>& anchors,
-                              const Permutation& perm)
+std::vector<coord3d> evaluate_sorted(const SurfaceParametrization& A,
+                                     const std::vector<coord3d>& anchors)
 {
     // Cones are written directly; interpolate_cell skips them
     // ("pre-painted" contract).  Non-cone slots are written by
@@ -156,13 +156,20 @@ std::vector<coord3d> evaluate(const SurfaceParametrization& A,
         throw PaintError(Code::INTERPOLATE,
             std::string("interpolate_throw: ") + e.what());
     }
+    return pos3d;
+}
 
-    // perm[u_orig] = u_sorted, so the position written at sorted vertex
-    // perm[u_orig] is u_orig's 3D coordinate.
-    const int Nv_orig = (int)perm.size();
+std::vector<coord3d> evaluate(const SurfaceParametrization& A,
+                              const std::vector<coord3d>& anchors)
+{
+    const std::vector<coord3d> pos3d = evaluate_sorted(A, anchors);
+
+    // A.perm[u_orig] = u_sorted, so the position written at sorted
+    // vertex A.perm[u_orig] is u_orig's 3D coordinate.
+    const int Nv_orig = (int)A.perm.size();
     std::vector<coord3d> out(Nv_orig);
     for (int u = 0; u < Nv_orig; ++u)
-        out[u] = pos3d[perm[u]];
+        out[u] = pos3d[A.perm[u]];
     return out;
 }
 
@@ -334,7 +341,7 @@ DualGeometry dual_geometry(const TriangulationView& T) {
         const SortedDual   S = sorted_dual(T);
         const DualPolytope P = realize_dual(S);
         const SurfaceParametrization A = parametrize(P.D, S);
-        R.coords = evaluate(A, P.cone_pos, S.perm);
+        R.coords = evaluate(A, P.cone_pos);
     });
     if (!R.status.ok()) R.coords.clear();
     return R;

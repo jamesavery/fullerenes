@@ -17,7 +17,6 @@
 #include "fullerenes/delaunay.hh"
 #include "fullerenes/buckygen-wrapper.hh"
 
-#include <array>
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -46,79 +45,73 @@ int main(int argc, char** argv) {
     }
     if (T.N == 0) { std::fprintf(stderr, "isomer not found\n"); return 1; }
 
-    ep::SortedDual S_d = ep::sorted_dual(T);
-    ep::DualPolytope Pl = ep::realize_dual(S_d);
-    const Triangulation& T_sorted = S_d.T;
-    const DelaunayTriangulation& D = Pl.D;
-    auto cells         = ep::embed_all_cells(D, T_sorted);
+    try {
+        ep::SortedDual S_d = ep::sorted_dual(T);
+        ep::DualPolytope Pl = ep::realize_dual(S_d);
+        const Triangulation& T_sorted = S_d.T;
+        const DelaunayTriangulation& D = Pl.D;
 
-    if (cell_id < 0) {
-        for (int f = 0; f < D.nf; ++f)
-            if (cells[f].ok) { cell_id = f; break; }
-    }
-    if (cell_id < 0 || cell_id >= D.nf || !cells[cell_id].ok) {
-        std::fprintf(stderr,
-            "cell %d not live.  Live cell ids: ", cell_id);
-        for (int f = 0; f < D.nf; ++f)
-            if (cells[f].ok) std::fprintf(stderr, "%d ", f);
-        std::fprintf(stderr, "\n");
+        // The flat chart tables both the prints and the unfolded view
+        // consume.
+        ep::SurfaceParametrization param = ep::parametrize(D, S_d);
+        const ep::ParamTablesView V = param.view();
+
+        if (cell_id < 0) {
+            for (int f = 0; f < D.nf; ++f)
+                if (V.cell_live(f)) { cell_id = f; break; }
+        }
+        if (cell_id < 0 || cell_id >= D.nf || !V.cell_live(cell_id)) {
+            std::fprintf(stderr,
+                "cell %d not live.  Live cell ids: ", cell_id);
+            for (int f = 0; f < D.nf; ++f)
+                if (V.cell_live(f)) std::fprintf(stderr, "%d ", f);
+            std::fprintf(stderr, "\n");
+            return 1;
+        }
+
+        const auto ids = V.corner_ids(cell_id);
+        const auto P   = V.frame_points(cell_id);
+        std::printf("cell %d: c0=%d c1=%d c2=%d  P0=(%d,%d) P1=(%d,%d) "
+                    "P2=(%d,%d)  %zu lattice pts\n",
+                    cell_id, ids[0], ids[1], ids[2],
+                    P[0].first, P[0].second,
+                    P[1].first, P[1].second,
+                    P[2].first, P[2].second,
+                    V.cell_entries(cell_id).size());
+        int hh = D.f_he[cell_id];
+        for (int k = 0; k < 3; ++k, hh = D.he_next[hh]) {
+            const int f_opp = D.he_face[hh ^ 1];
+            if (f_opp < 0 || !V.cell_live(f_opp)) {
+                std::printf("  neighbour[%d]: (none)\n", k);
+                continue;
+            }
+            const auto nids = V.corner_ids(f_opp);
+            std::printf("  neighbour[%d] cell %d: c0=%d c1=%d c2=%d  "
+                        "%zu lattice pts\n",
+                        k, f_opp, nids[0], nids[1], nids[2],
+                        V.cell_entries(f_opp).size());
+        }
+
+        // Strip-level view for the lmap picture only -- the tables
+        // intentionally omit strip data, so this is the ONE
+        // construction-vocabulary call.
+        ep::Cell F = ep::embed_cell(D, T_sorted, cell_id);
+        ep::LatticeMap F_lmap = ep::enumerate_cell_lattice(F, T_sorted);
+
+        char path[256];
+        std::snprintf(path, sizeof path, "%s_f%d_lmap.tex", prefix, cell_id);
+        std::ofstream out1(path);
+        ep::dump_lattice_map_tikz(F, F_lmap, T_sorted, out1);
+        std::printf("wrote %s\n", path);
+
+        std::snprintf(path, sizeof path, "%s_f%d_unfolded.tex", prefix, cell_id);
+        std::ofstream out2(path);
+        dump_neighbour_unfolding_tikz(D, V, cell_id, out2);
+        std::printf("wrote %s\n", path);
+    } catch (const ep::PaintError& e) {
+        std::fprintf(stderr, "tikz_paint: paint stage %s: %s\n",
+                     ep::code_name(e.code), e.what());
         return 1;
     }
-    const ep::Cell& F = cells[cell_id];
-    ep::LatticeMap F_lmap = ep::enumerate_cell_lattice(F, T_sorted);
-
-    // Adapter: bundle (Cell, LatticeMap) into the lib-side CellPlacement
-    // type the unfold tools consume.
-    auto to_placement = [](const ep::Cell& F, const ep::LatticeMap& lmap) {
-        return CellPlacement{
-            F.cell_id, F.corners[0], F.corners[1], F.corners[2],
-            F.P[0], F.P[1], F.P[2],
-            F.ok ? lmap.entries : std::vector<std::pair<Eisenstein, int>>{},
-            F.ok };
-    };
-    CellPlacement F_place = to_placement(F, F_lmap);
-
-    // 3 adjacent iDT cells across F's 3 edges.
-    const int hh[3] = { D.f_he[cell_id],
-                        D.he_next[D.f_he[cell_id]],
-                        D.he_next[D.he_next[D.f_he[cell_id]]] };
-    std::array<NeighbourCell, 3> neighbours;
-    for (int k = 0; k < 3; ++k) {
-        const int h_opp = hh[k] ^ 1;
-        const int f_opp = D.he_face[h_opp];
-        if (f_opp < 0 || f_opp >= D.nf || !cells[f_opp].ok) continue;
-        const ep::Cell& Fn = cells[f_opp];
-        ep::LatticeMap  Ln = ep::enumerate_cell_lattice(Fn, T_sorted);
-        neighbours[k].placement = to_placement(Fn, Ln);
-        neighbours[k].valid     = true;
-    }
-
-    std::printf("cell %d: c0=%d c1=%d c2=%d  P0=(%d,%d) P1=(%d,%d) P2=(%d,%d)  "
-                "%zu lattice pts\n",
-                F.cell_id, F.corners[0], F.corners[1], F.corners[2],
-                F.P[0].first, F.P[0].second,
-                F.P[1].first, F.P[1].second,
-                F.P[2].first, F.P[2].second,
-                F_lmap.entries.size());
-    for (int k = 0; k < 3; ++k) {
-        const auto& nd = neighbours[k];
-        if (!nd.valid) { std::printf("  neighbour[%d]: (none)\n", k); continue; }
-        std::printf("  neighbour[%d] cell %d: c0=%d c1=%d c2=%d  "
-                    "%zu lattice pts\n",
-                    k, nd.placement.cell_id,
-                    nd.placement.c0, nd.placement.c1, nd.placement.c2,
-                    nd.placement.lattice_points.size());
-    }
-
-    char path[256];
-    std::snprintf(path, sizeof path, "%s_f%d_lmap.tex", prefix, cell_id);
-    std::ofstream out1(path);
-    ep::dump_lattice_map_tikz(F, F_lmap, T_sorted, out1);
-    std::printf("wrote %s\n", path);
-
-    std::snprintf(path, sizeof path, "%s_f%d_unfolded.tex", prefix, cell_id);
-    std::ofstream out2(path);
-    dump_neighbour_unfolding_tikz(F_place, neighbours, T_sorted, out2);
-    std::printf("wrote %s\n", path);
     return 0;
 }

@@ -78,17 +78,6 @@ inline std::array<Eisenstein, 3> develop_face_on_edge(const tri_t& t, int k_arc,
   return p;
 }
 
-// Index of half-edge h within its face's 3-cycle.  Corner k of the
-// chart is the origin of the k-th cycle half-edge (the cell-metric
-// construction; gated per cell by build_atlas), so this index IS the
-// chart corner the edge leaves from.
-inline int cycle_index(const DelaunayView& D, int h) {
-  const auto cyc = D.face_halfedges(D.he_face[h]);
-  for (int k = 0; k < 3; k++)
-    if (cyc[k] == h) return k;
-  fail("half-edge not on its face's cycle");
-}
-
 // ---------------------------------------------------------------------------
 // build_atlas: a composition of value-producing constructions.  Each takes
 // exactly the values it depends on, so the dependency order is the argument
@@ -130,8 +119,8 @@ std::vector<LatticeIsometry> half_edge_transitions(const DelaunayView& D,
     const int ht = D.twin(h);
     const auto Pf = V.frame_points(D.he_face[h]);
     const auto Pg = V.frame_points(D.he_face[ht]);
-    const int k  = cycle_index(D, h);
-    const int k2 = cycle_index(D, ht);
+    const int k  = D.cycle_slot(h);       // = the chart corner slot the
+    const int k2 = D.cycle_slot(ht);      //   edge leaves from (gated above)
     trans[h] = isometry_from_segments(Pf[k], Pf[(k + 1) % 3],
                                       Pg[(k2 + 1) % 3], Pg[k2]);
   }
@@ -198,7 +187,7 @@ AnchoredEdges anchored_edges(const ParamTablesView& V, const TriangulationView& 
   for (int f = 0; f < V.nf; f++) {
     if (!V.cell_live(f)) continue;
     for (const LatticePoint& e : V.cell_entries(f)) {
-      const Eisenstein p(e.a, e.b);
+      const Eisenstein p = e.pos();
       for (const Eisenstein d : half_dirs) {
         const LatticePoint* q = V.claim(f, p + d);
         if (!q) continue;

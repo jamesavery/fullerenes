@@ -190,11 +190,6 @@ LatticeMap enumerate_cell_lattice(const Cell& F,
 // SurfaceParametrization: every cell charted, every vertex located.
 // =====================================================================
 
-// One appearance of a T_sorted vertex in some cell's chart.  Kept as
-// locate_vertex's return type until the sub-project sweep converts
-// callers to the flat VertexOccurrence; do not add new uses.
-struct Occurrence { int cell; Eisenstein pos; };
-
 // The intrinsic product of the pipeline, CSR-backed: all live cells
 // embedded and scanned, coverage-checked, every product a flat table
 // (element structs + extents in eisenstein_paint_tables.hh).
@@ -253,9 +248,10 @@ SurfaceParametrization parametrize(const DelaunayTriangulation& D,
                                    const SortedDual& S);
 
 // A T_sorted vertex is itself a lattice point: locate it via its first
-// recorded occurrence.  Throws std::logic_error if v is unclaimed
+// recorded occurrence (the flat VertexOccurrence: host cell + chart
+// position (a, b)).  Throws std::logic_error if v is unclaimed
 // (impossible on a parametrize() output: coverage checked).
-Occurrence locate_vertex(const SurfaceParametrization& P, int v);
+VertexOccurrence locate_vertex(const SurfaceParametrization& P, int v);
 
 // =====================================================================
 // TikZ visualisations (diagnostic only; intrinsic -- lattice pictures).

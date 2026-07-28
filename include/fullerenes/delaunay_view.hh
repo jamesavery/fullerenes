@@ -47,6 +47,8 @@
 #include <numbers>
 #include <optional>
 #include <span>
+#include <stdexcept>
+#include <string>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -388,6 +390,20 @@ struct DelaunayView {
   std::array<int,3> face_vertices(int f) const {
     const auto h = face_halfedges(f);
     return {he_origin[h[0]], he_origin[h[1]], he_origin[h[2]]};
+  }
+  // The cycle slot (0, 1, 2) of half-edge h within its face's 3-cycle.
+  // he_origin[h] is corner SLOT cycle_slot(h) of any chart built by the
+  // cell-metric construction (eisenstein_paint's cell_metric reads its
+  // corners off this same cycle) -- the label-free identification that
+  // stays sound when corner LABELS repeat on delta-complex cells.
+  // Pre: h is live and on a well-formed 3-cycle.
+  int cycle_slot(int h) const {
+    const auto cyc = face_halfedges(he_face[h]);
+    for (int k = 0; k < 3; k++)
+      if (cyc[k] == h) return k;
+    throw std::logic_error("DelaunayView::cycle_slot: half-edge "
+                           + std::to_string(h) + " not on face "
+                           + std::to_string(he_face[h]) + "'s 3-cycle");
   }
 
   // Count outgoing half-edges from v; 0 for a dead vertex.

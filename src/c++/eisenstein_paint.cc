@@ -373,16 +373,16 @@ bool clip_to_cell_by_scanline(const EdgeDevelopment& V,
     return true;
 }
 
-// All candidate strips of one arc: every qualifying development of the
-// arc start->target, clipped to the cell triangle and scanline-bucketed.
-// Empty if no development qualifies or none survives the clip;
-// embed_cell picks the one strip per arc that is mutually consistent
-// across the three arcs.
+// All strip developments of one arc: every qualifying development of
+// the arc start->target, clipped to the cell triangle and scanline-
+// bucketed.  Empty if no development qualifies or none survives the
+// clip; embed_cell picks the one strip per arc that is mutually
+// consistent across the three arcs.
 std::vector<EdgeStrip>
-arc_strip_candidates(const TriangulationView& T_sorted, int n_cones,
-                     int start_vertex, Eisenstein start_pos,
-                     int target_vertex, Eisenstein target_pos,
-                     const MetaTriangle& M_cell)
+arc_strip_developments(const TriangulationView& T_sorted, int n_cones,
+                       int start_vertex, Eisenstein start_pos,
+                       int target_vertex, Eisenstein target_pos,
+                       const MetaTriangle& M_cell)
 {
     std::vector<EdgeStrip> out;
     for (const EdgeDevelopment& dev :
@@ -423,17 +423,21 @@ bool strips_consistent(const EdgeStrip& e01, const EdgeStrip& e12, const EdgeStr
         && merge_strip_claims(e20, claim);
 }
 
-// Enumerate valid (P0, P1, P2) corner placements for F in F's frame.
-// Returns up to 2 candidates: 1 if N01 is single-orbit, up to 2 for
-// split-prime N01.  Each satisfies all three norm constraints and CCW
-// orientation; picking among them which one matches the SURFACE
-// geodesics is the walker's job (in embed_cell).
-struct CornerCandidate { Eisenstein P0, P1, P2; };
+// A lattice development of the cell: a valid (P0, P1, P2) corner
+// placement in F's frame -- one per sector-0 representative of N01
+// whose induced apex P2 (its direction is fixed by the metric) is a
+// lattice point meeting the remaining norm constraints and CCW
+// orientation.  The count is a(N(gcd(P1, P2))) + [delta | sqrt(N01)]
+// -- see the eisenstein_paint_tables.hh banner for THE statement --
+// typically 1 or 2 but UNBOUNDED over the isomer space (C980's cells
+// admit 4), so callers must never cap it.  Picking which development
+// matches the SURFACE geodesics is the walker's job (in embed_cell).
+struct Development { Eisenstein P0, P1, P2; };
 
 // One cell's iDT metric datum: CCW corner ids, the squared side norms
 // and the interior angle at corner 0 -- the input of the chart-frame
 // construction.  THE one derivation; embed_cell and
-// build_candidate_tables both open with it.  @pre D.f_he[f] >= 0.
+// cell_developments both open with it.  @pre D.f_he[f] >= 0.
 struct CellMetric {
     std::array<int, 3> corners;
     double L20 = 0, alpha_0 = 0;
@@ -456,11 +460,11 @@ CellMetric cell_metric(const DelaunayView& D, int f)
     return m;
 }
 
-std::vector<CornerCandidate>
-enumerate_corner_candidates(double L20, double alpha_0,
-                            long N01, long N12, long N20)
+std::vector<Development>
+enumerate_developments(double L20, double alpha_0,
+                       long N01, long N12, long N20)
 {
-    std::vector<CornerCandidate> out;
+    std::vector<Development> out;
     const Eisenstein P0(0, 0);
     std::vector<Eisenstein> P1_candidates = sector0_reps_of_norm((int)N01);
 
@@ -485,9 +489,13 @@ enumerate_corner_candidates(double L20, double alpha_0,
 // The cross-edge consistency selection: the FIRST triple of arc strips
 // (in the given candidate orders -- the order is part of the algorithm's
 // determinism) that glue to ONE position -> vertex map wherever they
-// overlap (strips_consistent).  By the cell-development lemma the
-// consistent triple is the cell's unique flat chart, so first-match is
-// not a heuristic but the search for the unique solution.
+// overlap (strips_consistent).  First-match IS the search for the
+// unique solution (the cell-development lemma): the true geodesic
+// c0 -> c1 has one developed displacement in the surface's own frame,
+// exactly one of its six rotations lies in sector 0, and every OTHER
+// sector-0 representative of N01 sits in a different unit orbit -- no
+// walk along the surface can terminate on it -- so at most one
+// development admits a consistent strip triple.
 bool first_consistent_triple(const std::array<std::vector<EdgeStrip>, 3>& cand,
                              std::array<const EdgeStrip*, 3>& out)
 {
@@ -515,21 +523,22 @@ Cell embed_cell(const DelaunayTriangulation& D,
     const CellMetric m = cell_metric(D, cell_id);
     F.corners = m.corners;
 
-    // Each corner candidate is a lattice-realisable corner placement
-    // (up to 2 for split-prime N01); each arc can admit several
-    // developments (see edge_developments).  The cell's chart is the
-    // unique corner placement + strip triple that is cross-edge
-    // consistent; the loops below search in deterministic order.
-    for (const CornerCandidate& C :
-         enumerate_corner_candidates(m.L20, m.alpha_0, m.N01, m.N12, m.N20)) {
+    // Each development is a lattice-realisable corner placement (see
+    // Development for the count -- unbounded, never capped); each arc
+    // can admit several strip developments (see edge_developments).
+    // The cell's chart is the FIRST placement + strip triple that is
+    // cross-edge consistent -- unique by the cell-development lemma
+    // (first_consistent_triple) -- searched in deterministic order.
+    for (const Development& C :
+         enumerate_developments(m.L20, m.alpha_0, m.N01, m.N12, m.N20)) {
         const MetaTriangle M = { C.P0, C.P1, C.P2 };
         const std::array<Eisenstein, 3> P = { C.P0, C.P1, C.P2 };
         std::array<std::vector<EdgeStrip>, 3> cand;
         for (int k = 0; k < 3; ++k)
-            cand[k] = arc_strip_candidates(T_sorted, n_cones,
-                                           F.corners[k],           P[k],
-                                           F.corners[(k + 1) % 3], P[(k + 1) % 3],
-                                           M);
+            cand[k] = arc_strip_developments(T_sorted, n_cones,
+                                             F.corners[k],           P[k],
+                                             F.corners[(k + 1) % 3], P[(k + 1) % 3],
+                                             M);
         if (cand[0].empty() || cand[1].empty() || cand[2].empty()) continue;
 
         std::array<const EdgeStrip*, 3> strips;
@@ -808,7 +817,7 @@ SurfaceParametrization parametrize(const DelaunayTriangulation& D,
     return P;
 }
 
-Occurrence locate_vertex(const SurfaceParametrization& P, int v) {
+VertexOccurrence locate_vertex(const SurfaceParametrization& P, int v) {
     if (v < 0 || v >= (int)P.T.N)
         throw std::logic_error("eisenstein_paint::locate_vertex: vertex "
                                + std::to_string(v) + " out of range");
@@ -816,11 +825,11 @@ Occurrence locate_vertex(const SurfaceParametrization& P, int v) {
     if (os.empty())
         throw std::logic_error("eisenstein_paint::locate_vertex: vertex "
                                + std::to_string(v) + " unclaimed by any cell");
-    return Occurrence{ os[0].cell, Eisenstein(os[0].a, os[0].b) };
+    return os[0];
 }
 
 // =====================================================================
-// build_candidate_tables: the pre-embed prepare form.
+// cell_developments: every admissible lattice development, CSR by cell.
 // =====================================================================
 
 namespace {
@@ -831,59 +840,61 @@ int64_t pow2_ceil64(int64_t x) { int64_t p = 64; while (p < x) p <<= 1; return p
 
 }  // namespace
 
-CandidateTables build_candidate_tables(const ::DelaunayView& D,
-                                       const SortedDual& S)
+CellDevelopments cell_developments(const ::DelaunayView& D,
+                                   const SortedDual& S)
 {
-    CandidateTables ct;
-    ct.nf       = D.nf;
-    ct.N_sorted = (int32_t)S.T.N;
-    ct.cells.assign(ct.nf, CellCorners{});
-    ct.n_cand.assign(ct.nf, 0);
-    ct.frames.assign((size_t)ct.nf * 2, CellFrame{});
-    ct.scans.assign((size_t)ct.nf * 2, ScanBlock{});
-    ct.entry_capacity_first.assign(ct.nf + 1, 0);
+    CellDevelopments cd;
+    cd.nf       = D.nf;
+    cd.N_sorted = (int32_t)S.T.N;
+    cd.n_cones  = S.n_cones;
+    cd.cells.assign(cd.nf, CellCorners{});
+    cd.dev_first.assign(cd.nf + 1, 0);
+    cd.entry_capacity_first.assign(cd.nf + 1, 0);
 
-    long s_max = 0;    // max |a|+|b| over candidate frame edges
+    long s_max = 0;    // max |a|+|b| over development frame edges
 
-    for (int f = 0; f < ct.nf; ++f) {
-        if (D.f_he[f] < 0) continue;    // dead slot
+    for (int f = 0; f < cd.nf; ++f) {
+        cd.dev_first[f] = (int32_t)cd.frames.size();
+        if (D.f_he[f] < 0) continue;    // dead slot: 0 developments
 
         const CellMetric m = cell_metric(D, f);
-        ct.cells[f] = CellCorners{ m.corners[0], m.corners[1], m.corners[2] };
+        cd.cells[f] = CellCorners{ m.corners[0], m.corners[1], m.corners[2] };
 
-        const auto cands =
-            enumerate_corner_candidates(m.L20, m.alpha_0, m.N01, m.N12, m.N20);
-        if (cands.empty() || cands.size() > 2)
+        // The development count is unbounded over the isomer space
+        // (see the header banner for the formula; C980's cells admit
+        // 4), hence the CSR.  A live cell with NO development has an
+        // unrealizable metric: refuse loudly.
+        const auto devs =
+            enumerate_developments(m.L20, m.alpha_0, m.N01, m.N12, m.N20);
+        if (devs.empty())
             throw PaintError(Code::EMBED,
-                "build_candidate_tables: cell " + std::to_string(f) + " admits " +
-                std::to_string(cands.size()) +
-                " lattice-realisable corner frames (the split-prime bound is 1..2)");
-        ct.n_cand[f] = (int32_t)cands.size();
+                "cell_developments: live cell " + std::to_string(f) +
+                " admits no lattice development");
 
-        // Per-candidate frame + triangle scan (append_scan_rows: the same
-        // row derivation the post-embed flatten uses).
+        // Per-development frame + triangle scan (append_scan_rows: the
+        // same row derivation the post-selection flatten uses).
         int32_t cap_f = 0;
-        for (size_t k = 0; k < cands.size(); ++k) {
-            const Eisenstein P1 = cands[k].P1, P2 = cands[k].P2;
-            ct.frames[(size_t)f * 2 + k] =
-                CellFrame{ P1.first, P1.second, P2.first, P2.second };
-            for (Eisenstein e : { P1, P2 - P1, cands[k].P0 - P2 }) {
+        for (const Development& C : devs) {
+            const Eisenstein P1 = C.P1, P2 = C.P2;
+            cd.frames.push_back(CellFrame{ P1.first, P1.second, P2.first, P2.second });
+            for (Eisenstein e : { P1, P2 - P1, C.P0 - P2 }) {
                 const long sd = std::labs(e.first) + std::labs(e.second);
                 if (sd > s_max) s_max = sd;
             }
             const ScanBlock sb =
-                append_scan_rows(ct.rows, scan_triangle(cands[k].P0, P1, P2));
-            ct.scans[(size_t)f * 2 + k] = sb;
+                append_scan_rows(cd.rows, scan_triangle(C.P0, P1, P2));
+            cd.scans.push_back(sb);
             const int32_t n_rows = sb.b_max - sb.b_min + 1;
-            if (n_rows > ct.rows_cap) ct.rows_cap = n_rows;
+            if (n_rows > cd.rows_cap) cd.rows_cap = n_rows;
             if (sb.n_entries > cap_f) cap_f = sb.n_entries;
         }
-        if (cap_f > ct.max_cell_entries) ct.max_cell_entries = cap_f;
-        ct.entry_capacity_first[f + 1] = cap_f;
+        if (cap_f > cd.max_cell_entries) cd.max_cell_entries = cap_f;
+        cd.entry_capacity_first[f + 1] = cap_f;
     }
-    for (int f = 0; f < ct.nf; ++f)    // exclusive prefix
-        ct.entry_capacity_first[f + 1] += ct.entry_capacity_first[f];
-    ct.entries_capacity = ct.entry_capacity_first[ct.nf];
+    cd.dev_first[cd.nf] = (int32_t)cd.frames.size();
+    for (int f = 0; f < cd.nf; ++f)    // exclusive prefix
+        cd.entry_capacity_first[f + 1] += cd.entry_capacity_first[f];
+    cd.entries_capacity = cd.entry_capacity_first[cd.nf];
 
     // Scratch capacity formulas (properties of the data; any executor
     // sizing embed/enumerate scratch reads these):
@@ -895,11 +906,11 @@ CandidateTables build_candidate_tables(const ::DelaunayView& D,
     //  * boundary map: a qualifying walk to displacement s = |a|+|b|
     //    pushes <= 3s faces, so <= 3*(3s+1)+3 registrations per edge,
     //    three edges; x2 headroom.
-    ct.wcap = pow2_ceil64(
-        2 * (std::min<int64_t>(ct.N_sorted, 3 * (int64_t)(walk_max_steps + 2)) + 8));
-    ct.bcap = pow2_ceil64(2 * (3 * (3 * s_max + 4) * 3 + 16));
+    cd.wcap = pow2_ceil64(
+        2 * (std::min<int64_t>(cd.N_sorted, 3 * (int64_t)(walk_max_steps + 2)) + 8));
+    cd.bcap = pow2_ceil64(2 * (3 * (3 * s_max + 4) * 3 + 16));
 
-    return ct;
+    return cd;
 }
 
 // =====================================================================

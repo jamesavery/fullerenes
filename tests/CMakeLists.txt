@@ -127,6 +127,10 @@ if(GTest_FOUND)
   target_link_libraries(eisenstein-atlas-test fullerenes buckygen GTest::GTest GTest::Main)
   add_test(NAME eisenstein-atlas-test COMMAND eisenstein-atlas-test)
 
+  add_executable(delaunay-unfold-test delaunay-unfold-test.cc)
+  target_link_libraries(delaunay-unfold-test fullerenes buckygen GTest::GTest GTest::Main)
+  add_test(NAME delaunay-unfold-test COMMAND delaunay-unfold-test)
+
   add_executable(star-unfold-test star-unfold-test.cc)
   target_link_libraries(star-unfold-test fullerenes GTest::GTest GTest::Main)
   add_test(NAME star-unfold-test COMMAND star-unfold-test)

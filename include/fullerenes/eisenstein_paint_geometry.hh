@@ -22,10 +22,12 @@
 //                         flat-diagonal multi-edges on exactly-
 //                         symmetric isomers -- the charts handle them;
 //                         simpliciality is NOT required here.)
-//   evaluate(A, ...)   -- integer barycentric combination of the three
-//                         corner anchors per cell, gcd-reduced on edge
-//                         points so adjacent cells produce bit-identical
-//                         output across shared edges (idempotent paint).
+//   evaluate_sorted(A, ...) -- integer barycentric combination of the
+//                         three corner anchors per cell, gcd-reduced on
+//                         edge points so adjacent cells produce
+//                         bit-identical output across shared edges
+//                         (idempotent paint); result in sorted labels.
+//   evaluate(A, ...)   -- the same, back-permuted to original labels.
 //
 // Cubic-metric geometry (cubic_geometry): the carbon-atom geometry
 // EXACTLY on the cubic Alexandrov polytope (the convex realization of
@@ -121,14 +123,25 @@ void interpolate_cell(const ParamTablesView& V, int f,
                       std::vector<coord3d>& pos3d);
 
 // Evaluate every chart of A against `anchors` (position of cone c at
-// anchors[c], c < A.n_cones) and back-permute to ORIGINAL labels via
-// `perm` (= SortedDual::perm).  The complex A was charted on must have
-// flat cells w.r.t. the surface the anchors live on -- i.e. A must be
-// parametrize(P.D, S) for a realized polytope P whose cone positions
-// are the anchors.  Throws PaintError(INTERPOLATE).
+// anchors[c], c < A.n_cones), in SORTED (T_sorted) labels: the result
+// has A.T.N entries, cones c < n_cones at anchors[c] verbatim, every
+// other vertex by barycentric interpolation in its cell's chart
+// (on-edge vertices idempotently from both adjacent cells).  CAUTION:
+// pair the result with the SORTED graph (A's T / SortedDual::T) --
+// indexing it by original labels is plausible-looking wrong output;
+// use evaluate below when original labels are wanted.  The
+// complex A was charted on must have flat cells w.r.t. the surface the
+// anchors live on -- i.e. A must be parametrize(P.D, S) for a realized
+// polytope P whose cone positions are the anchors.  Throws
+// PaintError(INTERPOLATE).
+std::vector<coord3d> evaluate_sorted(const SurfaceParametrization& A,
+                                     const std::vector<coord3d>& anchors);
+
+// evaluate = back-permutation o evaluate_sorted: the same positions
+// re-indexed to ORIGINAL labels via A's own stored permutation
+// (= SortedDual::perm at parametrize time; perm[u_orig] = u_sorted).
 std::vector<coord3d> evaluate(const SurfaceParametrization& A,
-                              const std::vector<coord3d>& anchors,
-                              const Permutation& perm);
+                              const std::vector<coord3d>& anchors);
 
 // =====================================================================
 // The realized cubic polytope.

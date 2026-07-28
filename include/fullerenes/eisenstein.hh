@@ -280,8 +280,13 @@ inline std::optional<Eisenstein> first_rep_of_norm(int N) {
 Eisenstein eisenstein_of_norm(int N);
 
 // Enumerate ALL sector-0 Eisenstein reps (a >= 0, b >= 0) of norm N.
-// Generic norms return 1 entry; split-prime norms return 2 entries in
-// distinct rotation orbits.
+// For N >= 1 the count equals the number of ideals of Z[w] of norm N,
+// +1 when N is a perfect square (the closed sector then holds both
+// boundary points (sqrt(N),0) and (0,sqrt(N)) of one orbit): 1 for a
+// NON-square norm with a single rotation orbit, 2 for a split prime
+// (or a square with one orbit, e.g. N = 4), and UNBOUNDED in general
+// -- N = 49 has 4: (7,0), (5,3), (3,5), (0,7).  No fixed per-norm
+// cap is sound.
 std::vector<Eisenstein> sector0_reps_of_norm(int N);
 
 
