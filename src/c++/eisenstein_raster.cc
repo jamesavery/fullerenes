@@ -70,8 +70,7 @@ WalkResult walk_line_primitive(const TriangulationView& T,
     long cur_t_num = 0, cur_t_den = 1;
     int  entry_edge = -1;           // 0=(U,V), 1=(V,W), 2=(W,U)
 
-    const int MAX_STEPS = 4096;
-    for (int step = 0; step < MAX_STEPS; ++step) {
+    for (int step = 0; step < walk_max_steps; ++step) {
         struct Cand {
             int idx;
             int A, B;

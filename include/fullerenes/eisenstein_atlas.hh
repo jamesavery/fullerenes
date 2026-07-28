@@ -84,7 +84,10 @@ struct ResolvedFace {
 // internal-facing.  (Per-vertex occurrences live on the
 // SurfaceParametrization; locate_vertex is a Layer-I function.)
 struct CellAtlas {
-  const DelaunayTriangulation* D = nullptr;  // the charted cone iDT
+  // The charted cone iDT, as a view: aliases the owner's buffers.
+  // Valid while the owner lives AND does not grow (growth repoints the
+  // owner and dangles this view); treat as read-only.
+  DelaunayView D;
   TriangulationView            T;            // T_sorted (non-owning view)
   std::vector<AtlasCell>       cells;        // indexed by D face id
 

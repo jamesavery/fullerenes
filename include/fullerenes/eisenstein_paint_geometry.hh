@@ -103,13 +103,21 @@ DualPolytope realize_dual(const SortedDual& S);
 // bit-identical 3D output across the shared edge).
 //
 // Preconditions:
-//   - F.ok == true
+//   - corners/frame belong to one charted cell; entries are its lattice
+//     points (scanline-major)
 //   - anchors.size() == n_cones, finite values
 //   - pos3d.size() >= the charted complex's vertex count
-void interpolate_cell(const Cell& F,
-                      const LatticeMap& lmap,
+// The (frame, corners, entries) form is the mathematical core; the
+// (V, f) form projects a cell out of the tables (@pre 0 <= f < V.nf,
+// V.cell_live(f)) and reads n_cones from the view.
+void interpolate_cell(CellFrame frame, CellCorners corners,
+                      std::span<const LatticePoint> entries,
                       const std::vector<coord3d>& anchors,
                       int n_cones,
+                      std::vector<coord3d>& pos3d,
+                      int cell_id_for_diag = -1);
+void interpolate_cell(const ParamTablesView& V, int f,
+                      const std::vector<coord3d>& anchors,
                       std::vector<coord3d>& pos3d);
 
 // Evaluate every chart of A against `anchors` (position of cone c at

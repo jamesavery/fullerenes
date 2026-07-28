@@ -90,20 +90,20 @@ inline std::array<Eisenstein, 3> develop_face_on_edge(const tri_t& t, int k_arc,
 // lookup.  No chart is recomputed -- the walkers and scans ran once, in
 // parametrize().
 std::vector<AtlasCell> index_charts(const SurfaceParametrization& P) {
-  const DelaunayTriangulation& D = *P.D;
-  std::vector<AtlasCell> cells(P.cells.size());
-  for (int f = 0; f < (int)P.cells.size(); f++) {
+  const DelaunayView& D = P.D;
+  const ParamTablesView V = P.view();
+  std::vector<AtlasCell> cells(V.nf);
+  for (int f = 0; f < V.nf; f++) {
     if (D.f_he[f] < 0) continue;
-    const Cell& C = P.cells[f];
-    if (!C.ok) fail("live cell " + std::to_string(f) + " not charted");
+    if (!V.cell_live(f)) fail("live cell " + std::to_string(f) + " not charted");
     AtlasCell& R = cells[f];
     R.ok = true;
-    R.corners = C.corners;
-    R.P       = C.P;
-    const LatticeMap& lm = P.lmaps[f];
-    R.claim.reserve(lm.entries.size() * 2);
-    for (const auto& [pos, vid] : lm.entries)
-      R.claim.emplace(pos, vid);
+    R.corners = V.corner_ids(f);
+    R.P       = V.frame_points(f);
+    const auto ents = V.cell_entries(f);
+    R.claim.reserve(ents.size() * 2);
+    for (const LatticePoint& e : ents)
+      R.claim.emplace(Eisenstein(e.a, e.b), e.vid);
   }
   return cells;
 }
@@ -112,7 +112,7 @@ std::vector<AtlasCell> index_charts(const SurfaceParametrization& P) {
 // orientation-preserving lattice isometry matching the shared edge's cone
 // corners across the two charts (Lemma: transitions are exact).
 std::unordered_map<long long, LatticeIsometry>
-chart_transitions(const DelaunayTriangulation& D,
+chart_transitions(const DelaunayView& D,
                   const std::vector<AtlasCell>& cells) {
   std::unordered_map<long long, LatticeIsometry> trans;
   auto corner_pos = [&](const AtlasCell& R, int cid) -> Eisenstein {
@@ -263,7 +263,7 @@ LatticeIsometry CellAtlas::transition(int f_from, int f_to) const {
 
 CellAtlas build_atlas(const SurfaceParametrization& P) {
   auto cells = index_charts(P);
-  auto trans = chart_transitions(*P.D, cells);
+  auto trans = chart_transitions(P.D, cells);
   auto tab   = face_edge_tables(P.T);
   auto anch  = anchored_edges(cells, tab);
   auto route = route_to_anchors(tab, anch.anchor_of_edge);
@@ -318,7 +318,7 @@ CellTrace trace_segment(const CellAtlas& A, int cell,
     }
     if (best < 0) fail("segment trace found no exit edge (point location stuck)");
     const int ca = R.corners[best], cb = R.corners[(best + 1) % 3];
-    const DelaunayTriangulation& D = *A.D;
+    const DelaunayView& D = A.D;
     int found = -1;
     for (const int h : D.face_halfedges(cell))
       if (D.he_origin[h] == ca && D.dest(h) == cb) { found = h; break; }

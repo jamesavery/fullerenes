@@ -26,6 +26,14 @@
 // Line walk through a CCW-oriented equilateral triangulation.
 // =====================================================================
 
+// The walk_line step budget, a safeguard: a primitive walk to
+// displacement s = |a|+|b| crosses <= 3s faces, so valid inputs never
+// approach it; exceeding it is reported through final_vertex = -1 (a
+// modelled outcome, not an abort).  THE one spelling of this bound --
+// the walker loop and the scratch-capacity formulas derived from it
+// (eisenstein_paint.cc) read this name.
+inline constexpr int walk_max_steps = 4096;
+
 struct WalkResult {
     // Lattice points on the line, in order, with their T vertex IDs.
     // Always includes the starting vertex u at (0, 0).  For a line with
@@ -42,7 +50,7 @@ struct WalkResult {
     std::vector<std::array<Eisenstein, 3>> face_pos;
 
     // Vertex ID at the endpoint, or -1 if the walk failed (line does
-    // not land at a face vertex within MAX_STEPS, or an invalid exit
+    // not land at a face vertex within walk_max_steps, or an invalid exit
     // is encountered).
     int final_vertex = -1;
 

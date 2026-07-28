@@ -91,36 +91,49 @@ Deltahedron DualPolytope::deltahedron() const {
 // Chart evaluation.
 // =====================================================================
 
-void interpolate_cell(const Cell& F,
-                      const LatticeMap& lmap,
+void interpolate_cell(CellFrame frame, CellCorners corners,
+                      std::span<const LatticePoint> entries,
                       const std::vector<coord3d>& anchors,
                       int n_cones,
-                      std::vector<coord3d>& pos3d)
+                      std::vector<coord3d>& pos3d,
+                      int cell_id_for_diag)
 {
-    if (!F.ok)
-        paint_throw("eisenstein_paint::interpolate_cell: F.ok=false");
     if ((int)anchors.size() != n_cones)
         paint_throw("eisenstein_paint::interpolate_cell: anchors size %zu != n_cones %d",
                     anchors.size(), n_cones);
-    const long g = wedge(F.P[1] - F.P[0], F.P[2] - F.P[0]);
+    const Eisenstein P0(0, 0);
+    const Eisenstein P1(frame.p1a, frame.p1b);
+    const Eisenstein P2(frame.p2a, frame.p2b);
+    const long g = wedge(P1 - P0, P2 - P0);
     if (g <= 0)
         paint_throw("eisenstein_paint::interpolate_cell(cell %d): g=%ld <= 0",
-                    F.cell_id, g);
-    const coord3d& C0 = anchors[F.corners[0]];
-    const coord3d& C1 = anchors[F.corners[1]];
-    const coord3d& C2 = anchors[F.corners[2]];
+                    cell_id_for_diag, g);
+    const coord3d& C0 = anchors[corners.c0];
+    const coord3d& C1 = anchors[corners.c1];
+    const coord3d& C2 = anchors[corners.c2];
 
-    for (const auto& [p, vid] : lmap.entries) {
-        if (vid < n_cones) continue;       // cone -- pre-painted
-        const IntBary bw = integer_barycentric(p, F.P[0], F.P[1], F.P[2]);
+    for (const LatticePoint& e : entries) {
+        if (e.vid < n_cones) continue;     // cone -- pre-painted
+        const Eisenstein p(e.a, e.b);
+        const IntBary bw = integer_barycentric(p, P0, P1, P2);
         if (bw.n0 < 0 || bw.n1 < 0 || bw.n2 < 0 || bw.denom != g)
             paint_throw("eisenstein_paint::interpolate_cell(cell %d): bad "
                         "barycentric for vertex %d at pos=(%d,%d): "
                         "(n0=%ld n1=%ld n2=%ld, denom=%ld, g=%ld)",
-                        F.cell_id, vid, p.first, p.second,
+                        cell_id_for_diag, e.vid, e.a, e.b,
                         bw.n0, bw.n1, bw.n2, bw.denom, g);
-        pos3d[vid] = barycentric_combine(reduce_to_lowest_terms(bw), C0, C1, C2);
+        pos3d[e.vid] = barycentric_combine(reduce_to_lowest_terms(bw), C0, C1, C2);
     }
+}
+
+void interpolate_cell(const ParamTablesView& V, int f,
+                      const std::vector<coord3d>& anchors,
+                      std::vector<coord3d>& pos3d)
+{
+    if (f < 0 || f >= V.nf || !V.cell_live(f))
+        paint_throw("eisenstein_paint::interpolate_cell: cell %d not charted", f);
+    interpolate_cell(V.frames[f], V.cells[f], V.cell_entries(f),
+                     anchors, V.n_cones, pos3d, f);
 }
 
 std::vector<coord3d> evaluate(const SurfaceParametrization& A,
@@ -135,10 +148,10 @@ std::vector<coord3d> evaluate(const SurfaceParametrization& A,
     std::vector<coord3d> pos3d(Nv_sorted);
     for (int c = 0; c < A.n_cones; ++c) pos3d[c] = anchors[c];
     try {
-        for (size_t fi = 0; fi < A.cells.size(); ++fi)
-            if (A.cells[fi].ok)
-                interpolate_cell(A.cells[fi], A.lmaps[fi], anchors,
-                                 A.n_cones, pos3d);
+        const ParamTablesView V = A.view();
+        for (int f = 0; f < V.nf; ++f)
+            if (V.cell_live(f))
+                interpolate_cell(V, f, anchors, pos3d);
     } catch (const std::exception& e) {
         throw PaintError(Code::INTERPOLATE,
             std::string("interpolate_throw: ") + e.what());
