@@ -123,6 +123,10 @@ if(GTest_FOUND)
   target_link_libraries(dense-linalg-test fullerenes GTest::GTest GTest::Main)
   add_test(NAME dense-linalg-test COMMAND dense-linalg-test)
 
+  add_executable(eisenstein-atlas-test eisenstein-atlas-test.cc)
+  target_link_libraries(eisenstein-atlas-test fullerenes buckygen GTest::GTest GTest::Main)
+  add_test(NAME eisenstein-atlas-test COMMAND eisenstein-atlas-test)
+
   add_executable(star-unfold-test star-unfold-test.cc)
   target_link_libraries(star-unfold-test fullerenes GTest::GTest GTest::Main)
   add_test(NAME star-unfold-test COMMAND star-unfold-test)

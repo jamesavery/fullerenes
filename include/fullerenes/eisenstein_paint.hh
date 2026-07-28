@@ -142,9 +142,9 @@ struct EdgeStrip {
 
 // One iDT 2-cell embedded into its own Eisenstein-lattice frame -- the
 // cell's CHART.  Corner k sits at P[k]; arc k runs corners[k] ->
-// corners[(k+1)%3] and carries edge strip edge[k].  (Array form shared
-// with the atlas's AtlasCell, so parallel structure stays visibly
-// parallel.)
+// corners[(k+1)%3] and carries edge strip edge[k].  (Same k-indexed
+// corner/position form as ParamTablesView's corner_ids/frame_points,
+// the flat product this construction fills.)
 struct Cell {
     int                         cell_id = -1;
     std::array<int, 3>          corners{ -1, -1, -1 };  // CCW T_sorted vertex ids

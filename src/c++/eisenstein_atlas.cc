@@ -32,13 +32,14 @@ inline int narrow(long x, const char* what) {
   return (int)x;
 }
 
-// q = num/den inside the CLOSED cell (all three edge half-planes)?
-// Cross-multiplied exact predicate; __int128 keeps den * coordinate exact.
-inline bool inside_cell(const AtlasCell& R, Eisenstein num, long den) {
+// q = num/den inside the CLOSED cell with frame corners P (all three edge
+// half-planes)?  Cross-multiplied exact predicate; __int128 keeps
+// den * coordinate exact.  den is narrow-checked ONCE by the caller.
+inline bool inside_cell(const std::array<Eisenstein, 3>& P, Eisenstein num, int den) {
   for (int k = 0; k < 3; k++) {
-    const Eisenstein Pi = R.P[k], Pj = R.P[(k + 1) % 3];
+    const Eisenstein Pi = P[k], Pj = P[(k + 1) % 3];
     const Eisenstein ev = Pj - Pi;
-    const Eisenstein rel = num - Pi * narrow(den, "denominator");
+    const Eisenstein rel = num - Pi * den;
     if ((__int128)ev.first * rel.second - (__int128)ev.second * rel.first < 0) return false;
   }
   return true;
@@ -46,12 +47,10 @@ inline bool inside_cell(const AtlasCell& R, Eisenstein num, long den) {
 
 // T applied to the raw rational num/den WITHOUT re-normalizing: trace_segment
 // keeps its two endpoints on one common denominator, which a canonicalizing
-// constructor would destroy.  (The missing vocabulary word here is a
-// "two points on one shared denominator" representation; coin it if a third
-// use appears.)
-inline Eisenstein apply_raw(const LatticeIsometry& T, Eisenstein num, long den) {
+// constructor would destroy.  den is narrow-checked ONCE by the caller.
+inline Eisenstein apply_raw(const LatticeIsometry& T, Eisenstein num, int den) {
   const Eisenstein n = T.reflect ? num.complex_conj() : num;
-  return T.t * narrow(den, "shared denominator") + T.u * n;
+  return T.t * den + T.u * n;
 }
 
 // Corner index k of face t whose CCW arc (t[k], t[k+1]) carries the
@@ -79,120 +78,133 @@ inline std::array<Eisenstein, 3> develop_face_on_edge(const tri_t& t, int k_arc,
   return p;
 }
 
-// ---------------------------------------------------------------------------
-// build_atlas: a composition of five value-producing constructions.  Each
-// takes exactly the values it depends on, so the dependency order is the
-// argument flow -- enforced by the compiler, not by call-order convention.
-// ---------------------------------------------------------------------------
-
-// The hash index of the parametrization's charts: an AtlasCell is the
-// chart's corner identity plus its claim map re-indexed for O(1) position
-// lookup.  No chart is recomputed -- the walkers and scans ran once, in
-// parametrize().
-std::vector<AtlasCell> index_charts(const SurfaceParametrization& P) {
-  const DelaunayView& D = P.D;
-  const ParamTablesView V = P.view();
-  std::vector<AtlasCell> cells(V.nf);
-  for (int f = 0; f < V.nf; f++) {
-    if (D.f_he[f] < 0) continue;
-    if (!V.cell_live(f)) fail("live cell " + std::to_string(f) + " not charted");
-    AtlasCell& R = cells[f];
-    R.ok = true;
-    R.corners = V.corner_ids(f);
-    R.P       = V.frame_points(f);
-    const auto ents = V.cell_entries(f);
-    R.claim.reserve(ents.size() * 2);
-    for (const LatticePoint& e : ents)
-      R.claim.emplace(Eisenstein(e.a, e.b), e.vid);
-  }
-  return cells;
+// Index of half-edge h within its face's 3-cycle.  Corner k of the
+// chart is the origin of the k-th cycle half-edge (the cell-metric
+// construction; gated per cell by build_atlas), so this index IS the
+// chart corner the edge leaves from.
+inline int cycle_index(const DelaunayView& D, int h) {
+  const auto cyc = D.face_halfedges(D.he_face[h]);
+  for (int k = 0; k < 3; k++)
+    if (cyc[k] == h) return k;
+  fail("half-edge not on its face's cycle");
 }
 
-// The chart transition across every D edge, both directions: the unique
-// orientation-preserving lattice isometry matching the shared edge's cone
-// corners across the two charts (Lemma: transitions are exact).
-std::unordered_map<long long, LatticeIsometry>
-chart_transitions(const DelaunayView& D,
-                  const std::vector<AtlasCell>& cells) {
-  std::unordered_map<long long, LatticeIsometry> trans;
-  auto corner_pos = [&](const AtlasCell& R, int cid) -> Eisenstein {
+// ---------------------------------------------------------------------------
+// build_atlas: a composition of value-producing constructions.  Each takes
+// exactly the values it depends on, so the dependency order is the argument
+// flow -- enforced by the compiler, not by call-order convention.
+// ---------------------------------------------------------------------------
+
+// The corner-k = k-th-cycle-origin theorem, gated: every live face has a
+// live chart whose CCW corner ids equal the origins of its face cycle.
+// cell_metric constructs charts exactly so; everything downstream --
+// transition matching and trace_segment's exit selection -- stands on it,
+// so the atlas verifies it per cell instead of trusting the cross-module
+// invariant silently.
+void check_charts_match_cycles(const DelaunayView& D, const ParamTablesView& V) {
+  for (int f = 0; f < D.nf; f++) {
+    if (D.f_he[f] < 0) continue;
+    if (!V.cell_live(f)) fail("live cell " + std::to_string(f) + " not charted");
+    const auto cyc = D.face_halfedges(f);
+    const auto ids = V.corner_ids(f);
     for (int k = 0; k < 3; k++)
-      if (R.corners[k] == cid) return R.P[k];
-    fail("cone " + std::to_string(cid) + " is not a corner of its cell");
-  };
-  for (int h = 0; h < D.nh; h += 2) {
+      if (D.he_origin[cyc[k]] != ids[k])
+        fail("cell " + std::to_string(f) + " chart corner order departs from its face cycle");
+  }
+}
+
+// Per-half-edge chart transitions: he_trans[h] maps face(h)'s frame onto
+// face(twin h)'s, matched on the crossed edge's corner SLOTS in each face
+// cycle (Lemma: transitions are exact).  Slot matching -- not cone-id
+// matching -- so a repeated-corner cell cannot confuse the pairing; the
+// twin cycles the same edge in the opposite direction, hence the reversed
+// slot pair on the g side.  Keyed by the crossing half-edge, so a cell
+// pair sharing several edges (legal on a delta-complex) is unambiguous by
+// construction.  Dead slots stay identity and are unreachable (@inv:
+// every half-edge on a live face cycle is alive).
+std::vector<LatticeIsometry> half_edge_transitions(const DelaunayView& D,
+                                                   const ParamTablesView& V) {
+  std::vector<LatticeIsometry> trans(D.nh);
+  for (int h = 0; h < D.nh; h++) {
     if (!D.alive(h)) continue;
-    const int f = D.he_face[h], g = D.he_face[D.twin(h)];
-    const int a = D.he_origin[h], b = D.dest(h);
-    const AtlasCell& Rf = cells[f];
-    const AtlasCell& Rg = cells[g];
-    trans[CellAtlas::arc_key(g, f)] =
-        isometry_from_segments(corner_pos(Rg, a), corner_pos(Rg, b),
-                               corner_pos(Rf, a), corner_pos(Rf, b));
-    trans[CellAtlas::arc_key(f, g)] =
-        isometry_from_segments(corner_pos(Rf, a), corner_pos(Rf, b),
-                               corner_pos(Rg, a), corner_pos(Rg, b));
+    const int ht = D.twin(h);
+    const auto Pf = V.frame_points(D.he_face[h]);
+    const auto Pg = V.frame_points(D.he_face[ht]);
+    const int k  = cycle_index(D, h);
+    const int k2 = cycle_index(D, ht);
+    trans[h] = isometry_from_segments(Pf[k], Pf[(k + 1) % 3],
+                                      Pg[(k2 + 1) % 3], Pg[k2]);
   }
   return trans;
 }
 
-// The T_sorted face/edge combinatorics: faces CCW, arc -> face-left,
-// undirected edges with ids, and each edge's two incident faces.
+// The T_sorted face/edge combinatorics: faces CCW, and the DENSE
+// arcid-indexed tables (arcid = u*dmax + arc index of v in u's list --
+// the DCEL build's own vocabulary): arc -> face-left, arc -> undirected
+// edge id, plus the edge list and each edge's two incident faces.
 struct FaceEdgeTables {
-  std::vector<tri_t>                 tface;
-  std::unordered_map<long long, int> arc_face;
-  std::vector<std::array<int, 2>>    tedge;
-  std::unordered_map<long long, int> edge_id;
-  std::vector<std::array<int, 2>>    edge_faces;
+  std::vector<tri_t>             tface;
+  std::vector<int32_t>           arc_face;    // [N*dmax]
+  std::vector<int32_t>           arc_edge;    // [N*dmax]
+  std::vector<std::array<int,2>> tedge;
+  std::vector<std::array<int,2>> edge_faces;
 };
 
 FaceEdgeTables face_edge_tables(const TriangulationView& T) {
   FaceEdgeTables tab;
   tab.tface = T.triangles();
+  tab.arc_face.assign(arc_space(T), -1);   // the lib's named arc-index space
+  tab.arc_edge.assign(arc_space(T), -1);
+  // @pre (u, v) is a T arc at every use below (consecutive face corners
+  // and enumerated adjacencies) -- the guard-free form is correct here.
+  auto arcid = [&](int u, int v) { return u * T.dmax + T.arc_ix(u, v); };
   for (int i = 0; i < (int)tab.tface.size(); i++) {
     const tri_t& t = tab.tface[i];
-    tab.arc_face[CellAtlas::arc_key(t[0], t[1])] = i;
-    tab.arc_face[CellAtlas::arc_key(t[1], t[2])] = i;
-    tab.arc_face[CellAtlas::arc_key(t[2], t[0])] = i;
+    tab.arc_face[arcid(t[0], t[1])] = i;
+    tab.arc_face[arcid(t[1], t[2])] = i;
+    tab.arc_face[arcid(t[2], t[0])] = i;
   }
   for (int u = 0; u < T.N; u++)
     for (int v : T[u])
       if (u < v) {
         const int id = (int)tab.tedge.size();
         tab.tedge.push_back({ u, v });
-        tab.edge_id[CellAtlas::edge_key(u, v)] = id;
-        const auto itf = tab.arc_face.find(CellAtlas::arc_key(u, v));
-        const auto itg = tab.arc_face.find(CellAtlas::arc_key(v, u));
-        if (itf == tab.arc_face.end() || itg == tab.arc_face.end())
+        tab.arc_edge[arcid(u, v)] = id;
+        tab.arc_edge[arcid(v, u)] = id;
+        const int fuv = tab.arc_face[arcid(u, v)];
+        const int fvu = tab.arc_face[arcid(v, u)];
+        if (fuv < 0 || fvu < 0)
           fail("T_sorted arc without a face (graph not closed/oriented)");
-        tab.edge_faces.push_back({ itf->second, itg->second });
+        tab.edge_faces.push_back({ fuv, fvu });
       }
   return tab;
 }
 
 // Anchored edges: two ADJACENT lattice points claimed by one cell.  Their
 // unit segment lies inside the closed convex cell, so their relative chart
-// positions are ground truth (the Anchoring lemma).
+// positions are ground truth (the Anchoring lemma).  Iteration is cells in
+// id order and entries in SCAN order, so anchor selection -- and hence
+// every resolved chain -- is deterministic and platform-stable.
 struct AnchoredEdges {
-  std::vector<int>                        anchor_of_edge;   // edge id -> anchors index, or -1
-  std::vector<CellAtlas::AnchorEdge>      anchors;
+  std::vector<int32_t>    anchor_of_edge;   // edge id -> anchors index, or -1
+  std::vector<AnchorEdge> anchors;
 };
 
-AnchoredEdges anchored_edges(const std::vector<AtlasCell>& cells,
+AnchoredEdges anchored_edges(const ParamTablesView& V, const TriangulationView& T,
                              const FaceEdgeTables& tab) {
   AnchoredEdges out;
   out.anchor_of_edge.assign(tab.tedge.size(), -1);
   const Eisenstein half_dirs[3] = { Eisenstein(1, 0), Eisenstein(0, 1), Eisenstein(-1, 1) };
-  for (int f = 0; f < (int)cells.size(); f++) {
-    const AtlasCell& R = cells[f];
-    if (!R.ok) continue;
-    for (const auto& [p, vid] : R.claim) {
+  for (int f = 0; f < V.nf; f++) {
+    if (!V.cell_live(f)) continue;
+    for (const LatticePoint& e : V.cell_entries(f)) {
+      const Eisenstein p(e.a, e.b);
       for (const Eisenstein d : half_dirs) {
-        const auto it = R.claim.find(p + d);
-        if (it == R.claim.end()) continue;
-        const int u = vid, v = it->second;
-        const auto eit = tab.edge_id.find(CellAtlas::edge_key(u, v));
-        if (eit == tab.edge_id.end())
+        const LatticePoint* q = V.claim(f, p + d);
+        if (!q) continue;
+        const int u = e.vid, v = q->vid;
+        const int ix = T.arc_ix(u, v);
+        if (ix < 0)
           fail("cell " + std::to_string(f) + " developed vertices "
                + std::to_string(u) + " and " + std::to_string(v)
                + " -- which are NOT a mesh edge -- onto adjacent lattice positions: "
@@ -202,8 +214,9 @@ AnchoredEdges anchored_edges(const std::vector<AtlasCell>& cells,
                "multi-edges. Parametrize the Alexandrov-realized iDT "
                "(eisenstein_paint::realize_dual) instead of the raw dual_idt "
                "for this isomer");
-        if (out.anchor_of_edge[eit->second] >= 0) continue;
-        out.anchor_of_edge[eit->second] = (int)out.anchors.size();
+        const int eid = tab.arc_edge[u * T.dmax + ix];
+        if (out.anchor_of_edge[eid] >= 0) continue;
+        out.anchor_of_edge[eid] = (int32_t)out.anchors.size();
         out.anchors.push_back({ f, u, v, p, p + d });
       }
     }
@@ -216,16 +229,19 @@ AnchoredEdges anchored_edges(const std::vector<AtlasCell>& cells,
 // T_sorted edge has a parent chain of via-face midpoint hops back to
 // ground truth.
 struct AnchorRouting {
-  std::vector<int> parent_edge;   // edge id -> parent edge (-1 root, from an anchor)
-  std::vector<int> via_face;      // edge id -> face shared with parent
+  std::vector<int32_t> parent_edge;   // edge id -> parent edge (-1 root, from an anchor)
+  std::vector<int32_t> via_face;      // edge id -> face shared with parent
+  std::vector<int32_t> depth;         // edge id -> chain length back to its anchor
 };
 
-AnchorRouting route_to_anchors(const FaceEdgeTables& tab,
-                               const std::vector<int>& anchor_of_edge) {
+AnchorRouting route_to_anchors(const TriangulationView& T,
+                               const FaceEdgeTables& tab,
+                               const std::vector<int32_t>& anchor_of_edge) {
   const int ne = (int)tab.tedge.size();
   AnchorRouting out;
   out.parent_edge.assign(ne, -2);   // -2 unvisited, -1 root
   out.via_face.assign(ne, -1);
+  out.depth.assign(ne, 0);
   std::vector<int> queue;
   queue.reserve(ne);
   for (int e = 0; e < ne; e++)
@@ -233,7 +249,8 @@ AnchorRouting route_to_anchors(const FaceEdgeTables& tab,
   if (queue.empty()) fail("no anchored edge anywhere (no cell claims two adjacent vertices)");
   auto face_edge = [&](int fi, int k) {
     const tri_t& t = tab.tface[fi];
-    return tab.edge_id.at(CellAtlas::edge_key(t[k], t[(k + 1) % 3]));
+    const int u = t[k], v = t[(k + 1) % 3];
+    return tab.arc_edge[u * T.dmax + T.arc_ix(u, v)];
   };
   for (size_t qi = 0; qi < queue.size(); qi++) {
     const int e = queue[qi];
@@ -243,6 +260,7 @@ AnchorRouting route_to_anchors(const FaceEdgeTables& tab,
         if (out.parent_edge[e2] != -2) continue;
         out.parent_edge[e2] = e;
         out.via_face[e2] = fi;
+        out.depth[e2] = out.depth[e] + 1;
         queue.push_back(e2);
       }
   }
@@ -253,78 +271,83 @@ AnchorRouting route_to_anchors(const FaceEdgeTables& tab,
 
 }  // namespace
 
-LatticeIsometry CellAtlas::transition(int f_from, int f_to) const {
-  const auto it = trans.find(arc_key(f_from, f_to));
-  if (it == trans.end())
-    throw std::logic_error("eisenstein_atlas: missing cell transition "
-                           + std::to_string(f_from) + " -> " + std::to_string(f_to));
-  return it->second;
-}
-
 CellAtlas build_atlas(const SurfaceParametrization& P) {
-  auto cells = index_charts(P);
-  auto trans = chart_transitions(P.D, cells);
-  auto tab   = face_edge_tables(P.T);
-  auto anch  = anchored_edges(cells, tab);
-  auto route = route_to_anchors(tab, anch.anchor_of_edge);
-
   CellAtlas A;
-  A.D              = P.D;
-  A.T              = P.T;
-  A.cells          = std::move(cells);
-  A.trans          = std::move(trans);
+  A.V = P.view();
+  A.D = P.D;
+  A.T = P.T;
+  check_charts_match_cycles(A.D, A.V);
+  A.he_trans = half_edge_transitions(A.D, A.V);
+  auto tab   = face_edge_tables(A.T);
+  auto anch  = anchored_edges(A.V, A.T, tab);
+  auto route = route_to_anchors(A.T, tab, anch.anchor_of_edge);
+
   A.tface          = std::move(tab.tface);
   A.arc_face       = std::move(tab.arc_face);
+  A.arc_edge       = std::move(tab.arc_edge);
   A.tedge          = std::move(tab.tedge);
-  A.edge_id        = std::move(tab.edge_id);
   A.edge_faces     = std::move(tab.edge_faces);
   A.anchor_of_edge = std::move(anch.anchor_of_edge);
   A.anchors        = std::move(anch.anchors);
   A.bfs_parent_edge = std::move(route.parent_edge);
   A.bfs_via_face    = std::move(route.via_face);
+  A.bfs_depth       = std::move(route.depth);
   A.resolved.assign(A.tface.size(), {});
   return A;
 }
+
+// The crossing cap: a valid trace crosses each cell a bounded number of
+// times (the crossing parameter never decreases and strictly increases
+// off the cones), so this is a deep-invariant guard, not a bound any
+// valid trace approaches.
+inline int max_cell_crossings(int nf) { return 4 * nf + 64; }
 
 CellTrace trace_segment(const CellAtlas& A, int cell,
                         EisensteinRational a, EisensteinRational b) {
   // Common denominator l for BOTH endpoints (raw, deliberately un-reduced:
   // the crossing parameter compares the two wedge values, which is only
-  // meaningful on one shared scale).
-  const long l = std::lcm(a.den, b.den);
+  // meaningful on one shared scale).  Narrow-checked ONCE; everything
+  // below works on the checked int.
+  const int l = narrow(std::lcm(a.den, b.den), "common denominator");
   Eisenstein an = a.num * narrow(l / a.den, "denominator scale");
   Eisenstein bn = b.num * narrow(l / b.den, "denominator scale");
   LatticeIsometry carried;   // identity
   __int128 t_num = 0, t_den = 1;   // progress along the segment (rational)
-  const int cap = 4 * (int)A.cells.size() + 64;
+  const int cap = max_cell_crossings(A.V.nf);
   for (int step = 0; step < cap; step++) {
-    const AtlasCell& R = A.cells[cell];
-    if (inside_cell(R, bn, l)) return { cell, EisensteinRational(bn, l), carried };
+    const std::array<Eisenstein, 3> P = A.V.frame_points(cell);
+    if (inside_cell(P, bn, l)) return { cell, EisensteinRational(bn, l), carried };
     int best = -1;
     __int128 bt_num = 0, bt_den = 1;
     for (int k = 0; k < 3; k++) {
-      const Eisenstein Pi = R.P[k], Pj = R.P[(k + 1) % 3];
+      const Eisenstein Pi = P[k], Pj = P[(k + 1) % 3];
       const Eisenstein ev = Pj - Pi;
       auto w = [&](const Eisenstein& num) -> __int128 {
-        const Eisenstein rel = num - Pi * (int)l;   // l checked above
+        const Eisenstein rel = num - Pi * l;
         return (__int128)ev.first * rel.second - (__int128)ev.second * rel.first;
       };
       const __int128 wa = w(an), wb = w(bn);
       if (wb >= 0) continue;                    // b not strictly beyond this edge
       if (wa < 0) continue;                     // a beyond it too (cannot exit through it)
       const __int128 cn = wa, cd = wa - wb;     // t_cross = wa / (wa - wb), cd > 0
+      // Progress filter is NON-strict (an equal-parameter crossing is
+      // admitted): a segment through a corner may re-cross at the same
+      // parameter.  Strict increase -- hence termination well inside the
+      // cap -- holds whenever the open segment meets no cone, which every
+      // internal caller guarantees (anchored segments, face midlines,
+      // closed-face samples).
       if (cn * t_den < t_num * cd) continue;    // behind current progress
       if (best < 0 || cn * bt_den < bt_num * cd) { best = k; bt_num = cn; bt_den = cd; }
     }
     if (best < 0) fail("segment trace found no exit edge (point location stuck)");
-    const int ca = R.corners[best], cb = R.corners[(best + 1) % 3];
-    const DelaunayView& D = A.D;
-    int found = -1;
-    for (const int h : D.face_halfedges(cell))
-      if (D.he_origin[h] == ca && D.dest(h) == cb) { found = h; break; }
-    if (found < 0) fail("cell corner edge not found in the DCEL");
-    const int ncell = D.he_face[D.twin(found)];
-    const LatticeIsometry T = A.transition(cell, ncell);
+    // The exit arc IS the best-th half-edge of the face cycle (corner k =
+    // origin of cycle half-edge k, gated by build_atlas), so the crossing
+    // transition is he_trans of exactly that half-edge -- no corner-pair
+    // search, and parallel edges of a delta-complex cell pair cannot be
+    // confused.
+    const int h_exit = A.D.face_halfedges(cell)[best];
+    const int ncell = A.D.he_face[A.D.twin(h_exit)];
+    const LatticeIsometry T = A.he_trans[h_exit];
     an = apply_raw(T, an, l);
     bn = apply_raw(T, bn, l);
     carried = T * carried;
@@ -335,32 +358,41 @@ CellTrace trace_segment(const CellAtlas& A, int cell,
   fail("segment trace exceeded " + std::to_string(cap) + " cell crossings");
 }
 
+// The face edge with the shallowest routing chain back to an anchor
+// (depths come from the BFS itself; k-ascending tie-break).
+static int shallowest_face_edge(const AtlasView& AV, const tri_t& t) {
+  int e_target = -1, best_depth = INT32_MAX;
+  for (int k = 0; k < 3; k++) {
+    const int e = AV.edge_of(t[k], t[(k + 1) % 3]);
+    if (AV.bfs_depth[e] < best_depth) { best_depth = AV.bfs_depth[e]; e_target = e; }
+  }
+  return e_target;
+}
+
+// The root-first parent chain of edge e (root = an anchored edge).
+static std::vector<int> anchor_chain(const AtlasView& AV, int e) {
+  std::vector<int> chain;
+  for (int cur = e; cur >= 0; cur = AV.bfs_parent_edge[cur]) chain.push_back(cur);
+  std::reverse(chain.begin(), chain.end());
+  return chain;
+}
+
 const ResolvedFace& resolve_face(CellAtlas& A, int fi) {
   ResolvedFace& RS = A.resolved[fi];
   if (RS.ok) return RS;
 
-  // Target: the face edge with the shallowest BFS chain back to an anchor.
+  const AtlasView AV = A.view();
   const tri_t& t = A.tface[fi];
-  int e_target = -1;
-  {
-    int best_depth = INT32_MAX;
-    for (int k = 0; k < 3; k++) {
-      const int e = A.edge_id.at(CellAtlas::edge_key(t[k], t[(k + 1) % 3]));
-      int d = 0, cur = e;
-      while (A.bfs_parent_edge[cur] >= 0) { cur = A.bfs_parent_edge[cur]; d++; }
-      if (d < best_depth) { best_depth = d; e_target = e; }
-    }
-  }
-  std::vector<int> chain;   // root ... e_target
-  for (int cur = e_target; cur >= 0; cur = A.bfs_parent_edge[cur]) chain.push_back(cur);
-  std::reverse(chain.begin(), chain.end());
+  const std::vector<int> chain = anchor_chain(AV, shallowest_face_edge(AV, t));
 
-  const CellAtlas::AnchorEdge& AE = A.anchors[A.anchor_of_edge[chain[0]]];
+  const AnchorEdge& AE = A.anchors[A.anchor_of_edge[chain[0]]];
   int  cell = AE.cell;
   int  eu = AE.u, ev = AE.v;
   Eisenstein pu = AE.pu, pv = AE.pv;
   EisensteinRational mid(pu + pv, 2);
-  if (!inside_cell(A.cells[cell], mid.num, mid.den)) fail("anchor midpoint not inside its cell");
+  if (!inside_cell(A.V.frame_points(cell), mid.num,
+                   narrow(mid.den, "anchor denominator")))
+    fail("anchor midpoint not inside its cell");
 
   // Midpoint hops: each hop's segment is a midline of the via-face -- inside
   // one flat face -- so its exact trace never wraps a cone.
@@ -404,7 +436,16 @@ const ResolvedFace& resolve_face(CellAtlas& A, int fi) {
   return RS;
 }
 
+void resolve_all(CellAtlas& A) {
+  for (int fi = 0; fi < (int)A.tface.size(); fi++) resolve_face(A, fi);
+}
+
 CellPoint locate_sample(CellAtlas& A, int fi, long a, long b, long c, long den) {
+  // @pre checked: the sample must lie in the CLOSED face (affine,
+  // non-negative weights) -- only there does the anchor-to-sample trace
+  // stay in flat cone-free territory.
+  if (a < 0 || b < 0 || c < 0 || den <= 0 || a + b + c != den)
+    fail("locate_sample weights must be non-negative with a + b + c == den");
   const ResolvedFace& R = resolve_face(A, fi);
   const Eisenstein num = R.P[0] * narrow(a, "sample weight")
                        + R.P[1] * narrow(b, "sample weight")

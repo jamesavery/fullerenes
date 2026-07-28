@@ -24,13 +24,12 @@
 // Cone positions stay OUT of both (Layer-I discipline: the tables are
 // intrinsic; Layer II passes anchors alongside).
 //
-// The claim lookup (ParamTablesView::claim) is the flat-form
-// replacement for the atlas's per-cell hash (the atlas migrates onto
-// it in the flattening step; it still builds its own index today): a
-// cell is a CONVEX lattice triangle, so each scanline's claimed points
-// are one contiguous a-range and (row, a-offset) is a bijection onto
-// the cell's entries -- the lookup is pure row arithmetic into the
-// CSR (@ref paint-cell-convexity, enforced at flatten time).
+// The claim lookup (ParamTablesView::claim) is the form
+// eisenstein_atlas reads cell charts through: a cell is a CONVEX
+// lattice triangle, so each scanline's claimed points are one
+// contiguous a-range and (row, a-offset) is a bijection onto the
+// cell's entries -- the lookup is pure row arithmetic into the CSR
+// (@ref paint-cell-convexity, enforced at flatten time).
 //
 // "Device-legal" here means: trivially copyable, no allocation and no
 // exceptions on the READ path (the element structs and ParamTablesView).
