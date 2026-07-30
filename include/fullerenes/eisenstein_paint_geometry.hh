@@ -77,6 +77,14 @@ struct DualPolytope {
     DelaunayTriangulation D;
     std::vector<coord3d>  cone_pos;    // one per cone, sorted labels
 
+    // The solve's converged radii r_v (B-I: r_v = |p_v| from the apex), one
+    // per D vertex in sorted labels.  Exposed because the polytope's
+    // 2-skeleton is unreachable without them: AlexandrovSolver::
+    // inessential_edges(D, r) and polytope_tesselation(D, r, labels) both
+    // need r, and T-bar -- not the flip-dependent triangulation -- is the
+    // unique, comparable form of a realized cone metric.
+    std::vector<double>   r;
+
     // The polytope as a library Deltahedron (cone iDT 1-skeleton +
     // positions; 12 vertices with degrees up to 11 for fullerene duals
     // -- not a fullerene dual itself, no deg-5/6 assumption).  Oriented

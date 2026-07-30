@@ -49,6 +49,7 @@ DualPolytope realize_dual(const SortedDual& S) {
     A.D        = std::move(P.D);
     P.cone_pos = A.solve();
     P.D        = std::move(A.D);
+    P.r        = std::move(A.r);   // carried out for T-bar (see DualPolytope::r)
     if (A.valid()) return P;
 
     using VS = AlexandrovSolver::ValidationStatus;
