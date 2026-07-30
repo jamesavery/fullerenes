@@ -51,8 +51,13 @@
 //
 // All positions are Eisenstein integers or EisensteinRational; every
 // predicate is exact integer arithmetic (__int128 for the
-// cross-multiplied comparisons, internal to the .cc; __int128 is
-// host-only today).  No floating point enters any decision.  Width
+// cross-multiplied comparisons, internal to the .cc).  This
+// implementation runs host-only.  A device port must satisfy itself
+// that its target supports __int128: the arithmetic has been measured
+// conformant on one NVIDIA GPU under one AdaptiveCpp SSCP flow
+// (2026-07-29), which says nothing about other vendors or about
+// DPC++/SPIR-V -- re-measure per target rather than assuming.  No
+// floating point enters any decision.  Width
 // contract: Eisenstein components are int; denominators and sample
 // weights must fit int after common-denominator scaling (checked
 // narrows throw, never truncate); the subsequent int products are
