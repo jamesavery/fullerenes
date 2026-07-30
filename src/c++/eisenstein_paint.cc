@@ -501,13 +501,14 @@ bool strips_consistent(const EdgeStrip& e01, const EdgeStrip& e12, const EdgeStr
         && merge_strip_claims(e20, claim);
 }
 
-// Enumerate valid (P0, P1, P2) corner placements for F in F's frame.
-// Returns up to 2 candidates: 1 if N01 is single-orbit, up to 2 for
-// split-prime N01.  Each satisfies all three norm constraints and CCW
-// orientation; picking among them which one matches the SURFACE
-// geodesics is the walker's job (in embed_cell).
-struct CornerCandidate { Eisenstein P0, P1, P2; };
+}  // namespace
 
+// Public (declared in eisenstein_paint.hh; CornerCandidate too), reused by the
+// intrinsic atlas.  Returns 1 candidate for single-orbit N01, up to 2 for a
+// split-prime N01.  Each satisfies all three norm constraints and CCW
+// orientation; choosing which one matches the SURFACE geodesics is the caller's
+// job: embed_cell (with T) or build_intrinsic_atlas (T-free, by cross-edge
+// transition consistency).
 std::vector<CornerCandidate>
 enumerate_corner_candidates(double L20, double alpha_0,
                             long N01, long N12, long N20)
@@ -533,8 +534,6 @@ enumerate_corner_candidates(double L20, double alpha_0,
     }
     return out;
 }
-
-}  // namespace
 
 Cell embed_cell(const DelaunayTriangulation& D,
                 const Triangulation& T_sorted,

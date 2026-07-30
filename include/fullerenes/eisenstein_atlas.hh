@@ -136,6 +136,35 @@ struct CellAtlas {
 //           embedded, unclaimed lattice adjacency, uncovered edge graph, ...).
 CellAtlas build_atlas(const Pipeline& P);
 
+// Build the atlas over D WITHOUT a known dual triangulation T (pure flat cone
+// metric): corner placement + intrinsic split-prime resolution (the candidate
+// giving a unit-rotation transition to an already-placed neighbour, where
+// build_atlas would use T) + transitions.  A.T, the per-cell claims, and
+// occurrences stay empty -- only cells + trans are built, which is all the
+// intrinsic dual reconstruction (no T, no 3D) consumes.  A folded cell on a noisy
+// metric is left ok == false, not fatal.  Curvature-sign-agnostic like build_atlas.
+//
+//   @pre    D a post-flip simplicial iDT with integer edge length-squares.
+//   @post   consistently reachable cells have ok + corners (CCW) + P; A.trans has
+//           both directional transitions across each edge between two placed cells.
+//   @throws std::logic_error only if D has no placeable cell at all (deep invariant).
+CellAtlas build_intrinsic_atlas(const DelaunayTriangulation& D);
+
+// Reconstruct the ORIENTED dual triangulation from an intrinsic atlas: scan each
+// cell's lattice points, unite the copies shared across every edge (via the chart
+// transitions), and read off the CCW unit-triangle faces as an oriented graph.
+// The cones become its degree-5 (pentagon) vertices and the interior lattice
+// points its degree-6 (hexagon) vertices -- the fullerene dual -- ready for
+// spiral_nomenclature.  Curvature-sign-agnostic: vertex degrees are read off, not
+// assumed, so fulleroid duals reconstruct unchanged.  This is the intrinsic,
+// combinatorial-only (no T, no 3D) analogue of run()'s dual.
+//
+//   @pre    A from build_intrinsic_atlas with every cell placed (a clean iDT).
+//   @post   an oriented Triangulation isomorphic to the dual of A.D's surface.
+//   @throws std::logic_error on an orientation inconsistency or a shared lattice
+//           point absent from a cell scan (deep invariants).
+Triangulation intrinsic_dual(const CellAtlas& A);
+
 // Trace the straight segment a -> b (both in `cell`'s frame; a inside the
 // CLOSED cell) through the cell complex.  Returns b's host cell, b
 // rewritten into that cell's frame, and the composed transition applied

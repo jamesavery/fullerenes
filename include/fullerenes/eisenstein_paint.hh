@@ -215,6 +215,19 @@ struct Cell {
     bool ok = false;
 };
 
+// A corner placement (P0, P1, P2) of one iDT cell in its own Eisenstein frame.
+struct CornerCandidate { Eisenstein P0, P1, P2; };
+
+// Enumerate valid corner placements from the three integer edge length-squares
+// (N01, N12, N20) + the interior angle alpha_0 at c0 (L20 = length of edge
+// c2->c0).  Returns 1 candidate for single-orbit N01, up to 2 for a split-prime
+// N01 (its two mirror geodesics).  Choosing which candidate matches the actual
+// surface is the caller's job: embed_cell (with T) or build_intrinsic_atlas
+// (T-free, by cross-edge transition consistency).
+std::vector<CornerCandidate>
+enumerate_corner_candidates(double L20, double alpha_0,
+                            long N01, long N12, long N20);
+
 // Embed one live iDT cell into its own Eisenstein frame by walking
 // T_sorted.  F's corners are placed from iDT lengths + the interior
 // angle at c0 (= D.he_angle of the f_he half-edge); each CCW arc's
