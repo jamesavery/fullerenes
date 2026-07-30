@@ -57,7 +57,10 @@ struct AlexandrovSolver {
   // max|kappa(D, r)| toward 0, flipping D to weighted-Delaunay as it
   // moves r (AlexandrovSolver::flip_to_weighted_delaunay), and return
   // whether it converged.  The internal trace/diag recorders are not
-  // populated on this path.  Incubation seam for the optimize framework
+  // populated on this path, and stats_flips reports only the
+  // continuation-stage flips (the override's own flips are not
+  // counted -- the callable returns no flip count).  Incubation seam
+  // for the optimize framework
   // (claude-projects/optimize) to run its re-expressed polish inside the
   // full production pipeline for head-to-head validation.
   std::function<bool(DelaunayTriangulation&, std::vector<double>&)> polish_override;

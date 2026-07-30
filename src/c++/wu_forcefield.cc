@@ -1,5 +1,10 @@
 #include "fullerenes/wu_forcefield.hh"
 
+#include "fullerenes/optim/linesearch.hh"
+#include "fullerenes/optim/steps/lbfgs.hh"
+#include "fullerenes/optim/models/extwu_angle.hh"
+#include "fullerenes/optim/models/geometry_hessians.hh"
+
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
@@ -15,12 +20,15 @@ namespace wu {
 
 namespace {
 
+// Single source of the profile math: optim::geom2::profile2 (which the
+// analytic Hessian also uses -- energy/gradient and HVP cannot drift).
+// The (h, dh) truncation pays the unused d2h (a constant for hard, a
+// few multiplies for soft) -- negligible against the per-term norms.
 struct Profile { double h, dh; };
 
 inline Profile profile(double d, bool soft) {
-    if (!soft) return { d * d, 2 * d };
-    const double s = 1.0 / std::sqrt(4 + d * d);
-    return { d * d * s, d * (8 + d * d) * s * s * s };
+    const auto p = optim::geom2::profile2(d, soft);
+    return { p.h, p.dh };
 }
 
 }  // namespace
@@ -201,47 +209,156 @@ ForceField forcefield(const FullereneGraphView& G, int variant,
 }
 
 // =====================================================================
-// Minimization driver.
+// Hessian-vector product: per term,
+//   k/2 [ h''(d) (grad q . v) grad q + h'(d) (grad^2 q . v) ],
+// the angle/dihedral (grad^2 q . v) obtained by a forward-mode dual
+// pass through the gradient formulas (optim/models/geometry_hessians.hh,
+// pinned to coord3d::dangle/ddihedral at 1e-12), the bond and Coulomb
+// terms written directly.  One helper per term class, mirroring the
+// gradient's decomposition; promoted from the optimizer framework's
+// incubation (claude-projects/optimize, FD-verified by test_extwu_hvp).
 // =====================================================================
 
-static_assert(sizeof(coord3d) == 3 * sizeof(double),
-              "wu::optimize reinterprets coord3d[] as double[]");
+namespace {
+
+using optim::geom2::DVec;
+
+DVec dual(const coord3d& p, const coord3d& t) {
+    return {{p[0], t[0]}, {p[1], t[1]}, {p[2], t[2]}};
+}
+coord3d val(const DVec& w)   { return coord3d(w.x.v, w.y.v, w.z.v); }
+coord3d dot_v(const DVec& w) { return coord3d(w.x.d, w.y.d, w.z.d); }
+
+void add_bond_hvp(const Bond& t, bool soft, std::span<const coord3d> X,
+                  std::span<const coord3d> V, std::span<coord3d> H) {
+    const auto [a, b] = t.atoms;
+    const coord3d u = X[a] - X[b];
+    const coord3d w = V[a] - V[b];
+    const double r = u.norm();
+    const coord3d uh = u / r;
+    const auto [h, dh, d2h] = optim::geom2::profile2(r - t.q0, soft);
+    const double drdt = uh.dot(w);
+    // (grad^2 r) . v on atom a: (I - uh uh^T) w / r; atom b: negated.
+    const coord3d curv = (w - uh * drdt) / r;
+    const coord3d f = uh * (0.5 * t.k * d2h * drdt) + curv * (0.5 * t.k * dh);
+    H[a] += f;
+    H[b] -= f;
+}
+
+void add_corner_hvp(const Corner& t, bool soft, std::span<const coord3d> X,
+                    std::span<const coord3d> V, std::span<coord3d> H) {
+    const auto [a, b, c] = t.atoms;
+    const DVec A = dual(X[a] - X[b], V[a] - V[b]);
+    const DVec C = dual(X[c] - X[b], V[c] - V[b]);
+    DVec da, dc;
+    optim::geom2::angle_grad(A, C, da, dc);
+    const coord3d ga = val(da), gc = val(dc);
+    const double theta = coord3d::angle(X[a] - X[b], X[c] - X[b]);
+    const auto [h, dh, d2h] = optim::geom2::profile2(theta - t.q0, soft);
+    const double dqdt = ga.dot(V[a] - V[b]) + gc.dot(V[c] - V[b]);
+    const double w2 = 0.5 * t.k * d2h * dqdt;
+    const double w1 = 0.5 * t.k * dh;
+    const coord3d fa = ga * w2 + dot_v(da) * w1;
+    const coord3d fc = gc * w2 + dot_v(dc) * w1;
+    H[a] += fa;
+    H[c] += fc;
+    H[b] -= fa + fc;
+}
+
+void add_dihedral_hvp(const Dihedral& t, bool soft, std::span<const coord3d> X,
+                      std::span<const coord3d> V, std::span<coord3d> H) {
+    const auto [a, b, c, d] = t.atoms;
+    const DVec B = dual(X[b] - X[a], V[b] - V[a]);
+    const DVec C = dual(X[c] - X[a], V[c] - V[a]);
+    const DVec D = dual(X[d] - X[a], V[d] - V[a]);
+    DVec db, dc, dd;
+    optim::geom2::dihedral_grad(B, C, D, db, dc, dd);
+    const coord3d gb = val(db), gc = val(dc), gd = val(dd);
+    const double phi =
+        coord3d::dihedral(X[b] - X[a], X[c] - X[a], X[d] - X[a]);
+    const auto [h, dh, d2h] = optim::geom2::profile2(phi - t.q0, soft);
+    const double dqdt = gb.dot(V[b] - V[a]) + gc.dot(V[c] - V[a])
+                      + gd.dot(V[d] - V[a]);
+    const double w2 = 0.5 * t.k * d2h * dqdt;
+    const double w1 = 0.5 * t.k * dh;
+    const coord3d fb = gb * w2 + dot_v(db) * w1;
+    const coord3d fc = gc * w2 + dot_v(dc) * w1;
+    const coord3d fd = gd * w2 + dot_v(dd) * w1;
+    H[b] += fb;
+    H[c] += fc;
+    H[d] += fd;
+    H[a] -= fb + fc + fd;
+}
+
+void add_coulomb_hvp(double k_coulomb, std::span<const coord3d> X,
+                     std::span<const coord3d> V, std::span<coord3d> H) {
+    for (std::size_t u = 0; u < X.size(); ++u) {
+        const double rinv = 1.0 / X[u].norm();
+        const double r3 = rinv * rinv * rinv;
+        const double xv = X[u].dot(V[u]);
+        // grad_u = -k/2 x r^-3; grad^2_u . v = -k/2 (v r^-3 - 3 x (x.v) r^-5)
+        H[u] -= (V[u] * r3 - X[u] * (3 * xv * r3 * rinv * rinv))
+                * (0.5 * k_coulomb);
+    }
+}
+
+}  // namespace
+
+void ForceField::hvp(std::span<const coord3d> x, std::span<const coord3d> v,
+                     std::span<coord3d> Hv) const {
+    std::fill(Hv.begin(), Hv.end(), coord3d());
+    for (const Bond& t : bonds)         add_bond_hvp(t, soft, x, v, Hv);
+    for (const Corner& t : corners)     add_corner_hvp(t, soft, x, v, Hv);
+    for (const Dihedral& t : dihedrals) add_dihedral_hvp(t, soft, x, v, Hv);
+    if (k_coulomb != 0) add_coulomb_hvp(k_coulomb, x, v, Hv);
+}
+
+// =====================================================================
+// Minimization driver: LineSearch<LBFGS> over the ExtWuAngle model of
+// the unified optimizer framework (fullerenes/optim/) -- the framework
+// is the graduated, transcription-verified form of minimize::lbfgs
+// (bit-identical trajectories, gated by claude-projects/optimize's
+// bench_wu_reexpr on C40-C420).  The public result type stays
+// minimize::Outcome for API continuity.
+// =====================================================================
 
 minimize::Outcome optimize(const ForceField& FF, std::span<coord3d> x,
                            double ftol) {
-    const size_t n = x.size();
-    std::span<double> flat(reinterpret_cast<double*>(x.data()), 3 * n);
+    std::span<double> flat = optim::as_flat(x);
 
-    // Minimize field F over the shared flat span with options o.
-    const auto run = [&](const ForceField& F, const minimize::Options& o) {
-        return minimize::lbfgs(
-            [&](std::span<const double> xf, std::span<double> gf) {
-                return F.energy_gradient(
-                    { reinterpret_cast<const coord3d*>(xf.data()), n },
-                    { reinterpret_cast<coord3d*>(gf.data()), n });
-            }, flat, o);
+    // Minimize field F over the shared flat span with criteria `stop`.
+    const auto run = [&](const ForceField& F, const optim::Criteria& stop) {
+        optim::ExtWuAngle model{F};
+        optim::Problem<optim::ExtWuAngle> prob{model, {}, nullptr, stop};
+        optim::LineSearch<optim::LBFGS> method{.step = optim::LBFGS{10},
+                                               // Per-iteration step cap: no
+                                               // atom moves more than half a
+                                               // bond length per step.
+                                               // Inactive near the minimum;
+                                               // from a pathological start it
+                                               // forces gradual untangling
+                                               // instead of a jump into a
+                                               // tangled local minimum.
+                                               .max_step = 0.7};
+        const optim::Result r = method.solve({}, prob, flat);
+        return minimize::Outcome{r.f, r.gmax, r.iters, r.n_grad,
+                                 r.converged()};
     };
 
-    minimize::Options opt;
-    opt.ftol_rel = ftol;
-    // Per-iteration step cap: no atom moves more than half a bond
-    // length per L-BFGS step.  Inactive near the minimum (converged
-    // steps are far smaller); from a pathological start (e.g. the
-    // legacy sphere-wrapped zero-order geometry) it forces gradual
-    // untangling instead of a jump into a tangled local minimum.
-    opt.max_step = 0.7;
+    optim::Criteria stop;
+    stop.ftol_rel = ftol;
 
-    if (FF.k_coulomb == 0) return run(FF, opt);
+    if (FF.k_coulomb == 0) return run(FF, stop);
 
     // Coulomb-carrying variant: the Fortran schedule (SA_frprmn3d)
     // inflates the start geometry with the origin repulsion until
     // ||g||_2 <= 10, then switches it off and converges the pure field.
-    minimize::Options pre = opt;
+    optim::Criteria pre = stop;
     pre.gtol_2 = 10.0;
     run(FF, pre);
     ForceField F0 = FF;
     F0.k_coulomb = 0;
-    return run(F0, opt);
+    return run(F0, stop);
 }
 
 int separate_coincident(std::span<coord3d> x) {
