@@ -8,7 +8,7 @@
 // All arguments optional; defaults: N=200, IPR=1, idx=0, arc=-1
 // (auto-pick longest), out.tex=strip.tex.
 
-#include "fullerenes/eisenstein_paint.hh"
+#include "fullerenes/eisenstein_paint_geometry.hh"
 #include "fullerenes/delaunay_strip.hh"
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/delaunay.hh"
@@ -43,7 +43,10 @@ int main(int argc, char** argv) {
     const char* out_path = (argc > 5) ? argv[5] : "strip.tex";
 
     Triangulation T    = load_isomer(N, idx, IPR);
-    auto [T_sorted, D] = ep::prepare_inputs(T);
+    ep::SortedDual S_d = ep::sorted_dual(T);
+    ep::DualPolytope Pl = ep::realize_dual(S_d);
+    const Triangulation& T_sorted = S_d.T;
+    const DelaunayTriangulation& D = Pl.D;
     auto strips        = unfold_all_arc_strips(D, T_sorted);
 
     if (arc < 0) {

@@ -12,7 +12,7 @@
 //           out_prefix=cell.  Emits <prefix>_f<id>.tex per cell, plus
 //           <prefix>_f<id>_canon_<edge>.tex per CCW arc.
 
-#include "fullerenes/eisenstein_paint.hh"
+#include "fullerenes/eisenstein_paint_geometry.hh"
 #include "fullerenes/delaunay_strip.hh"
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/delaunay.hh"
@@ -47,8 +47,11 @@ int main(int argc, char** argv) {
     int         arc    = (argc > 4) ? std::atoi(argv[4]) : -1;
     const char* prefix = (argc > 5) ? argv[5] : "cell";
 
-    Triangulation T    = load_isomer(N, idx, IPR);
-    auto [T_sorted, D] = ep::prepare_inputs(T);
+    Triangulation T     = load_isomer(N, idx, IPR);
+    ep::SortedDual S_d  = ep::sorted_dual(T);
+    ep::DualPolytope P  = ep::realize_dual(S_d);
+    const Triangulation& T_sorted = S_d.T;
+    const DelaunayTriangulation& D = P.D;
     auto strips        = unfold_all_arc_strips(D, T_sorted);
 
     if (arc < 0) {
@@ -101,8 +104,8 @@ int main(int argc, char** argv) {
         }
         ep::dump_cell_tikz(F, T_sorted, out);
         std::printf("  cell %d: c0=%d c1=%d c2=%d  P1=(%d,%d) P2=(%d,%d) -> %s\n",
-                    f, F.c0, F.c1, F.c2,
-                    F.P1.first, F.P1.second, F.P2.first, F.P2.second,
+                    f, F.corners[0], F.corners[1], F.corners[2],
+                    F.P[1].first, F.P[1].second, F.P[2].first, F.P[2].second,
                     path);
 
         // Canonical strips for each CCW arc.

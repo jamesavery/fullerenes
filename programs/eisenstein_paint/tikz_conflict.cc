@@ -10,7 +10,7 @@
 //
 // vertex_id = -1 -> pick the first interior-ambiguity conflict found.
 
-#include "fullerenes/eisenstein_paint.hh"
+#include "fullerenes/eisenstein_paint_geometry.hh"
 #include "fullerenes/barycentric.hh"
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/delaunay.hh"
@@ -46,7 +46,10 @@ int main(int argc, char** argv) {
     }
     if (T.N == 0) { std::fprintf(stderr, "isomer not found\n"); return 1; }
 
-    auto [T_sorted, D] = ep::prepare_inputs(T);
+    ep::SortedDual S_d = ep::sorted_dual(T);
+    ep::DualPolytope Pl = ep::realize_dual(S_d);
+    const Triangulation& T_sorted = S_d.T;
+    const DelaunayTriangulation& D = Pl.D;
     auto cells         = ep::embed_all_cells(D, T_sorted);
 
     struct Claim { int cell_id; Eisenstein pos; bool is_interior; };
@@ -57,7 +60,7 @@ int main(int argc, char** argv) {
         lmaps[fi] = ep::enumerate_cell_lattice(cells[fi], T_sorted);
         const ep::Cell& F = cells[fi];
         for (const auto& [p, v] : lmaps[fi].entries) {
-            const IntBary bw = integer_barycentric(p, F.P0, F.P1, F.P2);
+            const IntBary bw = integer_barycentric(p, F.P[0], F.P[1], F.P[2]);
             const bool interior = (bw.n0 > 0 && bw.n1 > 0 && bw.n2 > 0);
             claims[v].push_back({(int)fi, p, interior});
         }
@@ -87,12 +90,12 @@ int main(int argc, char** argv) {
     for (int f : interior_cells) {
         const ep::Cell& F = cells[f];
         std::printf("  cell %d: c0=%d c1=%d c2=%d  P1=(%d,%d) P2=(%d,%d)\n",
-                    f, F.c0, F.c1, F.c2,
-                    F.P1.first, F.P1.second, F.P2.first, F.P2.second);
+                    f, F.corners[0], F.corners[1], F.corners[2],
+                    F.P[1].first, F.P[1].second, F.P[2].first, F.P[2].second);
         for (const auto& c : claims[target_v]) {
             if (c.cell_id == f) {
                 const IntBary bw = integer_barycentric(c.pos,
-                                                       F.P0, F.P1, F.P2);
+                                                       F.P[0], F.P[1], F.P[2]);
                 std::printf("    hex %d at lattice (%d, %d) "
                             "bary=(%ld, %ld, %ld)/g=%ld\n",
                             target_v, c.pos.first, c.pos.second,

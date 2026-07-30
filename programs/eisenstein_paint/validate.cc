@@ -8,16 +8,16 @@
 // Usage: eisenstein_paint_validate [-r start_N] [--no-alex] [max_N] [results_dir]
 //
 //   -r N        resume from size N (skip sizes < N, append to summary.txt)
-//   --no-alex   only test prepare_iDT (sort + iDT compute + simplicial
-//               check); ~20x faster, useful for filtering inputs whose
-//               raw iDT is non-simplicial.
+//   --no-alex   only test sorted_dual + dual_idt (sort + iDT compute +
+//               chartability check); ~20x faster, useful for filtering
+//               inputs whose raw iDT is non-chartable.
 //   defaults: max_N=200, results_dir=./validate_results
 //
 // Per-N _fails.txt records: idx, stage_name, why.
 // Per-N _fails.tri dumps the failing triangulations (header + neighbour
 // lists) so downstream tools can reproduce without re-enumerating.
 
-#include "fullerenes/eisenstein_paint.hh"
+#include "fullerenes/eisenstein_paint_geometry.hh"
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/buckygen-wrapper.hh"
 #if defined(_OPENMP)
@@ -55,10 +55,10 @@ static void dump_triangulation(FILE* f, const Triangulation& T, long long idx,
 }
 
 // One isomer outcome under the chosen mode.  In --no-alex we only run
-// prepare_iDT; the Result-style fields are filled to mirror the same
-// shape as the full-pipeline path.
+// sorted_dual + dual_idt; the Status-style fields are filled to mirror
+// the same shape as the full-pipeline path.
 struct Outcome {
-    ep::Stage   stage;
+    ep::Code    code;
     std::string why;
     double      us;
 };
@@ -67,19 +67,19 @@ static Outcome run_one(const Triangulation& T, bool with_alex) {
     Outcome o;
     auto t0 = clk::now();
     if (with_alex) {
-        ep::Result R = ep::run(T);
-        o.stage = R.stage;
-        o.why   = std::move(R.why);
+        ep::DualGeometry R = ep::dual_geometry(T);
+        o.code = R.status.code;
+        o.why  = std::move(R.status.why);
     } else {
         try {
-            (void)ep::prepare_iDT(T);
-            o.stage = ep::Stage::OK;
-        } catch (const ep::StageError& e) {
-            o.stage = e.stage;
-            o.why   = e.what();
+            (void)ep::dual_idt(ep::sorted_dual(T));
+            o.code = ep::Code::OK;
+        } catch (const ep::PaintError& e) {
+            o.code = e.code;
+            o.why  = e.what();
         } catch (const std::exception& e) {
-            o.stage = ep::Stage::UNEXPECTED;
-            o.why   = std::string("unexpected: ") + e.what();
+            o.code = ep::Code::UNEXPECTED;
+            o.why  = std::string("unexpected: ") + e.what();
         }
     }
     auto t1 = clk::now();
@@ -160,24 +160,23 @@ int main(int argc, char** argv) {
                 outs[i] = run_one(Tbuf[i], with_alex);
 
             for (int i = 0; i < n_read; ++i) {
-                if (outs[i].stage == ep::Stage::OK) {
+                if (outs[i].code == ep::Code::OK) {
                     ++n_ok;
                     us.push_back(outs[i].us);
                     continue;
                 }
                 const long long idx = total_idx + i;
-                switch (outs[i].stage) {
-                    case ep::Stage::IDT_COMPUTE:    ++fail_idt;   break;
-                    case ep::Stage::ALEXANDROV:     ++fail_alex;  break;
-                    case ep::Stage::NON_SIMPLICIAL: ++fail_nsim;  break;
-                    case ep::Stage::EMBED:          ++fail_embed; break;
-                    case ep::Stage::COVERAGE:       ++fail_cov;   break;
-                    case ep::Stage::INTERPOLATE:    ++fail_embed; break;
-                    case ep::Stage::UNEXPECTED:     ++fail_other; break;
-                    case ep::Stage::OK:             break;
+                switch (outs[i].code) {
+                    case ep::Code::IDT_COMPUTE:    ++fail_idt;   break;
+                    case ep::Code::ALEXANDROV:     ++fail_alex;  break;
+                    case ep::Code::NON_SIMPLICIAL: ++fail_nsim;  break;
+                    case ep::Code::EMBED:          ++fail_embed; break;
+                    case ep::Code::COVERAGE:       ++fail_cov;   break;
+                    case ep::Code::INTERPOLATE:    ++fail_embed; break;
+                    case ep::Code::UNEXPECTED:     ++fail_other; break;
+                    case ep::Code::OK:             break;
                 }
-                ep::Result probe; probe.stage = outs[i].stage;
-                const char* sname = probe.stage_name();
+                const char* sname = ep::code_name(outs[i].code);
                 fails.push_back({idx, sname, outs[i].why});
                 if (!graph_dump) graph_dump = std::fopen(gpath, "w");
                 dump_triangulation(graph_dump, Tbuf[i], idx, N, sname);

@@ -84,7 +84,7 @@ struct WalkResult {
 //       cone into the face; embed_cell then selects, per cell, the triple of
 //       edge developments that agree wherever their strips share a lattice
 //       position (the multi-edge / obtuse-cell cross-edge disambiguator).
-WalkResult walk_line(const Triangulation& T,
+WalkResult walk_line(const TriangulationView& T,
                      int u, int v, int w,
                      int dir_uv,
                      Eisenstein endpoint);

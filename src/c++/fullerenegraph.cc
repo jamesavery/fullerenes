@@ -7,7 +7,7 @@
 #include "fullerenes/fullerenegraph.hh"
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/layout2d.hh"
-#include "fullerenes/eisenstein_paint.hh"
+#include "fullerenes/eisenstein_paint_geometry.hh"
 #include "fullerenes/wu_forcefield.hh"
 
 // Creates the m-point halma-fullerene from the current fullerene C_n with n(1+m)^2 vertices. (I.e. 4,9,16,25,36,... times)
@@ -131,11 +131,11 @@ vector<coord3d> FullereneGraphView::eisenstein_paint_geometry(double bond_length
   // (both enumerate faces in compute_face_representations order).
   Triangulation T(dual_graph(6));
 
-  eisenstein_paint::CubicResult R = eisenstein_paint::run_cubic(T);
-  if (!R.ok())
+  eisenstein_paint::CubicGeometry R = eisenstein_paint::cubic_geometry(T);
+  if (!R.status.ok())
     throw std::runtime_error(
-        string("eisenstein_paint_geometry: run_cubic failed at stage ")
-        + R.stage_name() + ": " + R.why);
+        string("eisenstein_paint_geometry: cubic_geometry failed (")
+        + R.status.name() + "): " + R.status.why);
 
   // R.cubic_coords[U] is the position of dual triangle T.triangles()[U]
   // (the T.dual_graph() labelling); rebuild the same triangle table.

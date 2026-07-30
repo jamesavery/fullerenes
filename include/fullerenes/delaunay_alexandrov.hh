@@ -456,9 +456,20 @@ struct AlexandrovIDTCubic {
   // read stats/r/D after; build() only replaces solver.D.
   AlexandrovSolver solver;
 
+  // Configure-before-build knob: when set, the flat-vertex removal inside
+  // build() TRACKS every removed kis vertex (DelaunayTriangulation point
+  // tracker), so after solve() the kappa=0 solver.D carries each hexagon
+  // center, pentagon center and hexagon-only cubic vertex as a
+  // (cell, barycentric) location on the cubic polytope's surface --
+  // transported through the removal and all homotopy flips.  Tracker
+  // labels are kis-complex ids (see KisMetric: id < T.N = dual vertex /
+  // cubic face center; id T.N + t = cubic vertex t in T.triangles() order).
+  bool track_removed = false;
+
   // Cone bookkeeping, filled by build().  Cone i is vertex i of solver.D.
   std::vector<tri_t> cone_triangle;  // dual triangle (CCW, T labels) = the cubic vertex
   std::vector<int>   cone_npent;     // k = #pentagon corners (deg-5 T vertices), 1..3
+  std::vector<int>   cone_kis_vertex; // kis id of cone i (= T.N + its triangle index)
 
   // The kis complex of the dual triangulation T, plus its metric.
   struct KisMetric {
@@ -478,7 +489,7 @@ struct AlexandrovIDTCubic {
   // @post result.triangle.size() == 2*T.N - 4
   // @post result.K.N == T.N + 2*T.N - 4
   // @throws std::logic_error when pre(fullerene) is violated
-  static KisMetric kis_metric(const Triangulation& T);
+  static KisMetric kis_metric(const TriangulationView& T);
 
   // kis -> flat removal (lib compute) -> cone iDT in solver.D + cone labels.
   // @anchor cubic-build
@@ -493,21 +504,21 @@ struct AlexandrovIDTCubic {
   // @throws std::logic_error when a cone guard trips (a flat vertex
   //         survived removal, kappa != k*pi/15, or total curvature != 4pi
   //         -- all "can't happen" on a correct kis metric)
-  void build(const Triangulation& T);
+  void build(const TriangulationView& T);
 
   // build(T) + solver.solve().
   // @anchor cubic-solve
   // @pre  as cubic-build
   // @post result.size() == solver.D.nv; result[i] is cone i's position,
   //       valid as an Alexandrov polytope iff solver.valid()
-  std::vector<coord3d> solve(const Triangulation& T);
+  std::vector<coord3d> solve(const TriangulationView& T);
 
   // build(T) + solver.solve_polytope(): positions + Tbar(0) (cells labeled
   // by cone index) + validation status, mirroring the base solver's API.
   // @anchor cubic-solve-polytope
   // @pre  as cubic-build
   // @post on ok: result.positions.size() == solver.D.nv
-  AlexandrovSolver::AlexandrovPolytope solve_polytope(const Triangulation& T);
+  AlexandrovSolver::AlexandrovPolytope solve_polytope(const TriangulationView& T);
 
   // Flat-face census of Tbar(0) against the cubic graph's face lattice.
   // Face u of the cubic graph (= vertex of T) is realized FLAT iff all its
@@ -527,6 +538,6 @@ struct AlexandrovIDTCubic {
   //       (solve_polytope(T).tesselation)
   // @post result.pent_flat <= 12 && result.hex_flat <= result.n_hex &&
   //           result.n_hex == T.N - 12
-  FlatFaceCensus flat_face_census(const Triangulation& T,
+  FlatFaceCensus flat_face_census(const TriangulationView& T,
                                   const CanonicalTesselation& tess) const;
 };
