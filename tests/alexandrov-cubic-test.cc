@@ -106,3 +106,29 @@ TEST(AlexandrovCubic, C60IhIsTruncatedIcosahedron)
                      sqrt(58 + 18 * S5) / 4,
                      (125 + 43 * S5) / 4);
 }
+
+// The Gauss-Newton trust-region fallback -- the solver path through the
+// shared JtJ product (dense_linalg_view.hh matmul) -- fires only when the
+// pure Newton step is rejected, which C20 and C60-Ih never do: measured
+// coverage puts the smallest provoking isomer at C40 buckygen idx 18
+// (36/1,625 solves across C20-C50 reach the branch).  This leg gives the
+// JtJ integration path a parent-side gate.
+TEST(AlexandrovCubic, C40Idx18ReachesGaussNewtonAndConverges)
+{
+  Triangulation T = nth_dual(40, false, 18);
+  {   // dual-metric path
+    AlexandrovSolver s;
+    s.D = DelaunayTriangulation::compute(T);
+    const vector<coord3d> pos = s.solve();
+    EXPECT_TRUE(s.valid());
+    EXPECT_LT(s.stats_final_kappa, 1e-10);
+    EXPECT_FALSE(pos.empty());
+  }
+  {   // cubic/kis path
+    AlexandrovIDTCubic c;
+    const vector<coord3d> pos = c.solve(T);
+    EXPECT_TRUE(c.solver.valid());
+    EXPECT_LT(c.solver.stats_final_kappa, 1e-10);
+    EXPECT_FALSE(pos.empty());
+  }
+}

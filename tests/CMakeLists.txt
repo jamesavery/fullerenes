@@ -80,6 +80,10 @@ if(GTest_FOUND)
   target_link_libraries(csr-test fullerenes GTest::GTest GTest::Main)
   add_test(NAME csr-test COMMAND csr-test)
 
+  add_executable(span-vector-test span-vector-test.cc)
+  target_link_libraries(span-vector-test fullerenes GTest::GTest GTest::Main)
+  add_test(NAME span-vector-test COMMAND span-vector-test)
+
   add_executable(dense-graph-test dense-graph-test.cc)
   target_link_libraries(dense-graph-test fullerenes GTest::GTest GTest::Main)
   add_test(NAME dense-graph-test COMMAND dense-graph-test)
@@ -118,6 +122,14 @@ if(GTest_FOUND)
   add_executable(dense-linalg-test dense-linalg-test.cc)
   target_link_libraries(dense-linalg-test fullerenes GTest::GTest GTest::Main)
   add_test(NAME dense-linalg-test COMMAND dense-linalg-test)
+
+  add_executable(eisenstein-atlas-test eisenstein-atlas-test.cc)
+  target_link_libraries(eisenstein-atlas-test fullerenes buckygen GTest::GTest GTest::Main)
+  add_test(NAME eisenstein-atlas-test COMMAND eisenstein-atlas-test)
+
+  add_executable(delaunay-unfold-test delaunay-unfold-test.cc)
+  target_link_libraries(delaunay-unfold-test fullerenes buckygen GTest::GTest GTest::Main)
+  add_test(NAME delaunay-unfold-test COMMAND delaunay-unfold-test)
 
   add_executable(star-unfold-test star-unfold-test.cc)
   target_link_libraries(star-unfold-test fullerenes GTest::GTest GTest::Main)

@@ -373,16 +373,16 @@ bool clip_to_cell_by_scanline(const EdgeDevelopment& V,
     return true;
 }
 
-// All candidate strips of one arc: every qualifying development of the
-// arc start->target, clipped to the cell triangle and scanline-bucketed.
-// Empty if no development qualifies or none survives the clip;
-// embed_cell picks the one strip per arc that is mutually consistent
-// across the three arcs.
+// All strip developments of one arc: every qualifying development of
+// the arc start->target, clipped to the cell triangle and scanline-
+// bucketed.  Empty if no development qualifies or none survives the
+// clip; embed_cell picks the one strip per arc that is mutually
+// consistent across the three arcs.
 std::vector<EdgeStrip>
-arc_strip_candidates(const TriangulationView& T_sorted, int n_cones,
-                     int start_vertex, Eisenstein start_pos,
-                     int target_vertex, Eisenstein target_pos,
-                     const MetaTriangle& M_cell)
+arc_strip_developments(const TriangulationView& T_sorted, int n_cones,
+                       int start_vertex, Eisenstein start_pos,
+                       int target_vertex, Eisenstein target_pos,
+                       const MetaTriangle& M_cell)
 {
     std::vector<EdgeStrip> out;
     for (const EdgeDevelopment& dev :
@@ -423,18 +423,48 @@ bool strips_consistent(const EdgeStrip& e01, const EdgeStrip& e12, const EdgeStr
         && merge_strip_claims(e20, claim);
 }
 
-// Enumerate valid (P0, P1, P2) corner placements for F in F's frame.
-// Returns up to 2 candidates: 1 if N01 is single-orbit, up to 2 for
-// split-prime N01.  Each satisfies all three norm constraints and CCW
-// orientation; picking among them which one matches the SURFACE
-// geodesics is the walker's job (in embed_cell).
-struct CornerCandidate { Eisenstein P0, P1, P2; };
+// A lattice development of the cell: a valid (P0, P1, P2) corner
+// placement in F's frame -- one per sector-0 representative of N01
+// whose induced apex P2 (its direction is fixed by the metric) is a
+// lattice point meeting the remaining norm constraints and CCW
+// orientation.  The count is a(N(gcd(P1, P2))) + [delta | sqrt(N01)]
+// -- see the eisenstein_paint_tables.hh banner for THE statement --
+// typically 1 or 2 but UNBOUNDED over the isomer space (C980's cells
+// admit 4), so callers must never cap it.  Picking which development
+// matches the SURFACE geodesics is the walker's job (in embed_cell).
+struct Development { Eisenstein P0, P1, P2; };
 
-std::vector<CornerCandidate>
-enumerate_corner_candidates(double L20, double alpha_0,
-                            long N01, long N12, long N20)
+// One cell's iDT metric datum: CCW corner ids, the squared side norms
+// and the interior angle at corner 0 -- the input of the chart-frame
+// construction.  THE one derivation; embed_cell and
+// cell_developments both open with it.  @pre D.f_he[f] >= 0.
+struct CellMetric {
+    std::array<int, 3> corners;
+    double L20 = 0, alpha_0 = 0;
+    long   N01 = 0, N12 = 0, N20 = 0;
+};
+
+CellMetric cell_metric(const DelaunayView& D, int f)
 {
-    std::vector<CornerCandidate> out;
+    const int h0 = D.f_he[f];
+    const int h1 = D.he_next[h0];
+    const int h2 = D.he_next[h1];
+    CellMetric m;
+    m.corners = { D.he_origin[h0], D.he_origin[h1], D.he_origin[h2] };
+    const double L01 = D.he_length[h0];
+    m.L20     = D.he_length[h2];
+    m.N01     = (long)std::lround(L01 * L01);
+    m.N12     = (long)std::lround(D.he_length[h1] * D.he_length[h1]);
+    m.N20     = (long)std::lround(m.L20 * m.L20);
+    m.alpha_0 = D.he_angle[h0];   // the interior angle at corner 0
+    return m;
+}
+
+std::vector<Development>
+enumerate_developments(double L20, double alpha_0,
+                       long N01, long N12, long N20)
+{
+    std::vector<Development> out;
     const Eisenstein P0(0, 0);
     std::vector<Eisenstein> P1_candidates = sector0_reps_of_norm((int)N01);
 
@@ -459,9 +489,13 @@ enumerate_corner_candidates(double L20, double alpha_0,
 // The cross-edge consistency selection: the FIRST triple of arc strips
 // (in the given candidate orders -- the order is part of the algorithm's
 // determinism) that glue to ONE position -> vertex map wherever they
-// overlap (strips_consistent).  By the cell-development lemma the
-// consistent triple is the cell's unique flat chart, so first-match is
-// not a heuristic but the search for the unique solution.
+// overlap (strips_consistent).  First-match IS the search for the
+// unique solution (the cell-development lemma): the true geodesic
+// c0 -> c1 has one developed displacement in the surface's own frame,
+// exactly one of its six rotations lies in sector 0, and every OTHER
+// sector-0 representative of N01 sits in a different unit orbit -- no
+// walk along the surface can terminate on it -- so at most one
+// development admits a consistent strip triple.
 bool first_consistent_triple(const std::array<std::vector<EdgeStrip>, 3>& cand,
                              std::array<const EdgeStrip*, 3>& out)
 {
@@ -486,33 +520,25 @@ Cell embed_cell(const DelaunayTriangulation& D,
     if (cell_id < 0 || cell_id >= D.nf || D.f_he[cell_id] < 0) return F;
     const int n_cones = count_cones(T_sorted);
 
-    const int h0 = D.f_he[cell_id];
-    const int h1 = D.he_next[h0];
-    const int h2 = D.he_next[h1];
-    F.corners = { D.he_origin[h0], D.he_origin[h1], D.he_origin[h2] };
+    const CellMetric m = cell_metric(D, cell_id);
+    F.corners = m.corners;
 
-    const double L01 = D.he_length[h0];
-    const double L20 = D.he_length[h2];
-    const long N01 = (long)std::lround(L01 * L01);
-    const long N12 = (long)std::lround(D.he_length[h1] * D.he_length[h1]);
-    const long N20 = (long)std::lround(L20 * L20);
-    const double alpha_0 = D.he_angle[h0];   // F's interior angle at corner 0
-
-    // Each corner candidate is a lattice-realisable corner placement
-    // (up to 2 for split-prime N01); each arc can admit several
-    // developments (see edge_developments).  The cell's chart is the
-    // unique corner placement + strip triple that is cross-edge
-    // consistent; the loops below search in deterministic order.
-    for (const CornerCandidate& C :
-         enumerate_corner_candidates(L20, alpha_0, N01, N12, N20)) {
+    // Each development is a lattice-realisable corner placement (see
+    // Development for the count -- unbounded, never capped); each arc
+    // can admit several strip developments (see edge_developments).
+    // The cell's chart is the FIRST placement + strip triple that is
+    // cross-edge consistent -- unique by the cell-development lemma
+    // (first_consistent_triple) -- searched in deterministic order.
+    for (const Development& C :
+         enumerate_developments(m.L20, m.alpha_0, m.N01, m.N12, m.N20)) {
         const MetaTriangle M = { C.P0, C.P1, C.P2 };
         const std::array<Eisenstein, 3> P = { C.P0, C.P1, C.P2 };
         std::array<std::vector<EdgeStrip>, 3> cand;
         for (int k = 0; k < 3; ++k)
-            cand[k] = arc_strip_candidates(T_sorted, n_cones,
-                                           F.corners[k],           P[k],
-                                           F.corners[(k + 1) % 3], P[(k + 1) % 3],
-                                           M);
+            cand[k] = arc_strip_developments(T_sorted, n_cones,
+                                             F.corners[k],           P[k],
+                                             F.corners[(k + 1) % 3], P[(k + 1) % 3],
+                                             M);
         if (cand[0].empty() || cand[1].empty() || cand[2].empty()) continue;
 
         std::array<const EdgeStrip*, 3> strips;
@@ -653,18 +679,82 @@ void require_all_charted(const DelaunayTriangulation& D,
                        std::to_string(f) + " admits no consistent chart");
 }
 
-// Per-vertex chart appearances: one Occurrence per lattice claim.
-std::vector<std::vector<Occurrence>>
-chart_occurrences(const std::vector<Cell>& cells,
-                  const std::vector<LatticeMap>& lmaps, int Nv)
+// append_scan_rows -- the ONE row-table derivation, shared by the
+// post-embed flatten and the candidate builder: append one triangle
+// scan's rows and return its block.  Empty scanlines keep the scan's
+// own (a_left > a_right) values, so both derivations produce identical
+// bytes.
+ScanBlock append_scan_rows(std::vector<ScanRow>& rows, const ScanLines& scan)
 {
-    std::vector<std::vector<Occurrence>> occ(Nv);
-    for (size_t fi = 0; fi < cells.size(); ++fi) {
-        if (!cells[fi].ok) continue;
-        for (const auto& [pos, vid] : lmaps[fi].entries)
-            occ[vid].push_back({ (int)fi, pos });
+    ScanBlock sb;
+    sb.b_min = scan.b_min;
+    sb.b_max = scan.b_max;
+    sb.rows_first = (int32_t)rows.size();
+    int32_t running = 0;
+    for (const ScanLine& sl : scan.lines) {
+        rows.push_back(ScanRow{sl.a_left, sl.a_right, running});
+        if (!sl.empty()) running += sl.a_right - sl.a_left + 1;
     }
-    return occ;
+    sb.n_entries = running;
+    return sb;
+}
+
+// Flatten one cell's lattice map into the CSR: the row table comes from
+// the winning frame's OWN triangle scan (append_scan_rows -- the same
+// derivation the candidate tables use), and the entries are verified to
+// land exactly where the rows say as they are appended.
+//
+// The convexity lemma (@anchor paint-cell-convexity, PROMOTION-DESIGN
+// sec 2.3): a cell is a convex lattice triangle, so each scanline's
+// claimed points are ONE contiguous a-range -- claim()'s (row, a-offset)
+// bijection rests on it.  enumerate_cell_lattice produces exactly the
+// scan's runs by construction; this check is that postcondition made
+// loud (a divergence is a chart fold or a scan drift, never silently
+// mis-indexed later).
+void flatten_cell(SurfaceParametrization& P, int f, const LatticeMap& lmap)
+{
+    const Eisenstein P0(0, 0);
+    const Eisenstein P1(P.frames[f].p1a, P.frames[f].p1b);
+    const Eisenstein P2(P.frames[f].p2a, P.frames[f].p2b);
+    P.scans[f] = append_scan_rows(P.rows, scan_triangle(P0, P1, P2));
+    const ScanBlock& sb = P.scans[f];
+
+    auto fold = [&](int b, const char* what) {
+        throw PaintError(Code::EMBED,
+            "flatten_cell: cell " + std::to_string(f) + " scanline b=" +
+            std::to_string(b) + ": " + what + " (chart fold)");
+    };
+    size_t i = 0;
+    for (int b = sb.b_min; b <= sb.b_max; ++b) {
+        const ScanRow& row = P.rows[(size_t)sb.rows_first + (b - sb.b_min)];
+        for (int32_t a = row.a_left; a <= row.a_right; ++a) {
+            if (i >= lmap.entries.size()) fold(b, "entries end before the scan");
+            const auto& [pos, vid] = lmap.entries[i];
+            if (pos.first != a || pos.second != b)
+                fold(b, "entry does not match the scan run");
+            P.entries.push_back(LatticePoint{pos.first, pos.second, vid});
+            ++i;
+        }
+    }
+    if (i != lmap.entries.size())
+        fold(sb.b_max, "entries outlast the scan");
+}
+
+// Per-vertex chart appearances as a CSR: count, prefix, fill -- the
+// fill iterates cells in id order, so each vertex's occurrences keep
+// the old push_back order (cell-major).
+void build_occurrence_csr(SurfaceParametrization& P)
+{
+    const int Nv = (int)P.T.N;
+    P.occ_first.assign(Nv + 1, 0);
+    for (const LatticePoint& e : P.entries) P.occ_first[e.vid + 1]++;
+    for (int v = 0; v < Nv; ++v) P.occ_first[v + 1] += P.occ_first[v];
+    P.occ.resize(P.entries.size());
+    std::vector<int32_t> cursor(P.occ_first.begin(), P.occ_first.end() - 1);
+    const ParamTablesView V = P.view();
+    for (int f = 0; f < (int)P.cells.size(); ++f)
+        for (const LatticePoint& e : V.cell_entries(f))
+            P.occ[cursor[e.vid]++] = VertexOccurrence{f, e.a, e.b};
 }
 
 // The coverage lemma as a guard: every non-cone vertex appears in exactly
@@ -673,9 +763,10 @@ chart_occurrences(const std::vector<Cell>& cells,
 // @anchor paint-coverage
 void check_coverage(const SurfaceParametrization& P)
 {
+    const ParamTablesView V = P.view();
     int unclaimed = 0, three_plus = 0;
     for (int v = P.n_cones; v < (int)P.T.N; ++v) {
-        const int n = (int)P.occurrences[v].size();
+        const int n = (int)V.occurrences(v).size();
         if      (n == 0) ++unclaimed;
         else if (n >= 3) ++three_plus;
     }
@@ -691,28 +782,135 @@ SurfaceParametrization parametrize(const DelaunayTriangulation& D,
                                    const SortedDual& S)
 {
     SurfaceParametrization P;
-    P.D       = &D;
+    P.D       = D;                       // owner IS-A view: alias, caller keeps D alive
     P.T       = S.T;
     P.n_cones = S.n_cones;
+    P.perm.resize(S.perm.size());
+    for (size_t u = 0; u < S.perm.size(); ++u) P.perm[u] = S.perm[u];
 
-    P.cells = embed_all_cells(D, S.T);
-    require_all_charted(D, P.cells);
+    const std::vector<Cell> construction = embed_all_cells(D, S.T);
+    require_all_charted(D, construction);
 
-    P.lmaps.resize(P.cells.size());
-    for (size_t fi = 0; fi < P.cells.size(); ++fi)
-        if (P.cells[fi].ok)
-            P.lmaps[fi] = enumerate_cell_lattice(P.cells[fi], S.T);
+    const int nf = (int)construction.size();
+    P.cells.assign(nf, CellCorners{});
+    P.frames.assign(nf, CellFrame{});
+    P.scans.assign(nf, ScanBlock{});
+    P.entry_first.assign(nf + 1, 0);
 
-    P.occurrences = chart_occurrences(P.cells, P.lmaps, S.T.N);
+    for (int f = 0; f < nf; ++f) {
+        P.entry_first[f] = (int32_t)P.entries.size();
+        if (!construction[f].ok) {
+            // dead slot: empty block, rows_first kept monotone
+            P.scans[f].rows_first = (int32_t)P.rows.size();
+            continue;
+        }
+        const Cell& F = construction[f];
+        P.cells[f]  = CellCorners{F.corners[0], F.corners[1], F.corners[2]};
+        P.frames[f] = CellFrame{F.P[1].first, F.P[1].second,
+                                F.P[2].first, F.P[2].second};
+        flatten_cell(P, f, enumerate_cell_lattice(F, S.T));
+    }
+    P.entry_first[nf] = (int32_t)P.entries.size();
+
+    build_occurrence_csr(P);
     check_coverage(P);
     return P;
 }
 
-Occurrence locate_vertex(const SurfaceParametrization& P, int v) {
-    if (v < 0 || v >= (int)P.occurrences.size() || P.occurrences[v].empty())
+VertexOccurrence locate_vertex(const SurfaceParametrization& P, int v) {
+    if (v < 0 || v >= (int)P.T.N)
+        throw std::logic_error("eisenstein_paint::locate_vertex: vertex "
+                               + std::to_string(v) + " out of range");
+    const auto os = P.view().occurrences(v);
+    if (os.empty())
         throw std::logic_error("eisenstein_paint::locate_vertex: vertex "
                                + std::to_string(v) + " unclaimed by any cell");
-    return P.occurrences[v].front();
+    return os[0];
+}
+
+// =====================================================================
+// cell_developments: every admissible lattice development, CSR by cell.
+// =====================================================================
+
+namespace {
+
+// Smallest power of two >= x, floored at 64 (open-addressing scratch
+// wants pow2 extents with load-factor headroom).
+int64_t pow2_ceil64(int64_t x) { int64_t p = 64; while (p < x) p <<= 1; return p; }
+
+}  // namespace
+
+CellDevelopments cell_developments(const ::DelaunayView& D,
+                                   const SortedDual& S)
+{
+    CellDevelopments cd;
+    cd.nf       = D.nf;
+    cd.N_sorted = (int32_t)S.T.N;
+    cd.n_cones  = S.n_cones;
+    cd.cells.assign(cd.nf, CellCorners{});
+    cd.dev_first.assign(cd.nf + 1, 0);
+    cd.entry_capacity_first.assign(cd.nf + 1, 0);
+
+    long s_max = 0;    // max |a|+|b| over development frame edges
+
+    for (int f = 0; f < cd.nf; ++f) {
+        cd.dev_first[f] = (int32_t)cd.frames.size();
+        if (D.f_he[f] < 0) continue;    // dead slot: 0 developments
+
+        const CellMetric m = cell_metric(D, f);
+        cd.cells[f] = CellCorners{ m.corners[0], m.corners[1], m.corners[2] };
+
+        // The development count is unbounded over the isomer space
+        // (see the header banner for the formula; C980's cells admit
+        // 4), hence the CSR.  A live cell with NO development has an
+        // unrealizable metric: refuse loudly.
+        const auto devs =
+            enumerate_developments(m.L20, m.alpha_0, m.N01, m.N12, m.N20);
+        if (devs.empty())
+            throw PaintError(Code::EMBED,
+                "cell_developments: live cell " + std::to_string(f) +
+                " admits no lattice development");
+
+        // Per-development frame + triangle scan (append_scan_rows: the
+        // same row derivation the post-selection flatten uses).
+        int32_t cap_f = 0;
+        for (const Development& C : devs) {
+            const Eisenstein P1 = C.P1, P2 = C.P2;
+            cd.frames.push_back(CellFrame{ P1.first, P1.second, P2.first, P2.second });
+            for (Eisenstein e : { P1, P2 - P1, C.P0 - P2 }) {
+                const long sd = std::labs(e.first) + std::labs(e.second);
+                if (sd > s_max) s_max = sd;
+            }
+            const ScanBlock sb =
+                append_scan_rows(cd.rows, scan_triangle(C.P0, P1, P2));
+            cd.scans.push_back(sb);
+            const int32_t n_rows = sb.b_max - sb.b_min + 1;
+            if (n_rows > cd.rows_cap) cd.rows_cap = n_rows;
+            if (sb.n_entries > cap_f) cap_f = sb.n_entries;
+        }
+        if (cap_f > cd.max_cell_entries) cd.max_cell_entries = cap_f;
+        cd.entry_capacity_first[f + 1] = cap_f;
+    }
+    cd.dev_first[cd.nf] = (int32_t)cd.frames.size();
+    for (int f = 0; f < cd.nf; ++f)    // exclusive prefix
+        cd.entry_capacity_first[f + 1] += cd.entry_capacity_first[f];
+    cd.entries_capacity = cd.entry_capacity_first[cd.nf];
+
+    // Scratch capacity formulas (properties of the data; any executor
+    // sizing embed/enumerate scratch reads these):
+    //  * walk registration: distinct keys are T_sorted vertex ids, and a
+    //    walk registers <= 3 vertices per pushed face with <=
+    //    walk_max_steps faces per primitive sub-walk, so
+    //    min(N_sorted, 3*(walk_max_steps+2)) bounds the live count; x2
+    //    keeps the open-addressing load factor comfortable.
+    //  * boundary map: a qualifying walk to displacement s = |a|+|b|
+    //    pushes <= 3s faces, so <= 3*(3s+1)+3 registrations per edge,
+    //    three edges; x2 headroom.
+    cd.wcap = pow2_ceil64(
+        2 * (std::min<int64_t>(cd.N_sorted, 3 * (int64_t)(walk_max_steps + 2)) + 8));
+    cd.bcap = pow2_ceil64(2 * (3 * (3 * s_max + 4) * 3 + 16));
+
+    return cd;
 }
 
 // =====================================================================

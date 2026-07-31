@@ -44,11 +44,10 @@
 // convert to a Status value; callers of the composable functions let
 // PaintError propagate.
 //
-// GPU note: read-only triangulation parameters are TriangulationView
-// (non-owning, span-based) so the interfaces survive the move to batch
-// GPU execution (parallel-primitives).  DelaunayTriangulation has no
-// view type yet; when spanify reaches the DCEL, the pointer members
-// below become views.
+// GPU note: every read-only input and product of this layer has a
+// trivially-copyable span form -- TriangulationView for the mesh,
+// DelaunayView for the cone iDT (delaunay_view.hh), and the flat
+// tables of eisenstein_paint_tables.hh for the parametrization.
 // =====================================================================
 
 #include "fullerenes/triangulation.hh"
@@ -56,6 +55,7 @@
 #include "fullerenes/permutation.hh"
 #include "fullerenes/eisenstein.hh"
 #include "fullerenes/delaunay_strip.hh"      // StripVertex, Strip
+#include "fullerenes/eisenstein_paint_tables.hh"  // the flat table form
 
 #include <array>
 #include <iosfwd>
@@ -144,9 +144,9 @@ struct EdgeStrip {
 
 // One iDT 2-cell embedded into its own Eisenstein-lattice frame -- the
 // cell's CHART.  Corner k sits at P[k]; arc k runs corners[k] ->
-// corners[(k+1)%3] and carries edge strip edge[k].  (Array form shared
-// with the atlas's AtlasCell, so parallel structure stays visibly
-// parallel.)
+// corners[(k+1)%3] and carries edge strip edge[k].  (Same k-indexed
+// corner/position form as ParamTablesView's corner_ids/frame_points,
+// the flat product this construction fills.)
 struct Cell {
     int                         cell_id = -1;
     std::array<int, 3>          corners{ -1, -1, -1 };  // CCW T_sorted vertex ids
@@ -192,21 +192,51 @@ LatticeMap enumerate_cell_lattice(const Cell& F,
 // SurfaceParametrization: every cell charted, every vertex located.
 // =====================================================================
 
-// One appearance of a T_sorted vertex in some cell's chart.
-struct Occurrence { int cell; Eisenstein pos; };
-
-// The intrinsic product of the pipeline: all live cells embedded and
-// scanned, coverage-checked, with a per-vertex index of chart
-// appearances.  Non-owning views of the inputs (the caller keeps D and
-// S alive; same contract as the atlas).
+// The intrinsic product of the pipeline, CSR-backed: all live cells
+// embedded and scanned, coverage-checked, every product a flat table
+// (element structs + extents in eisenstein_paint_tables.hh).
+// parametrize no longer STORES Cell/LatticeMap -- they remain the
+// public construction vocabulary (embed_cell, enumerate_cell_lattice,
+// the strip-level tikz diagnostics, which draw data the tables
+// intentionally omit); readers go through view()'s accessors.
+//
+// LIFETIME/STABILITY: D and T alias the inputs' buffers, not their
+// owners.  Valid while the owners live AND do not grow -- every
+// owner-level growth op (ensure_*/alloc_*/split_face/
+// bisect_multi_edges) repoints the owner and dangles these views; a
+// copy of the owner does not re-bind them.  Re-run parametrize after
+// any growth.  D carries the view's mutation API; holders of a
+// SurfaceParametrization must treat it as read-only.
 struct SurfaceParametrization {
-    const DelaunayTriangulation* D = nullptr;   // the charted complex
-    TriangulationView            T;             // T_sorted
-    int                          n_cones = 0;   // = SortedDual::n_cones
+    DelaunayView      D;                // the charted complex (view)
+    TriangulationView T;                // T_sorted
+    int               n_cones = 0;      // = SortedDual::n_cones
 
-    std::vector<Cell>       cells;              // indexed by D face id
-    std::vector<LatticeMap> lmaps;              //   "     "  (empty on dead slots)
-    std::vector<std::vector<Occurrence>> occurrences;  // per T_sorted vertex
+    // Owning vectors backing ParamTablesView, in its span order.
+    std::vector<CellCorners>      cells;        // [nf]
+    std::vector<CellFrame>        frames;       // [nf]  the winning chart
+    std::vector<ScanBlock>        scans;        // [nf]
+    std::vector<ScanRow>          rows;         // CSR row blocks
+    std::vector<int32_t>          entry_first;  // [nf+1]
+    std::vector<LatticePoint>     entries;      // scanline-major per cell
+    std::vector<int32_t>          perm;         // [N_orig] orig -> sorted
+    std::vector<int32_t>          occ_first;    // [N_sorted+1]
+    std::vector<VertexOccurrence> occ;
+
+    // The span mirror of this parametrization; valid while *this is
+    // alive and unmodified.
+    ParamTablesView view() const {
+        ParamTablesView v;
+        v.nf = (int32_t)cells.size();
+        v.N_sorted = (int32_t)T.N;
+        v.N_orig = (int32_t)perm.size();
+        v.n_cones = n_cones;
+        v.entries_total = (int64_t)entries.size();
+        v.cells = cells; v.frames = frames; v.scans = scans; v.rows = rows;
+        v.entry_first = entry_first; v.entries = entries; v.perm = perm;
+        v.occ_first = occ_first; v.occ = occ;
+        return v;
+    }
 };
 
 // Chart all live cells of D and check coverage: every non-cone vertex
@@ -220,9 +250,10 @@ SurfaceParametrization parametrize(const DelaunayTriangulation& D,
                                    const SortedDual& S);
 
 // A T_sorted vertex is itself a lattice point: locate it via its first
-// recorded occurrence.  Throws std::logic_error if v is unclaimed
+// recorded occurrence (the flat VertexOccurrence: host cell + chart
+// position (a, b)).  Throws std::logic_error if v is unclaimed
 // (impossible on a parametrize() output: coverage checked).
-Occurrence locate_vertex(const SurfaceParametrization& P, int v);
+VertexOccurrence locate_vertex(const SurfaceParametrization& P, int v);
 
 // =====================================================================
 // TikZ visualisations (diagnostic only; intrinsic -- lattice pictures).

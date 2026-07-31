@@ -22,10 +22,12 @@
 //                         flat-diagonal multi-edges on exactly-
 //                         symmetric isomers -- the charts handle them;
 //                         simpliciality is NOT required here.)
-//   evaluate(A, ...)   -- integer barycentric combination of the three
-//                         corner anchors per cell, gcd-reduced on edge
-//                         points so adjacent cells produce bit-identical
-//                         output across shared edges (idempotent paint).
+//   evaluate_sorted(A, ...) -- integer barycentric combination of the
+//                         three corner anchors per cell, gcd-reduced on
+//                         edge points so adjacent cells produce
+//                         bit-identical output across shared edges
+//                         (idempotent paint); result in sorted labels.
+//   evaluate(A, ...)   -- the same, back-permuted to original labels.
 //
 // Cubic-metric geometry (cubic_geometry): the carbon-atom geometry
 // EXACTLY on the cubic Alexandrov polytope (the convex realization of
@@ -75,6 +77,14 @@ struct DualPolytope {
     DelaunayTriangulation D;
     std::vector<coord3d>  cone_pos;    // one per cone, sorted labels
 
+    // The solve's converged radii r_v (B-I: r_v = |p_v| from the apex), one
+    // per D vertex in sorted labels.  Exposed because the polytope's
+    // 2-skeleton is unreachable without them: AlexandrovSolver::
+    // inessential_edges(D, r) and polytope_tesselation(D, r, labels) both
+    // need r, and T-bar -- not the flip-dependent triangulation -- is the
+    // unique, comparable form of a realized cone metric.
+    std::vector<double>   r;
+
     // The polytope as a library Deltahedron (cone iDT 1-skeleton +
     // positions; 12 vertices with degrees up to 11 for fullerene duals
     // -- not a fullerene dual itself, no deg-5/6 assumption).  Oriented
@@ -103,24 +113,43 @@ DualPolytope realize_dual(const SortedDual& S);
 // bit-identical 3D output across the shared edge).
 //
 // Preconditions:
-//   - F.ok == true
+//   - corners/frame belong to one charted cell; entries are its lattice
+//     points (scanline-major)
 //   - anchors.size() == n_cones, finite values
 //   - pos3d.size() >= the charted complex's vertex count
-void interpolate_cell(const Cell& F,
-                      const LatticeMap& lmap,
+// The (frame, corners, entries) form is the mathematical core; the
+// (V, f) form projects a cell out of the tables (@pre 0 <= f < V.nf,
+// V.cell_live(f)) and reads n_cones from the view.
+void interpolate_cell(CellFrame frame, CellCorners corners,
+                      std::span<const LatticePoint> entries,
                       const std::vector<coord3d>& anchors,
                       int n_cones,
+                      std::vector<coord3d>& pos3d,
+                      int cell_id_for_diag = -1);
+void interpolate_cell(const ParamTablesView& V, int f,
+                      const std::vector<coord3d>& anchors,
                       std::vector<coord3d>& pos3d);
 
 // Evaluate every chart of A against `anchors` (position of cone c at
-// anchors[c], c < A.n_cones) and back-permute to ORIGINAL labels via
-// `perm` (= SortedDual::perm).  The complex A was charted on must have
-// flat cells w.r.t. the surface the anchors live on -- i.e. A must be
-// parametrize(P.D, S) for a realized polytope P whose cone positions
-// are the anchors.  Throws PaintError(INTERPOLATE).
+// anchors[c], c < A.n_cones), in SORTED (T_sorted) labels: the result
+// has A.T.N entries, cones c < n_cones at anchors[c] verbatim, every
+// other vertex by barycentric interpolation in its cell's chart
+// (on-edge vertices idempotently from both adjacent cells).  CAUTION:
+// pair the result with the SORTED graph (A's T / SortedDual::T) --
+// indexing it by original labels is plausible-looking wrong output;
+// use evaluate below when original labels are wanted.  The
+// complex A was charted on must have flat cells w.r.t. the surface the
+// anchors live on -- i.e. A must be parametrize(P.D, S) for a realized
+// polytope P whose cone positions are the anchors.  Throws
+// PaintError(INTERPOLATE).
+std::vector<coord3d> evaluate_sorted(const SurfaceParametrization& A,
+                                     const std::vector<coord3d>& anchors);
+
+// evaluate = back-permutation o evaluate_sorted: the same positions
+// re-indexed to ORIGINAL labels via A's own stored permutation
+// (= SortedDual::perm at parametrize time; perm[u_orig] = u_sorted).
 std::vector<coord3d> evaluate(const SurfaceParametrization& A,
-                              const std::vector<coord3d>& anchors,
-                              const Permutation& perm);
+                              const std::vector<coord3d>& anchors);
 
 // =====================================================================
 // The realized cubic polytope.

@@ -19,6 +19,8 @@
 
 using tikz::BBox;
 using tikz::cart;
+using eisenstein_paint::LatticePoint;
+using eisenstein_paint::ParamTablesView;
 
 namespace {
 
@@ -30,72 +32,89 @@ namespace {
     throw std::runtime_error(buf);
 }
 
+void require_parametrizes(const DelaunayTriangulation& D,
+                          const ParamTablesView& V, const char* who) {
+    if (V.nf != D.nf)
+        unfold_throw("%s: tables/complex cell-count mismatch (V.nf=%d, "
+                     "D.nf=%d) -- V must be the parametrization of this D",
+                     who, V.nf, D.nf);
+}
+
+// An orientation-preserving lattice gluing of one directed segment onto
+// another exists iff their edge vectors are ASSOCIATES (unit quotient):
+// equal norm AND the aligning rotation z_to * conj(z_from) / N integral.
+// Equal norm alone is NOT sufficient -- the smallest norm with several
+// ideal classes is 49, where equal-norm vectors sit in unrelated orbits
+// (rotation exists for neither branch) or in conjugate orbits (only a
+// REFLECTED gluing exists, and a development never mirrors).  This is
+// the non-throwing guard for isometry_from_segments, whose failures are
+// deep-invariant logic_errors.
+bool rotation_glues(Eisenstein z_from, Eisenstein z_to) {
+    const long N = z_from.norm2();
+    if (N == 0 || z_to.norm2() != N) return false;
+    const Eisenstein num = z_to * z_from.complex_conj();
+    return num.first % N == 0 && num.second % N == 0;
+}
+
 }  // namespace
 
 // =====================================================================
-// dump_neighbour_unfolding_tikz -- F + 3 unfolded neighbours.
+// dump_neighbour_unfolding_tikz -- f + 3 unfolded neighbours.
 // =====================================================================
 
-void dump_neighbour_unfolding_tikz(const CellPlacement& F,
-                                   const std::array<NeighbourCell, 3>& neighbours,
-                                   const Triangulation& T_sorted,
+void dump_neighbour_unfolding_tikz(const DelaunayTriangulation& D,
+                                   const ParamTablesView& V,
+                                   int f,
                                    std::ostream& os,
                                    double scale)
 {
-    // For each neighbour: compute an affine mapping from its frame to
-    // F's frame such that the shared edge's two cones coincide.  Then
-    // transform the neighbour's lattice points into F's frame and draw
+    // For each neighbour across f's three edges: compute the lattice
+    // isometry from its frame to f's frame that glues the shared edge,
+    // identified by cycle SLOT on both sides (multi-edge-sound).  Then
+    // transform the neighbour's lattice points into f's frame and draw
     // them colour-coded.
+    require_parametrizes(D, V, "dump_neighbour_unfolding_tikz");
+    if (f < 0 || f >= D.nf || !V.cell_live(f))
+        unfold_throw("dump_neighbour_unfolding_tikz: cell %d not charted", f);
 
     struct Transformed {
         int cell_id;
-        Eisenstein P0, P1, P2;                          // corners in F's frame
-        std::vector<std::pair<Eisenstein, int>> entries; // (pos in F's frame, vertex_id)
+        Eisenstein P0, P1, P2;                          // corners in f's frame
+        std::vector<std::pair<Eisenstein, int>> entries; // (pos in f's frame, vertex_id)
     };
     std::vector<Transformed> adj;
 
-    // F's edges, by index: 0 = c0-c1, 1 = c1-c2, 2 = c2-c0.
-    int Fcor[3][2] = { { F.c0, F.c1 }, { F.c1, F.c2 }, { F.c2, F.c0 } };
-    Eisenstein FP[3][2] = { { F.P0, F.P1 }, { F.P1, F.P2 }, { F.P2, F.P0 } };
+    const eisenstein_paint::ChartView chf = V.chart(f);
+    const auto FP = chf.frame_points();
 
-    auto find_corner_pos = [&](const CellPlacement& N, int cone) -> Eisenstein {
-        if (cone == N.c0) return N.P0;
-        if (cone == N.c1) return N.P1;
-        if (cone == N.c2) return N.P2;
-        return Eisenstein(0, 0);
-    };
-
-    for (int k = 0; k < 3; ++k) {
-        const NeighbourCell& nd = neighbours[k];
-        if (!nd.valid || !nd.placement.ok) continue;
-        const CellPlacement& N = nd.placement;
-        int c_a = Fcor[k][0], c_b = Fcor[k][1];
-        Eisenstein Pa = FP[k][0], Pb = FP[k][1];
-        Eisenstein Qa = find_corner_pos(N, c_a);
-        Eisenstein Qb = find_corner_pos(N, c_b);
-        Eisenstein z_src = Qb - Qa;
-        Eisenstein z_dst = Pb - Pa;
-        if (z_src.norm2() != z_dst.norm2()) {
+    int hh = D.f_he[f];
+    for (int k = 0; k < 3; ++k, hh = D.he_next[hh]) {
+        const int twin = hh ^ 1;
+        const int g    = D.he_face[twin];
+        if (g < 0 || g >= D.nf || !V.cell_live(g)) continue;
+        // hh runs u -> v with u at f's corner slot k; the twin runs
+        // v -> u with v at g's corner slot k_g.
+        const int k_g = D.cycle_slot(twin);
+        const eisenstein_paint::ChartView chg = V.chart(g);
+        const auto GP = chg.frame_points();
+        const Eisenstein Pa = FP[k],             Pb = FP[(k + 1) % 3];   // u, v in f
+        const Eisenstein Qa = GP[(k_g + 1) % 3], Qb = GP[k_g];           // u, v in g
+        // Both sides are genuine developments of the same edge, so the
+        // rotation always exists here; the guard is defensive.
+        if (!rotation_glues(Qb - Qa, Pb - Pa)) {
             std::fprintf(stderr,
-                "dump_neighbour_unfolding_tikz: neighbour %d edge %d norm "
-                "mismatch (src %d vs dst %d)\n",
-                N.cell_id, k, z_src.norm2(), z_dst.norm2());
+                "dump_neighbour_unfolding_tikz: neighbour %d edge %d cannot "
+                "be glued (norm or orbit mismatch)\n", g, k);
             continue;
         }
-        LatticeIsometry T = align(z_src, z_dst);
-        auto apply = [&](Eisenstein p) {
-            Eisenstein q = p - Qa;
-            if (T.reflect) q = q.complex_conj();
-            q = q * T.u;
-            return q + Pa;
-        };
+        const LatticeIsometry T = isometry_from_segments(Qa, Qb, Pa, Pb);
         Transformed t;
-        t.cell_id = N.cell_id;
-        t.P0 = apply(N.P0);
-        t.P1 = apply(N.P1);
-        t.P2 = apply(N.P2);
-        for (const auto& [p, v] : N.lattice_points)
-            t.entries.push_back({apply(p), v});
+        t.cell_id = g;
+        t.P0 = T.apply(GP[0]);
+        t.P1 = T.apply(GP[1]);
+        t.P2 = T.apply(GP[2]);
+        for (const LatticePoint& e : chg.entries)
+            t.entries.push_back({T.apply(e.pos()), e.vid});
         adj.push_back(std::move(t));
     }
 
@@ -104,11 +123,11 @@ void dump_neighbour_unfolding_tikz(const CellPlacement& F,
           "\\begin{document}\n"
           "\\begin{tikzpicture}[scale=" << scale
        << ", every node/.style={font=\\tiny}]\n";
-    os << "% face " << F.cell_id << " + 3 unfolded neighbours\n";
+    os << "% face " << f << " + 3 unfolded neighbours\n";
 
     BBox bb;
-    bb.bump(F.P0); bb.bump(F.P1); bb.bump(F.P2);
-    for (const auto& [p, v] : F.lattice_points) bb.bump(p);
+    bb.bump(FP[0]); bb.bump(FP[1]); bb.bump(FP[2]);
+    for (const LatticePoint& e : chf.entries) bb.bump(e.pos());
     for (const auto& t : adj) {
         bb.bump(t.P0); bb.bump(t.P1); bb.bump(t.P2);
         for (const auto& [p, v] : t.entries) bb.bump(p);
@@ -118,9 +137,9 @@ void dump_neighbour_unfolding_tikz(const CellPlacement& F,
     bb.ymin -= margin; bb.ymax += margin;
     tikz::emit_grid(os, bb);
 
-    // F's lattice triangle in red; neighbours in lighter shades.
+    // f's lattice triangle in red; neighbours in lighter shades.
     const char* nb_tri_col[3] = { "blue!40", "green!40!black", "orange!60!black" };
-    tikz::emit_lattice_triangle(os, F.P0, F.P1, F.P2);
+    tikz::emit_lattice_triangle(os, FP[0], FP[1], FP[2]);
     for (size_t i = 0; i < adj.size(); ++i) {
         const auto& t = adj[i];
         auto [x0, y0] = cart(t.P0);
@@ -131,22 +150,9 @@ void dump_neighbour_unfolding_tikz(const CellPlacement& F,
            << ") -- (" << x2 << "," << y2 << ") -- cycle;\n";
     }
 
-    // Walk F's lattice points first; track {vertex_id -> (pos, owner_face_tag)}.
-    // owner_face_tag: 0 = F, 1..3 = neighbours by index in adj.
-    std::unordered_map<int, std::pair<Eisenstein, int>> ownership;
-    auto mark = [&](Eisenstein p, int v, int tag) {
-        auto it = ownership.find(v);
-        if (it == ownership.end()) ownership[v] = {p, tag};
-        // else: keep first; disagreement will show up as two draw-calls
-        // at different lattice positions.
-    };
-    for (const auto& [p, v] : F.lattice_points) mark(p, v, 0);
-    for (size_t i = 0; i < adj.size(); ++i)
-        for (const auto& [p, v] : adj[i].entries) mark(p, v, (int)i + 1);
-
     auto face_col = [&](int tag) {
         switch (tag) {
-            case 0: return "red!75!black";       // F itself
+            case 0: return "red!75!black";       // f itself
             case 1: return "blue!70!black";
             case 2: return "green!55!black";
             case 3: return "orange!75!black";
@@ -157,8 +163,9 @@ void dump_neighbour_unfolding_tikz(const CellPlacement& F,
     // Draw EVERY lattice-point occurrence (not just first ownership) so
     // inconsistent placements show as MULTIPLE dots for the same id.
     std::vector<std::tuple<Eisenstein, int, int>> all_occ;
-    auto cone_or_not = [&](int v) { return v < 12; };
-    for (const auto& [p, v] : F.lattice_points) all_occ.push_back({p, v, 0});
+    auto cone_or_not = [&](int v) { return v < V.n_cones; };
+    for (const LatticePoint& e : chf.entries)
+        all_occ.push_back({e.pos(), e.vid, 0});
     for (size_t i = 0; i < adj.size(); ++i)
         for (const auto& [p, v] : adj[i].entries) all_occ.push_back({p, v, (int)i + 1});
 
@@ -192,27 +199,20 @@ void dump_neighbour_unfolding_tikz(const CellPlacement& F,
 
 namespace {
 
-// One greedy DFS unfolding starting from a specific seed cell.  Every
-// reachable ok cell is placed exactly once (via the arc that first
-// reaches it in the DFS traversal).  Cone deficits produce "tears": a
-// cone placed by face A at position P_A may get placed by face B at a
-// different P_B; we record all distinct positions per cone and count
-// the tears.
+// One greedy DFS unfolding starting from a specific seed cell.  Each
+// reachable charted cell is placed AT MOST once (via the half-edge
+// that first reaches it and can be glued -- the header lists the skip
+// conditions).  Cone deficits produce "tears": a cone placed by face A
+// at position P_A may get placed by face B at a different P_B; we
+// record all distinct positions per cone and count the tears.
 LatticeUnfolding unfold_from_seed(const DelaunayTriangulation& D,
-                                  const std::vector<CellPlacement>& cells,
+                                  const ParamTablesView& V,
                                   int seed_cell_id)
 {
     LatticeUnfolding U;
-    if (seed_cell_id < 0 || seed_cell_id >= D.nf || !cells[seed_cell_id].ok)
+    U.n_cones = V.n_cones;
+    if (seed_cell_id < 0 || seed_cell_id >= D.nf || !V.cell_live(seed_cell_id))
         return U;
-
-    auto corner_pos = [&](const CellPlacement& F, int cone) -> Eisenstein {
-        if (cone == F.c0) return F.P0;
-        if (cone == F.c1) return F.P1;
-        if (cone == F.c2) return F.P2;
-        unfold_throw("unfold_iDT: cone %d not a corner of cell %d",
-                     cone, F.cell_id);
-    };
 
     // Per-cone FIRST position (the position recorded by the first cell
     // to place this cone in the DFS).  Used as the twin-arc anchor when
@@ -224,46 +224,37 @@ LatticeUnfolding unfold_from_seed(const DelaunayTriangulation& D,
         all.push_back(p);
     };
 
-    auto place = [&](int cell_id, Eisenstein P0g, Eisenstein P1g,
-                      Eisenstein P2g, int parent_id,
-                      Eisenstein anchor_local, Eisenstein anchor_global,
-                      const LatticeIsometry& T)
+    // Place one cell: its chart mapped into the global frame by the
+    // (orientation-preserving) lattice isometry g.
+    auto place = [&](int cell_id, const eisenstein_paint::ChartView& ch,
+                     int parent_id, const LatticeIsometry& g)
     {
-        LatticeUnfolding::UnfoldedCell g;
-        const CellPlacement& F = cells[cell_id];
-        g.cell_id        = cell_id;
-        g.c0 = F.c0; g.c1 = F.c1; g.c2 = F.c2;
-        g.P0 = P0g;  g.P1 = P1g;  g.P2 = P2g;
-        g.parent_cell_id = parent_id;
-        for (const auto& [p, v] : F.lattice_points) {
-            Eisenstein q = p - anchor_local;
-            if (T.reflect) q = q.complex_conj();
-            q = q * T.u + anchor_global;
-            g.entries.push_back({q, v});
-        }
-        U.cells.push_back(std::move(g));
-        ++U.n_cells;
+        LatticeUnfolding::UnfoldedCell F;
+        const auto FP = ch.frame_points();
+        F.cell_id = cell_id;
+        F.c0 = ch.corners[0]; F.c1 = ch.corners[1]; F.c2 = ch.corners[2];
+        F.P0 = g.apply(FP[0]); F.P1 = g.apply(FP[1]); F.P2 = g.apply(FP[2]);
+        F.parent_cell_id = parent_id;
+        for (const LatticePoint& e : ch.entries)
+            F.entries.push_back({g.apply(e.pos()), e.vid});
 
         for (auto [cone, p] : std::initializer_list<std::pair<int, Eisenstein>>{
-                {F.c0, P0g}, {F.c1, P1g}, {F.c2, P2g}})
+                {F.c0, F.P0}, {F.c1, F.P1}, {F.c2, F.P2}})
         {
             auto it = first_pos.find(cone);
             if (it == first_pos.end()) first_pos[cone] = p;
             else if (it->second != p) ++U.n_tears;
             record_cone(cone, p);
         }
+        U.cells.push_back(std::move(F));
+        ++U.n_cells;
     };
 
     std::vector<bool> cell_placed(D.nf, false);
 
-    // Seed: place at its local lattice positions in the global frame.
-    {
-        const CellPlacement& F0 = cells[seed_cell_id];
-        LatticeIsometry T_id;   // identity
-        place(seed_cell_id, F0.P0, F0.P1, F0.P2,
-              /*parent=*/-1, F0.P0, F0.P0, T_id);
-        cell_placed[seed_cell_id] = true;
-    }
+    // Seed: place at its local lattice positions (identity isometry).
+    place(seed_cell_id, V.chart(seed_cell_id), /*parent=*/-1, LatticeIsometry{});
+    cell_placed[seed_cell_id] = true;
 
     // DFS stack of half-edges pointing INTO unplaced cells from placed
     // ones (LIFO order).
@@ -283,31 +274,40 @@ LatticeUnfolding unfold_from_seed(const DelaunayTriangulation& D,
         int fid = D.he_face[h];
         if (fid < 0 || fid >= D.nf) continue;
         if (cell_placed[fid]) continue;
-        if (!cells[fid].ok) continue;
-        const CellPlacement& F = cells[fid];
+        if (!V.cell_live(fid)) continue;
 
-        int h_next = D.he_next[h];
+        // h runs u -> v inside fid, with u at fid's corner slot
+        // D.cycle_slot(h) -- the slot pairing identifies the shared edge
+        // by position in the face cycle, not by corner label.  The GLOBAL
+        // anchors stay label-keyed on purpose: gluing to each cone's
+        // first-sighting position is what defines the tear semantics.
+        // Both anchors always exist -- the entering edge's endpoints are
+        // corners of the already-placed twin cell, which recorded them.
         int u = D.he_origin[h];
-        int v = D.he_origin[h_next];
+        int v = D.he_origin[D.he_next[h]];
         auto itu = first_pos.find(u);
         auto itv = first_pos.find(v);
-        if (itu == first_pos.end() || itv == first_pos.end()) continue;
+        if (itu == first_pos.end() || itv == first_pos.end())
+            unfold_throw("unfold_iDT: entering edge %d -> %d of cell %d has "
+                         "an unrecorded anchor -- placement invariant broken",
+                         u, v, fid);
         Eisenstein Pu_g = itu->second, Pv_g = itv->second;
-        Eisenstein Pu_l = corner_pos(F, u);
-        Eisenstein Pv_l = corner_pos(F, v);
-        Eisenstein z_local  = Pv_l - Pu_l;
-        Eisenstein z_global = Pv_g - Pu_g;
-        if (z_local.norm2() != z_global.norm2()) continue;
-        LatticeIsometry T = align(z_local, z_global);
-        auto apply = [&](Eisenstein p) {
-            Eisenstein q = p - Pu_l;
-            if (T.reflect) q = q.complex_conj();
-            return q * T.u + Pu_g;
-        };
-        Eisenstein P0g = apply(F.P0), P1g = apply(F.P1), P2g = apply(F.P2);
+        const int  k_c  = D.cycle_slot(h);
+        const eisenstein_paint::ChartView ch = V.chart(fid);
+        const auto FP   = ch.frame_points();
+        Eisenstein Pu_l = FP[k_c];
+        Eisenstein Pv_l = FP[(k_c + 1) % 3];
+        // Skip when no orientation-preserving gluing exists: after a tear
+        // the label-keyed anchors can be ANY equal-norm vector -- in a
+        // different ideal-class orbit (no lattice alignment at all) or in
+        // the conjugate orbit (only a REFLECTED alignment, and a
+        // development never mirrors; e.g. the other parallel copy of a
+        // multi-edge, C128#0 cell 24).
+        if (!rotation_glues(Pv_l - Pu_l, Pv_g - Pu_g)) continue;
+        const LatticeIsometry g =
+            isometry_from_segments(Pu_l, Pv_l, Pu_g, Pv_g);
 
-        int parent_id = D.he_face[h ^ 1];
-        place(fid, P0g, P1g, P2g, parent_id, Pu_l, Pu_g, T);
+        place(fid, ch, D.he_face[h ^ 1], g);
         cell_placed[fid] = true;
 
         int hh0 = D.f_he[fid];
@@ -327,18 +327,20 @@ LatticeUnfolding unfold_from_seed(const DelaunayTriangulation& D,
 }  // namespace
 
 LatticeUnfolding unfold_iDT(const DelaunayTriangulation& D,
-                            const std::vector<CellPlacement>& cells,
+                            const ParamTablesView& V,
                             int start_cell_id,
                             int dfs_max_seeds)
 {
+    require_parametrizes(D, V, "unfold_iDT");
+
     // Collect candidate seed cells.
     std::vector<int> seeds;
-    if (start_cell_id >= 0 && start_cell_id < D.nf && cells[start_cell_id].ok) {
+    if (start_cell_id >= 0 && start_cell_id < D.nf && V.cell_live(start_cell_id)) {
         seeds.push_back(start_cell_id);
     }
     if (dfs_max_seeds > (int)seeds.size() || seeds.empty()) {
         for (int f = 0; f < D.nf; ++f) {
-            if (!cells[f].ok) continue;
+            if (!V.cell_live(f)) continue;
             bool already = false;
             for (int s : seeds) if (s == f) { already = true; break; }
             if (already) continue;
@@ -353,9 +355,9 @@ LatticeUnfolding unfold_iDT(const DelaunayTriangulation& D,
         return a.n_tears < b.n_tears;
     };
 
-    LatticeUnfolding best = unfold_from_seed(D, cells, seeds[0]);
+    LatticeUnfolding best = unfold_from_seed(D, V, seeds[0]);
     for (size_t i = 1; i < seeds.size(); ++i) {
-        LatticeUnfolding u = unfold_from_seed(D, cells, seeds[i]);
+        LatticeUnfolding u = unfold_from_seed(D, V, seeds[i]);
         if (better(u, best)) best = std::move(u);
     }
     return best;
@@ -418,7 +420,7 @@ void dump_lattice_unfolding_tikz(const LatticeUnfolding& U,
     for (const auto& F : U.cells) {
         for (const auto& [p, v] : F.entries) {
             auto [x, y] = cart(p);
-            bool cone = (v < 12);
+            bool cone = v < U.n_cones;
             bool dup  = is_duplicate(v);
             const char* shape = cone ? "rectangle" : "circle";
             const char* fill  = cone ? "red!75!black" : "blue!70!black";
@@ -456,16 +458,17 @@ void dump_lattice_unfolding_tikz(const LatticeUnfolding& U,
             << F.entries.size() << " lattice pts\n";
     }
 
-    // Duplicate hex vertices.
-    dbg << "\n-- DUPLICATE hex vertices (at >=2 distinct global positions) --\n";
+    // Duplicate non-cone vertices (cones tear by design; anything ELSE
+    // at two distinct positions is a placement inconsistency).
+    dbg << "\n-- DUPLICATE non-cone vertices (at >=2 distinct global positions) --\n";
     int n_dup = 0;
     for (const auto& [v, occ] : occurrences) {
-        if (v < 12) continue;
+        if (v < U.n_cones) continue;
         std::set<std::pair<int, int>> distinct;
         for (const auto& [p, f] : occ) distinct.insert({p.first, p.second});
         if (distinct.size() > 1) {
             ++n_dup;
-            dbg << "    hex " << v << " at " << distinct.size()
+            dbg << "    vertex " << v << " at " << distinct.size()
                 << " positions:\n";
             for (const auto& [p, f] : occ) {
                 dbg << "       face " << f << " pos (" << p.first
@@ -475,17 +478,18 @@ void dump_lattice_unfolding_tikz(const LatticeUnfolding& U,
     }
     if (n_dup == 0) dbg << "    (none)\n";
 
-    // Missing hex vertices.
-    dbg << "\n-- MISSING hex vertices (T_sorted vertex never placed) --\n";
+    // Missing vertices (never placed by any placed cell -- e.g. the
+    // entire subtree carrying them was stranded by a tear).
+    dbg << "\n-- MISSING vertices (T_sorted vertex never placed) --\n";
     int n_miss = 0;
-    for (int v = 12; v < T_sorted.N; ++v) {
+    for (int v = 0; v < T_sorted.N; ++v) {
         if (occurrences.find(v) == occurrences.end()) {
             ++n_miss;
-            dbg << "    hex " << v << "\n";
+            dbg << "    vertex " << v << "\n";
         }
     }
     if (n_miss == 0) dbg << "    (none)\n";
 
     dbg << "\nsummary: " << n_dup << " duplicates, " << n_miss
-        << " missing; unfolding " << U.n_cells << "/20 faces\n";
+        << " missing; unfolding placed " << U.n_cells << " faces\n";
 }

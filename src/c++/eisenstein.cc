@@ -14,34 +14,21 @@ Eisenstein Eisenstein::unit[7] = {{1,0},{0,1},{-1,1},{-1,0},{0,-1},{1,-1},{1,0}}
 // Number theory: norm-form representatives.
 // =====================================================================
 
+// (The norm-form scan itself -- a_of_norm_leg, Sector0Reps, first_rep_of_norm
+// -- is header-inline in eisenstein.hh: run-path callers need it without a
+// link dependency.)
+
 std::vector<Eisenstein> sector0_reps_of_norm(int N) {
   std::vector<Eisenstein> out;
-  if (N == 0) { out.push_back(Eisenstein(0, 0)); return out; }
-  if (N < 0) return out;   // not a norm: no reps (callers treat empty as "non-Loeschian")
-  // a >= 0, b >= 0:  a^2 + a*b + b^2 == N
-  for (int b = 0; 3 * b * b <= 4 * N; ++b) {
-    const long disc = 4L * N - 3L * b * b;
-    const long s    = (long)std::lround(std::sqrt((double)disc));
-    for (long ds = -1; ds <= 1; ++ds) {
-      const long st = s + ds;
-      if (st < 0) continue;
-      if (st * st != disc) continue;
-      const long two_a = st - b;
-      if (two_a < 0) continue;
-      if (two_a % 2 != 0) continue;
-      const int a = (int)(two_a / 2);
-      out.push_back(Eisenstein(a, b));
-      break;
-    }
-  }
+  for (Eisenstein z : Sector0Reps(N)) out.push_back(z);
   return out;
 }
 
 Eisenstein eisenstein_of_norm(int N) {
-  auto all = sector0_reps_of_norm(N);
-  if (all.empty())
+  auto rep = first_rep_of_norm(N);
+  if (!rep)
     throw std::logic_error("eisenstein_of_norm: no solution for N=" + std::to_string(N));
-  return all[0];
+  return *rep;
 }
 
 // =====================================================================

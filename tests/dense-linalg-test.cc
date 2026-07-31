@@ -7,11 +7,117 @@
 
 #include <gtest/gtest.h>
 #include <cmath>
+#include <cstring>
 #include <random>
 #include <vector>
 
 using namespace std;
 using LinAlg::V;
+
+// ============================================================================
+// frozen: the pre-promotion owner bodies VERBATIM (dense_linalg.cc and
+// matrix.hh operator* @ 262fb63e) -- the independent historical oracle for
+// the view bodies.  FROZEN 2026-07-27: never refactor, never modernize; its
+// entire value is being a second, unchanging implementation.  A frozen BODY
+// compiled in this TU (rather than stored hex) cancels FP-contraction
+// differences across compilers and architectures.
+// ============================================================================
+namespace frozen {
+
+static bool lu_decompose(const matrix<double>& A, vector<double>& M,
+                         int& sign, V* b)
+{
+  int n = A.m;
+  M.assign(size_t(n)*n, 0.0);
+  for (int i = 0; i < n; i++)
+    for (int j = 0; j < n; j++)
+      M[size_t(i)*n + j] = A(i, j);
+  sign = 1;
+  for (int c = 0; c < n; c++) {
+    int p = c;
+    for (int q = c+1; q < n; q++)
+      if (fabs(M[size_t(q)*n + c]) > fabs(M[size_t(p)*n + c])) p = q;
+    if (M[size_t(p)*n + c] == 0) return false;
+    if (p != c) {
+      for (int j = c; j < n; j++) swap(M[size_t(c)*n + j], M[size_t(p)*n + j]);
+      if (b) swap((*b)[c], (*b)[p]);
+      sign = -sign;
+    }
+    if (M[size_t(c)*n + c] < 0) sign = -sign;
+    for (int q = c+1; q < n; q++) {
+      double m = M[size_t(q)*n + c] / M[size_t(c)*n + c];
+      if (m == 0) continue;
+      for (int j = c+1; j < n; j++) M[size_t(q)*n + j] -= m * M[size_t(c)*n + j];
+      if (b) (*b)[q] -= m * (*b)[c];
+    }
+  }
+  return true;
+}
+
+static std::expected<LinAlg::LuSolved, LinAlg::LuFail>
+solve_with_sign(const matrix<double>& A, const V& b)
+{
+  int n = A.m;
+  vector<double> M;
+  V   x(b);
+  int sign;
+  if (!lu_decompose(A, M, sign, &x)) return std::unexpected(LinAlg::LuFail::Singular);
+  for (int c = n-1; c >= 0; c--) {
+    double s = x[c];
+    for (int j = c+1; j < n; j++) s -= M[size_t(c)*n + j] * x[j];
+    x[c] = s / M[size_t(c)*n + c];
+  }
+  return LinAlg::LuSolved{std::move(x), sign};
+}
+
+static double det(const matrix<double>& A)
+{
+  int n = A.m;
+  vector<double> M;
+  int sign;
+  if (!lu_decompose(A, M, sign, nullptr)) return 0.0;
+  double mag = 1.0;
+  for (int i = 0; i < n; i++) mag *= fabs(M[size_t(i)*n + i]);
+  return sign * mag;
+}
+
+static V solve(const matrix<double>& A, const V& b)
+{
+  auto r = solve_with_sign(A, b);
+  return r ? std::move(r->x) : V(A.m, 0.0);
+}
+
+static V solve_shifted(const matrix<double>& A, const V& b, double lambda)
+{
+  matrix<double> Al = A;
+  for (int i = 0; i < A.m; i++) Al(i,i) += lambda;
+  return solve(Al, b);
+}
+
+static V matvec(const matrix<double>& A, const V& v)
+{
+  int n = A.m;
+  V r(n, 0.0);
+  for (int i = 0; i < n; i++)
+    for (int j = 0; j < n; j++)
+      r[i] += A(i,j) * v[j];
+  return r;
+}
+
+static matrix<double> matmul(const matrix<double>& A, const matrix<double>& B)
+{
+  // the historical matrix.hh operator* loop, verbatim
+  matrix<double> C(A.m, B.n);
+  for (int i = 0; i < A.m; i++)
+    for (int j = 0; j < B.n; j++) {
+      double x = 0;
+      for (int k = 0; k < A.n; k++) x += A[size_t(i)*A.n + k] * B[size_t(k)*B.n + j];
+      C(i, j) = x;
+    }
+  return C;
+}
+
+}  // namespace frozen
 
 namespace {
 
@@ -196,4 +302,188 @@ TEST(DenseLinalg, PseudoinverseSolvesFullRankSystem)
   double err = 0;
   for (int i = 0; i < n; i++) err = max(err, fabs(sol.x[i] - x_true[i]));
   EXPECT_LT(err, 1e-8);
+}
+
+// ============================================================================
+// View-level conformance (dense_linalg_view.hh).  The owner API and
+// matrix::operator* both DELEGATE to the view bodies, so owner-vs-view is no
+// pin; the independent instruments are:
+//   - the FROZEN HISTORICAL ORACLE above (the pre-promotion bodies,
+//     byte-compared -- kills reassociation and pivot-rule drift the
+//     value-level tests are measured-blind to),
+//   - the strided live-block path vs the packed one (the batch-port shape,
+//     exercised by no owner call), and
+//   - the singular zero-fill contract, incl. a LATE zero pivot (partially
+//     forward-eliminated RHS).
+// ============================================================================
+
+namespace {
+
+// Hilbert matrix: dense, ill-conditioned, exactly representable inputs.
+matrix<double> hilbert(int n)
+{
+  matrix<double> A(n, n, 0.0);
+  for (int i = 0; i < n; i++)
+    for (int j = 0; j < n; j++) A(i, j) = 1.0 / (i + j + 1);
+  return A;
+}
+
+// Exact-magnitude pivot ties in column 0 -- the discriminator for the
+// pivot selection rule (> vs >=), which no random matrix produces.
+matrix<double> tie3()
+{
+  return matrix<double>(3, 3, V{1, 2, 0, -1, 5, 1, 1, 0, 7});
+}
+
+// Near-singular: row 3 = row 0 + row 1 over random doubles.  NOT exactly
+// singular in floating point (the eliminated pivot is ~1e-16 rounding
+// residue, and the solve "succeeds" with huge components) -- a conformance
+// input for the frozen oracle, not a zero-fill case.
+matrix<double> near_singular(unsigned seed)
+{
+  matrix<double> A = random_matrix(5, seed, false);
+  for (int j = 0; j < 5; j++) A(3, j) = A(0, j) + A(1, j);
+  return A;
+}
+
+// EXACTLY singular at the LAST pivot: integer entries with row 2 a bitwise
+// duplicate of row 0.  No swap at c = 0 (row 0 holds the strict max), the
+// duplicate eliminates with multiplier exactly 1.0 to an all-zero row, and
+// the zero pivot appears at c = 2 -- after the RHS has been forward-
+// eliminated through two columns.
+matrix<double> singular_late_exact()
+{
+  return matrix<double>(3, 3, V{4, 1, 7,  2, 3, 5,  4, 1, 7});
+}
+
+void expect_bits_equal(const V& a, const V& b, const char* tag)
+{
+  ASSERT_EQ(a.size(), b.size()) << tag;
+  EXPECT_EQ(memcmp(a.data(), b.data(), a.size() * sizeof(double)), 0) << tag;
+}
+
+// The full solve family, new vs frozen, bitwise.
+void expect_matches_frozen(const matrix<double>& A, const V& b, const char* tag)
+{
+  expect_bits_equal(LinAlg::solve(A, b), frozen::solve(A, b), tag);
+  for (double lam : {0.37, 1e-14, 0.0, -0.5})
+    expect_bits_equal(LinAlg::solve_shifted(A, b, lam),
+                      frozen::solve_shifted(A, b, lam), tag);
+  expect_bits_equal(LinAlg::matvec(A, b), frozen::matvec(A, b), tag);
+
+  const double dn = LinAlg::det(A), df = frozen::det(A);
+  EXPECT_EQ(memcmp(&dn, &df, sizeof(double)), 0) << tag << " det";
+
+  auto sn = LinAlg::solve_with_sign(A, b);
+  auto sf = frozen::solve_with_sign(A, b);
+  ASSERT_EQ(sn.has_value(), sf.has_value()) << tag;
+  if (sn) {
+    EXPECT_EQ(sn->det_sign, sf->det_sign) << tag;
+    expect_bits_equal(sn->x, sf->x, tag);
+  }
+
+  const double dotn = LinAlg::dot(b, b);
+  double dotf = 0;
+  for (size_t i = 0; i < b.size(); i++) dotf += b[i] * b[i];   // frozen dot
+  EXPECT_EQ(memcmp(&dotn, &dotf, sizeof(double)), 0) << tag << " dot";
+}
+
+}  // namespace
+
+TEST(DenseLinalgFrozenOracle, SolveFamilyBitIdenticalToHistory)
+{
+  for (int n : {5, 12, 17, 60, 128})
+    expect_matches_frozen(random_matrix(n, 300 + n, /*symmetric=*/false),
+                          random_vector(n, 400 + n), "random");
+  for (int n : {5, 12, 17})
+    expect_matches_frozen(hilbert(n), random_vector(n, 500 + n), "hilbert");
+  expect_matches_frozen(tie3(), random_vector(3, 42), "pivot-tie");
+  expect_matches_frozen(near_singular(77), random_vector(5, 78), "near-singular");
+  expect_matches_frozen(singular_late_exact(), random_vector(3, 79),
+                        "singular-late-exact");
+}
+
+TEST(DenseLinalgFrozenOracle, MatmulBitIdenticalToHistory)
+{
+  // matrix::operator* now DELEGATES to LinAlg::matmul, so operator*-vs-view
+  // is wiring, not a pin; the frozen historical product is the oracle.
+  for (int n : {3, 7, 17, 60, 128}) {
+    matrix<double> A = random_matrix(n, 101 + n, /*symmetric=*/false);
+    matrix<double> B = random_matrix(n, 202 + n, /*symmetric=*/false);
+    matrix<double> Cf = frozen::matmul(A, B);
+    matrix<double> Cd = A * B;                       // the delegation wiring
+    std::vector<double> out((size_t)n * n);
+    LinAlg::matmul(LinAlg::view_of(A), LinAlg::view_of(B), out);
+    ASSERT_EQ(memcmp(&Cf[0], out.data(), (size_t)n * n * sizeof(double)), 0)
+        << "view matmul must be bit-identical to the frozen product, n = " << n;
+    ASSERT_EQ(memcmp(&Cf[0], &Cd[0], (size_t)n * n * sizeof(double)), 0)
+        << "operator* must delegate to the same body, n = " << n;
+  }
+}
+
+TEST(DenseLinalgView, StridedLiveBlockMatchesPacked)
+{
+  // The batch-port shape: the live n x n block embedded in an lda-strided
+  // buffer must compute bit-identically to the packed owner path.  Scratch
+  // is POISONED, so a slot the copy loops fail to overwrite is detected.
+  const int n   = 17;
+  const int lda = 23;
+  matrix<double> A = random_matrix(n, 7, /*symmetric=*/false);
+  matrix<double> B = random_matrix(n, 9, /*symmetric=*/false);
+  V b = random_vector(n, 8);
+  auto widen = [&](const matrix<double>& S) {
+    std::vector<double> wide((size_t)n * lda, -999.0);
+    for (int i = 0; i < n; i++)
+      for (int j = 0; j < n; j++) wide[(size_t)i * lda + j] = S(i, j);
+    return wide;
+  };
+  std::vector<double> Awide = widen(A), Bwide = widen(B);
+  const LinAlg::MatConstView Av{Awide, n, n, lda};
+  const LinAlg::MatConstView Bv{Bwide, n, n, lda};
+
+  std::vector<double> M((size_t)n * n, -999.0), M2((size_t)n * n, -999.0);
+  std::vector<double> x(n), xs(n), mv(n), mm((size_t)n * n);
+  ASSERT_EQ(LinAlg::solve(Av, b, M, x), LinAlg::LuStatus::Ok);
+  expect_bits_equal(V(x.begin(), x.end()), LinAlg::solve(A, b), "strided solve");
+
+  ASSERT_EQ(LinAlg::solve_shifted(Av, b, 0.37, M2, M, xs), LinAlg::LuStatus::Ok);
+  expect_bits_equal(V(xs.begin(), xs.end()), LinAlg::solve_shifted(A, b, 0.37),
+                    "strided solve_shifted");
+
+  LinAlg::matvec(Av, b, mv);
+  expect_bits_equal(V(mv.begin(), mv.end()), LinAlg::matvec(A, b), "strided matvec");
+
+  // Strided matmul -- BOTH operands strided: exactly the Alexandrov batch
+  // shape (matmul(Jview, Jview, JtJ) with lda = nv_cap != n).
+  LinAlg::matmul(Av, Bv, mm);
+  std::vector<double> mm_packed((size_t)n * n);
+  LinAlg::matmul(LinAlg::view_of(A), LinAlg::view_of(B), mm_packed);
+  EXPECT_EQ(memcmp(mm.data(), mm_packed.data(), (size_t)n * n * sizeof(double)), 0)
+      << "strided matmul must match packed";
+}
+
+TEST(DenseLinalgView, SingularSolveZeroFillsThroughBothAPIs)
+{
+  {   // pivot-0 singular: x is the raw b copy when the guard fires
+    const int n = 5;
+    matrix<double> A(n, n, 0.0);
+    V b = random_vector(n, 9);
+    std::vector<double> M((size_t)n * n), x(n, 7.0);
+    EXPECT_EQ(LinAlg::solve(LinAlg::view_of(A), b, M, x), LinAlg::LuStatus::Singular);
+    for (int i = 0; i < n; i++) EXPECT_EQ(x[i], 0.0);
+    V xo = LinAlg::solve(A, b);
+    for (int i = 0; i < n; i++) EXPECT_EQ(xo[i], 0.0);
+  }
+  {   // LATE zero pivot: the RHS is partially forward-eliminated before the
+      // trip -- the zero-fill must still win, through every entry point.
+    matrix<double> A = singular_late_exact();
+    V b = random_vector(3, 32);
+    std::vector<double> M(9), x(3, 7.0);
+    EXPECT_EQ(LinAlg::solve(LinAlg::view_of(A), b, M, x), LinAlg::LuStatus::Singular);
+    for (int i = 0; i < 3; i++) EXPECT_EQ(x[i], 0.0);
+    V xo = LinAlg::solve(A, b);
+    for (int i = 0; i < 3; i++) EXPECT_EQ(xo[i], 0.0);
+    EXPECT_FALSE(LinAlg::solve_with_sign(A, b).has_value());
+    EXPECT_EQ(LinAlg::det(A), 0.0);
+  }
 }

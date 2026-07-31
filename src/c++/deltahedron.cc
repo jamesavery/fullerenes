@@ -1,4 +1,5 @@
 #include "fullerenes/deltahedron.hh"
+#include "fullerenes/optim/delta_optimize.hh"
 #include "fullerenes/polyhedron.hh"
 #include "fullerenes/unfold.hh"
 #include "fullerenes/buckinverse.hh"
@@ -1914,34 +1915,6 @@ static double deltahedron_energy_and_gradient(
   return energy;
 }
 
-// Dot product of two vector<coord3d> arrays (sum of component-wise products).
-static double vec_dot(const vector<coord3d>& a, const vector<coord3d>& b){
-  double s = 0;
-  for(int i = 0; i < (int)a.size(); i++)
-    s += a[i].dot(b[i]);
-  return s;
-}
-
-static double vec_norm(const vector<coord3d>& a){
-  return sqrt(vec_dot(a, a));
-}
-
-// a[i] += alpha * b[i]
-static void vec_axpy(vector<coord3d>& a, double alpha, const vector<coord3d>& b){
-  for(int i = 0; i < (int)a.size(); i++)
-    a[i] = a[i] + b[i] * alpha;
-}
-
-static void vec_scale(vector<coord3d>& a, double alpha){
-  for(int i = 0; i < (int)a.size(); i++)
-    a[i] = a[i] * alpha;
-}
-
-static void vec_zero(vector<coord3d>& a){
-  for(int i = 0; i < (int)a.size(); i++)
-    a[i] = coord3d(0,0,0);
-}
-
 // ---------- Hessian-vector product (matrix-free) ----------
 //
 // Computes Hv = H * v for the same energy terms used in optimize():
@@ -2988,6 +2961,12 @@ const char* PipelineDiag::flag_name(uint32_t f) {
   return "unknown";
 }
 
+// The optimizer itself graduated into the unified framework
+// (fullerenes/optim/delta_optimize.hh) -- the transcription-verified
+// re-expression of the former ~550-line CG/LBFGS/Steihaug dispatcher,
+// gated by quality-distribution parity (claude-projects/optimize's
+// bench_delta_reexpr) and the full-pipeline bench_epopt comparison.
+// This member is the state-field adapter around it.
 OptResult Deltahedron::optimize(std::span<const coord3d> initial_geometry, double target_L,
                                 double grad_tol, const vector<bool>& fixed,
                                 long long max_work, double angle_tol)
@@ -2995,552 +2974,49 @@ OptResult Deltahedron::optimize(std::span<const coord3d> initial_geometry, doubl
   assert((int)initial_geometry.size() == N);
   assert(fixed.empty() || (int)fixed.size() == N);
   std::copy(initial_geometry.begin(), initial_geometry.end(), points.begin());
-  const bool has_fixed = !fixed.empty();
   opt_diag_flags = 0;  // Reset per-call optimizer diagnostics
 
-  // Cache edge list (avoid recomputing on every energy evaluation)
-  vector<edge_t> edges = undirected_edges();
+  optim::DeltaConfig cfg;
+  cfg.method = (opt_method == OptMethod::CG)    ? optim::DeltaMethod::CG
+             : (opt_method == OptMethod::LBFGS) ? optim::DeltaMethod::LBFGS
+                                                : optim::DeltaMethod::STEIHAUG;
+  cfg.target_L          = target_L;
+  cfg.grad_tol          = grad_tol;
+  cfg.fixed             = fixed;
+  cfg.max_work          = max_work;
+  cfg.angle_tol         = angle_tol;
+  cfg.k_flat            = opt_k_flat;
+  cfg.k_conv            = opt_k_conv;
+  cfg.convex_constraint = opt_convex_constraint;
+  cfg.skip_post_reflect = opt_skip_post_reflect;
+  cfg.log               = opt_log;
 
-  // Target edge length: use provided value, or mean of initial edge lengths.
-  double L = target_L;
-  if(L <= 0){
-    double sum = 0; int count = 0;
-    for(const edge_t& e : edges){
-      sum += coord3d::dist(points[e.first], points[e.second]);
-      count++;
-    }
-    L = sum / count;
+  const optim::DeltaResult r = optim::delta_optimize(*this, cfg);
+
+  iterations_used    = r.iters;
+  final_gmax_L       = r.gmax_L;
+  final_angle_relerr = r.angle_relerr;
+  final_n_concave    = r.n_concave;
+  n_energy_evals     = r.n_energy;
+  n_grad_evals       = r.n_grad;
+  n_hv_evals         = r.n_hv;
+  if (r.flags & optim::Result::NEG_CURVATURE) opt_diag_flags |= PipelineDiag::NEG_CURVATURE;
+  if (r.flags & optim::Result::TR_BOUNDARY)   opt_diag_flags |= PipelineDiag::TR_BOUNDARY;
+  if (r.flags & optim::Result::STEP_REJECTED) opt_diag_flags |= PipelineDiag::STEP_REJECTED;
+  if (r.flags & optim::Result::CVX_REJECTED)  opt_diag_flags |= PipelineDiag::CVX_REJECTED;
+  if (r.flags & optim::Result::LBFGS_RESET)   opt_diag_flags |= PipelineDiag::LBFGS_RESET;
+  // Exhaustive switch (no default): a new optim::Outcome enumerator is a
+  // -Wswitch warning here instead of a silent BUDGET_EXHAUSTED label.
+  switch (r.outcome) {
+    case optim::Outcome::CONVERGED:        final_opt_result = OptResult::CONVERGED;        break;
+    case optim::Outcome::STAGNATED:        final_opt_result = OptResult::STAGNATED;        break;
+    case optim::Outcome::BUDGET_EXHAUSTED: final_opt_result = OptResult::BUDGET_EXHAUSTED; break;
+    case optim::Outcome::CONSTRAINT_STUCK: final_opt_result = OptResult::CONVEXITY_STUCK;  break;
+    // delta_optimize never produces these two; a budget label is the
+    // least-wrong fallback for a safeguard-class stop.
+    case optim::Outcome::STEP_FAILED:
+    case optim::Outcome::INFEASIBLE:       final_opt_result = OptResult::BUDGET_EXHAUSTED; break;
   }
-
-  // Force constants (fixed throughout)
-  const double k_bond   = 1.0;
-  const double k_angle  = 1.0;
-  const double k_curv   = 2.0;
-  const double k_conv   = opt_k_conv;  // quadratic one-sided convexity penalty
-
-  // Two-phase optimization:
-  //   Phase 1: k_flat active — settle into flat/equilateral
-  //   Phase 2: k_flat off — pure equilateral convergence
-  double k_flat = opt_k_flat;
-  int phase = (k_flat > 0) ? 1 : 2;
-  double phase1_grad_norm0 = 0;
-
-  const double c1 = 1e-4;        // Armijo parameter
-
-  // Shared helpers
-  auto zero_fixed_grad = [&](vector<coord3d>& grad){
-    if(has_fixed) for(int i = 0; i < N; i++) if(fixed[i]) grad[i] = coord3d(0,0,0);
-  };
-
-  // Evaluation counters
-  n_energy_evals = 0;
-  n_grad_evals = 0;
-  n_hv_evals = 0;
-
-  // Work budget: total_work = n_energy + 2*n_grad + 7*n_hv
-  // All three primitives are O(Nv) per call with constant cost ratios.
-  // Empirical cost ratios measured at Nv=32,52,102 (consistent within 10%):
-  //   energy_eval : gradient_eval : hv_product ≈ 1 : 2 : 7
-  // Budget in units of "energy evaluations".  Default: 400*Nv^2.
-  // Each CG/LBFGS iteration costs ~17 energy evals (line search) + 1 gradient (=2),
-  // so ~19 work per iteration.  400*Nv^2/19 ≈ 21*Nv^2 iterations.
-  // Real wall time scales as budget * Nv (since each eval is O(Nv)).
-  if(max_work <= 0) max_work = 400LL * N * N;
-  const long long phase1_work_budget = max_work / 4;
-  auto total_work_fn = [&]() -> long long {
-    return (long long)n_energy_evals + 2LL * n_grad_evals + 7LL * n_hv_evals;
-  };
-
-  auto compute_eg = [&](vector<coord3d>& grad) -> double {
-    n_grad_evals++;
-    double E = deltahedron_energy_and_gradient(*this, edges, points, &grad, L,
-                                                k_bond, k_angle, k_curv, k_flat, k_conv);
-    zero_fixed_grad(grad);
-    return E;
-  };
-
-  auto compute_e_only = [&](const vector<coord3d>& x_trial) -> double {
-    n_energy_evals++;
-    return deltahedron_energy_only(*this, edges, x_trial, L, k_bond, k_angle, k_curv, k_flat, k_conv);
-  };
-
-  auto compute_gmax = [&](const vector<coord3d>& grad) -> double {
-    double gmax = 0;
-    for(int i = 0; i < N; i++){
-      if(has_fixed && fixed[i]) continue;
-      gmax = max(gmax, grad[i].norm());
-    }
-    return gmax * L;
-  };
-
-  auto edge_cv = [&]() -> double {
-    double s = 0, s2 = 0;
-    for(const edge_t& e : edges){
-      double d = coord3d::dist(points[e.first], points[e.second]);
-      s += d; s2 += d*d;
-    }
-    int ne = (int)edges.size();
-    double mu = s / ne;
-    return sqrt(max(0.0, s2/ne - mu*mu)) / mu;
-  };
-
-  // Phase transition logic (shared by all methods)
-  // Phase 1 ends when: work budget quarter exhausted, or gradient drops 100x.
-  // Returns true if phase changed.
-  long long phase1_work_start = 0;
-  auto check_phase_transition = [&](int iter, const vector<coord3d>& grad) -> bool {
-    if(phase != 1 || iter % 50 != 49) return false;
-    bool advance = (total_work_fn() - phase1_work_start >= phase1_work_budget);
-    if(!advance && phase1_grad_norm0 > 0){
-      double gn = vec_norm(grad);
-      if(gn < phase1_grad_norm0 * 0.01) advance = true;
-    }
-    if(advance){
-      k_flat = 0;
-      phase = 2;
-      return true;
-    }
-    return false;
-  };
-
-  // Backtracking Armijo line search (shared by CG and L-BFGS)
-  auto line_search = [&](double E, const vector<coord3d>& grad, const vector<coord3d>& dir,
-                         vector<coord3d>& x_trial) -> double {
-    double slope = vec_dot(grad, dir);
-    double alpha = 1.0;
-    for(int ls = 0; ls < 60; ls++){
-      for(int i = 0; i < N; i++) x_trial[i] = points[i] + dir[i] * alpha;
-      double E_trial = compute_e_only(x_trial);
-      if(E_trial <= E + c1 * alpha * slope) break;
-      double denom = 2.0 * (E_trial - E - slope * alpha);
-      if(denom > 1e-30){
-        double alpha_q = -slope * alpha * alpha / denom;
-        alpha = max(0.1 * alpha, min(0.5 * alpha, alpha_q));
-      } else {
-        alpha *= 0.5;
-      }
-    }
-    return alpha;
-  };
-
-  // Log ~20 times over the work budget. Estimate iters from work/N (each iter ~ N work).
-  const int log_interval = opt_log ? max(1, (int)(max_work / (20LL * N))) : 0;
-  const char* method_name = (opt_method == OptMethod::CG) ? "CG" :
-                            (opt_method == OptMethod::LBFGS) ? "LBFGS" : "ST";
-
-  vector<coord3d> grad(N);
-  double E = compute_eg(grad);
-  phase1_grad_norm0 = vec_norm(grad);
-
-  if(opt_log)
-    fprintf(opt_log, "  %s start: E=%.6f |g|=%.4e L=%.4f cv=%.4f ph=%d tol=%.2e\n",
-            method_name, E, phase1_grad_norm0, L, edge_cv(), phase, grad_tol);
-
-  bool converged = false;
-
-  // Stagnation detection for angle-based convergence: if energy hasn't
-  // decreased meaningfully for stag_window consecutive iterations, the
-  // optimizer is stuck at a local minimum and can't reduce angle error
-  // further.  Break to avoid burning the entire work budget.
-  const int stag_window = 50;
-  double stag_E_ref = E;   // energy at start of current window
-  int stag_count = 0;      // iterations since last meaningful decrease
-
-  // ==================== CG ====================
-  if(opt_method == OptMethod::CG){
-    vector<coord3d> grad_old(N), dir(N), x_trial(N);
-    for(int i = 0; i < N; i++) dir[i] = grad[i] * (-1.0);
-    if(has_fixed) for(int i = 0; i < N; i++) if(fixed[i]) dir[i] = coord3d(0,0,0);
-
-    for(int iter = 0; ; iter++){
-      iterations_used = iter + 1;
-      if(total_work_fn() >= max_work) break;
-
-      // Phase transition
-      if(check_phase_transition(iter, grad)){
-        E = compute_eg(grad);
-        for(int i = 0; i < N; i++) dir[i] = grad[i] * (-1.0);
-        if(has_fixed) for(int i = 0; i < N; i++) if(fixed[i]) dir[i] = coord3d(0,0,0);
-      }
-
-      // Convergence check
-      double gmax = compute_gmax(grad);
-      if(gmax < grad_tol){ converged = true; break; }
-      if(angle_tol > 0 && max_angle_relerr() < angle_tol && count_concave() == 0){ converged = true; break; }
-      if(stag_count >= stag_window) break;  // no progress for 50 iterations
-
-      // Ensure descent direction
-      double slope = vec_dot(grad, dir);
-      if(slope > 0){
-        for(int i = 0; i < N; i++) dir[i] = grad[i] * (-1.0);
-        if(has_fixed) for(int i = 0; i < N; i++) if(fixed[i]) dir[i] = coord3d(0,0,0);
-      }
-
-      // Line search and update
-      double alpha = line_search(E, grad, dir, x_trial);
-      for(int i = 0; i < N; i++) points[i] = points[i] + dir[i] * alpha;
-
-      grad_old = grad;
-      double E_old = E;
-      E = compute_eg(grad);
-
-      // Stagnation tracking
-      if(E_old - E > 1e-15 * max(1.0, fabs(E_old))){ stag_count = 0; stag_E_ref = E; }
-      else stag_count++;
-
-      // Logging
-      if(log_interval > 0 && iter % log_interval == 0)
-        fprintf(opt_log, "  CG %4d: E=%.6f |g|=%.4e gmax*L=%.4e a=%.3e cv=%.4f ang=%.2e ph=%d\n",
-                iter, E, vec_norm(grad), compute_gmax(grad), alpha, edge_cv(),
-                max_angle_relerr(), phase);
-
-      // Polak-Ribiere beta
-      double gg_old = vec_dot(grad_old, grad_old);
-      double beta = 0.0;
-      if(gg_old > 1e-30){
-        vector<coord3d> gdiff(N);
-        for(int i = 0; i < N; i++) gdiff[i] = grad[i] - grad_old[i];
-        beta = max(0.0, vec_dot(grad, gdiff) / gg_old);
-      }
-      for(int i = 0; i < N; i++) dir[i] = grad[i] * (-1.0) + dir[i] * beta;
-      if(has_fixed) for(int i = 0; i < N; i++) if(fixed[i]) dir[i] = coord3d(0,0,0);
-    }
-  }
-
-  // ==================== L-BFGS ====================
-  else if(opt_method == OptMethod::LBFGS){
-    const int m = 10;  // history depth
-    deque<vector<coord3d>> S, Y;
-    deque<double> rho_hist;
-    vector<coord3d> dir(N), x_trial(N), grad_old(N);
-
-    for(int iter = 0; ; iter++){
-      iterations_used = iter + 1;
-      if(total_work_fn() >= max_work) break;
-
-      // Phase transition
-      if(check_phase_transition(iter, grad)){
-        E = compute_eg(grad);
-        S.clear(); Y.clear(); rho_hist.clear();
-      }
-
-      // Convergence check
-      double gmax = compute_gmax(grad);
-      if(gmax < grad_tol){ converged = true; break; }
-      if(angle_tol > 0 && max_angle_relerr() < angle_tol && count_concave() == 0){ converged = true; break; }
-      if(stag_count >= stag_window) break;  // no progress for 50 iterations
-
-      // Two-loop recursion to compute search direction
-      dir = grad;  // q = grad
-      int hist_size = (int)S.size();
-      vector<double> alpha_hist(hist_size);
-
-      // Forward loop
-      for(int i = hist_size - 1; i >= 0; i--){
-        alpha_hist[i] = rho_hist[i] * vec_dot(S[i], dir);
-        vec_axpy(dir, -alpha_hist[i], Y[i]);
-      }
-
-      // Initial Hessian approximation: gamma * I
-      if(hist_size > 0){
-        double ys = vec_dot(Y.back(), S.back());
-        double yy = vec_dot(Y.back(), Y.back());
-        if(yy > 1e-30) vec_scale(dir, ys / yy);
-      }
-
-      // Backward loop
-      for(int i = 0; i < hist_size; i++){
-        double beta = rho_hist[i] * vec_dot(Y[i], dir);
-        vec_axpy(dir, alpha_hist[i] - beta, S[i]);
-      }
-
-      // dir = -H*g (negate for descent direction)
-      vec_scale(dir, -1.0);
-      if(has_fixed) for(int i = 0; i < N; i++) if(fixed[i]) dir[i] = coord3d(0,0,0);
-
-      // Safeguard: if not a descent direction, reset to -grad
-      double slope = vec_dot(grad, dir);
-      if(slope > 0){
-        opt_diag_flags |= PipelineDiag::LBFGS_RESET;
-        for(int i = 0; i < N; i++) dir[i] = grad[i] * (-1.0);
-        if(has_fixed) for(int i = 0; i < N; i++) if(fixed[i]) dir[i] = coord3d(0,0,0);
-        S.clear(); Y.clear(); rho_hist.clear();
-      }
-
-      // Save old state for history update
-      grad_old = grad;
-
-      // Line search and update
-      double alpha = line_search(E, grad, dir, x_trial);
-      for(int i = 0; i < N; i++) points[i] = points[i] + dir[i] * alpha;
-      double E_old = E;
-      E = compute_eg(grad);
-
-      // Stagnation tracking
-      if(E_old - E > 1e-15 * max(1.0, fabs(E_old))){ stag_count = 0; stag_E_ref = E; }
-      else stag_count++;
-
-      // Update L-BFGS history: s = alpha*dir, y = grad - grad_old
-      {
-        vector<coord3d> s(N), y(N);
-        for(int i = 0; i < N; i++){
-          s[i] = dir[i] * alpha;
-          y[i] = grad[i] - grad_old[i];
-        }
-        double ys = vec_dot(y, s);
-        if(ys > 1e-10 * vec_dot(s, s)){  // curvature condition
-          S.push_back(std::move(s));
-          Y.push_back(std::move(y));
-          rho_hist.push_back(1.0 / ys);
-          if((int)S.size() > m){ S.pop_front(); Y.pop_front(); rho_hist.pop_front(); }
-        }
-      }
-
-      // Logging
-      if(log_interval > 0 && iter % log_interval == 0){
-        // Compute h_min for log
-        double h_min_log = 1e30;
-        for(int v = 0; v < N; v++){
-          if(has_fixed && fixed[v]) continue;
-          int d = degree(v);
-          if(d > 6) continue;
-          coord3d cen(0,0,0);
-          for(int j = 0; j < d; j++) cen += points[(*this)[v][j]];
-          cen /= (double)d;
-          coord3d nf(0,0,0);
-          for(int j = 0; j < d; j++){
-            coord3d e1 = points[(*this)[v][j]] - points[v];
-            coord3d e2 = points[(*this)[v][(j+1)%d]] - points[v];
-            nf += e1.cross(e2);
-          }
-          double nl = nf.norm();
-          if(nl < 1e-15) continue;
-          double h = (points[v] - cen).dot(nf / nl);
-          if(h < h_min_log) h_min_log = h;
-        }
-        fprintf(opt_log, "  LB %4d: E=%.6f |g|=%.4e gmax*L=%.4e a=%.3e cv=%.4f ang=%.2e hmin=%+.4f ph=%d h=%d\n",
-                iter, E, vec_norm(grad), compute_gmax(grad), alpha, edge_cv(),
-                max_angle_relerr(), h_min_log, phase, (int)S.size());
-      }
-    }
-  }
-
-  // ==================== Steihaug-Toint ====================
-  else if(opt_method == OptMethod::STEIHAUG){
-    double Delta_max = L;
-    double Delta = 0.5 * L;
-    const int max_inner = min(3 * N, 200);
-
-    // Temp vectors for inner CG
-    vector<coord3d> z(N), r_cg(N), d_cg(N), Hd(N), x_trial(N);
-
-    // Convexity constraint: h_current tracks which vertices are convex.
-    // Updated at each accepted step; only convex→concave transitions are rejected.
-    // Works with or without E_conv: constraint prevents new concavities,
-    // E_conv (if active) pushes existing concave vertices toward h=0.
-    vector<double> h_current, h_trial;
-    if(opt_convex_constraint){
-      compute_h_values(*this, points, h_current, fixed);
-    }
-
-    for(int iter = 0; ; iter++){
-      iterations_used = iter + 1;
-      if(total_work_fn() >= max_work) break;
-
-      // Phase transition
-      if(check_phase_transition(iter, grad)){
-        E = compute_eg(grad);
-        Delta = 0.5 * L;  // reset trust region on phase change
-        if(opt_convex_constraint) compute_h_values(*this, points, h_current, fixed);
-      }
-
-      // Convergence check
-      double gmax = compute_gmax(grad);
-      if(gmax < grad_tol){ converged = true; break; }
-      if(angle_tol > 0 && max_angle_relerr() < angle_tol && count_concave() == 0){ converged = true; break; }
-      if(stag_count >= stag_window) break;  // no progress for 50 iterations
-
-      // --- Steihaug CG to solve trust-region subproblem ---
-      // Approximately solve: min_z  g^T z + 0.5 z^T H z,  ||z|| <= Delta
-      vec_zero(z);
-      for(int i = 0; i < N; i++) r_cg[i] = grad[i] * (-1.0);  // r = -g
-      if(has_fixed) for(int i = 0; i < N; i++) if(fixed[i]) r_cg[i] = coord3d(0,0,0);
-      d_cg = r_cg;  // d = r
-      double rr = vec_dot(r_cg, r_cg);
-      double gnorm = sqrt(rr);
-      int inner_iters = 0;
-
-      for(int j = 0; j < max_inner; j++){
-        inner_iters = j + 1;
-
-        // Hv product
-        vec_zero(Hd);
-        n_hv_evals++;
-        deltahedron_hv_product(*this, edges, points, d_cg, Hd, L,
-                               k_bond, k_angle, k_curv, k_flat, fixed, k_conv);
-
-        double kappa = vec_dot(d_cg, Hd);
-
-        if(kappa <= 1e-15 * rr){
-          // Negative or zero curvature: step to trust-region boundary along d
-          opt_diag_flags |= PipelineDiag::NEG_CURVATURE;
-          double zz = vec_dot(z, z);
-          double zd = vec_dot(z, d_cg);
-          double dd = vec_dot(d_cg, d_cg);
-          // Solve ||z + tau*d||^2 = Delta^2
-          double a_coeff = dd;
-          double b_coeff = 2.0 * zd;
-          double c_coeff = zz - Delta * Delta;
-          double disc = b_coeff * b_coeff - 4.0 * a_coeff * c_coeff;
-          double tau = (-b_coeff + sqrt(max(0.0, disc))) / (2.0 * a_coeff);
-          vec_axpy(z, tau, d_cg);
-          break;
-        }
-
-        double alpha_cg = rr / kappa;
-
-        // Check trust-region boundary
-        {
-          vector<coord3d> z_new(N);
-          for(int i = 0; i < N; i++) z_new[i] = z[i] + d_cg[i] * alpha_cg;
-          double z_new_norm = vec_norm(z_new);
-          if(z_new_norm >= Delta){
-            // Truncate to boundary
-            opt_diag_flags |= PipelineDiag::TR_BOUNDARY;
-            double zz = vec_dot(z, z);
-            double zd = vec_dot(z, d_cg);
-            double dd = vec_dot(d_cg, d_cg);
-            double a_coeff = dd;
-            double b_coeff = 2.0 * zd;
-            double c_coeff = zz - Delta * Delta;
-            double disc = b_coeff * b_coeff - 4.0 * a_coeff * c_coeff;
-            double tau = (-b_coeff + sqrt(max(0.0, disc))) / (2.0 * a_coeff);
-            vec_axpy(z, tau, d_cg);
-            break;
-          }
-          z = z_new;
-        }
-
-        // Update residual
-        vector<coord3d> r_new(N);
-        for(int i = 0; i < N; i++) r_new[i] = r_cg[i] - Hd[i] * alpha_cg;
-        if(has_fixed) for(int i = 0; i < N; i++) if(fixed[i]) r_new[i] = coord3d(0,0,0);
-
-        double rr_new = vec_dot(r_new, r_new);
-        if(sqrt(rr_new) < 0.01 * gnorm) break;  // inner convergence
-
-        double beta_cg = rr_new / rr;
-        for(int i = 0; i < N; i++) d_cg[i] = r_new[i] + d_cg[i] * beta_cg;
-        if(has_fixed) for(int i = 0; i < N; i++) if(fixed[i]) d_cg[i] = coord3d(0,0,0);
-        r_cg = r_new;
-        rr = rr_new;
-      }
-
-      // --- Evaluate trust-region step ---
-      double znorm = vec_norm(z);
-
-      // Predicted reduction: -(g.z) - 0.5*(z.Hz)
-      vec_zero(Hd);
-      n_hv_evals++;
-      deltahedron_hv_product(*this, edges, points, z, Hd, L,
-                             k_bond, k_angle, k_curv, k_flat, fixed, k_conv);
-      double pred = -(vec_dot(grad, z) + 0.5 * vec_dot(z, Hd));
-
-      // Trial point
-      for(int i = 0; i < N; i++) x_trial[i] = points[i] + z[i];
-      double E_trial = compute_e_only(x_trial);
-      double actual = E - E_trial;
-
-      double rho = (pred > 1e-30) ? actual / pred : -1;
-
-      // Accept based on energy reduction.  If opt_convex_constraint is on,
-      // also reject steps that make a currently-convex vertex concave.
-      bool accepted = (rho > 0.1);
-      if(accepted && opt_convex_constraint){
-        compute_h_values(*this, x_trial, h_trial, fixed);
-        for(int v = 0; v < N && accepted; v++)
-          if(h_current[v] > 0 && h_trial[v] < 0){
-            accepted = false;
-            opt_diag_flags |= PipelineDiag::CVX_REJECTED;
-          }
-      }
-
-      if(accepted){
-        double E_old = E;
-        std::copy(x_trial.begin(), x_trial.end(), points.begin());
-        E = compute_eg(grad);
-        if(opt_convex_constraint) compute_h_values(*this, points, h_current, fixed);
-        if(rho > 0.75 && znorm > 0.5 * Delta) Delta = min(2.0 * Delta, Delta_max);
-        // Stagnation tracking
-        if(E_old - E > 1e-15 * max(1.0, fabs(E_old))){ stag_count = 0; stag_E_ref = E; }
-        else stag_count++;
-      } else {
-        Delta *= 0.25;
-        if(Delta < 1e-14 * L) Delta = 1e-14 * L;
-        stag_count++;  // rejected step = no progress
-        opt_diag_flags |= PipelineDiag::STEP_REJECTED;
-      }
-
-      // Logging
-      if(log_interval > 0 && iter % log_interval == 0)
-        fprintf(opt_log, "  ST %4d: E=%.6f |g|=%.4e gmax*L=%.4e |z|=%.2e D=%.2e rho=%.2f ang=%.2e in=%d ph=%d %s\n",
-                iter, E, vec_norm(grad), compute_gmax(grad), znorm, Delta, rho,
-                max_angle_relerr(), inner_iters, phase, accepted ? "acc" : "REJ");
-    }
-  }
-
-  // Final stats
-  final_gmax_L = compute_gmax(grad);
-  bool stagnated = !converged && stag_count >= stag_window;
-  if(opt_log)
-    fprintf(opt_log, "  %s done: %d iters, E=%.6f gmax*L=%.4e cv=%.4f %s\n",
-            method_name, iterations_used, E, final_gmax_L, edge_cv(),
-            converged ? "CONVERGED" : stagnated ? "STAGNATED" : "budget");
-
-  // Post-optimization strict convexity cleanup.
-  // Hull projection can disturb angle quality, so CG polish after projecting.
-  // Skipped when opt_skip_post_reflect is set (caller will handle convexity).
-  if(!opt_skip_post_reflect)
-  {
-    int total_projected = project_onto_convex_hull(points);
-    if(total_projected > 0){
-      // Projection moved vertices — brief CG (Polak-Ribiere) polish to recover angle quality.
-      E = compute_eg(grad);
-      zero_fixed_grad(grad);
-      vector<coord3d> dir_r(N), grad_old_r(N), x_trial_r(N);
-      for(int i = 0; i < N; i++) dir_r[i] = grad[i] * (-1.0);
-      if(has_fixed) for(int i = 0; i < N; i++) if(fixed[i]) dir_r[i] = coord3d(0,0,0);
-      for(int iter = 0; iter < 50; iter++){
-        if(compute_gmax(grad) < grad_tol) break;
-        grad_old_r = grad;
-        double alpha = line_search(E, grad, dir_r, x_trial_r);
-        for(int i = 0; i < N; i++) points[i] = points[i] + dir_r[i] * alpha;
-        E = compute_eg(grad);
-        // Polak-Ribiere beta
-        double gg_old = vec_dot(grad_old_r, grad_old_r);
-        double beta = 0.0;
-        if(gg_old > 1e-30){
-          vector<coord3d> gdiff(N);
-          for(int i = 0; i < N; i++) gdiff[i] = grad[i] - grad_old_r[i];
-          beta = max(0.0, vec_dot(grad, gdiff) / gg_old);
-        }
-        for(int i = 0; i < N; i++) dir_r[i] = grad[i] * (-1.0) + dir_r[i] * beta;
-        if(has_fixed) for(int i = 0; i < N; i++) if(fixed[i]) dir_r[i] = coord3d(0,0,0);
-      }
-      // Final projection in case CG polish re-introduced barely-concave vertices
-      project_onto_convex_hull(points);
-      if(opt_log)
-        fprintf(opt_log, "  Post-project polish: projected=%d ang=%.4e\n",
-                total_projected, max_angle_relerr());
-    }
-  }
-
-  final_angle_relerr = max_angle_relerr();
-  final_n_concave = count_concave();
-  final_opt_result = converged ? OptResult::CONVERGED
-                   : stagnated ? OptResult::STAGNATED
-                               : OptResult::BUDGET_EXHAUSTED;
-
   return final_opt_result;
 }
 

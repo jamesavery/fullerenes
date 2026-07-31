@@ -8,14 +8,8 @@ using namespace std;
 
 namespace LinAlg {
 
-// --- Vector reductions ---
-
-double dot(const V& a, const V& b) { double s=0; for (size_t i=0;i<a.size();i++) s+=a[i]*b[i]; return s; }
-double norm(const V& v)            { return sqrt(dot(v, v)); }
-double max_abs(const V& v)         { double m=0; for (double x:v) { if (std::isnan(x)) return HUGE_VAL; m=max(m,fabs(x)); } return m; }
-double sum_sq(const V& v)          { return dot(v, v); }
-bool   is_valid(const V& v)        { double n=sum_sq(v); return isfinite(n) && n > 1e-30; }
-double energy(const V& v)          { return 0.5 * sum_sq(v); }
+// (Vector reductions: view-level only -- vectors convert to spans, so the
+// view functions serve every owner caller with no wrapper.)
 
 // --- Symmetric eigendecomposition (cyclic Jacobi) ---
 
@@ -110,96 +104,61 @@ std::vector<double> sym_eigvals(const matrix<double>& A)
   return w;
 }
 
-// --- LU with partial pivoting ---
-
-// Partial-pivot LU factorization, shared by solve_with_sign and det.  Copies A
-// into the row-major working buffer M (n×n) and reduces it so M holds U on and
-// above the diagonal; sign := (−1)^{#row swaps} × ∏ sign(diag U).  When b is
-// non-null the same swaps and forward elimination are applied to it, leaving the
-// triangular system U·x = b ready for back-substitution.  Returns false on an
-// exact zero pivot (A singular); M and sign are then only partially reduced.
-static bool lu_decompose(const matrix<double>& A, vector<double>& M,
-                         int& sign, V* b)
-{
-  int n = A.m;
-  M.assign(size_t(n)*n, 0.0);                  // row-major working copy
-  for (int i = 0; i < n; i++)
-    for (int j = 0; j < n; j++)
-      M[size_t(i)*n + j] = A(i, j);
-  sign = 1;
-  for (int c = 0; c < n; c++) {
-    int p = c;
-    for (int q = c+1; q < n; q++)
-      if (fabs(M[size_t(q)*n + c]) > fabs(M[size_t(p)*n + c])) p = q;
-    if (M[size_t(p)*n + c] == 0) return false;
-    if (p != c) {
-      for (int j = c; j < n; j++) swap(M[size_t(c)*n + j], M[size_t(p)*n + j]);
-      if (b) swap((*b)[c], (*b)[p]);
-      sign = -sign;                            // row swap parity
-    }
-    if (M[size_t(c)*n + c] < 0) sign = -sign;  // sign of diag(U)
-    for (int q = c+1; q < n; q++) {
-      double m = M[size_t(q)*n + c] / M[size_t(c)*n + c];
-      if (m == 0) continue;
-      for (int j = c+1; j < n; j++) M[size_t(q)*n + j] -= m * M[size_t(c)*n + j];
-      if (b) (*b)[q] -= m * (*b)[c];
-    }
-  }
-  return true;
-}
+// --- LU with partial pivoting (bodies: dense_linalg_view.hh's shared
+// row_reduce core; these wrappers allocate the scratch and the result) ---
 
 std::expected<LuSolved, LuFail>
 solve_with_sign(const matrix<double>& A, const V& b)
 {
-  int n = A.m;
-  vector<double> M;
-  V   x(b);
-  int sign;
-  if (!lu_decompose(A, M, sign, &x)) return std::unexpected(LuFail::Singular);
-  for (int c = n-1; c >= 0; c--) {             // back substitution
-    double s = x[c];
-    for (int j = c+1; j < n; j++) s -= M[size_t(c)*n + j] * x[j];
-    x[c] = s / M[size_t(c)*n + c];
-  }
-  return LuSolved{std::move(x), sign};
+  const int n = A.m;
+  vector<double> M(size_t(n) * n);
+  V x(b);
+  const LuReduction lu = row_reduce(view_of(A), M, x);
+  if (lu.status != LuStatus::Ok) return std::unexpected(LuFail::Singular);
+  back_substitute(M, n, x);
+  return LuSolved{std::move(x), lu.sign};
 }
 
 double det(const matrix<double>& A)
 {
-  int n = A.m;
-  vector<double> M;
-  int sign;
+  const int n = A.m;
+  vector<double> M(size_t(n) * n);
   // An exact zero pivot means A is singular — det = 0 is the true value here,
   // not an error, so we return 0.0 rather than propagating LuFail::Singular.
-  if (!lu_decompose(A, M, sign, nullptr)) return 0.0;
+  const LuReduction lu = row_reduce(view_of(A), M, {});
+  if (lu.status != LuStatus::Ok) return 0.0;
   // |det A| = ∏|U_ii|; sign already carries (−1)^{#swaps} × ∏ sign(U_ii).
   double mag = 1.0;
   for (int i = 0; i < n; i++) mag *= fabs(M[size_t(i)*n + i]);
-  return sign * mag;
+  return lu.sign * mag;
 }
 
 V solve(const matrix<double>& A, const V& b)
 {
-  auto r = solve_with_sign(A, b);
-  return r ? std::move(r->x) : V(A.m, 0.0);
+  const int n = A.m;
+  vector<double> M(size_t(n) * n);
+  V x(n, 0.0);
+  // The view solve zero-fills x on a singular A — the documented value.
+  solve(view_of(A), b, M, x);
+  return x;
 }
 
 V solve_shifted(const matrix<double>& A, const V& b, double lambda)
 {
-  matrix<double> Al = A;
-  for (int i = 0; i < A.m; i++) Al(i,i) += lambda;
-  return solve(Al, b);
+  const int n = A.m;
+  vector<double> M2(size_t(n) * n), M(size_t(n) * n);
+  V x(n, 0.0);
+  solve_shifted(view_of(A), b, lambda, M2, M, x);
+  return x;
 }
 
 V matvec(const matrix<double>& A, const V& v)
 {
-  int n = A.m;
-  V r(n, 0.0);
-  for (int i = 0; i < n; i++)
-    for (int j = 0; j < n; j++)
-      r[i] += A(i,j) * v[j];
+  V r(A.m, 0.0);
+  matvec(view_of(A), v, r);
   return r;
 }
+
 
 // --- Symmetric truncated pseudoinverse ---
 

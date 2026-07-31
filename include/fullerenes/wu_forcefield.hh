@@ -131,6 +131,21 @@ struct ForceField {
     // @post result == energy(x)
     double energy_gradient(std::span<const coord3d> x,
                            std::span<coord3d>       g) const;
+
+    // Hv = (grad^2 E)(x) . v -- the matrix-free Hessian-vector product,
+    // exact to roundoff for all four term classes (bond, corner,
+    // dihedral, Coulomb).  The angle/dihedral second derivatives come
+    // from a forward-mode dual pass through the gradient formulas
+    // (fullerenes/optim/models/geometry_hessians.hh, pinned to
+    // coord3d::dangle/ddihedral at 1e-12); FD-verified against
+    // energy_gradient by claude-projects/optimize's test_extwu_hvp.
+    // Feeds Newton/Steihaug steps of the optimizer framework.
+    // @anchor wu-hvp
+    // @pre  v.size() == x.size() && Hv.size() == x.size()
+    // @post Hv is the exact directional derivative of energy_gradient's
+    //       g along v (symmetric: v.hvp(x,w) == w.hvp(x,v))
+    void hvp(std::span<const coord3d> x, std::span<const coord3d> v,
+             std::span<coord3d> Hv) const;
 };
 
 // Build the classified force field of G under the legacy variant
