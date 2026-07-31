@@ -95,7 +95,7 @@ matrix<int> FullereneGraphView::pentagon_distance_mtx() const {
   return Triangulation(dual_graph()).pentagon_distance_mtx();
 }
 
-vector<coord3d> FullereneGraphView::zero_order_geometry(double scalerad) const
+vector<coord3d> FullereneGraphView::tutte_sphere_geometry(double scalerad) const
 {
   vector<coord2d> flat_layout = tutte_layout();
   vector<coord2d> angles(layout2d::spherical_projection(*this, flat_layout));

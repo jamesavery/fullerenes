@@ -198,6 +198,7 @@ class FullereneGraph;
 
 struct FullereneGraphView : CubicGraphView {
     using CubicGraphView::CubicGraphView;
+    using InitialGeometry = vector<coord3d> (FullereneGraphView::*)(double) const;
     static constexpr uint8_t default_dmax = 3;
 
     // --- Fullerene-specific methods ---
@@ -212,21 +213,18 @@ struct FullereneGraphView : CubicGraphView {
                           bool general=true, bool pentagon_start=true) const;
 
     matrix<int> pentagon_distance_mtx() const;
-    vector<coord3d> zero_order_geometry(double scalerad=4) const;
+
+    vector<coord3d> zero_order_geometry(double bond_length=1.44) const { return eisenstein_paint_geometry(bond_length); }
 
     // Warm-start 3D geometry from the cubic-metric Eisenstein paint
     // (eisenstein_paint::cubic_geometry): AlexandrovIDTCubic realizes the
     // cubic polyhedral metric's 20..60 pentagon-incident vertices
-    // exactly, the integer paint interpolates the rest over the realized
-    // dual polytope's flat cells.  Deterministic,
-    // respects the intrinsic global shape (nanotubes come out
-    // elongated, not sphere-wrapped), edge lengths ~ bond_length.
-    // Throws std::runtime_error when the paint pipeline fails (rare:
-    // e.g. a non-embeddable iDT -- self-loop / non-triangle face -- or a
-    // cubic metric that will not realize as a simple convex polytope);
-    // callers wanting a total start geometry catch and fall back to
-    // zero_order_geometry.
+    // exactly as the unique convex embedding realizing Alexandrov's theorem. 
+    // The exact integer Eisenstein paint interpolates the rest over the realized
+    // dual polytope's flat cells and projects onto the coarse embedding's faces.  
+    // Throws std::runtime_error if the paint pipeline fails (must never happen).
     vector<coord3d> eisenstein_paint_geometry(double bond_length=1.44) const;
+    vector<coord3d> tutte_sphere_geometry(double scalerad=4) const;
 
     // Force-field geometry optimization (Wu / extended Wu, harmonic) --
     // the production optimizer for cubic fullerene graphs.  opt_method
@@ -240,6 +238,14 @@ struct FullereneGraphView : CubicGraphView {
     // directly -- libfullerenes itself is Fortran-free).
     vector<coord3d> optimized_geometry(std::span<const coord3d> initial_geometry,
                                        int opt_method=3, double ftol=1e-12) const;
+
+    vector<coord3d> optimized_geometry(
+        const InitialGeometry f_initial = &FullereneGraphView::eisenstein_paint_geometry, 
+        double initial_scalar = 1.44,
+        int opt_method=3, double ftol=1e-12) const {
+            vector<coord3d> initial_geometry = (this->*f_initial)(1.44);          
+            return optimized_geometry(initial_geometry, opt_method, ftol);
+        }
 };
 
 // ---------------------------------------------------------------------------
