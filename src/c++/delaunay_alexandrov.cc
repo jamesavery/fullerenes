@@ -1016,10 +1016,14 @@ const char* AlexandrovSolver::status_str(ValidationStatus s) {
 //                   Outward normal taken from the half-edge CCW
 //                   convention; defensive precondition rejects
 //                   inverted-volume positions.
-static AlexandrovSolver::ValidationStatus validate_polytope(
-    AlexandrovSolver& S, const vector<coord3d>& pos) {
+AlexandrovSolver::ValidationStatus AlexandrovSolver::validate_polytope(
+    const DelaunayTriangulation& D, const vector<double>& r,
+    const vector<coord3d>& pos, PolytopeValidation* out, bool verbose) {
   using VS = AlexandrovSolver::ValidationStatus;
-  const DelaunayTriangulation& D = S.D;
+  PolytopeValidation v;
+  // Early failures copy the record as computed so far (later checks keep
+  // their defaults) — the `done` wrapper is the one exit path.
+  auto done = [&](VS s) { if (out) *out = v; return s; };
 
   // ── SIMPLICITY ──────────────────────────────────────────────────────
   //   T̄(0) must be a simple polygonal tesselation with F ≥ 3.
@@ -1031,28 +1035,28 @@ static AlexandrovSolver::ValidationStatus validate_polytope(
   //   |θ − π| ≲ 1e-7 once Newton converges; if the continuation stalls
   //   before that (κ residual > tol), the F ≥ 3 check catches the
   //   resulting degeneracy.
-  S.stats_t0_simplicial = AlexandrovSolver::is_simplicial(D);  // diagnostic only
+  v.t0_simplicial = AlexandrovSolver::is_simplicial(D);  // diagnostic only
   vector<int> labels(D.nv);
   std::iota(labels.begin(), labels.end(), 0);
-  auto tbar = AlexandrovSolver::polytope_tesselation(D, S.r, labels);
-  S.stats_tbar_n_cells = tbar.n_cells();
-  S.stats_tbar_simple_polygonal = AlexandrovSolver::is_simple_polygonal(tbar);
+  auto tbar = AlexandrovSolver::polytope_tesselation(D, r, labels);
+  v.tbar_n_cells = tbar.n_cells();
+  v.tbar_simple_polygonal = AlexandrovSolver::is_simple_polygonal(tbar);
 
-  bool simple = S.stats_tbar_simple_polygonal && S.stats_tbar_n_cells >= 3;
+  bool simple = v.tbar_simple_polygonal && v.tbar_n_cells >= 3;
   if (!simple) {
-    if (S.verbose)
+    if (verbose)
       printf("  VALIDATION (simplicity) failed: T̄(0) simple_polygonal=%d, "
              "n_cells=%d (need F≥3), T(0) simplicial=%d (diagnostic).\n",
-             S.stats_tbar_simple_polygonal, S.stats_tbar_n_cells,
-             S.stats_t0_simplicial);
-    return VS::FAIL_NOT_SIMPLE;
+             v.tbar_simple_polygonal, v.tbar_n_cells,
+             v.t0_simplicial);
+    return done(VS::FAIL_NOT_SIMPLE);
   }
 
   // Compute volume_norm = |V| / ⟨ℓ⟩³ for the well-formedness gate and
   // diagnostic stat.
   double volume = std::abs(signed_volume6(D, pos)) / 6.0;
   double mean_l = mean_edge_length(D);
-  S.stats_volume_norm = volume / (mean_l * mean_l * mean_l);
+  v.volume_norm = volume / (mean_l * mean_l * mean_l);
 
   // ── WELL-FORMEDNESS ─────────────────────────────────────────────────
   //   Non-degenerate volume AND embedded surface (no 3D self-intersection).
@@ -1070,24 +1074,24 @@ static AlexandrovSolver::ValidationStatus validate_polytope(
   //     so that any failure (numerical or otherwise) is flagged with
   //     its true cause rather than swept into a different bucket.
   constexpr double VOLUME_NORM_DEGENERATE = 0.01;
-  bool well_formed_volume = std::isfinite(S.stats_volume_norm) &&
-                              S.stats_volume_norm >= VOLUME_NORM_DEGENERATE;
-  S.stats_polytope_no_self_intersect =
+  bool well_formed_volume = std::isfinite(v.volume_norm) &&
+                              v.volume_norm >= VOLUME_NORM_DEGENERATE;
+  v.no_self_intersect =
       !AlexandrovSolver::has_self_intersection(D, pos);
   // Volume gate first, then self-intersection gate.  Order is the order
   // of stats_status when multiple fail.
   if (!well_formed_volume) {
-    if (S.verbose)
+    if (verbose)
       printf("  VALIDATION (well-formedness/volume) failed: vol_norm=%.3e "
              "(threshold %.2e).\n",
-             S.stats_volume_norm, VOLUME_NORM_DEGENERATE);
-    return VS::FAIL_VOLUME_DEGENERATE;
+             v.volume_norm, VOLUME_NORM_DEGENERATE);
+    return done(VS::FAIL_VOLUME_DEGENERATE);
   }
-  if (!S.stats_polytope_no_self_intersect) {
-    if (S.verbose)
+  if (!v.no_self_intersect) {
+    if (verbose)
       printf("  VALIDATION (well-formedness/self-intersection) failed: "
              "two non-adjacent triangles cross in 3D.\n");
-    return VS::FAIL_SELF_INTERSECTING;
+    return done(VS::FAIL_SELF_INTERSECTING);
   }
 
   // ── CONVEXITY ───────────────────────────────────────────────────────
@@ -1097,15 +1101,15 @@ static AlexandrovSolver::ValidationStatus validate_polytope(
   //   non-convex configuration.  Outward normal taken from the half-
   //   edge CCW convention; defensive precondition inside is_convex
   //   verifies signed volume is strictly positive.
-  S.stats_polytope_convex = AlexandrovSolver::is_convex(D, pos);
-  if (!S.stats_polytope_convex) {
-    if (S.verbose)
+  v.convex = AlexandrovSolver::is_convex(D, pos);
+  if (!v.convex) {
+    if (verbose)
       printf("  VALIDATION (convexity) failed: some vertex sticks out "
              "beyond a face plane.\n");
-    return VS::FAIL_NOT_CONVEX;
+    return done(VS::FAIL_NOT_CONVEX);
   }
 
-  return VS::OK;
+  return done(VS::OK);
 }
 
 // The 5-step B-I algorithm: initial radii → continuation (κ(r)=t·κ₁, t:1→0)
@@ -1197,8 +1201,19 @@ vector<coord3d> AlexandrovSolver::solve() {
     return pos;   // failed-but-inspectable positions
   }
 
-  // 5. Validation: the three-property gate (see validate_polytope above).
-  stats_status = validate_polytope(*this, pos);
+  // 5. Validation: the three-property gate (the public static — one
+  //    ladder for this instance path and for external (T, r, pos) callers),
+  //    with the per-check record copied into the stats_* diagnostics.
+  {
+    PolytopeValidation pv;
+    stats_status = validate_polytope(D, r, pos, &pv, verbose);
+    stats_t0_simplicial            = pv.t0_simplicial;
+    stats_tbar_n_cells             = pv.tbar_n_cells;
+    stats_tbar_simple_polygonal    = pv.tbar_simple_polygonal;
+    stats_volume_norm              = pv.volume_norm;
+    stats_polytope_no_self_intersect = pv.no_self_intersect;
+    stats_polytope_convex          = pv.convex;
+  }
   return pos;
 }
 

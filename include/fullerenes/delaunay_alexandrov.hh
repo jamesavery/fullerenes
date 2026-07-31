@@ -384,6 +384,35 @@ struct AlexandrovSolver {
   static bool has_self_intersection(const DelaunayTriangulation& T,
                                       const std::vector<coord3d>& pos,
                                       double tol = 1e-6);
+
+  // ------ Post-convergence polytope validation (the realize gate) ------
+
+  // Per-check record of the validation ladder; the instance stats_* fields
+  // mirror these after solve().
+  struct PolytopeValidation {
+    bool   t0_simplicial         = false;
+    bool   tbar_simple_polygonal = false;
+    int    tbar_n_cells          = 0;
+    double volume_norm           = 0;
+    bool   no_self_intersect     = false;
+    bool   convex                = false;
+  };
+
+  // The three-property polytope gate on an arbitrary realized (T, r, pos):
+  //   SIMPLICITY       T̄(0) is a simple polygonal tesselation with F ≥ 3;
+  //   WELL-FORMEDNESS  vol/⟨ℓ⟩³ ≥ 0.01 and no 3D self-intersection;
+  //   CONVEXITY        every non-face vertex inside every face plane.
+  // This IS the gate solve() applies — its instance path delegates here and
+  // copies the per-check record into stats_* — exposed so a caller holding
+  // a (T, r, pos) produced elsewhere (e.g. a device batch solve) can apply
+  // the identical acceptance rather than re-deriving the ladder.
+  // Checks that an early failure skips are left at their defaults in `out`.
+  // @pre  r.size() >= T.nv, pos.size() == T.nv, κ ≈ 0 (a converged solve)
+  static ValidationStatus validate_polytope(const DelaunayTriangulation& T,
+                                            const std::vector<double>& r,
+                                            const std::vector<coord3d>& pos,
+                                            PolytopeValidation* out = nullptr,
+                                            bool verbose = false);
 };
 
 // ============================================================================
