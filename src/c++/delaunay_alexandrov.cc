@@ -1020,6 +1020,15 @@ AlexandrovSolver::ValidationStatus AlexandrovSolver::validate_polytope(
     const DelaunayTriangulation& D, const vector<double>& r,
     const vector<coord3d>& pos, PolytopeValidation* out, bool verbose) {
   using VS = AlexandrovSolver::ValidationStatus;
+  // Public entry: r/pos are caller-supplied (the instance path's were
+  // solver-sized by construction), and three ladder rungs index them by
+  // D.nv before is_convex's own check — enforce the @pre up front.
+  if ((int)r.size() < D.nv || (int)pos.size() != D.nv)
+    throw std::invalid_argument(
+        "AlexandrovSolver::validate_polytope: r.size() >= T.nv and "
+        "pos.size() == T.nv required (r " + std::to_string(r.size()) +
+        ", pos " + std::to_string(pos.size()) + ", nv " +
+        std::to_string(D.nv) + ")");
   PolytopeValidation v;
   // Early failures copy the record as computed so far (later checks keep
   // their defaults) — the `done` wrapper is the one exit path.

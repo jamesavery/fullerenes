@@ -407,7 +407,9 @@ struct AlexandrovSolver {
   // a (T, r, pos) produced elsewhere (e.g. a device batch solve) can apply
   // the identical acceptance rather than re-deriving the ladder.
   // Checks that an early failure skips are left at their defaults in `out`.
-  // @pre  r.size() >= T.nv, pos.size() == T.nv, κ ≈ 0 (a converged solve)
+  // @pre  κ ≈ 0 (a converged solve)
+  // @throws std::invalid_argument unless r.size() >= T.nv and
+  //         pos.size() == T.nv (enforced up front; the ladder indexes both)
   static ValidationStatus validate_polytope(const DelaunayTriangulation& T,
                                             const std::vector<double>& r,
                                             const std::vector<coord3d>& pos,
