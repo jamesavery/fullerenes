@@ -8,10 +8,19 @@ add_library(fullerenes SHARED
 )
 
 #Ensure that CMAKE_Fortran_IMPLICIT_LINK_LIBRARIES is defined
-if(NOT CMAKE_Fortran_IMPLICIT_LINK_LIBRARIES)
+if(NOT FULLERENES_CORE_ONLY AND NOT CMAKE_Fortran_IMPLICIT_LINK_LIBRARIES)
   #Terminate
   message(FATAL_ERROR "CMAKE_Fortran_IMPLICIT_LINK_LIBRARIES is not defined")
 endif()
+
+# Export the include dirs on the target so a parent project consuming this
+# repo via add_subdirectory gets them transitively (the global
+# include_directories above only covers this repo's own subdirs).
+# Fullerenes_* (project-scoped), NOT CMAKE_SOURCE_DIR: correct in both
+# standalone and submodule modes.
+target_include_directories(fullerenes PUBLIC
+  ${Fullerenes_SOURCE_DIR}/include
+  ${Fullerenes_BINARY_DIR}/include)   # generated config.hh
 
 find_package(OpenMP)
 # BLAS/LAPACK deliberately NOT linked: the last LAPACK call in the C++ core
