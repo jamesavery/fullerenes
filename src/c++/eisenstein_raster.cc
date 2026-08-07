@@ -180,13 +180,20 @@ NextFace find_next_face_at_hex(const TriangulationView& T,
     // Frame offset: T[V][0] is at lattice direction (d_X - j_X) mod 6.
     int k0 = ((d_X - j_X) % 6 + 6) % 6;
 
-    // Lattice direction of the line at V.  line_dir is an Eisenstein
-    // pointing in the line's direction (any positive-scale rep).
-    auto xy = line_dir.coord();
-    double theta = std::atan2(xy.second, xy.first);
-    if (theta < 0) theta += 2 * M_PI;
-    int j_line = (int)std::floor(theta / (M_PI / 3.0));
-    j_line = ((j_line % 6) + 6) % 6;
+    // Lattice direction of the line at V: the sextant [unit(j), unit(j+1))
+    // containing line_dir, decided by exact integer sector membership
+    // (Sector::contains_co is the [R, L) half-open test, i.e. floor-sextant
+    // semantics: a line along a unit direction belongs to the sector it
+    // OPENS).  line_dir is an Eisenstein pointing in the line's direction
+    // (any positive-scale rep).  This replaces floor(atan2/(pi/3)), whose
+    // result was 1-ULP-decided exactly on those boundary directions.
+    int j_line = -1;
+    for (int j = 0; j < 6; ++j)
+        if (Sector{unit_direction(j), unit_direction(j + 1)}.contains_co(line_dir)) {
+            j_line = j;
+            break;
+        }
+    if (j_line < 0) return out;    // unreachable: the six sectors cover the circle
 
     // Face index i such that T[V][i] is at direction j_line.
     int i = ((j_line - k0) % 6 + 6) % 6;
