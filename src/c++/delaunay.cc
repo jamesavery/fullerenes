@@ -636,30 +636,16 @@ void DelaunayTriangulation::remove_flat_vertices_exact(const std::function<void(
 
 std::vector<int> DelaunayTriangulation::compact_vertices()
 {
-  // Live vertices (v_out >= 0) get fresh contiguous indices in their current
-  // order; dead vertices are dropped. Half-edge origins and the per-vertex
-  // arrays are rewritten; nv shrinks to the live count.
-  std::vector<int> new_of_old(nv, -1), new_to_old;
-  for (int v = 0; v < nv; v++)
-    if (v_out[v] >= 0) { new_of_old[v] = (int)new_to_old.size(); new_to_old.push_back(v); }
-  int nlive = (int)new_to_old.size();
-
-  for (int h = 0; h < nh; h++)
-    if (he_origin[h] >= 0) he_origin[h] = new_of_old[he_origin[h]];
-
-  std::vector<int>    nout(nlive);
-  std::vector<double> ncone(nlive);
-  std::vector<int>    ndeg(nlive);
-  for (int w = 0; w < nlive; w++) {
-    int o = new_to_old[w];
-    nout[w]  = v_out[o];
-    ncone[w] = v_cone_angle[o];
-    ndeg[w]  = v_orig_degree[o];
-  }
-  owned_v_out = std::move(nout);
-  owned_v_cone_angle = std::move(ncone);
-  owned_v_orig_degree = std::move(ndeg);
-  nv = nlive;
+  // Owner wrapper over the view-level body (delaunay_view.hh — the in-place
+  // compaction the device batch pipelines run): owned scratch in, the owned
+  // per-vertex vectors trimmed to the live count after.
+  std::vector<int> new_to_old(nv), new_of_old(nv);
+  const int nlive = DelaunayView::compact_vertices(new_to_old, new_of_old);
+  throw_on_status("compact_vertices");
+  new_to_old.resize(nlive);
+  owned_v_out.resize(nlive);
+  owned_v_cone_angle.resize(nlive);
+  owned_v_orig_degree.resize(nlive);
   repoint();
   return new_to_old;
 }

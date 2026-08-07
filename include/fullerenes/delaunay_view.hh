@@ -1607,6 +1607,37 @@ struct DelaunayView {
     return status;
   }
 
+  // Compact the vertex range after removal: live vertices (v_out >= 0) get
+  // fresh contiguous indices in their current order, dead ones are dropped;
+  // he_origin and the per-vertex arrays are rewritten in place (new index
+  // <= old, ascending, so the forward rewrite over the fixed spans is
+  // safe), and nv shrinks to the live count.  new_to_old[0..nlive) reports
+  // the surviving old labels; new_of_old is scratch.  Device-legal,
+  // allocation-free; the owner's compact_vertices() wraps this with owned
+  // scratch.
+  int compact_vertices(std::span<int> new_to_old, std::span<int> new_of_old) {
+    if (status != Status::Ok) return nv;
+    if ((int)new_to_old.size() < nv || (int)new_of_old.size() < nv) {
+      trip(Status::CapacityExceeded, "compact_vertices: scratch smaller than nv",
+           (int)std::min(new_to_old.size(), new_of_old.size()));
+      return nv;
+    }
+    int nlive = 0;
+    for (int v = 0; v < nv; v++) new_of_old[v] = -1;
+    for (int v = 0; v < nv; v++)
+      if (v_out[v] >= 0) { new_of_old[v] = nlive; new_to_old[nlive++] = v; }
+    for (int h = 0; h < nh; h++)
+      if (he_origin[h] >= 0) he_origin[h] = new_of_old[he_origin[h]];
+    for (int w = 0; w < nlive; w++) {
+      const int o = new_to_old[w];
+      v_out[w]         = v_out[o];
+      v_cone_angle[w]  = v_cone_angle[o];
+      v_orig_degree[w] = v_orig_degree[o];
+    }
+    nv = nlive;
+    return nlive;
+  }
+
   // Structural well-formedness over caller-owned visited bits (>= nh):
   // every live half-edge in exactly one he_next cycle, every cycle length 3.
   bool is_well_formed(Spanify::BitSpan& visited) const {
