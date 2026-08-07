@@ -8,6 +8,7 @@
 #include "fullerenes/eisenstein.hh"
 #include "fullerenes/eisenstein_raster.hh"
 #include "fullerenes/eisenstein_tikz.hh"
+#include "fullerenes/delaunay_geometry.hh"   // lsq_integrality_band (the float->exact entry)
 #include "fullerenes/delaunay_strip.hh"
 
 #include <algorithm>
@@ -442,6 +443,27 @@ struct CellMetric {
     long N01 = 0, N12 = 0, N20 = 0;
 };
 
+// The float->exact entry of the paint pipeline: the iDT's post-flip edge
+// lengths (doubles -- the Alexandrov homotopy's banded flips discard the
+// exact Lsq carry) re-enter the integer regime here, through the SAME
+// named integrality trust boundary every other such conversion uses
+// (delaunay_detail::lsq_integrality_band; cf. Diamond::squared and the
+// exact-reduction entry in delaunay.cc).  A length whose square is not
+// integer within the band is a non-Loeschian metric: refuse loudly --
+// without the guard such a value could mis-round to a NEIGHBOURING valid
+// norm and chart the wrong cell silently.
+long checked_integer_norm(double L, int f)
+{
+    const double sq = L * L;
+    const long   N  = (long)std::lround(sq);
+    if (std::abs(sq - (double)N) >
+        delaunay_detail::lsq_integrality_band * std::max(1.0, sq))
+        throw PaintError(Code::EMBED,
+            "cell_metric: cell " + std::to_string(f) + " edge length^2 = " +
+            std::to_string(sq) + " is not integer within the integrality band");
+    return N;
+}
+
 CellMetric cell_metric(const DelaunayView& D, int f)
 {
     const int h0 = D.f_he[f];
@@ -449,9 +471,9 @@ CellMetric cell_metric(const DelaunayView& D, int f)
     const int h2 = D.he_next[h1];
     CellMetric m;
     m.corners = { D.he_origin[h0], D.he_origin[h1], D.he_origin[h2] };
-    m.N01 = (long)std::lround(D.he_length[h0] * D.he_length[h0]);
-    m.N12 = (long)std::lround(D.he_length[h1] * D.he_length[h1]);
-    m.N20 = (long)std::lround(D.he_length[h2] * D.he_length[h2]);
+    m.N01 = checked_integer_norm(D.he_length[h0], f);
+    m.N12 = checked_integer_norm(D.he_length[h1], f);
+    m.N20 = checked_integer_norm(D.he_length[h2], f);
     return m;
 }
 
