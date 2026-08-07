@@ -65,6 +65,7 @@
 // =====================================================================
 
 #include "fullerenes/eisenstein.hh"
+#include "fullerenes/eisenstein_raster.hh"   // ScanLine (append_scan_rows_into's input)
 #include "fullerenes/delaunay_view.hh"   // DelaunayView (the builder's input)
 
 #include <array>
@@ -108,6 +109,33 @@ struct ScanRow {
     int32_t a_left = 1, a_right = 0, entry_off = 0;
     bool empty() const { return a_left > a_right; }
 };
+
+// append_scan_rows_into — the ONE row-table derivation over CALLER
+// storage (device-legal: no allocation, no throw): append one triangle
+// scan's rows (a ScanLine span from scan_triangle_into) at rows[nrows..]
+// and return its block, advancing nrows.  Empty scanlines keep the
+// scan's own (a_left > a_right) values, so every derivation produces
+// identical bytes.  rows_first == -1 signals capacity (rows too small).
+// The owning append_scan_rows (eisenstein_paint.cc) wraps this.
+inline ScanBlock append_scan_rows_into(std::span<ScanRow> rows, long& nrows,
+                                       std::span<const ScanLine> lines,
+                                       int32_t b_min, int32_t b_max) {
+    ScanBlock sb;
+    sb.b_min = b_min;
+    sb.b_max = b_max;
+    sb.rows_first = (int32_t)nrows;
+    const long n = (long)b_max - b_min + 1;
+    if (n > 0 && nrows + n > (long)rows.size()) { sb.rows_first = -1; return sb; }
+    int32_t running = 0;
+    for (long i = 0; i < n; ++i) {
+        rows[(std::size_t)nrows++] =
+            ScanRow{lines[(std::size_t)i].a_left, lines[(std::size_t)i].a_right, running};
+        if (!lines[(std::size_t)i].empty())
+            running += lines[(std::size_t)i].a_right - lines[(std::size_t)i].a_left + 1;
+    }
+    sb.n_entries = running;
+    return sb;
+}
 
 // One enumerated lattice point: chart position (a, b) and the T_sorted
 // vertex id claimed there (scanline-major per cell).

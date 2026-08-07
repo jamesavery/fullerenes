@@ -693,23 +693,16 @@ void require_all_charted(const DelaunayTriangulation& D,
 }
 
 // append_scan_rows -- the ONE row-table derivation, shared by the
-// post-embed flatten and the candidate builder: append one triangle
-// scan's rows and return its block.  Empty scanlines keep the scan's
-// own (a_left > a_right) values, so both derivations produce identical
-// bytes.
+// post-embed flatten and the candidate builder: the owning wrapper of
+// append_scan_rows_into (eisenstein_paint_tables.hh -- the device batch
+// builder runs the same body).
 ScanBlock append_scan_rows(std::vector<ScanRow>& rows, const ScanLines& scan)
 {
-    ScanBlock sb;
-    sb.b_min = scan.b_min;
-    sb.b_max = scan.b_max;
-    sb.rows_first = (int32_t)rows.size();
-    int32_t running = 0;
-    for (const ScanLine& sl : scan.lines) {
-        rows.push_back(ScanRow{sl.a_left, sl.a_right, running});
-        if (!sl.empty()) running += sl.a_right - sl.a_left + 1;
-    }
-    sb.n_entries = running;
-    return sb;
+    const long need = std::max(0L, (long)scan.b_max - scan.b_min + 1);
+    long nrows = (long)rows.size();
+    rows.resize(rows.size() + (std::size_t)need);
+    return append_scan_rows_into(rows, nrows, scan.lines,
+                                 scan.b_min, scan.b_max);
 }
 
 // Flatten one cell's lattice map into the CSR: the row table comes from
