@@ -90,6 +90,47 @@ inline void negate(std::span<double> v) {
   for (double& x : v) x = -x;
 }
 
+// --- Vector assignments (the span forms of the owner V expressions the
+//     solver family writes: r = r - dr, r_trial = r + delta,
+//     F = kappa - t1*kappa1, result = result + r_j*basis).  Elementwise
+//     with one rounding per element, so a call site composed of these is
+//     bit-identical to the owner expression it restates.  New at this
+//     level, like negate() -- see the banner.
+//     @pre for each: src.size() == dst.size() (and no aliasing, per the
+//     file banner). ---
+
+// dst := src
+inline void copy_into(std::span<double> dst, std::span<const double> src) {
+  for (std::size_t i = 0; i < dst.size(); i++) dst[i] = src[i];
+}
+// dst := -src (exact sign flip, like negate)
+inline void neg_into(std::span<double> dst, std::span<const double> src) {
+  for (std::size_t i = 0; i < dst.size(); i++) dst[i] = -src[i];
+}
+// dst += src
+inline void add_into(std::span<double> dst, std::span<const double> src) {
+  for (std::size_t i = 0; i < dst.size(); i++) dst[i] += src[i];
+}
+// dst -= src
+inline void sub_into(std::span<double> dst, std::span<const double> src) {
+  for (std::size_t i = 0; i < dst.size(); i++) dst[i] -= src[i];
+}
+// dst += s * src
+inline void add_scaled(std::span<double> dst, double s, std::span<const double> src) {
+  for (std::size_t i = 0; i < dst.size(); i++) dst[i] += s * src[i];
+}
+// dst -= s * src
+inline void sub_scaled(std::span<double> dst, double s, std::span<const double> src) {
+  for (std::size_t i = 0; i < dst.size(); i++) dst[i] -= s * src[i];
+}
+// Sum of entries -- term-for-term identical to the owner idiom
+// dot(v, ones) (v[i] * 1.0 == v[i] exactly, same accumulation order).
+inline double sum(std::span<const double> v) {
+  double s = 0;
+  for (double x : v) s += x;
+  return s;
+}
+
 // --- Solver policy (calibrated constants; NOT neutral linear algebra) ---
 
 // Residual energy E = 1/2 ||v||^2 (the Gauss-Newton objective's 1/2).
