@@ -450,6 +450,41 @@ struct FullereneDualView : TriangulationView {
 // Forward declaration for return types.
 class Polyhedron;
 
+// ---------------------------------------------------------------------------
+// The moments of the SOLID enclosed by a closed oriented triangle surface.
+// ---------------------------------------------------------------------------
+struct VolumeMoments {
+    double   volume = 0;         // > 0; the surface's orientation sign is normalised away
+    coord3d  centroid{0,0,0};    // the body's centre of mass (uniform density)
+    matrix3d covariance{};       // ∫ (x-centroid)(x-centroid)^T dV, about the CENTROID
+};
+
+// Exact moments of the solid enclosed by an oriented triangle surface, by
+// signed-tetrahedron sums over the faces: nothing is sampled and nothing is
+// vertex-weighted, so a densely triangulated patch does not move the answer.
+// Per tetrahedron (a,b,c) with apex o, exactly:
+//     V            = det[a b c]/6
+//     ∫ x    dV    = det (a+b+c)/24
+//     ∫ x x^T dV   = det M S M^T,  M = [a b c] as COLUMNS,
+//                    S = diag(1/60) + offdiag(1/120)  (reference tetrahedron)
+// S = (J+I)/120 with J all-ones, so M S M^T = (ss^T + aa^T + bb^T + cc^T)/120
+// with s = a+b+c: three outer products instead of a 3x3 triple product.
+//
+// This is the KERNEL: the arithmetic over a point set and an oriented triangle
+// list, with no view type in the signature -- PolyhedronView<double>::
+// volume_moments() (which triangulates its polygon faces first) is one caller,
+// and any triangulated view (DeltahedronView, which is not a PolyhedronView, so
+// it reaches this through its own triangles()) or caller-supplied triangle list
+// is another.
+//
+// @pre    closed:    `tris` is a closed, consistently oriented triangle surface
+//                    over `points`
+// @post   positive:  result.volume > 0, or a zeroed VolumeMoments if the
+//                    surface is degenerate (< 4 points, no faces, or zero
+//                    enclosed volume) -- the caller tests `volume > 0` rather
+//                    than being thrown at
+VolumeMoments volume_moments(std::span<const coord3d> points, const vector<tri_t>& tris);
+
 template<typename T = double>
 struct PolyhedronView : PlanarGraphView {
     std::span<coord3<T>> points;
@@ -495,8 +530,37 @@ struct PolyhedronView : PlanarGraphView {
     double diameter() const;
     pair<coord3<T>,coord3<T>> bounding_box() const;
     coord3<T> width_height_depth() const;
-    matrix3d inertia_matrix() const;
-    matrix3d principal_axes() const;
+
+    // Moments of the enclosed solid: the faces (compute_faces()) go through
+    // centroid_triangulation() -- the same surface surface_area(),
+    // volume_tetra() and volume_divergence() integrate over, so `.volume` is
+    // volume_tetra() -- and then through the volume_moments() kernel above.
+    // Requires a closed oriented surface.
+    VolumeMoments volume_moments() const;
+
+    // The CENTRAL inertia tensor -- taken about the mass distribution's own
+    // centre, so it is invariant under translating the polyhedron (before
+    // 2026-08-07 the vertex sum was about the ORIGIN, and an off-centre cage
+    // got a frame that depended on where it sat).  Two weightings:
+    //   vertex_weighted == false (DEFAULT): the enclosed SOLID, of uniform
+    //     density, about the volume centroid -- exact per triangle,
+    //     meshing-independent.  This is the answer the type name promises, and
+    //     the one a principal frame should be built on.
+    //   vertex_weighted == true: uniform mass at the VERTICES, about the vertex
+    //     mean -- the molecular convention (mass sits at the atoms), right for
+    //     a fullerene cage, and now an explicit opt-in because a densely
+    //     triangulated region silently drags the axis.
+    // The two are NOT interchangeable, so choose deliberately: measured over 41
+    // C60/C70 cages the two tensors agree to 5.9% (Frobenius, unit-trace) but a
+    // WELL-SEPARATED axis of the resulting frame still turns by up to 3.70 deg
+    // (tests/volume-moments-test.cc).  The repo's molecular call sites --
+    // fullerene_polyhedron() and the programs/ tools -- therefore pass `true`
+    // explicitly rather than inherit the default.
+    // NOTE: the SYCL path (src/sycl/geometry-properties.cc) has its own
+    // vertex-weighted, origin-based inertia_matrix/principal_axes and does NOT
+    // follow this default.
+    matrix3d inertia_matrix(bool vertex_weighted = false) const;
+    matrix3d principal_axes(bool vertex_weighted = false) const;
     bool is_invalid() const;
 
     Polyhedron incremental_convex_hull() const;
@@ -516,7 +580,7 @@ struct PolyhedronView : PlanarGraphView {
         c /= (T)N;
         move(-c);
     }
-    void align_with_axes() { matrix3d If(principal_axes()); for(node_t u=0;u<N;u++) points[u] = If * points[u]; }
+    void align_with_axes(bool vertex_weighted = false) { matrix3d If(principal_axes(vertex_weighted)); for(node_t u=0;u<N;u++) points[u] = If * points[u]; }
 
     vector<coord2d> polar_angles() const {
         vector<coord2d> angles(N);
@@ -546,8 +610,9 @@ template<> double PolyhedronView<double>::volume_divergence() const;
 template<> double PolyhedronView<double>::volume_tetra() const;
 template<> pair<coord3d,coord3d> PolyhedronView<double>::bounding_box() const;
 template<> coord3d PolyhedronView<double>::width_height_depth() const;
-template<> matrix3d PolyhedronView<double>::inertia_matrix() const;
-template<> matrix3d PolyhedronView<double>::principal_axes() const;
+template<> VolumeMoments PolyhedronView<double>::volume_moments() const;
+template<> matrix3d PolyhedronView<double>::inertia_matrix(bool vertex_weighted) const;
+template<> matrix3d PolyhedronView<double>::principal_axes(bool vertex_weighted) const;
 template<> bool PolyhedronView<double>::is_invalid() const;
 template<> Polyhedron PolyhedronView<double>::incremental_convex_hull() const;
 template<> Polyhedron PolyhedronView<double>::dual() const;

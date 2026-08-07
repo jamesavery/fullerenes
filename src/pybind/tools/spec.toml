@@ -153,7 +153,8 @@ harvest = ["PolyhedronView", "PlanarGraphView", "GraphView"]
 # its default arg) would otherwise make one classifiable. (write/to_povray/
 # to_latex are owned-Polyhedron methods, not harvested, so they need no skip.)
 skip = ["bounding_box", "faces", "optimize", "move_to_origin", "align_with_axes",
-        "scale", "move", "incremental_convex_hull", "dual", "leapfrog_dual"]
+        "scale", "move", "incremental_convex_hull", "dual", "leapfrog_dual",
+        "inertia_matrix", "principal_axes"]
 extra_stub = [
   '@staticmethod',
   'def from_fullerene(graph: "FullereneGraph", verbose: bool = ...) -> "Polyhedron": ...',
@@ -165,9 +166,11 @@ extra_stub = [
   'def from_file(path: str) -> "Polyhedron": ...',
   'def bounding_box(self) -> tuple[numpy.ndarray, numpy.ndarray]: ...',
   'def faces(self) -> list[list[int]]: ...',
+  'def inertia_matrix(self, vertex_weighted: bool = ...) -> numpy.ndarray: ...',
+  'def principal_axes(self, vertex_weighted: bool = ...) -> numpy.ndarray: ...',
   'def optimize(self, method: int = ..., ftol: float = ..., verbose: bool = ...) -> bool: ...',
   'def move_to_origin(self) -> None: ...',
-  'def align_with_axes(self) -> None: ...',
+  'def align_with_axes(self, vertex_weighted: bool = ...) -> None: ...',
   'def scale(self, s) -> None: ...',
   'def move(self, d) -> None: ...',
   'def convex_hull(self) -> "Polyhedron": ...',

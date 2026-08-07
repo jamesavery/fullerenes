@@ -181,7 +181,7 @@ int main(int ac, char **av)
 
   {
     P.move_to_origin();
-    matrix3d If(P.principal_axes());
+    matrix3d If(P.principal_axes(true));	// molecular convention: mass at the atoms
     for(node_t u=0;u<P.N;u++) P.points[u] = If * P.points[u];
 
     Polyhedron::to_file(P,"output/"+basename+"-if.mol2");

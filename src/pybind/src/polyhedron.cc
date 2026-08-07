@@ -79,6 +79,22 @@ void register_polyhedron(py::module_& m) {
     cls.def("faces", [](PyPoly& w) { return pyf::faces_copy(w.view().faces()); },
             "Polygon faces as list[list[int]].");
 
+    // Parameterised, so hand-written rather than generated (the generator binds
+    // nullary methods only). The default is the VOLUME frame -- the moments of
+    // the enclosed solid; vertex_weighted=True is the molecular convention
+    // (uniform mass at the atoms), which is what these returned before.
+    cls.def("inertia_matrix", [](PyPoly& w, bool vertex_weighted) {
+        return pyf::matrix3d_copy(w.view().inertia_matrix(vertex_weighted));
+    }, py::arg("vertex_weighted") = false,
+       "Inertia tensor about the origin. Default: the enclosed solid (uniform "
+       "density, exact per triangle). vertex_weighted=True: uniform mass at the "
+       "vertices (molecular convention).");
+    cls.def("principal_axes", [](PyPoly& w, bool vertex_weighted) {
+        return pyf::matrix3d_copy(w.view().principal_axes(vertex_weighted));
+    }, py::arg("vertex_weighted") = false,
+       "Eigenvectors of inertia_matrix(vertex_weighted) as rows (identity if the "
+       "frame is degenerate).");
+
     // --- In-place geometry (writes back through .points) ---
     cls.def("optimize", [](PyPoly& w, int method, double ftol, bool verbose) {
         pyf::FdSilencer hush(!verbose);   // silence the Fortran optimizer log by default
@@ -87,7 +103,11 @@ void register_polyhedron(py::module_& m) {
        "Force-field optimize in place (writes into .points). Returns success. "
        "verbose=True shows the optimizer log.");
     cls.def("move_to_origin", [](PyPoly& w) { w.view().move_to_origin(); });
-    cls.def("align_with_axes", [](PyPoly& w) { w.view().align_with_axes(); });
+    cls.def("align_with_axes", [](PyPoly& w, bool vertex_weighted) {
+        w.view().align_with_axes(vertex_weighted);
+    }, py::arg("vertex_weighted") = false,
+       "Rotate into the principal frame of inertia_matrix(vertex_weighted) "
+       "(in place). Default: the enclosed solid; True: mass at the vertices.");
     cls.def("scale", [](PyPoly& w, py::handle s) { w.view().scale(pyf::as_coord3d(s)); },
             py::arg("s"), "Scale per-axis by a length-3 vector (in place).");
     cls.def("move", [](PyPoly& w, py::handle d) { w.view().move(pyf::as_coord3d(d)); },

@@ -301,7 +301,7 @@ int main(int ac, char **av)
   P.optimize();
 
   P.move_to_origin();
-  P.align_with_axes();
+  P.align_with_axes(true);	// molecular convention: mass at the atoms
 
   output << "Pcoordinates = "  << P.points << ";\n";
   output << "P = " << P << ";\n";

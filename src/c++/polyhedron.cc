@@ -309,28 +309,110 @@ Polyhedron::Polyhedron(const vector<coord3d>& xs, double tolerance)
 }
 
 
-template<>
-matrix3d PolyhedronView<double>::inertia_matrix() const
+// The moments of the solid enclosed by an oriented triangle surface.  The
+// arithmetic is documented at the declaration in graphview.hh; the apex `o` is
+// taken at the vertex mean, a pure translation (the moments are exactly
+// translation-covariant) bought for nothing: summing 10^5 tetrahedra whose apex
+// sits 10^3 units outside the body loses ~5 digits to cancellation before the
+// answer appears.
+VolumeMoments volume_moments(std::span<const coord3d> P, const vector<tri_t>& tris)
 {
-  matrix3d I;
+  VolumeMoments m;
+  const int n = (int)P.size();
+  if(n < 4 || tris.empty()) return m;
 
-  for(int k=0;k<points.size();k++){
-    const coord3d& x(points[k]);
-    const long double xx(x.dot(x));
-    for(int i=0;i<3;i++){
-      I(i,i) += xx;
+  coord3d o{0,0,0};
+  for(const coord3d& p: P) o = o + p;
+  o = o / (double)n;
 
-      for(int j=0;j<3;j++)
-        I(i,j) -= x[i]*x[j];
-    }
+  double   det_sum = 0;
+  coord3d  m1{0,0,0};
+  matrix3d m2{};
+  for(const tri_t& t: tris){
+    const coord3d a = P[t[0]]-o, b = P[t[1]]-o, c = P[t[2]]-o;
+    const double  det = a.dot(b.cross(c));
+    const coord3d s = a+b+c;
+    det_sum += det;
+    m1 = m1 + s*det;
+    m2 += (s.outer(s) + a.outer(a) + b.outer(b) + c.outer(c)) * (det/120.0);
   }
+  // An inward-oriented surface gives det_sum < 0, which would negate the
+  // covariance and invert its eigenvalue ordering (the longest axis would sort
+  // last).  Normalise the sign here so no caller has to know the winding; the
+  // centroid is a ratio and is unaffected.
+  const double sgn = (det_sum < 0)? -1.0 : 1.0;
+  const double vol = sgn*det_sum/6.0;
+  if(!(vol > 0)) return m;
+  const coord3d cr = m1 * (sgn/(24.0*vol));   // centroid relative to the apex o
+  m.volume     = vol;
+  m.centroid   = o + cr;
+  m.covariance = m2*sgn - cr.outer(cr)*vol;
+  return m;
+}
+
+// Inertia tensor from a CENTRAL second-moment matrix M: I = tr(M) Id - M.
+// Shared by both weightings so the identity is written once.
+static matrix3d inertia_from_second_moment(const matrix3d& M)
+{
+  const double tr = M(0,0) + M(1,1) + M(2,2);
+  matrix3d I(-M);
+  for(int i=0;i<3;i++) I(i,i) += tr;
   return I;
 }
 
+// The faces are triangulated the way the rest of the class triangulates them --
+// centroid_triangulation(), the same surface surface_area() / volume_tetra() /
+// volume_divergence() integrate over -- so this method's `volume` IS
+// volume_tetra() (to roundoff) rather than a second, slightly different answer
+// to the same question.  A face of a real cage is not exactly planar, and the
+// two conventions genuinely differ: fan-triangulating (v0,vi,vi+1) instead moves
+// the C60 volume by 3.3e-5 relative AND makes it depend on which vertex the face
+// list happens to start at, which centroid triangulation does not.
 template<>
-matrix3d PolyhedronView<double>::principal_axes() const
+VolumeMoments PolyhedronView<double>::volume_moments() const
 {
-  const matrix3d I(inertia_matrix());
+  const vector<face_t>  fs(faces());
+  const vector<tri_t>   tris(centroid_triangulation(fs));
+  const vector<coord3d> pts(centroid_points(points, fs));
+
+  return ::volume_moments(std::span<const coord3d>(pts.data(),pts.size()), tris);
+}
+
+// Both branches are CENTRAL: the second moment is taken about the mass
+// distribution's own centre (the volume centroid / the vertex mean), so the
+// tensor -- and every frame built on it -- is invariant under translating the
+// polyhedron.  Before 2026-08-07 the vertex sum was taken about the ORIGIN, so
+// an off-centre cage got a frame that depended on where it happened to sit.
+template<>
+matrix3d PolyhedronView<double>::inertia_matrix(bool vertex_weighted) const
+{
+  if(vertex_weighted){
+    // Uniform mass at the vertices (molecular convention), about the vertex mean.
+    coord3d c(0,0,0);
+    for(size_t k=0;k<points.size();k++) c += points[k];
+    c /= (double)points.size();
+
+    matrix3d M;
+    for(size_t k=0;k<points.size();k++){
+      const coord3d x(points[k]-c);
+      for(int i=0;i<3;i++)
+        for(int j=0;j<3;j++)
+          M(i,j) += x[i]*x[j];
+    }
+    return inertia_from_second_moment(M);
+  }
+
+  // The enclosed solid, of uniform density: volume_moments().covariance is
+  // already the second moment about the volume centroid.  A degenerate surface
+  // returns a zeroed VolumeMoments (volume == 0, covariance == 0), and this
+  // then yields the zero tensor -- principal_axes()'s guards take it from there.
+  return inertia_from_second_moment(volume_moments().covariance);
+}
+
+template<>
+matrix3d PolyhedronView<double>::principal_axes(bool vertex_weighted) const
+{
+  const matrix3d I(inertia_matrix(vertex_weighted));
   pair<coord3d,matrix3d> ES(I.eigensystem());
 
   matrix3d Id;
@@ -453,7 +535,7 @@ Polyhedron Polyhedron::fullerene_polyhedron(FullereneGraph G)
   P.repoint();
 
   P.move_to_origin();		// Center of mass at (0,0,0)
-  P.align_with_axes();		// Align with principal axes
+  P.align_with_axes(true);	// Align with principal axes -- molecular convention: mass at the atoms
 
   return P;
 }
