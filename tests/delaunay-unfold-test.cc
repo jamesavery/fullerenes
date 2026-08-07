@@ -36,6 +36,7 @@
 #include "fullerenes/buckygen-wrapper.hh"
 
 #include <algorithm>
+#include <cmath>
 #include <stdexcept>
 #include <utility>
 
@@ -166,7 +167,65 @@ void expect_developments(const Charted& c, const char* tag) {
     }
 }
 
+// The RETIRED float development construction, frozen as a census
+// reference (2026-08-07, when enumerate_developments went exact via
+// place_third_eis_total): per sector-0 base P1, the apex from atan2 of
+// the base + the interior angle + L20*cos/sin + lattice rounding,
+// accepted by the exact norm/orientation identities.  Never used by the
+// library; its whole value is being the unchanging pre-exactness
+// formula the census below compares against.
+std::vector<std::array<Eisenstein, 3>>
+frozen_float_developments(const DelaunayTriangulation& D, int f) {
+    const int h0 = D.f_he[f], h1 = D.he_next[h0], h2 = D.he_next[h1];
+    const double L01 = D.he_length[h0], L20 = D.he_length[h2];
+    const long   N01 = (long)std::lround(L01 * L01);
+    const long   N12 = (long)std::lround(D.he_length[h1] * D.he_length[h1]);
+    const long   N20 = (long)std::lround(L20 * L20);
+    const double alpha_0 = D.he_angle[h0];
+    std::vector<std::array<Eisenstein, 3>> out;
+    const Eisenstein P0(0, 0);
+    for (Eisenstein P1 : sector0_reps_of_norm((int)N01)) {
+        auto [P1x, P1y] = P1.coord();
+        const double theta_02 = std::atan2(P1y, P1x) + alpha_0;
+        const Eisenstein P2(std::pair<double, double>{L20 * std::cos(theta_02),
+                                                      L20 * std::sin(theta_02)});
+        if ((long)P2.norm2() == N20 && (long)(P2 - P1).norm2() == N12 &&
+            wedge(P1, P2) > 0)
+            out.push_back({P0, P1, P2});
+    }
+    return out;
+}
+
+// Census: the exact enumeration must reproduce the retired float
+// construction development-for-development (count, frames, order) on
+// every live cell — a float-vs-exact disagreement would mean the float
+// formula was mis-placing an apex on real inputs.
+void expect_exact_matches_frozen_float(const Charted& c, const char* tag) {
+    const CellDevelopments cd = cell_developments(c.D, c.S);
+    for (int f = 0; f < cd.nf; ++f) {
+        if (cd.corners(f).c0 < 0) continue;
+        const auto frozen = frozen_float_developments(c.D, f);
+        ASSERT_EQ(cd.n_developments(f), (int)frozen.size())
+            << tag << " cell " << f << ": exact/frozen-float count differs";
+        for (int k = 0; k < (int)frozen.size(); ++k) {
+            const CellFrame Fk = cd.development(f, k).frame;
+            EXPECT_EQ(Eisenstein(Fk.p1a, Fk.p1b), frozen[(size_t)k][1])
+                << tag << " cell " << f << " dev " << k << " (P1)";
+            EXPECT_EQ(Eisenstein(Fk.p2a, Fk.p2b), frozen[(size_t)k][2])
+                << tag << " cell " << f << " dev " << k << " (P2)";
+        }
+    }
+}
+
 }  // namespace
+
+TEST(DelaunayUnfold, ExactDevelopmentsMatchFrozenFloat) {
+    expect_exact_matches_frozen_float(chart(nth_dual(20, false, 0)), "C20#0");
+    expect_exact_matches_frozen_float(chart(nth_dual(60, false, 0)), "C60#0");
+    expect_exact_matches_frozen_float(chart(nth_dual(128, false, 0)), "C128#0");
+    expect_exact_matches_frozen_float(chart(nth_dual(20, false, 0).GCtransform(7, 0)),
+                                      "C980");
+}
 
 TEST(DelaunayUnfold, C20) {
     Charted c = chart(nth_dual(20, false, 0));

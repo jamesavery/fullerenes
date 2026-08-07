@@ -425,23 +425,21 @@ bool strips_consistent(const EdgeStrip& e01, const EdgeStrip& e12, const EdgeStr
 
 // A lattice development of the cell: a valid (P0, P1, P2) corner
 // placement in F's frame -- one per sector-0 representative of N01
-// whose induced apex P2 (its direction is fixed by the metric) is a
-// lattice point meeting the remaining norm constraints and CCW
-// orientation.  The count is a(N(gcd(P1, P2))) + [delta | sqrt(N01)]
+// that admits a lattice apex P2 with the remaining squared norms and
+// CCW orientation.  The count is a(N(gcd(P1, P2))) + [delta | sqrt(N01)]
 // -- see the eisenstein_paint_tables.hh banner for THE statement --
 // typically 1 or 2 but UNBOUNDED over the isomer space (C980's cells
 // admit 4), so callers must never cap it.  Picking which development
 // matches the SURFACE geodesics is the walker's job (in embed_cell).
 struct Development { Eisenstein P0, P1, P2; };
 
-// One cell's iDT metric datum: CCW corner ids, the squared side norms
-// and the interior angle at corner 0 -- the input of the chart-frame
-// construction.  THE one derivation; embed_cell and
-// cell_developments both open with it.  @pre D.f_he[f] >= 0.
+// One cell's iDT metric datum: CCW corner ids + the squared side norms
+// -- the input of the chart-frame construction.  THE one derivation;
+// embed_cell and cell_developments both open with it.
+// @pre D.f_he[f] >= 0.
 struct CellMetric {
     std::array<int, 3> corners;
-    double L20 = 0, alpha_0 = 0;
-    long   N01 = 0, N12 = 0, N20 = 0;
+    long N01 = 0, N12 = 0, N20 = 0;
 };
 
 CellMetric cell_metric(const DelaunayView& D, int f)
@@ -451,37 +449,30 @@ CellMetric cell_metric(const DelaunayView& D, int f)
     const int h2 = D.he_next[h1];
     CellMetric m;
     m.corners = { D.he_origin[h0], D.he_origin[h1], D.he_origin[h2] };
-    const double L01 = D.he_length[h0];
-    m.L20     = D.he_length[h2];
-    m.N01     = (long)std::lround(L01 * L01);
-    m.N12     = (long)std::lround(D.he_length[h1] * D.he_length[h1]);
-    m.N20     = (long)std::lround(m.L20 * m.L20);
-    m.alpha_0 = D.he_angle[h0];   // the interior angle at corner 0
+    m.N01 = (long)std::lround(D.he_length[h0] * D.he_length[h0]);
+    m.N12 = (long)std::lround(D.he_length[h1] * D.he_length[h1]);
+    m.N20 = (long)std::lround(D.he_length[h2] * D.he_length[h2]);
     return m;
 }
 
 std::vector<Development>
-enumerate_developments(double L20, double alpha_0,
-                       long N01, long N12, long N20)
+enumerate_developments(long N01, long N12, long N20)
 {
+    // Exact in Z[w]: for each sector-0 base P1 the apex is the UNIQUE
+    // lattice point at squared distances N20 from P0 and N12 from P1 on
+    // the CCW side (place_third_eis_total; nullopt = this base admits no
+    // lattice apex).  Replaces the float construction (atan2 of the base
+    // + the acos'd interior angle + L20*cos/sin + lattice rounding) whose
+    // result was certified by exactly the norm-and-orientation identities
+    // that are the placement's postcondition -- same accepted set, no
+    // transcendentals, no dependence on he_angle/he_length beyond the
+    // integer norms.
     std::vector<Development> out;
     const Eisenstein P0(0, 0);
-    std::vector<Eisenstein> P1_candidates = sector0_reps_of_norm((int)N01);
-
-    for (Eisenstein P1 : P1_candidates) {
-        auto [P1x, P1y] = P1.coord();
-        const double theta_01 = std::atan2(P1y, P1x);
-        const double theta_02 = theta_01 + alpha_0;
-        const double P2x = L20 * std::cos(theta_02);
-        const double P2y = L20 * std::sin(theta_02);
-        const Eisenstein P2(std::pair<double,double>{P2x, P2y});
-
-        if ((long)P2.norm2() == N20
-            && (long)(P2 - P1).norm2() == N12
-            && wedge(P1, P2) > 0)
-        {
-            out.push_back({P0, P1, P2});
-        }
+    for (Eisenstein P1 : sector0_reps_of_norm((int)N01)) {
+        const auto P2 =
+            place_third_eis_total(P0, P1, (int)N01, (int)N20, (int)N12, +1);
+        if (P2) out.push_back({P0, P1, *P2});
     }
     return out;
 }
@@ -530,7 +521,7 @@ Cell embed_cell(const DelaunayTriangulation& D,
     // cross-edge consistent -- unique by the cell-development lemma
     // (first_consistent_triple) -- searched in deterministic order.
     for (const Development& C :
-         enumerate_developments(m.L20, m.alpha_0, m.N01, m.N12, m.N20)) {
+         enumerate_developments(m.N01, m.N12, m.N20)) {
         const MetaTriangle M = { C.P0, C.P1, C.P2 };
         const std::array<Eisenstein, 3> P = { C.P0, C.P1, C.P2 };
         std::array<std::vector<EdgeStrip>, 3> cand;
@@ -865,7 +856,7 @@ CellDevelopments cell_developments(const ::DelaunayView& D,
         // 4), hence the CSR.  A live cell with NO development has an
         // unrealizable metric: refuse loudly.
         const auto devs =
-            enumerate_developments(m.L20, m.alpha_0, m.N01, m.N12, m.N20);
+            enumerate_developments(m.N01, m.N12, m.N20);
         if (devs.empty())
             throw PaintError(Code::EMBED,
                 "cell_developments: live cell " + std::to_string(f) +
