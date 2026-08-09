@@ -39,7 +39,9 @@
 // which is at most #ideals(N01) + [N01 a perfect square]: typically
 // 1 or 2, but UNBOUNDED over the isomer space -- a GC(7,0)-scaled
 // cell (side norm 49) admits 4 -- so storage is CSR over cells,
-// never a fixed slot count.  The accepted development -- the first
+// never a fixed slot count (a bounded-storage executor slots cells
+// at max_cell_developments and refuses LOUDLY on overflow, never
+// truncates).  The accepted development -- the first
 // whose OWN three boundary strips glue into one consistent
 // position -> vertex map; no neighbour data enters the selection --
 // becomes the cell's CHART, and it is unique (the cell-development
@@ -58,18 +60,27 @@
 //
 // "Device-legal" here means: trivially copyable, no allocation and no
 // exceptions on the READ path (the element structs, the views, the
-// projections).  CellDevelopments and its builder are host
-// construction (owning vectors, throwing).  The accessors are
-// UNCHECKED projections (@pre 0 <= f < nf, 0 <= v < N_sorted); claim
-// is the only lookup whose domain includes misses.
+// projections) -- and, for the BUILDER vocabulary at the end of this
+// header (cell_metric_total ... cell_developments_into), on the write
+// path too: span bodies over caller storage, failure by sentinel.
+// The owning CellDevelopments and cell_developments stay host
+// construction (owning vectors, throwing) wrapping those bodies --
+// ONE body each, the scan_triangle_into / append_scan_rows_into
+// pattern.  The accessors are UNCHECKED projections (@pre 0 <= f < nf,
+// 0 <= v < N_sorted); claim is the only lookup whose domain includes
+// misses.
 // =====================================================================
 
 #include "fullerenes/eisenstein.hh"
-#include "fullerenes/eisenstein_raster.hh"   // ScanLine (append_scan_rows_into's input)
+#include "fullerenes/eisenstein_raster.hh"   // ScanLine, scan_triangle_into
 #include "fullerenes/delaunay_view.hh"   // DelaunayView (the builder's input)
+#include "fullerenes/delaunay_geometry.hh"   // lsq_integrality_band (the float->exact entry)
 
+#include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <type_traits>
 #include <vector>
@@ -305,6 +316,8 @@ struct CellDevelopmentsView {
 
 static_assert(std::is_trivially_copyable_v<CellDevelopmentsView>);
 
+struct DevelopmentSizing;   // the builder's sizing block (defined below)
+
 // ---------------------------------------------------------------------
 // CellDevelopments: every admissible lattice development of every live
 // cell, in the canonical enumeration order (host-built, owning).
@@ -360,6 +373,11 @@ struct CellDevelopments {
     int32_t max_cell_entries = 0;  // max per-cell entry width
     int64_t wcap = 0;              // walk-registration scratch (pow2)
     int64_t bcap = 0;              // boundary-map scratch (pow2)
+
+    // The owner's executor sizing in the builder's block form — THE one
+    // owner -> DevelopmentSizing projection (byte gates and span
+    // surfaces compare/carry this form).  Defined after the block.
+    DevelopmentSizing sizing() const;
 };
 
 // Per-edge strip-development bound (loud CAPACITY on overflow) -- a
@@ -376,16 +394,310 @@ struct CellDevelopments {
 // never truncation.
 inline constexpr int max_strip_developments = 8;
 
+// Per-cell development cap for BOUNDED-STORAGE executors.  Unlike the
+// strip cap above, the per-cell development COUNT is unbounded over
+// the isomer space (the banner's formula; no fixed per-norm cap is
+// sound), so the owning cell_developments never caps it -- it grows.
+// An executor with fixed slabs slots each cell at this many
+// developments and refuses LOUDLY (the builder's capacity sentinel)
+// when exceeded, never truncating.  8 is calibrated headroom over the
+// observed corpus maximum (C980's cells admit 4); the first norm past
+// it is N01 = (7*13)^2 = 8281 with 10 sector-0 reps (~C165,000 in the
+// GC family).
+inline constexpr int max_cell_developments = 8;
+
+// =====================================================================
+// The builder vocabulary (device-legal: no allocation, no throw): the
+// span/sentinel bodies the owning cell_developments wraps -- ONE body
+// for the lib pipeline and any device executor, completing the
+// scan_triangle_into / append_scan_rows_into pattern.
+// =====================================================================
+
+// One cell's iDT metric datum: CCW corner ids + the squared side norms
+// -- the input of the chart-frame construction.  THE one derivation;
+// embed_cell and cell_developments both open with it.
+struct CellMetric {
+    std::array<int, 3> corners{ -1, -1, -1 };
+    long N01 = 0, N12 = 0, N20 = 0;
+};
+
+// The float->exact entry of the paint pipeline, total form: the iDT's
+// post-flip edge lengths (doubles -- the Alexandrov homotopy's banded
+// flips discard the exact Lsq carry) re-enter the integer regime here,
+// through the SAME named integrality trust boundary every other such
+// conversion uses (delaunay_detail::lsq_integrality_band; cf.
+// Diamond::squared and the exact-reduction entry in delaunay.cc).
+// nullopt = not an integer within the band (a non-Loeschian metric --
+// without the guard such a value could mis-round to a NEIGHBOURING
+// valid norm and chart the wrong cell silently), or non-finite /
+// >= 2^52 (a broken metric, and past the exact-cast domain below).
+// The owning checked_integer_norm (eisenstein_paint.cc) throws the
+// per-edge diagnosis.
+inline std::optional<long> checked_integer_norm_total(double L) {
+    const double sq = L * L;
+    if (!(sq >= 0.0 && sq < 4503599627370496.0))   // 2^52
+        return std::nullopt;
+    // (long)(sq + 0.5) == lround(sq) unconditionally on [0, 2^52): for
+    // sq >= 1, 0.5 is a multiple of ulp(sq) so sq + 0.5 is exact except
+    // in the exponent-bump region, where the floor still lands on the
+    // bumped power; below 1 the two forms differ only ~0.5 away from an
+    // integer, which the band rejects either way.  Spelled without
+    // lround because device SSCP passes lack a builtin for it.
+    const long N = (long)(sq + 0.5);
+    if (std::fabs(sq - (double)N) >
+        delaunay_detail::lsq_integrality_band * std::max(1.0, sq))
+        return std::nullopt;
+    return N;
+}
+
+// One cell's metric, total form: nullopt when any edge's squared length
+// fails the trust boundary above (the owning cell_metric throws with
+// the per-edge diagnosis).  @pre D.f_he[f] >= 0.
+inline std::optional<CellMetric> cell_metric_total(const ::DelaunayView& D,
+                                                   int f) {
+    const int h0 = D.f_he[f];
+    const int h1 = D.he_next[h0];
+    const int h2 = D.he_next[h1];
+    const auto N01 = checked_integer_norm_total(D.he_length[h0]);
+    const auto N12 = checked_integer_norm_total(D.he_length[h1]);
+    const auto N20 = checked_integer_norm_total(D.he_length[h2]);
+    if (!N01 || !N12 || !N20) return std::nullopt;
+    CellMetric m;
+    m.corners = { D.he_origin[h0], D.he_origin[h1], D.he_origin[h2] };
+    m.N01 = *N01; m.N12 = *N12; m.N20 = *N20;
+    return m;
+}
+
+// for_each_development -- THE enumeration body (the banner carries THE
+// count statement): visit every admissible development frame (P1, P2)
+// of the metric (N01, N12, N20) in the canonical sector-0 order, P0 at
+// the origin.  Exact in Z[w]: for each sector-0 base P1 the apex is
+// the UNIQUE lattice point at squared distances N20 from P0 and N12
+// from P1 on the CCW side (place_third_eis_total; nullopt = this base
+// admits no lattice apex).  visit returns false to stop early (a
+// bounded executor's capacity trip).  The owning
+// enumerate_developments (eisenstein_paint.cc) wraps this.
+template <class Visit>
+inline void for_each_development(long N01, long N12, long N20,
+                                 Visit&& visit) {
+    const Eisenstein P0(0, 0);
+    for (Eisenstein P1 : Sector0Reps((int)N01)) {
+        const auto P2 =
+            place_third_eis_total(P0, P1, (int)N01, (int)N20, (int)N12, +1);
+        if (!P2) continue;
+        if (!visit(P1, *P2)) return;
+    }
+}
+
+// Scratch capacity formulas (properties of the data; any executor
+// sizing embed/enumerate scratch reads these):
+//  * walk registration: distinct keys are T_sorted vertex ids, and a
+//    walk registers <= 3 vertices per pushed face with <=
+//    walk_max_steps faces per primitive sub-walk, so
+//    min(N_sorted, 3*(walk_max_steps+2)) bounds the live count; x2
+//    keeps the open-addressing load factor comfortable.
+//  * boundary map: a qualifying walk to displacement s = l1_norm
+//    pushes <= 3s faces, so <= 3*(3s+1)+3 registrations per edge,
+//    three edges; x2 headroom.  s_max = max l1_norm over development
+//    frame edges.
+struct ScratchCapacities { int64_t wcap = 0, bcap = 0; };
+
+inline ScratchCapacities scratch_capacities(int64_t N_sorted, long s_max) {
+    // Smallest power of two >= x, floored at 64 (open-addressing
+    // scratch wants pow2 extents with load-factor headroom).
+    const auto pow2_ceil64 = [](int64_t x) {
+        int64_t p = 64;
+        while (p < x) p <<= 1;
+        return p;
+    };
+    ScratchCapacities c;
+    c.wcap = pow2_ceil64(
+        2 * (std::min<int64_t>(N_sorted, 3 * (int64_t)(walk_max_steps + 2)) + 8));
+    c.bcap = pow2_ceil64(2 * (3 * (3 * s_max + 4) * 3 + 16));
+    return c;
+}
+
+// The builder's sizing block -- the span form of the owner's fenced
+// executor-sizing fields (defaulted == so both legs of a byte gate
+// compare it as one value).
+struct DevelopmentSizing {
+    int32_t n_frames = 0;          // = dev_first[nf]
+    int32_t rows_cap = 0;          // max row count over (cell, development)
+    int32_t max_cell_entries = 0;  // max per-cell entry width
+    int64_t n_rows = 0;            // rows written (= the owner's rows.size())
+    int64_t entries_capacity = 0;  // = entry_capacity_first[nf]
+    int64_t wcap = 0, bcap = 0;    // scratch_capacities of the data
+    friend bool operator==(const DevelopmentSizing&,
+                           const DevelopmentSizing&) = default;
+};
+
+static_assert(std::is_trivially_copyable_v<DevelopmentSizing>);
+
+inline DevelopmentSizing CellDevelopments::sizing() const {
+    DevelopmentSizing s;
+    s.n_frames         = (int32_t)frames.size();
+    s.rows_cap         = rows_cap;
+    s.max_cell_entries = max_cell_entries;
+    s.n_rows           = (int64_t)rows.size();
+    s.entries_capacity = entries_capacity;
+    s.wcap             = wcap;
+    s.bcap             = bcap;
+    return s;
+}
+
+// CellDevelopmentsOut: CellDevelopments over CALLER storage -- the
+// builder's out-form.  The identity triple + the mutable table slabs +
+// the sizing block; view() projects the filled prefix as the
+// device-legal CellDevelopmentsView.  fail_cell names the refusing
+// cell on a degenerate (-1) return (the owner's diagnosis handle).
+struct CellDevelopmentsOut {
+    int32_t nf = 0;            // written by the builder (= D.nf)
+    int32_t N_sorted = 0;      // written by the builder (caller identity)
+    int32_t n_cones = 0;       // written by the builder (caller identity)
+
+    std::span<CellCorners> cells;                 // [>= nf]
+    std::span<int32_t>     dev_first;             // [>= nf+1]
+    std::span<CellFrame>   frames;                // executor-sized (max_cell_developments slots)
+    std::span<ScanBlock>   scans;                 // same extent as frames
+    std::span<ScanRow>     rows;                  // executor-sized
+    std::span<int32_t>     entry_capacity_first;  // [>= nf+1]
+
+    DevelopmentSizing sizing;
+    int32_t fail_cell = -1;
+
+    CellDevelopmentsView view() const {
+        CellDevelopmentsView v;
+        v.nf = nf; v.N_sorted = N_sorted; v.n_cones = n_cones;
+        v.cells     = cells.first((std::size_t)nf);
+        v.dev_first = dev_first.first((std::size_t)nf + 1);
+        v.frames    = frames.first((std::size_t)sizing.n_frames);
+        v.scans     = scans.first((std::size_t)sizing.n_frames);
+        v.rows      = rows.first((std::size_t)sizing.n_rows);
+        return v;
+    }
+};
+
+// cell_developments_into -- THE builder body over CALLER storage
+// (device-legal: no allocation, no throw): every admissible lattice
+// development of every live cell of D, CSR by cell, in the canonical
+// enumeration order, with per-development triangle scans and the
+// scratch capacities.  The owning cell_developments below wraps it --
+// ONE body.
+//
+// @pre  D's live faces are triangles (f_he[f] < 0 marks a dead slot);
+//       N_sorted / n_cones are the sorted dual's identity (stored on
+//       out, never read by the builder).
+// @pre  lines is the per-development scanline scratch (its size bounds
+//       the rows of ONE development; scan_triangle_into refuses past
+//       it).
+// @error -2 (capacity) when cells/dev_first/entry_capacity_first are
+//       smaller than nf/nf+1/nf+1, or frames/scans/rows/lines are
+//       exhausted -- grow and re-run (the owner grows; a bounded
+//       executor refuses loudly).
+// @error -1 (degenerate, out.fail_cell = the cell) when a live cell's
+//       metric fails the integrality boundary, admits no lattice
+//       development, or only a zero-area one (lattice tau == 0, where
+//       scan_triangle_into reports the collinear frame) -- the owner's
+//       PaintError(EMBED).
+// @post on success (return = n_frames >= 0): dev_first is the
+//       development CSR with dev_first[nf] == n_frames;
+//       entry_capacity_first is the exclusive prefix of per-cell max
+//       entry widths; sizing is filled; the filled prefixes equal the
+//       owning cell_developments' tables byte-for-byte.  On any
+//       negative return the tables are partial: read only fail_cell.
+inline long cell_developments_into(const ::DelaunayView& D,
+                                   int32_t N_sorted, int32_t n_cones,
+                                   CellDevelopmentsOut& out,
+                                   std::span<ScanLine> lines) {
+    const int nf = D.nf;
+    if ((long)out.cells.size() < nf ||
+        (long)out.dev_first.size() < nf + 1 ||
+        (long)out.entry_capacity_first.size() < nf + 1)
+        return -2;
+    out.nf = nf;
+    out.N_sorted = N_sorted;
+    out.n_cones = n_cones;
+    out.sizing = DevelopmentSizing{};
+    out.fail_cell = -1;
+    out.entry_capacity_first[0] = 0;
+    long n_rows = 0;     // append_scan_rows_into's running row count
+    long s_max = 0;      // max l1_norm over development frame edges
+    const Eisenstein P0(0, 0);
+
+    for (int f = 0; f < nf; ++f) {
+        out.dev_first[f] = out.sizing.n_frames;
+        out.entry_capacity_first[f + 1] = 0;
+        out.cells[f] = CellCorners{};
+        if (D.f_he[f] < 0) continue;    // dead slot: 0 developments
+
+        const auto m = cell_metric_total(D, f);
+        if (!m) { out.fail_cell = f; return -1; }
+        out.cells[f] = CellCorners{ m->corners[0], m->corners[1],
+                                    m->corners[2] };
+
+        // Per-development frame + triangle scan (scan_triangle_into +
+        // append_scan_rows_into: the same derivations the
+        // post-selection flatten uses).
+        int32_t n_dev = 0, cap_f = 0;
+        long rc = 0;
+        for_each_development(m->N01, m->N12, m->N20,
+                             [&](Eisenstein P1, Eisenstein P2) -> bool {
+            const long slot = out.sizing.n_frames;
+            if (slot >= (long)out.frames.size() ||
+                slot >= (long)out.scans.size()) { rc = -2; return false; }
+            out.frames[slot] = CellFrame{ P1.first, P1.second,
+                                          P2.first, P2.second };
+            for (Eisenstein e : { P1, P2 - P1, P0 - P2 }) {
+                const long sd = e.l1_norm();
+                if (sd > s_max) s_max = sd;
+            }
+            int b_min = 0, b_max = -1;
+            const long nl = scan_triangle_into(P0, P1, P2, lines,
+                                               b_min, b_max);
+            if (nl == -1) { rc = -1; return false; }   // zero-area frame
+            if (nl == -2) { rc = -2; return false; }   // lines too small
+            const ScanBlock sb = append_scan_rows_into(
+                out.rows, n_rows, lines.first((std::size_t)nl),
+                (int32_t)b_min, (int32_t)b_max);
+            if (sb.rows_first < 0) { rc = -2; return false; }
+            out.scans[slot] = sb;
+            const int32_t nr = sb.n_rows();
+            if (nr > out.sizing.rows_cap) out.sizing.rows_cap = nr;
+            if (sb.n_entries > cap_f) cap_f = sb.n_entries;
+            ++out.sizing.n_frames;
+            ++n_dev;
+            return true;
+        });
+        if (rc != 0) { if (rc == -1) out.fail_cell = f; return rc; }
+        if (n_dev == 0) { out.fail_cell = f; return -1; }
+        if (cap_f > out.sizing.max_cell_entries)
+            out.sizing.max_cell_entries = cap_f;
+        out.entry_capacity_first[f + 1] = cap_f;
+    }
+    out.dev_first[nf] = out.sizing.n_frames;
+    for (int f = 0; f < nf; ++f)    // exclusive prefix
+        out.entry_capacity_first[f + 1] += out.entry_capacity_first[f];
+    out.sizing.n_rows = n_rows;
+    out.sizing.entries_capacity = out.entry_capacity_first[nf];
+    const ScratchCapacities sc = scratch_capacities(N_sorted, s_max);
+    out.sizing.wcap = sc.wcap;
+    out.sizing.bcap = sc.bcap;
+    return out.sizing.n_frames;
+}
+
 struct SortedDual;   // eisenstein_paint.hh
 
 // Every admissible lattice development of every live cell of an
 // intrinsically-Delaunay complex D over S: corner data, frames in the
 // canonical enumeration order, per-development triangle scans, and the
-// scratch capacity formulas.  Host, allocating.  Only S.T.N and
+// scratch capacity formulas.  Host, allocating; owning wrapper of
+// cell_developments_into -- one body (it grows the slabs on the
+// capacity sentinel, so it never refuses on capacity).  Only S.T.N and
 // S.n_cones are read from S today; the SortedDualView facade is the
-// eventual parameter.  Throws PaintError(EMBED) when a live cell
-// admits NO lattice development (its metric is not realizable -- the
-// loud refusal).
+// eventual parameter.  Throws PaintError(EMBED) on the degenerate
+// sentinel: a live cell whose metric fails the integrality boundary
+// (the per-edge diagnosis) or admits no non-degenerate lattice
+// development.
 CellDevelopments cell_developments(const ::DelaunayView& D,
                                    const SortedDual& S);
 

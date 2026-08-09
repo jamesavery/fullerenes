@@ -102,6 +102,16 @@ public:
   int norm2() const { return first*first + first*second + second*second; }
   double norm() const { return sqrt(norm2()); }
 
+  // The l1 norm |a| + |b|: the displacement bound of the raster walk
+  // (the s of walk_max_steps' contract) and the size variable of the
+  // paint scratch-capacity formulas.  Widen-then-negate (INT_MIN-safe),
+  // spelled without std::labs so the body is device-legal.
+  long l1_norm() const {
+    const long a = first  < 0 ? -(long)first  : first;
+    const long b = second < 0 ? -(long)second : second;
+    return a + b;
+  }
+
   Eisenstein abs() const { return Eisenstein(::abs(first),::abs(second)); }
 
   Eisenstein div(const Eisenstein& y) const {
