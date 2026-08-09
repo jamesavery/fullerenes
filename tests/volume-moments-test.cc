@@ -212,8 +212,9 @@ void split_top_face(Box& B) {
 
 // A triangle surface is closed and consistently oriented iff every directed edge
 // appears exactly once (so its reverse carries the neighbouring triangle).  The
-// kernel's stated precondition, checked rather than assumed -- unlike
-// is_consistently_oriented(), which is vacuously true on an edgeless graph.
+// kernel's stated precondition, checked rather than assumed -- the kernel takes
+// a bare triangle LIST, which carries no rotation system for
+// GraphView::is_consistently_oriented() to look at.
 bool is_closed_oriented(const vector<tri_t>& tris) {
   map<arc_t, int> seen;
   for (const tri_t& t : tris)
@@ -608,39 +609,55 @@ TEST(MassMoments, PinnedMolecularCallSitesUnchanged) {
 // 7. Surfaces that cannot be integrated -- the named outcomes.
 // ---------------------------------------------------------------------------
 
-// The default path now needs a face structure where the old vertex sum needed
-// none: volume_moments() calls faces().
+// The default path needs a face structure where the old vertex sum needed none:
+// volume_moments() calls faces().  So the ways a surface can fail to exist are
+// part of this method's contract, and each one has a NAME.
 //
-// MEASURED 2026-08-07, and it is NOT clean for one input: on an EDGELESS view
-// (N points, deg == 0) faces() returns an empty list without throwing, and
-// centroid_triangulation({}) then takes its "already a triangulation" branch
-// (vacuously true for zero faces) into orient_triangulation(), which indexes
-// tris[0] unconditionally -- SIGSEGV.  That is PRE-EXISTING and not specific to
-// the new path: volume_tetra(), volume_divergence() and surface_area() all reach
-// it through exactly the same two calls and crash identically on the same input
-// (verified by calling volume_tetra() directly on this view).  What the changed
-// default does is make inertia_matrix()/principal_axes()/align_with_axes()
-// inherit volume_tetra()'s precondition -- a closed surface with at least one
-// face -- where before they were pure point arithmetic needing no topology.  The
-// kernel's own tris.empty() guard is therefore unreachable THROUGH THE METHOD
-// for that input; it still protects direct kernel callers, which is what the
-// first case below checks.
+// Until 2026-08-09 one of them had no name and no test: on an EDGELESS view
+// (N points, deg == 0) faces() returned an empty list without throwing, and
+// centroid_triangulation({}) then took its "already a triangulation" branch
+// (vacuously true for zero faces) into orient_triangulation(), which indexed
+// tris[0] unconditionally -- SIGSEGV, through all four integrals alike.  Case (a)
+// could therefore only be made against the KERNEL.  The invariant work (plan step
+// 1 + 4) removed both halves of that: the edgeless view now FAILS
+// is_consistently_oriented() instead of passing vacuously, and
+// orient_triangulation is gone, so centroid_surface() answers with
+// CentroidSurface::Code::NoFaces and case (a) exercises the method.
 //
-// This is a TRACKED outcome, not folklore: claude-projects/curvature-flow/
+// This was a TRACKED outcome, not folklore: claude-projects/curvature-flow/
 // refactor-debt.md, entry 2026-08-07-orientation-invariant-not-explicit, which
-// names the cure (make orientation an invariant maintained by construction
+// named the cure (make orientation an invariant maintained by construction
 // rather than repaired at every use site) and the verification.
 TEST(MassMoments, SurfacesThatCannotBeIntegrated) {
   const matrix3d Id = matrix3d::unit_matrix();
+  using SurfaceCode = Polyhedron::CentroidSurface::Code;
 
-  // (a) NO FACES: the kernel's own guard, reached directly.  The METHOD is not
-  // called on the edgeless view -- see the note above.
+  // (a) NO FACES: an edgeless view -- N points, not one edge.  Both the kernel's
+  // own guard (which still protects direct callers, who pass a triangle list with
+  // no view behind it) and the METHOD, which now names the outcome instead of
+  // crashing on it.
   {
     vector<coord3d> pts{{0,0,0},{1,0,0},{0,1,0},{0,0,1},{1,1,0},{1,0,1},{0,1,1},{1,1,1}};
     const MassMoments m = volume_moments(std::span<const coord3d>(pts), {});
     EXPECT_EQ(m.code, MassMoments::Code::Degenerate);
     EXPECT_EQ(m.mass, 0.0);
     EXPECT_EQ(m.covariance.norm(), 0.0);
+
+    Polyhedron P;
+    static_cast<Owned<PolyhedronView<double>>&>(P) = Owned<PolyhedronView<double>>(int(pts.size()));
+    P.set_points(pts);
+    ASSERT_EQ(P.count_edges(), 0u);
+
+    const Polyhedron::CentroidSurface S = P.centroid_surface();
+    EXPECT_EQ(S.code, SurfaceCode::NoFaces);
+    EXPECT_TRUE(S.points.empty());
+    EXPECT_TRUE(S.tris.empty());
+
+    // The documented value of every scalar integral when there is no surface.
+    EXPECT_EQ(P.volume_moments().code, MassMoments::Code::Degenerate);
+    EXPECT_EQ(P.surface_area(), 0.0);
+    EXPECT_EQ(P.volume(),       0.0);
+    EXPECT_EQ(P.volume_tetra(), 0.0);
   }
 
   // (b) NaN COORDINATES on a valid topology (is_invalid() == true).
@@ -690,6 +707,71 @@ TEST(MassMoments, SurfacesThatCannotBeIntegrated) {
     EXPECT_EQ(m.mass, 0.0);
     EXPECT_EQ(m.covariance.norm(), 0.0);
   }
+
+  // (d) NOT ORIENTABLE: a cage with faces, but not a sphere's.  Transposing two
+  // entries of one degree-3 row of C20 merges three pentagons into one 15-arc
+  // face -- 12 faces become 10, chi = 0 -- so it is a perfectly consistent
+  // rotation system OF A TORUS (tests/oriented-surface-test.cc makes that case
+  // in full).  faces() refuses it by throwing, which is right for faces() and
+  // useless to a scalar integral, so centroid_surface() is where that becomes a
+  // named outcome the three doubles can be documented against.
+  {
+    Polyhedron P = Polyhedron::C20();
+    ASSERT_EQ(P.centroid_surface().code, SurfaceCode::Ok);
+
+    std::swap(P[0][0], P[0][1]);
+    ASSERT_EQ(P.oriented_surface().code, OrientedSurface::Code::GenusMismatch);
+    ASSERT_EQ(P.oriented_surface().genus, 1);
+    EXPECT_THROW((void)P.faces(), std::logic_error);
+
+    const Polyhedron::CentroidSurface S = P.centroid_surface();
+    EXPECT_EQ(S.code, SurfaceCode::NotOrientable);
+    EXPECT_TRUE(S.points.empty());
+    EXPECT_TRUE(S.tris.empty());
+
+    EXPECT_EQ(P.volume_moments().code, MassMoments::Code::Degenerate);
+    EXPECT_EQ(P.surface_area(), 0.0);
+    EXPECT_EQ(P.volume(),       0.0);
+    EXPECT_EQ(P.volume_tetra(), 0.0);
+  }
+}
+
+// The two triangulations preserve the faces' orientation, so a MIXED
+// triangle-and-polygon mesh comes out consistent.  It did not before 2026-08-09:
+// the polygon branch wound its boundary arc backwards while a triangle face was
+// copied through unchanged, so on the square pyramid below the quad's four
+// triangles and the four lateral faces traversed their shared edges in the SAME
+// direction -- a surface that is not oriented at all, previously reaching the
+// integrals unchecked (centroid_triangulation's orientation-repair call was
+// commented out, and the repair pass would have abort()ed the process anyway).
+//
+// The face list is the whole input: centroid_triangulation reads only N and
+// `faces`, so the view underneath needs no edges.
+TEST(CentroidTriangulation, MixedTriangleAndPolygonFacesStayConsistent) {
+  // Square pyramid: quad base (0,3,2,1) and four lateral triangles, every
+  // directed edge appearing exactly once -- the outward-oriented surface.
+  const vector<face_t> faces{face_t(vector<node_t>{0,3,2,1}), face_t(vector<node_t>{0,1,4}),
+                             face_t(vector<node_t>{1,2,4}),   face_t(vector<node_t>{2,3,4}),
+                             face_t(vector<node_t>{3,0,4})};
+
+  Polyhedron P;
+  static_cast<Owned<PolyhedronView<double>>&>(P) = Owned<PolyhedronView<double>>(5);
+
+  const vector<tri_t> centroid = P.centroid_triangulation(faces);
+  EXPECT_EQ(centroid.size(), 8u);          // 4 around the base centroid + 4 laterals
+  EXPECT_TRUE(is_closed_oriented(centroid));
+
+  // The fan is the same claim about the other triangulation, and doubles as the
+  // check that the fixture face list was oriented to begin with (a fan adds only
+  // diagonals, so it is oriented iff the faces are).
+  const vector<tri_t> fan = P.triangulation(faces);
+  EXPECT_EQ(fan.size(), 6u);               // 2 for the base + 4 laterals
+  EXPECT_TRUE(is_closed_oriented(fan));
+
+  // A face too small to be a polygon is refused, not read past its end.
+  const vector<face_t> degenerate{face_t(vector<node_t>{0,1})};
+  EXPECT_THROW((void)P.centroid_triangulation(degenerate), std::logic_error);
+  EXPECT_THROW((void)P.triangulation(degenerate),          std::logic_error);
 }
 
 // ---------------------------------------------------------------------------

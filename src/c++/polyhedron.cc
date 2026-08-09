@@ -18,11 +18,23 @@ double PolyhedronView<double>::diameter() const {
 };
 
 // The surface every integral below runs over -- documented at the declaration.
+//
+// This is the FUNNEL: faces() refuses anything but a genus-0 rotation system by
+// throwing, and a scalar-returning integral has nowhere to put an exception, so
+// the surface is asked for its verdict FIRST and that verdict is translated into
+// this type's two failure modes -- the style-failures.md boundary where a deep
+// throw becomes a named outcome, because at this level "there is no surface to
+// integrate" is a known outcome rather than a broken contract.
 template<>
 PolyhedronView<double>::CentroidSurface PolyhedronView<double>::centroid_surface() const {
-  const vector<face_t> fs(faces());
+  const OrientedSurface surface = oriented_surface();
+  if(surface.code == OrientedSurface::Code::Degenerate) return {CentroidSurface::Code::NoFaces};
+  if(surface.code != OrientedSurface::Code::Ok)         return {CentroidSurface::Code::NotOrientable};
 
-  CentroidSurface S{vector<coord3d>(points.begin(), points.end()), centroid_triangulation(fs)};
+  const vector<face_t> fs(faces());
+  CentroidSurface S{CentroidSurface::Code::Ok,
+                    vector<coord3d>(points.begin(), points.end()),
+                    centroid_triangulation(fs)};
   for (const face_t& f : fs) S.points.push_back(f.centroid(points));
   return S;
 }
@@ -224,12 +236,31 @@ struct sort_ccw_coord3d {
 
 
 
-// Orient neighbours using planar_orient + 3D volume sign check.
-// This is a free-standing helper for Polyhedron construction from unoriented data.
+// ORIENTATION BOUNDARY 3 of 4 (see layout2d.hh), and the one that is not a
+// repair but a CONSTRUCTION: the extrinsic geometry supplies the CW/CCW that the
+// combinatorics cannot.  planar_orient establishes a planar embedding, of
+// unspecified handedness because no combinatorial test can choose between an
+// embedding and its mirror; the signed volume below then picks the one whose
+// normals point outward, which is the house convention (CCW-on-the-outside).
+// Coordinates are the only thing that can decide that, so this is the ONLY place
+// in the library where handedness is fixed, and the only sanctioned caller of
+// layout2d::planar_orient outside the Fortran adjacency-matrix boundary.
+//
+// Its own callers are the two Polyhedron(graph, points) constructors below and
+// nothing else -- file-static so that stays true.  They reach it when the rows
+// they were given are NOT already an embedding, which is the case for every
+// Polyhedron built from coordinates alone: Polyhedron(points, tolerance) infers
+// bonds by distance and push_backs them in ascending index order, and ascending
+// order is a rotation system of the wrong genus (for C20, 2 faces and genus 5
+// where 12 faces and genus 0 were claimed).
+//
+// @throws unoriented_surface_error when the inferred bond graph is not a planar
+//         graph, i.e. when there was no polyhedron to construct
 static void orient_polyhedron_neighbours(Polyhedron& P)
 {
   // First get a consistent planar orientation
   layout2d::planar_orient(P);
+  require_oriented_surface(P, "Polyhedron: orienting neighbours from coordinates");
 
   // Check volume sign to ensure outward-pointing normals (CCW-on-outside convention)
   double V=0;
@@ -248,6 +279,14 @@ static void orient_polyhedron_neighbours(Polyhedron& P)
   }
 }
 
+// The two (graph, points) constructors are the entrance to boundary 3.  An
+// oriented G -- which is every G built inside this library -- is taken as it
+// stands; only rows that are not an embedding at all are constructed from the
+// coordinates, and by the time the body ends the object satisfies the invariant
+// either way.
+//
+// @throws unoriented_surface_error when G is not oriented AND the coordinates do
+//         not make it orientable either (see orient_polyhedron_neighbours)
 Polyhedron::Polyhedron(const PlanarGraphView& G, const vector<coord3d>& points_, const int face_max_) :
   base_t(G), face_max(face_max_)
 {
@@ -277,7 +316,13 @@ Polyhedron::Polyhedron(const PlanarGraphView& G, std::span<coord3d> points_, con
   }
 }
 
-Polyhedron::Polyhedron(const vector<coord3d>& xs, double tolerance) 
+// Coordinates only: bonds are INFERRED by distance and pushed in ascending index
+// order, so the rows below carry no orientation whatever -- this is the input
+// boundary 3 exists for, and the delegation on the last line is where the
+// geometry supplies one.  (Until the orientation predicate became a real test,
+// the guard in the delegate never fired and this path silently returned a
+// genus-5 "polyhedron".)
+Polyhedron::Polyhedron(const vector<coord3d>& xs, double tolerance)
 {
   double bondlength = INFINITY;
 
@@ -401,6 +446,7 @@ template<>
 MassMoments PolyhedronView<double>::volume_moments() const
 {
   const CentroidSurface S(centroid_surface());
+  if(S.code != CentroidSurface::Code::Ok) return {};      // Degenerate: no surface to integrate
   return ::volume_moments(std::span<const coord3d>(S.points.data(), S.points.size()), S.tris);
 }
 
@@ -506,7 +552,7 @@ Polyhedron PolyhedronView<double>::dual() const
 template<>
 Polyhedron PolyhedronView<double>::leapfrog_dual() const
 {
-  assert(is_consistently_oriented());
+  require_oriented_surface(*this, "PolyhedronView<double>::leapfrog_dual");
   auto fs = faces();
   size_t Nf = fs.size();
 
