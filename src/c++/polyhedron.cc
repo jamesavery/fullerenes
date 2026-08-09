@@ -17,23 +17,23 @@ double PolyhedronView<double>::diameter() const {
   return dmax;
 };
 
-// Helper: build the extended point list for centroid triangulation.
-// Appends each face's centroid to the vertex list.
-static vector<coord3d> centroid_points(std::span<const coord3d> points, const vector<face_t>& faces) {
-  vector<coord3d> pts(points.begin(), points.end());
-  for (const auto& f : faces) pts.push_back(f.centroid(points));
-  return pts;
+// The surface every integral below runs over -- documented at the declaration.
+template<>
+PolyhedronView<double>::CentroidSurface PolyhedronView<double>::centroid_surface() const {
+  const vector<face_t> fs(faces());
+
+  CentroidSurface S{vector<coord3d>(points.begin(), points.end()), centroid_triangulation(fs)};
+  for (const face_t& f : fs) S.points.push_back(f.centroid(points));
+  return S;
 }
 
 template<>
 double PolyhedronView<double>::surface_area() const {
-  auto fs = faces();
-  vector<tri_t>  tris(centroid_triangulation(fs));
-  vector<coord3d> pts(centroid_points(points, fs));
+  const CentroidSurface S(centroid_surface());
 
   double A = 0;
-  for (const auto& tri : tris)
-    A += Tri3D(pts[tri[0]], pts[tri[1]], pts[tri[2]]).area();
+  for (const tri_t& t : S.tris)
+    A += Tri3D(S.points[t[0]], S.points[t[1]], S.points[t[2]]).area();
   return A;
 }
 
@@ -42,13 +42,11 @@ double PolyhedronView<double>::surface_area() const {
 // any vertex gives the exact integral over the triangle.
 template<>
 double PolyhedronView<double>::volume_divergence() const {
-  auto fs = faces();
-  vector<tri_t>   tris(centroid_triangulation(fs));
-  vector<coord3d> pts(centroid_points(points, fs));
+  const CentroidSurface S(centroid_surface());
 
   double V = 0;
-  for (const auto& t : tris) {
-    Tri3D T(pts[t[0]], pts[t[1]], pts[t[2]]);
+  for (const tri_t& t : S.tris) {
+    Tri3D T(S.points[t[0]], S.points[t[1]], S.points[t[2]]);
     V += T.a.dot(T.n) * T.area() / T.n.norm();
   }
   return fabs(V / 3.0);
@@ -58,13 +56,11 @@ double PolyhedronView<double>::volume_divergence() const {
 // V = (1/6) Σ a·(b×c) for each triangle (a,b,c).
 template<>
 double PolyhedronView<double>::volume_tetra() const {
-  auto fs = faces();
-  vector<tri_t>   tris(centroid_triangulation(fs));
-  vector<coord3d> pts(centroid_points(points, fs));
+  const CentroidSurface S(centroid_surface());
 
   double V = 0;
-  for (const auto& t : tris) {
-    const coord3d &a = pts[t[0]], &b = pts[t[1]], &c = pts[t[2]];
+  for (const tri_t& t : S.tris) {
+    const coord3d &a = S.points[t[0]], &b = S.points[t[1]], &c = S.points[t[2]];
     V += a.dot(b.cross(c));
   }
   return fabs(V / 6.0);
@@ -207,10 +203,8 @@ struct sort_ccw_coord3d {
   sort_ccw_coord3d(std::span<const coord3d> points)
     : points(points) {
 
-    // TODO: More numerically robust method    
-    coord3d xc(0,0,0);
-    for(const coord3d &p: points) xc += p;
-    xc /= points.size();
+    // TODO: More numerically robust method
+    const coord3d xc(mean(points));
 
     n = /*x0*/-xc; n /= n.norm();	//
 
@@ -309,21 +303,34 @@ Polyhedron::Polyhedron(const vector<coord3d>& xs, double tolerance)
 }
 
 
+// A second moment is a Gram matrix -- an integral of x x^T against a nonnegative
+// measure -- and is therefore positive semidefinite by construction.  A negative
+// eigenvalue is not a small error but a proof that the input was not the mass
+// distribution it claimed to be, and the sign test costs no tolerance.
+//
+// It is the ONLY detector for a MIS-ORIENTED face list.  Half the surface wound
+// inwards makes det_sum cancel while the first moment does not, so the enclosed
+// volume survives the `vol > 0` guard as a near-zero number, the centroid ratio
+// blows up, and the covariance still comes out FINITE -- every other guard here
+// and in principal_frame() passes, and the caller gets a confidently wrong frame.
+// Measured on the mis-oriented cube in tests/volume-moments-test.cc: unguarded
+// volume 2.5e-4 (> 0), covariance norm 188 (finite), lambda_min = -188.
+//
+// matrix3d::eigenvalues() returns descending, so [2] is lambda_min.
+static bool is_positive_semidefinite(const matrix3d& M) { return M.eigenvalues()[2] >= 0; }
+
 // The moments of the solid enclosed by an oriented triangle surface.  The
 // arithmetic is documented at the declaration in graphview.hh; the apex `o` is
 // taken at the vertex mean, a pure translation (the moments are exactly
 // translation-covariant) bought for nothing: summing 10^5 tetrahedra whose apex
 // sits 10^3 units outside the body loses ~5 digits to cancellation before the
 // answer appears.
-VolumeMoments volume_moments(std::span<const coord3d> P, const vector<tri_t>& tris)
+MassMoments volume_moments(std::span<const coord3d> P, const vector<tri_t>& tris)
 {
-  VolumeMoments m;
-  const int n = (int)P.size();
-  if(n < 4 || tris.empty()) return m;
+  MassMoments m;
+  if(P.size() < 4 || tris.empty()) return m;
 
-  coord3d o{0,0,0};
-  for(const coord3d& p: P) o = o + p;
-  o = o / (double)n;
+  const coord3d o(mean(P));
 
   double   det_sum = 0;
   coord3d  m1{0,0,0};
@@ -333,7 +340,7 @@ VolumeMoments volume_moments(std::span<const coord3d> P, const vector<tri_t>& tr
     const double  det = a.dot(b.cross(c));
     const coord3d s = a+b+c;
     det_sum += det;
-    m1 = m1 + s*det;
+    m1 += s*det;
     m2 += (s.outer(s) + a.outer(a) + b.outer(b) + c.outer(c)) * (det/120.0);
   }
   // An inward-oriented surface gives det_sum < 0, which would negate the
@@ -343,101 +350,122 @@ VolumeMoments volume_moments(std::span<const coord3d> P, const vector<tri_t>& tr
   const double sgn = (det_sum < 0)? -1.0 : 1.0;
   const double vol = sgn*det_sum/6.0;
   if(!(vol > 0)) return m;
-  const coord3d cr = m1 * (sgn/(24.0*vol));   // centroid relative to the apex o
-  m.volume     = vol;
+  const coord3d  cr = m1 * (sgn/(24.0*vol));   // centroid relative to the apex o
+  const matrix3d cov = m2*sgn - cr.outer(cr)*vol;
+  if(!is_positive_semidefinite(cov)) return MassMoments{MassMoments::Code::NotPositiveSemidefinite};
+
+  m.code       = MassMoments::Code::Ok;
+  m.mass       = vol;
   m.centroid   = o + cr;
-  m.covariance = m2*sgn - cr.outer(cr)*vol;
+  m.covariance = cov;
+  return m;
+}
+
+// The point-mass sibling: unit mass at each point.  Same triple, same
+// postcondition, no topology -- documented at the declaration in graphview.hh.
+MassMoments vertex_moments(std::span<const coord3d> P)
+{
+  MassMoments m;
+  if(P.empty()) return m;
+
+  const coord3d c(mean(P));
+
+  matrix3d cov{};
+  for(const coord3d& p: P){ const coord3d x(p-c); cov += x.outer(x); }
+  if(!is_positive_semidefinite(cov)) return MassMoments{MassMoments::Code::NotPositiveSemidefinite};
+
+  m.code       = MassMoments::Code::Ok;
+  m.mass       = (double)P.size();
+  m.centroid   = c;
+  m.covariance = cov;
   return m;
 }
 
 // Inertia tensor from a CENTRAL second-moment matrix M: I = tr(M) Id - M.
-// Shared by both weightings so the identity is written once.
+// Shared by both mass models so the identity is written once.
 static matrix3d inertia_from_second_moment(const matrix3d& M)
 {
-  const double tr = M(0,0) + M(1,1) + M(2,2);
-  matrix3d I(-M);
-  for(int i=0;i<3;i++) I(i,i) += tr;
-  return I;
+  return matrix3d::unit_matrix()*M.trace() - M;
 }
 
 // The faces are triangulated the way the rest of the class triangulates them --
-// centroid_triangulation(), the same surface surface_area() / volume_tetra() /
-// volume_divergence() integrate over -- so this method's `volume` IS
-// volume_tetra() (to roundoff) rather than a second, slightly different answer
-// to the same question.  A face of a real cage is not exactly planar, and the
-// two conventions genuinely differ: fan-triangulating (v0,vi,vi+1) instead moves
-// the C60 volume by 3.3e-5 relative AND makes it depend on which vertex the face
-// list happens to start at, which centroid triangulation does not.
+// centroid_surface(), the same surface surface_area() / volume_tetra() /
+// volume_divergence() integrate over -- so this method's `mass` (the enclosed
+// volume, under this weighting) and volume_tetra() are the same integral rather
+// than two slightly different answers to the same question.  A face of a real cage is not exactly planar,
+// and the two triangulation conventions genuinely differ: fan-triangulating
+// (v0,vi,vi+1) instead moves the C60 volume by 3.3e-5 relative AND makes it
+// depend on which vertex the face list happens to start at, which centroid
+// triangulation does not.
 template<>
-VolumeMoments PolyhedronView<double>::volume_moments() const
+MassMoments PolyhedronView<double>::volume_moments() const
 {
-  const vector<face_t>  fs(faces());
-  const vector<tri_t>   tris(centroid_triangulation(fs));
-  const vector<coord3d> pts(centroid_points(points, fs));
-
-  return ::volume_moments(std::span<const coord3d>(pts.data(),pts.size()), tris);
+  const CentroidSurface S(centroid_surface());
+  return ::volume_moments(std::span<const coord3d>(S.points.data(), S.points.size()), S.tris);
 }
 
-// Both branches are CENTRAL: the second moment is taken about the mass
+// The moments of the chosen mass distribution -- the one place the two models
+// differ, so that everything downstream is written once.
+static MassMoments moments_of(const PolyhedronView<double>& P, MassModel m)
+{
+  return m == MassModel::Atoms
+       ? ::vertex_moments(std::span<const coord3d>(P.points.data(), P.points.size()))
+       : P.volume_moments();
+}
+
+// Both models are CENTRAL: the second moment is taken about the mass
 // distribution's own centre (the volume centroid / the vertex mean), so the
 // tensor -- and every frame built on it -- is invariant under translating the
 // polyhedron.  Before 2026-08-07 the vertex sum was taken about the ORIGIN, so
 // an off-centre cage got a frame that depended on where it happened to sit.
+//
+// A degenerate or non-PSD distribution has a zeroed covariance, so this yields
+// the ZERO tensor -- a plausible-looking wrong answer that no guard downstream
+// catches.  principal_axes() on the zero tensor returns the identity, but NOT
+// because either of its checks fires: the eigenvalues are 0, not NaN, and the
+// returned matrix is perfectly unitary.  The identity comes from
+// matrix3d::eigensystem()'s ISOTROPIC branch (geometry.hh), which returns the
+// standard basis whenever the deviatoric part vanishes -- and the zero matrix is
+// isotropic.  The fact is therefore only reachable through the named outcome:
+// moments_of(...).code, or principal_frame()'s translation of it.
 template<>
-matrix3d PolyhedronView<double>::inertia_matrix(bool vertex_weighted) const
+matrix3d PolyhedronView<double>::inertia_matrix(MassModel m) const
 {
-  if(vertex_weighted){
-    // Uniform mass at the vertices (molecular convention), about the vertex mean.
-    coord3d c(0,0,0);
-    for(size_t k=0;k<points.size();k++) c += points[k];
-    c /= (double)points.size();
+  return inertia_from_second_moment(moments_of(*this, m).covariance);
+}
 
-    matrix3d M;
-    for(size_t k=0;k<points.size();k++){
-      const coord3d x(points[k]-c);
-      for(int i=0;i<3;i++)
-        for(int j=0;j<3;j++)
-          M(i,j) += x[i]*x[j];
-    }
-    return inertia_from_second_moment(M);
+// The principal frame, with the reason attached when it is the identity fallback
+// rather than a frame.  Until 2026-08-08 the two guards below wrote a sentence to
+// cerr and returned the identity, which no caller could branch on and no sweep
+// could count; the codes are that information on the return channel.
+template<>
+InertialFrame PolyhedronView<double>::principal_frame(MassModel m) const
+{
+  const MassMoments M(moments_of(*this, m));
+  switch(M.code){
+  case MassMoments::Code::Degenerate:
+    return {InertialFrame::Code::DegenerateMass};
+  case MassMoments::Code::NotPositiveSemidefinite:
+    return {InertialFrame::Code::NotPositiveSemidefinite};
+  case MassMoments::Code::Ok: break;
   }
 
-  // The enclosed solid, of uniform density: volume_moments().covariance is
-  // already the second moment about the volume centroid.  A degenerate surface
-  // returns a zeroed VolumeMoments (volume == 0, covariance == 0), and this
-  // then yields the zero tensor -- principal_axes()'s guards take it from there.
-  return inertia_from_second_moment(volume_moments().covariance);
+  const matrix3d I(inertia_from_second_moment(M.covariance));
+  const pair<coord3d,matrix3d> ES(I.eigensystem());
+
+  for(int i=0;i<3;i++)
+    if(std::isnan(ES.first[i])) return {InertialFrame::Code::NonFiniteTensor};
+
+  if((ES.second*ES.second.transpose() - matrix3d::unit_matrix()).norm() > 1e-2)
+    return {InertialFrame::Code::NotUnitary};
+
+  return {InertialFrame::Code::Ok, ES.second};
 }
 
 template<>
-matrix3d PolyhedronView<double>::principal_axes(bool vertex_weighted) const
+matrix3d PolyhedronView<double>::principal_axes(MassModel m) const
 {
-  const matrix3d I(inertia_matrix(vertex_weighted));
-  pair<coord3d,matrix3d> ES(I.eigensystem());
-
-  matrix3d Id;
-  Id(0,0) = 1; 
-  Id(1,1) = 1; 
-  Id(2,2) = 1; 
-/*
-  cerr << "Inertial frame:\n " 
-       << " inertia_matrix = " << I << ";\n"
-       << " lambda  = " << ES.first << ";\n"
-       << " vectors = " << ES.second << ";\n";
-*/
-
-  for(int i=0;i<3;i++) 
-    if(std::isnan(ES.first[i])){
-      cerr << "Warning: Inertial frame returned NaN. Setting inertial frame transformation to identity.\n";
-      return Id;
-    }
-  
-  if((ES.second*ES.second.transpose() - Id).norm() > 1e-2){
-    cerr << "Warning: Inertial frame transform is not unitary. Setting inertial frame transformation to identity.\n";
-    return Id;
-  }
-
-  return ES.second;
+  return principal_frame(m).axes;
 }
 
 template<>
@@ -535,7 +563,7 @@ Polyhedron Polyhedron::fullerene_polyhedron(FullereneGraph G)
   P.repoint();
 
   P.move_to_origin();		// Center of mass at (0,0,0)
-  P.align_with_axes(true);	// Align with principal axes -- molecular convention: mass at the atoms
+  P.align_with_axes(MassModel::Atoms);
 
   return P;
 }

@@ -189,7 +189,7 @@ int main(int ac, char **av)
 
   printf("Aligning P\n");  
   P.move_to_origin();
-  P.align_with_axes(true);	// molecular convention: mass at the atoms
+  P.align_with_axes(MassModel::Atoms);
 
   printf("Writing P-aligned\n");    
   Polyhedron::to_file(P,"output/"+basename+"-if.mol2");

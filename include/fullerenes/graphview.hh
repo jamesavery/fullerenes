@@ -451,12 +451,40 @@ struct FullereneDualView : TriangulationView {
 class Polyhedron;
 
 // ---------------------------------------------------------------------------
-// The moments of the SOLID enclosed by a closed oriented triangle surface.
+// The moments of a mass distribution: total mass, centre of mass, and the
+// CENTRAL second moment about that centre.  One shape for both mass models
+// (MassModel below), so the two inertia branches are the same sentence with one
+// word changed.
+//
+// `mass` is whatever the weighting makes it, and is the ONLY field whose
+// meaning the two branches state differently: for volume_moments() -- the
+// enclosed SOLID of unit density, whose mass IS its volume -- it is the enclosed
+// volume, and for the point-mass sibling vertex_moments() it is the total point
+// mass, i.e. the point COUNT.  (Until 2026-08-09 the type was VolumeMoments and
+// the field `volume`, which told the truth for the first and not the second.)
 // ---------------------------------------------------------------------------
-struct VolumeMoments {
-    double   volume = 0;         // > 0; the surface's orientation sign is normalised away
-    coord3d  centroid{0,0,0};    // the body's centre of mass (uniform density)
-    matrix3d covariance{};       // ∫ (x-centroid)(x-centroid)^T dV, about the CENTROID
+struct MassMoments {
+    // Why the fields do not describe a body.  Only Ok leaves them meaningful:
+    // every other code leaves the zeroed sentinel below, and centroid {0,0,0} is
+    // a perfectly plausible-looking point, so a caller must read `code` (or test
+    // `mass > 0`) rather than eyeball the numbers.
+    enum class Code {
+        Ok,                        // the fields are the moments of a body
+        Degenerate,                // no mass to take moments of: < 4 points, no faces or
+                                   // zero enclosed volume (volume_moments); no points at
+                                   // all (vertex_moments)
+        NotPositiveSemidefinite,   // covariance has a negative or non-finite minimum
+                                   // eigenvalue -- it is not a second moment, so the
+                                   // input was not the mass distribution it claimed
+    };
+    Code     code = Code::Degenerate;
+    double   mass = 0;           // the distribution's total mass: the enclosed VOLUME for
+                                 // volume_moments() (the surface's orientation sign is
+                                 // normalised away), the point COUNT for vertex_moments().
+                                 // > 0 iff code == Ok
+    coord3d  centroid{0,0,0};    // the distribution's centre of mass
+    matrix3d covariance{};       // ∫ (x-centroid)(x-centroid)^T dm, about the CENTROID
+                                 // (the sum over the points for vertex_moments())
 };
 
 // Exact moments of the solid enclosed by an oriented triangle surface, by
@@ -477,13 +505,65 @@ struct VolumeMoments {
 // it reaches this through its own triangles()) or caller-supplied triangle list
 // is another.
 //
-// @pre    closed:    `tris` is a closed, consistently oriented triangle surface
-//                    over `points`
-// @post   positive:  result.volume > 0, or a zeroed VolumeMoments if the
-//                    surface is degenerate (< 4 points, no faces, or zero
-//                    enclosed volume) -- the caller tests `volume > 0` rather
-//                    than being thrown at
-VolumeMoments volume_moments(std::span<const coord3d> points, const vector<tri_t>& tris);
+// CALLER'S OBLIGATION, stated here rather than in a formal slot because the
+// library carries no predicate for it: `tris` must be a CLOSED, CONSISTENTLY
+// ORIENTED triangle surface over `points` -- every directed edge appearing
+// exactly once.  A surface that is not returns Code::NotPositiveSemidefinite in
+// the cases that are detectable and is otherwise meaningless; the winding
+// DIRECTION does not matter, only its consistency (the orientation sign is
+// normalised away).  The two failure modes below are the ones the kernel
+// detects: too little input to enclose anything (< 4 points, no triangles, or a
+// signed volume that is not positive), and a second moment that is not one.
+//
+// @anchor solid-volume-moments
+// @post on Ok:         result.mass > 0 && result.covariance.eigenvalues()[2] >= 0 &&
+//                          (result.covariance - result.covariance.transpose()).norm() == 0
+// @post on Degenerate: result.mass == 0 && result.covariance.norm() == 0
+// @post on NotPositiveSemidefinite:
+//                      result.mass == 0 && result.covariance.norm() == 0
+MassMoments volume_moments(std::span<const coord3d> points, const vector<tri_t>& tris);
+
+// The moments of the point-mass distribution "unit mass at every point" -- the
+// sibling of volume_moments() for MassModel::Atoms, in the same triple so the
+// two mass models compose identically.  `mass` carries the total mass, which
+// for unit masses is points.size() -- a COUNT, not a volume, which is why the
+// shared type is MassMoments; `covariance` is Σ (x-mean)(x-mean)^T about the
+// point mean.  Needs no topology at all.
+//
+// @anchor point-mass-moments
+// @post on Ok:         result.mass == (double)points.size() &&
+//                          result.covariance.eigenvalues()[2] >= 0 &&
+//                          (result.covariance - result.covariance.transpose()).norm() == 0
+// @post on Degenerate: result.mass == 0 && result.covariance.norm() == 0
+// @post on NotPositiveSemidefinite:
+//                      result.mass == 0 && result.covariance.norm() == 0
+MassMoments vertex_moments(std::span<const coord3d> points);
+
+// ---------------------------------------------------------------------------
+// Which mass distribution an inertia tensor / principal frame describes.
+// The two are NOT interchangeable -- see PolyhedronView::inertia_matrix.
+// ---------------------------------------------------------------------------
+enum class MassModel {
+    Solid,   // uniform density over the enclosed solid (needs a closed oriented surface)
+    Atoms,   // uniform mass at the vertices (the molecular convention; needs no topology)
+};
+
+// ---------------------------------------------------------------------------
+// Why a principal frame could not be built.  Every failure returns the identity
+// matrix, which is a perfectly legal rotation, so a caller that does not look at
+// the code cannot tell a frame from a fallback.
+// ---------------------------------------------------------------------------
+struct InertialFrame {
+    enum class Code {
+        Ok,
+        DegenerateMass,            // the distribution has no body: zero mass / zero tensor
+        NotPositiveSemidefinite,   // the second moment is not a second moment (see MassMoments)
+        NonFiniteTensor,           // NaN/inf in the tensor -- non-finite coordinates upstream
+        NotUnitary,                // the eigenvector matrix is not orthogonal to 1e-2
+    };
+    Code     code = Code::Ok;
+    matrix3d axes = matrix3d::unit_matrix();   // row i is the i-th principal axis
+};
 
 template<typename T = double>
 struct PolyhedronView : PlanarGraphView {
@@ -531,36 +611,103 @@ struct PolyhedronView : PlanarGraphView {
     pair<coord3<T>,coord3<T>> bounding_box() const;
     coord3<T> width_height_depth() const;
 
-    // Moments of the enclosed solid: the faces (compute_faces()) go through
-    // centroid_triangulation() -- the same surface surface_area(),
-    // volume_tetra() and volume_divergence() integrate over, so `.volume` is
-    // volume_tetra() -- and then through the volume_moments() kernel above.
-    // Requires a closed oriented surface.
-    VolumeMoments volume_moments() const;
+    // The closed triangle surface every surface integral on this class runs
+    // over: the polygon faces split at their centroids (centroid_triangulation),
+    // with those centroids appended to the vertex list.  One object rather than
+    // two calls because the halves index each other -- `tris` indexes `points` --
+    // and because the point of using it FOUR times (surface_area, volume_tetra,
+    // volume_divergence, volume_moments) is that they integrate the SAME surface.
+    struct CentroidSurface {
+        vector<coord3d> points;   // the polyhedron's vertices, then one centroid per face
+        vector<tri_t>   tris;     // closed and consistently oriented iff *this is
+    };
+    CentroidSurface centroid_surface() const;
 
-    // The CENTRAL inertia tensor -- taken about the mass distribution's own
-    // centre, so it is invariant under translating the polyhedron (before
-    // 2026-08-07 the vertex sum was about the ORIGIN, and an off-centre cage
-    // got a frame that depended on where it sat).  Two weightings:
-    //   vertex_weighted == false (DEFAULT): the enclosed SOLID, of uniform
-    //     density, about the volume centroid -- exact per triangle,
-    //     meshing-independent.  This is the answer the type name promises, and
-    //     the one a principal frame should be built on.
-    //   vertex_weighted == true: uniform mass at the VERTICES, about the vertex
-    //     mean -- the molecular convention (mass sits at the atoms), right for
-    //     a fullerene cage, and now an explicit opt-in because a densely
-    //     triangulated region silently drags the axis.
-    // The two are NOT interchangeable, so choose deliberately: measured over 41
-    // C60/C70 cages the two tensors agree to 5.9% (Frobenius, unit-trace) but a
-    // WELL-SEPARATED axis of the resulting frame still turns by up to 3.70 deg
-    // (tests/volume-moments-test.cc).  The repo's molecular call sites --
-    // fullerene_polyhedron() and the programs/ tools -- therefore pass `true`
-    // explicitly rather than inherit the default.
+    // Moments of the enclosed solid: centroid_surface() -- the same surface
+    // surface_area(), volume_tetra() and volume_divergence() integrate over --
+    // through the volume_moments() kernel above.  So `.mass` (which for this
+    // weighting IS the enclosed volume) and volume_tetra() are the same integral,
+    // agreeing exactly in exact arithmetic; in floating
+    // point they part company where the apex choice earns its keep, since
+    // volume_tetra() sums tetrahedra from the ORIGIN rather than from the vertex
+    // mean.  Measured on a 3x5x7 box (2026-08-08, tests/volume-moments-test.cc):
+    // both exact at offsets up to 1e6, but at offset 1e8 the origin-apex sum has
+    // relative error 9.5e5 while this one is still exact.  On a cage shifted by
+    // |d| = 18 the two agree to 3e-15 relative.
+    // @pre closed: is_consistently_oriented() && !faces().empty()
+    MassMoments volume_moments() const;
+
+    // The CENTRAL inertia tensor I = tr(M) Id - M of the second moment M of one
+    // of two mass distributions (MassModel) -- taken about that distribution's
+    // own centre, so it is invariant under translating the polyhedron (before
+    // 2026-08-07 the vertex sum was about the ORIGIN, and an off-centre cage got
+    // a frame that depended on where it sat).
+    //   MassModel::Solid (DEFAULT): the enclosed solid of uniform density, about
+    //     the volume centroid -- exact per triangle, and independent of how
+    //     finely the surface is triangulated to the extent that the faces are
+    //     planar (a real cage face is not: fan-triangulating instead of splitting
+    //     at the centroid moves the C60 volume by 3.3e-5 relative).  This is the
+    //     answer the type name promises, and the one a principal frame should be
+    //     built on.
+    //   MassModel::Atoms: uniform mass at the VERTICES, about the vertex mean --
+    //     the molecular convention (mass sits at the atoms), right for a fullerene
+    //     cage, and an explicit opt-in because a densely triangulated region
+    //     silently drags the axis.
+    // The two are NOT interchangeable, so choose deliberately: measured over 40
+    // C60/C70 cages plus a squashed icosahedral C80 the two tensors agree to 5.9%
+    // (Frobenius, unit-trace) but the FRAMES do not -- an axis both models resolve
+    // turns by up to 3.40 deg, 3.70 deg at a marginal eigenvalue gap, and 6.27 deg
+    // raw inside a near-degenerate eigenplane (where no direction is determined at
+    // all, so that last number measures nothing).  A symmetric cage is the
+    // exception: the squashed icosahedral C80 agrees to 0.0006 deg.  Numbers from
+    // tests/volume-moments-test.cc, which prints them on every run.  The repo's
+    // molecular call sites therefore pass MassModel::Atoms explicitly rather than
+    // inherit the default; of the eight, five are live (fullerene_polyhedron()
+    // and programs/{fullerene-isomers-polyhedra,fullerene-polyhedron,
+    // polyhedron-optimize,halma-polyhedron}.cc) and three are not built: density.cc
+    // is commented out of programs/CMakeLists.txt, and gaudi.cc / gs-ex.cc appear
+    // in no build file and no longer compile against the current API
+    // (gaudi.cc:498 pushes onto points, now a std::span; gs-ex.cc:309 calls
+    // dual(10,true) against a nullary dual()).  So the pinning is VERIFIED for
+    // five call sites and asserted for three.
     // NOTE: the SYCL path (src/sycl/geometry-properties.cc) has its own
     // vertex-weighted, origin-based inertia_matrix/principal_axes and does NOT
     // follow this default.
-    matrix3d inertia_matrix(bool vertex_weighted = false) const;
-    matrix3d principal_axes(bool vertex_weighted = false) const;
+    //
+    // @anchor polyhedron-inertia-matrix
+    // @pre closed: implies(m == MassModel::Solid,
+    //                      is_consistently_oriented() && !faces().empty())
+    // @post symmetric: (result - result.transpose()).norm() == 0
+    matrix3d inertia_matrix(MassModel m = MassModel::Solid) const;
+
+    // The principal frame of inertia_matrix(m): row i of the result is the unit
+    // eigenvector of the i-th eigenvalue, ordered by |lambda| ascending (see
+    // matrix3d::eigensystem), which for a positive-semidefinite tensor is
+    // ascending lambda -- so row 0 is the smallest moment, the LONGEST axis.
+    //
+    // Every failure returns the identity, which is a legal rotation and
+    // therefore indistinguishable from a real frame: a caller that needs to know
+    // calls principal_frame(m) instead and reads its code.
+    //
+    // @anchor polyhedron-principal-axes
+    // @pre closed: implies(m == MassModel::Solid,
+    //                      is_consistently_oriented() && !faces().empty())
+    // @post orthogonal: (result*result.transpose() - matrix3d::unit_matrix()).norm() < 1e-2
+    matrix3d principal_axes(MassModel m = MassModel::Solid) const;
+
+    // principal_axes(m) with the outcome attached -- the same matrix, plus the
+    // reason when it is the identity fallback rather than a frame.
+    //
+    // @anchor polyhedron-principal-frame
+    // @pre closed: implies(m == MassModel::Solid,
+    //                      is_consistently_oriented() && !faces().empty())
+    // @post on Ok: (result.axes*result.axes.transpose() -
+    //                   matrix3d::unit_matrix()).norm() < 1e-2
+    // @post on DegenerateMass:          result.axes == matrix3d::unit_matrix()
+    // @post on NotPositiveSemidefinite: result.axes == matrix3d::unit_matrix()
+    // @post on NonFiniteTensor:         result.axes == matrix3d::unit_matrix()
+    // @post on NotUnitary:              result.axes == matrix3d::unit_matrix()
+    InertialFrame principal_frame(MassModel m = MassModel::Solid) const;
     bool is_invalid() const;
 
     Polyhedron incremental_convex_hull() const;
@@ -574,13 +721,17 @@ struct PolyhedronView : PlanarGraphView {
 
     void scale(const coord3<T>& s) { for(node_t u=0;u<N;u++) points[u] *= s; }
     void move(const coord3<T>& d)  { for(node_t u=0;u<N;u++) points[u] += d; }
-    void move_to_origin() {
-        coord3<T> c(0,0,0);
-        for(node_t u=0;u<N;u++) c += points[u];
-        c /= (T)N;
-        move(-c);
-    }
-    void align_with_axes(bool vertex_weighted = false) { matrix3d If(principal_axes(vertex_weighted)); for(node_t u=0;u<N;u++) points[u] = If * points[u]; }
+    // Apply a linear map to every vertex in place: points <- M points.
+    void transform(const matrix3d& M) { for(node_t u=0;u<N;u++) points[u] = M * points[u]; }
+    void move_to_origin() { move(-mean(std::span<const coord3<T>>(points.data(), N))); }
+    // Rotate into the principal frame of inertia_matrix(m), in place.  Inherits
+    // that method's precondition: MassModel::Solid integrates the enclosed solid,
+    // so it needs a closed oriented surface, where MassModel::Atoms needs no
+    // topology at all.  An unbuildable frame silently applies the identity --
+    // call principal_frame(m) first if that must be distinguished.
+    // @pre closed: implies(m == MassModel::Solid,
+    //                      is_consistently_oriented() && !faces().empty())
+    void align_with_axes(MassModel m = MassModel::Solid) { transform(principal_axes(m)); }
 
     vector<coord2d> polar_angles() const {
         vector<coord2d> angles(N);
@@ -610,9 +761,11 @@ template<> double PolyhedronView<double>::volume_divergence() const;
 template<> double PolyhedronView<double>::volume_tetra() const;
 template<> pair<coord3d,coord3d> PolyhedronView<double>::bounding_box() const;
 template<> coord3d PolyhedronView<double>::width_height_depth() const;
-template<> VolumeMoments PolyhedronView<double>::volume_moments() const;
-template<> matrix3d PolyhedronView<double>::inertia_matrix(bool vertex_weighted) const;
-template<> matrix3d PolyhedronView<double>::principal_axes(bool vertex_weighted) const;
+template<> PolyhedronView<double>::CentroidSurface PolyhedronView<double>::centroid_surface() const;
+template<> MassMoments PolyhedronView<double>::volume_moments() const;
+template<> matrix3d PolyhedronView<double>::inertia_matrix(MassModel m) const;
+template<> matrix3d PolyhedronView<double>::principal_axes(MassModel m) const;
+template<> InertialFrame PolyhedronView<double>::principal_frame(MassModel m) const;
 template<> bool PolyhedronView<double>::is_invalid() const;
 template<> Polyhedron PolyhedronView<double>::incremental_convex_hull() const;
 template<> Polyhedron PolyhedronView<double>::dual() const;

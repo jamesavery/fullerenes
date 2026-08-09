@@ -19,6 +19,56 @@ def test_polyhedron_c20_geometry():
     assert lo.shape == (3,) and np.all(hi >= lo)
 
 
+def _low_symmetry_C60():
+    """buckygen's C60 #17 -- the cage where the two mass models disagree most
+    (3.70 deg between axes that are individually determined; measured in
+    tests/volume-moments-test.cc). buckygen's FIRST C60 is the icosahedral one,
+    whose inertia tensors are isotropic and whose frames therefore agree
+    trivially -- exactly the wrong fixture for these two tests."""
+    with fl.buckygen(60) as gen:
+        dual = [d for _, d in zip(range(18), gen)][-1]
+    return fl.Polyhedron.from_fullerene(dual.dual())
+
+
+def _offdiag(I):
+    """How far a tensor is from diagonal, relative -- i.e. how far the coordinate
+    axes are from being its principal axes."""
+    return np.linalg.norm(I - np.diag(np.diag(I))) / np.linalg.norm(I)
+
+
+def test_polyhedron_mass_model_is_a_named_enum():
+    # The mass model is a NAMED enum argument, not a bare bool: MassModel.SOLID
+    # (the default) integrates the ENCLOSED SOLID, MassModel.ATOMS puts uniform
+    # mass at the vertices -- the molecular convention. Accepted BY NAME.
+    P = _low_symmetry_C60()
+    solid = P.inertia_matrix(mass_model=fl.MassModel.SOLID)
+    atoms = P.inertia_matrix(mass_model=fl.MassModel.ATOMS)
+    assert solid.shape == atoms.shape == (3, 3)
+    assert np.allclose(P.inertia_matrix(), solid)          # SOLID is the default
+    assert np.allclose(P.principal_axes(), P.principal_axes(mass_model=fl.MassModel.SOLID))
+
+    # Two mass models, two different answers. Compared unit-trace normalised, so
+    # only the SHAPE of the mass distribution is compared and the differing total
+    # masses drop out: the two agree to percent, not to roundoff.
+    shape = lambda I: I / np.trace(I)
+    d = np.linalg.norm(shape(atoms) - shape(solid)) / np.linalg.norm(shape(solid))
+    assert 1e-3 < d < 0.10, f"the two mass models differ by {d}"
+
+
+def test_polyhedron_from_fullerene_leaves_the_cage_in_the_ATOMS_frame():
+    # from_fullerene() centres the cage and aligns it with MassModel.ATOMS -- the
+    # molecular convention. A DEFAULTED align_with_axes() is MassModel.SOLID, so
+    # it silently rotates the cage back OUT of that frame (by up to 3.70 deg on a
+    # low-symmetry cage). Documented on both Python methods; pinned here.
+    P = _low_symmetry_C60()
+    assert _offdiag(P.inertia_matrix(mass_model=fl.MassModel.ATOMS)) < 1e-9   # in it
+    assert _offdiag(P.inertia_matrix()) > 1e-4                                # not the SOLID one
+
+    P.align_with_axes()                                      # defaulted -> MassModel.SOLID
+    assert _offdiag(P.inertia_matrix()) < 1e-9                               # now the SOLID one
+    assert _offdiag(P.inertia_matrix(mass_model=fl.MassModel.ATOMS)) > 1e-4  # left the molecular one
+
+
 def test_polyhedron_move_to_origin_writes_through():
     P = fl.Polyhedron.C20()
     pts = P.points
