@@ -977,10 +977,12 @@ struct DelaunayView {
   // @error InvariantViolated (exact regime, via m.flipped): a convex
   //        diamond without a lattice diagonal, or a diagonal past the
   //        exact envelope -- both mean the Lsq carry is corrupt.
-  // The transport policy's plan hook runs before the first write (it may
-  // throw with everything untouched); commit after the rewire.  The metric
-  // policy decides convexity and the new diagonal's length in both
-  // coordinates (Length), and owns the paired he_length / Lsq write.
+  // The transport policy's plan hook runs before the first write and is
+  // COMMIT-OR-NOTHING: a plan that refuses trips the Status latch, this
+  // returns false, and the complex is untouched (@post on false).  Commit
+  // runs after the rewire.  The metric policy decides convexity and the new
+  // diagonal's length in both coordinates (Length), and owns the paired
+  // he_length / Lsq write.
   template <class Metric = BandedFloatMetric, class Transport = NoTransport>
   bool flip_edge(int h, Metric&& m = Metric{}, Transport&& tr = Transport{}) {
     if (status != Status::Ok) return false;
@@ -999,6 +1001,11 @@ struct DelaunayView {
     // face slots fh, ft by rewiring in place (avoids dealloc/realloc).
     int fh = he_face[h], ft = he_face[t];
     tr.plan_flip(h, fh, ft);
+    // The plan refused (wrong-side transport, non-finite development, or an
+    // exhausted carry): leave the diamond untouched.  Without this the
+    // rewire below would proceed while the tracked points still carry the
+    // PRE-flip charts -- every point on fh/ft silently teleported.
+    if (status != Status::Ok) return false;
 
     he_origin[h] = B;
     he_origin[t] = D;

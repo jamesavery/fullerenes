@@ -114,6 +114,12 @@ struct DelaunayPointTrackerView {
     for (std::size_t f = 0; f < head.size(); f++) { head[f] = -1; tail[f] = -1; }
   }
 
+  // @pre 0 <= f < head.size() -- callers own the range check (the transport
+  //      trips its Status latch; see TrackerTransport::bucket_face_ok).
+  // @pre bucket_push: i is not already in bucket f.  A repeated push would
+  //      set next[i] = i (a self-cycle) and every later walk of the bucket
+  //      would not terminate; the transport refuses the repeat upstream, at
+  //      the one place it can arise (a plan naming one face slot twice).
   void bucket_clear(int f) { head[f] = -1; tail[f] = -1; }
   void bucket_push(int f, int32_t i) {
     next[i] = -1;
@@ -249,6 +255,17 @@ struct TrackerTransport {
     return clamp_barycentric(tk, b) ? true : trip(who, witness);
   }
 
+  // Every bucket WRITE is range-checked against the tracker's own bucket
+  // count.  The READ path (develop_bucket) guards already; an unchecked
+  // write past the span would corrupt whatever follows it -- on device, the
+  // neighbouring isomer's tracker slab -- instead of refusing, which is what
+  // the boundedness contract promises.
+  bool bucket_face_ok(int f, const char* who) {
+    if (f >= 0 && f < (int)tk.head.size()) return true;
+    trip(who, f);
+    return false;
+  }
+
   bool push_carry(int32_t idx, double x, double y) {
     if (n_carry >= carry.cap())
       return T.trip(DelaunayView::Status::CapacityExceeded,
@@ -327,6 +344,8 @@ struct TrackerTransport {
         idx = tk.n++;
         tk.label[idx] = seed_label;
       }
+      if (!bucket_face_ok(f, "TrackerTransport: commit face out of range"))
+        return;
       tk.face[idx] = f;
       for (int k = 0; k < 3; k++) tk.b_of(idx)[k] = carry.rb[(std::size_t)3 * i + k];
       tk.bucket_push(f, idx);
@@ -341,6 +360,14 @@ struct TrackerTransport {
       return;
     }
     n_carry = 0;
+    // The two diamond faces must be distinct slots: one slot named twice
+    // would carry its points twice and commit would push each index into
+    // that bucket twice (a self-cycling list).  Refuse rather than guess
+    // which of the two developments the shared face should take.
+    if (fh == ft) {
+      trip("TrackerTransport: flip diamond names one face slot twice", h);
+      return;
+    }
     const int t  = h ^ 1;
     const int h1 = T.he_next[h], h2 = T.he_next[h1];
     const int h4 = T.he_next[t], h5 = T.he_next[h4];
@@ -368,6 +395,8 @@ struct TrackerTransport {
     // Clear the source buckets only once every re-expression is verified: on
     // a refusal the tracker is left untouched.
     if (T.status != DelaunayView::Status::Ok) return;
+    if (!bucket_face_ok(fh, "TrackerTransport: flip face out of range") ||
+        !bucket_face_ok(ft, "TrackerTransport: flip face out of range")) return;
     tk.bucket_clear(fh);
     tk.bucket_clear(ft);
   }
@@ -388,13 +417,24 @@ struct TrackerTransport {
     n_carry = 0;
     if (!push_carry(-1, 0.0, 0.0)) return;              // the seeded apex
     for (int i = 0; i < fan.k; i++) {
+      // A delta-complex fan can traverse ONE face slot twice (a face with the
+      // apex at two corners).  Its points would then carry twice, at two
+      // different planar placements, and commit would self-cycle the bucket.
+      // Refuse: the development is genuinely ambiguous, so there is nothing
+      // to pick.  (The pre-span tracker duplicated the entry instead.)
+      const int fi = T.he_face[fan.spoke_he[i]];
+      for (int p = 0; p < i; p++)
+        if (T.he_face[fan.spoke_he[p]] == fi) {
+          trip("TrackerTransport: star names one face slot twice", fi);
+          return;
+        }
       const int j = (i + 1) % fan.k;
       auto corner = [&](int he, double& x, double& y) {
         if      (he == fan.spoke_he[i])  { x = 0;        y = 0; }
         else if (he == fan.inner_rim[i]) { x = fan.x(i); y = fan.y(i); }
         else                             { x = fan.x(j); y = fan.y(j); }
       };
-      develop_bucket(T.he_face[fan.spoke_he[i]], corner);
+      develop_bucket(fi, corner);
     }
   }
 
@@ -404,7 +444,11 @@ struct TrackerTransport {
     // All re-expressions verified: clear the source buckets before the
     // surgery recycles their face slots.
     if (T.status != DelaunayView::Status::Ok) return;
-    for (int i = 0; i < fan.k; i++) tk.bucket_clear(T.he_face[fan.spoke_he[i]]);
+    for (int i = 0; i < fan.k; i++) {
+      const int fi = T.he_face[fan.spoke_he[i]];
+      if (!bucket_face_ok(fi, "TrackerTransport: star face out of range")) return;
+      tk.bucket_clear(fi);
+    }
   }
 
   void commit_removal(std::span<const int> faces, int v) {

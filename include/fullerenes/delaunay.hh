@@ -156,6 +156,16 @@ struct DelaunayPointTracker {
     }
     rebind();
   }
+
+  // Headroom for a removal pass: every removed vertex seeds exactly ONE
+  // tracked point, ON TOP of whatever the caller already registered through
+  // track_point.  The owner grows (it holds vectors), so a tracked removal
+  // never has to refuse for want of seed slots -- which is what the
+  // enable-time sizing alone would do once the caller registers more points
+  // than the pass leaves survivors.
+  void reserve_for_removals(long n_removals, long buckets_cap) {
+    ensure_capacity((long)view.n + n_removals, buckets_cap);
+  }
 };
 
 // ============================================================================

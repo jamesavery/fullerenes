@@ -163,8 +163,9 @@ void DelaunayTriangulation::enable_point_tracking()
         "enable_point_tracking: tracker already carries points "
         "(one tracking session per complex; stale state would be transported)");
   tracker.active = true;
-  // Removal seeds one point per removed flat vertex; the buckets index every
-  // face slot the surgery may allocate.
+  // The buckets index every face slot the surgery may allocate.  The point
+  // capacity here covers a removal pass on its own; track_point and
+  // reserve_for_removals grow it for registered points plus their seeds.
   tracker.ensure_capacity(tracked_points_cap(nv), nf_cap);
   tracker.view.reset();
 }
@@ -254,6 +255,7 @@ void DelaunayTriangulation::remove_flat_vertex(int v)
   // self-loops can push it past the vertex count).  O(nh) bytes.
   HostDelaunayWorkspace ws({.nv0 = nv, .k_max = nh, .nh_explicit = nh});
   if (tracker.active) {
+    tracker.reserve_for_removals(1, nf_cap);   // this removal's seed
     TrackerTransport tr{*this, tracker.view, tracker.carry};
     DelaunayView::remove_flat_vertex(v, ws, BandedFloatMetric{}, tr);
   } else {
@@ -304,6 +306,8 @@ void run_flat_removal(DelaunayTriangulation& D, Metric&& m,
 
   HostDelaunayWorkspace ws({.nv0 = D.nv, .k_max = D.nh, .nh_explicit = D.nh});
   if (D.tracker.active) {
+    // At most every live vertex is removed, each seeding one point.
+    D.tracker.reserve_for_removals(D.nv, D.nf_cap);
     TrackerTransport tr{D, D.tracker.view, D.tracker.carry};
     D.DelaunayView::remove_flat_vertices(ws, m, tr, obs);
   } else {
