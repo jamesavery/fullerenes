@@ -217,61 +217,49 @@ CubicPolytope realize_cubic(const TriangulationView& T) {
 
 CubicRealization evaluate_tracked_complex(const CubicPolytope& C, int Nv)
 {
+    // Owning wrapper of the device-legal body (header): owned outputs and
+    // coverage record in, the named failure value converted to this
+    // function's documented throws after.
     const int Nc = 2 * Nv - 4;
     CubicRealization G;
     G.cubic_coords.assign(Nc, coord3d{0, 0, 0});
     G.dual_coords.assign(Nv, coord3d{0, 0, 0});
-    std::vector<char> have_cubic(Nc, 0), have_dual(Nv, 0);
+    std::vector<std::uint8_t> have_cubic(Nc, 0), have_dual(Nv, 0);
 
-    // Cones: exact solver positions.  Cone i is kis vertex Nv + U_i (its
-    // cubic vertex in T.triangles() order).
-    for (size_t i = 0; i < C.cone_pos.size(); ++i) {
-        const int U = C.cone_kis_vertex[i] - Nv;
-        if (U < 0 || U >= Nc)
-            paint_throw("eisenstein_paint::evaluate_tracked_complex: cone %zu "
-                        "has kis id %d (dual-vertex range; expected a cubic "
-                        "vertex)", i, C.cone_kis_vertex[i]);
-        G.cubic_coords[U] = C.cone_pos[i];
-        have_cubic[U] = 1;
-    }
+    const TrackedEvalResult r = evaluate_tracked_into<double>(
+        C.D, C.cone_pos, C.D.tracker.view, C.cone_kis_vertex, Nv, /*bond=*/1.0,
+        G.cubic_coords, G.dual_coords, have_cubic, have_dual);
 
-    // Tracked kis vertices: barycentric combination against their
-    // kappa=0 cell's cone positions -- exactly on the polytope surface
-    // (the cell is a flat piece of it).  face_vertices order == the slot
-    // anchoring.
-    for (const auto& p : C.D.tracker.points) {
-        const auto vs = C.D.face_vertices(p.face);
-        const coord3d x = barycentric_combine(p.b, C.cone_pos[vs[0]],
-                                              C.cone_pos[vs[1]],
-                                              C.cone_pos[vs[2]]);
-        if (p.label >= Nv) {
-            const int U = p.label - Nv;
-            if (U >= Nc || have_cubic[U])
-                paint_throw("eisenstein_paint::evaluate_tracked_complex: cubic "
-                            "vertex %d tracked twice or out of range", U);
-            G.cubic_coords[U] = x;
-            have_cubic[U] = 1;
-        } else {
-            if (p.label < 0 || have_dual[p.label])
-                paint_throw("eisenstein_paint::evaluate_tracked_complex: dual "
-                            "vertex %d tracked twice or out of range", p.label);
-            G.dual_coords[p.label] = x;
-            have_dual[p.label] = 1;
-        }
-    }
-
-    // Coverage: cones + tracked points partition the kis vertices, so
-    // every cubic vertex and every dual vertex must be written.
-    // @anchor cubic-coverage
-    int miss_cubic = 0, miss_dual = 0;
-    for (int U = 0; U < Nc; ++U) if (!have_cubic[U]) ++miss_cubic;
-    for (int u = 0; u < Nv; ++u) if (!have_dual[u]) ++miss_dual;
-    if (miss_cubic || miss_dual)
+    switch (r.code) {
+    case TrackedEval::OK:
+        return G;
+    case TrackedEval::CAPACITY:
+        paint_throw("eisenstein_paint::evaluate_tracked_complex: %zu cone "
+                    "positions / %zu kis ids for %d solved cones (Nv=%d)",
+                    C.cone_pos.size(), C.cone_kis_vertex.size(), C.D.nv, Nv);
+    case TrackedEval::CONE_NOT_CUBIC:
+        paint_throw("eisenstein_paint::evaluate_tracked_complex: cone %d has "
+                    "kis id %d (dual-vertex range; expected a cubic vertex)",
+                    r.witness, C.cone_kis_vertex[r.witness]);
+    case TrackedEval::DEAD_CELL:
+        paint_throw("eisenstein_paint::evaluate_tracked_complex: tracked point "
+                    "%d sits on cell %d, which is not live", r.witness,
+                    C.D.tracker.view.face[r.witness]);
+    case TrackedEval::TRACKED_TWICE:
+        paint_throw("eisenstein_paint::evaluate_tracked_complex: kis vertex %d "
+                    "tracked twice or out of range", r.witness);
+    case TrackedEval::COVERAGE: {
+        int miss_cubic = 0, miss_dual = 0;
+        for (int U = 0; U < Nc; ++U) if (!have_cubic[U]) ++miss_cubic;
+        for (int u = 0; u < Nv; ++u) if (!have_dual[u]) ++miss_dual;
         throw PaintError(Code::COVERAGE,
             "eisenstein_paint::evaluate_tracked_complex: coverage(missing_cubic=" +
             std::to_string(miss_cubic) + ",missing_dual=" +
             std::to_string(miss_dual) + ")");
-    return G;
+    }
+    }
+    paint_throw("eisenstein_paint::evaluate_tracked_complex: unnamed evaluation "
+                "status %d", (int)r.code);
 }
 
 // =====================================================================

@@ -45,7 +45,24 @@ coord3d barycentric_combine(ReducedBary b,
 // (b0 + b1 + b2 == 1): v = b0*C0 + b1*C1 + b2*C2.  The FP-barycentric
 // counterpart used by the (non-Loeschian) cubic transport path, so both
 // number systems name the one "interpolate a triangle" operation.
-coord3d barycentric_combine(const double b[3],
-                            const coord3d& C0,
-                            const coord3d& C1,
-                            const coord3d& C2);
+//
+// Header-inline (device-legal: the cubic paint seed evaluates it inside a
+// kernel, where an out-of-line library symbol neither links nor
+// materializes), carrying the contraction policy of the .cc's TU-wide
+// #pragma STDC FP_CONTRACT OFF at block scope: with contraction on, the
+// three-term sum fuses into an FMA chain whose nesting depends on which
+// slot holds a zero weight, so two cells sharing an edge diverge by 1 ULP.
+// Non-clang builds must supply -ffp-contract=off.
+inline coord3d barycentric_combine(const double b[3],
+                                   const coord3d& C0,
+                                   const coord3d& C1,
+                                   const coord3d& C2)
+{
+#if defined(__clang__)
+#pragma clang fp contract(off)
+#endif
+  coord3d v;
+  for (int i = 0; i < 3; ++i)
+    v[i] = b[0] * C0[i] + b[1] * C1[i] + b[2] * C2[i];
+  return v;
+}

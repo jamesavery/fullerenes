@@ -65,13 +65,6 @@ coord3d barycentric_combine(ReducedBary b,
   return v;
 }
 
-coord3d barycentric_combine(const double b[3],
-                            const coord3d& C0,
-                            const coord3d& C1,
-                            const coord3d& C2)
-{
-  coord3d v;
-  for (int i = 0; i < 3; ++i)
-    v[i] = b[0] * C0[i] + b[1] * C1[i] + b[2] * C2[i];
-  return v;
-}
+// (The double-triple barycentric_combine is header-inline in
+// barycentric.hh: a kernel cannot call an out-of-line library symbol.  It
+// carries this TU's contraction policy at block scope.)

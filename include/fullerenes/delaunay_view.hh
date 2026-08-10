@@ -32,8 +32,10 @@
 // over DelaunayWorkspace, with the Status latch as the run-path error
 // channel, the Transport policy carrying the point tracker's hooks, and the
 // Metric policy selecting the predicate regime (exact integer vs banded
-// float).  Owner-level (delaunay.hh): storage, growth, the tracked
-// TrackerTransport policy, serialization, and every allocating convenience.
+// float).  The tracking policy itself is delaunay_transport.hh's
+// TrackerTransport (span-based, so host and device share it); owner-level
+// (delaunay.hh): storage, growth, serialization, and every allocating
+// convenience.
 //
 // (See the device caveat in the banner above: eisenstein.hh, reached via
 // delaunay_geometry.hh, is the one non-device-clean include.)
@@ -223,13 +225,14 @@ struct DelaunayWorkspace {
 
 // ============================================================================
 // Transport policy: the point-tracker's hook points on the two
-// topology-changing operations.  NoTransport (the default, and the only
-// policy device code sees) is a set of empty inline no-ops -- the
-// instantiated bodies are the untracked operations exactly.  The owner's
-// tracked path supplies a host-side policy (TrackerTransport, delaunay.cc)
-// reproducing the flip-tape transport through the same surgery bodies.
-// Plan hooks run BEFORE any mutation and may throw (host policies only);
-// commit hooks run after the surgery and must not fail.
+// topology-changing operations.  NoTransport (the default) is a set of empty
+// inline no-ops -- the instantiated bodies are the untracked operations
+// exactly.  A tracked run supplies TrackerTransport
+// (delaunay_transport.hh), which carries the flip-tape transport through
+// these same surgery bodies over spans, so the host owner and a device
+// kernel instantiate ONE policy.  Plan hooks run BEFORE any mutation and
+// report failure through this file's Status latch; commit hooks run after
+// the surgery and must not fail.
 // ============================================================================
 struct NoTransport {
   static constexpr bool tracking() { return false; }

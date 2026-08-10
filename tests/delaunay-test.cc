@@ -1049,10 +1049,10 @@ static bool same_dcel_state(const DelaunayTriangulation& A,
   if (!dcel_arrays_equal(A, B)) return false;
   if (!spans_equal(A.free_edges.live(), B.free_edges.live())) return false;
   if (!spans_equal(A.free_faces.live(), B.free_faces.live())) return false;
-  if (A.tracker.points.size() != B.tracker.points.size()) return false;
-  for (size_t i = 0; i < A.tracker.points.size(); i++) {
-    const auto& p = A.tracker.points[i];
-    const auto& q = B.tracker.points[i];
+  if (A.tracker.view.n != B.tracker.view.n) return false;
+  for (int32_t i = 0; i < A.tracker.view.n; i++) {
+    const DelaunayTrackedPoint p = A.tracker.view.point(i);
+    const DelaunayTrackedPoint q = B.tracker.view.point(i);
     if (p.label != q.label || p.face != q.face ||
         p.b[0] != q.b[0] || p.b[1] != q.b[1] || p.b[2] != q.b[2]) return false;
   }
@@ -1103,7 +1103,7 @@ TEST(DCELOwnership, CopyPreservesEveryField) {
   std::vector<int> n2o;
   auto D = DelaunayTriangulation::compute(T, unit, 1e-6, &n2o, /*track_removed=*/true);
   ASSERT_FALSE(D.free_edges.empty());               // reduction recycled slots
-  ASSERT_FALSE(D.tracker.points.empty());           // removals were tracked
+  ASSERT_GT(D.tracker.view.n, 0);                   // removals were tracked
 
   auto D2 = D;
   EXPECT_TRUE(same_dcel_state(D, D2));
