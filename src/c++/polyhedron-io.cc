@@ -178,7 +178,28 @@ bool Polyhedron::to_wavefront_obj(const Polyhedron &P, FILE *file)
 
 bool Polyhedron::to_mol2(const Polyhedron &P, FILE *file)
 {
-  size_t Nedges = P.count_edges();
+  // Some pipeline stages may fill adjacency rows but leave degree counters at 0.
+  // Fall back to scanning valid neighbour slots in that case.
+  vector<edge_t> edges;
+  edges.reserve(P.N * 3 / 2);
+
+  for(node_t u = 0; u < P.N; ++u){
+    if(P.degree(u) > 0){
+      for(node_t v: P.nbrs(u))
+        if(v >= u)
+          edges.push_back(edge_t(u, v));
+      continue;
+    }
+
+    for(int k = 0; k < P.dmax; ++k){
+      const node_t v = P.neighbours[u * P.dmax + k];
+      if(v < 0 || v >= P.N) continue;
+      if(v >= u)
+        edges.push_back(edge_t(u, v));
+    }
+  }
+
+  const size_t Nedges = edges.size();
   fprintf(file,
 	  "# Created by libgraph from Fullerene (http://tinyurl.com/fullerenes)\r\n"
 	  "@<TRIPOS>MOLECULE\r\n"
@@ -196,11 +217,8 @@ bool Polyhedron::to_mol2(const Polyhedron &P, FILE *file)
 
   fprintf(file,"@<TRIPOS>BOND\r\n");
   int i = 1;
-  for(node_t u=0;u<P.N;u++){
-    for(node_t v: P.nbrs(u))
-      if(v>=u)
-	fprintf(file,"%d\t %d\t %d\t un\r\n",i++,u+1,v+1);
-  }
+  for(const auto& e: edges)
+    fprintf(file,"%d\t %d\t %d\t un\r\n",i++,e.first+1,e.second+1);
 
   return true;
 }

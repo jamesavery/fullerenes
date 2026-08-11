@@ -103,8 +103,11 @@ int main(int argc, char** argv)
             Graph cubicG = batch::to_graph(view_i);
             std::vector<coord3d> pts = batch::to_points(
                 std::span<const std::array<real_t,3>>(xyz.data() + std::size_t(i) * n, n));
-
+            
+            std::cout << cubicG.owned_neighbours << '\n';
             Polyhedron polyhedron(PlanarGraph(cubicG), pts);
+            std::cout << PlanarGraph(cubicG).owned_neighbours << '\n';
+            std::cout << polyhedron.owned_neighbours << '\n';
             const std::string path = output_name(prefix, n, i);
             if (!Polyhedron::to_file(polyhedron, path))
                 throw std::runtime_error("failed to write mol2 file: " + path);

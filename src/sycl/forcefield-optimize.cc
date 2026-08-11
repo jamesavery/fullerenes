@@ -1683,20 +1683,6 @@ struct ForceField
             arc_energy += arc.energy(constants);
         }
         return sycl::reduce_over_group(cta, arc_energy, sycl::plus<real_t>{});
-
-        // switch (FFT)
-        //{
-        // case FLATNESS_ENABLED: {
-        //     FaceData face(cta, X, node_graph);
-        //     return reduce_over_group(cta, arc_energy + face.flatness_energy(constants), sycl::plus<real_t>{});
-        //     }
-        // case FLAT_BOND: {
-        //     FaceData face(cta, X, node_graph);
-        //     return reduce_over_group(cta, arc_energy + face.flatness_energy(constants), sycl::plus<real_t>{});
-        //     }
-        // default:
-        //     return reduce_over_group(cta, arc_energy, sycl::plus<real_t>{});
-        // }
     }
 
     // Golden Section Search, using fixed iterations.
@@ -1771,11 +1757,8 @@ struct ForceField
 
         // Normalize To match reference python implementation by Buster.
         s_norm = SQRT(sycl::reduce_over_group(cta, dot(s, s), sycl::plus<real_t>{}));
-        // s_norm = SQRT(reduction(sdata, dot(s,s)));
-        if (node_id == 0) printf("CG_INIT: s_norm=%f g0=(%f,%f,%f)\n", s_norm, g0[0], g0[1], g0[2]);
         s /= s_norm;
 
-        sycl::group_barrier(cta);
         for (size_t i = 0; i < MaxIter; i++)
         {
             alpha = GSS(X, s, X1, X2);
@@ -1783,23 +1766,6 @@ struct ForceField
             if (alpha > (real_t)0.0)
             {
                 X1[node_id] = X[node_id] + alpha * s;
-            }
-            // DEBUG: check X1 before gradient call (barrier outside conditional)
-            sycl::group_barrier(cta);
-            if (i == 0 && node_id == 0) {
-                int first_nan = -1;
-                for (size_t k = 0; k < N; k++) {
-                    if (!std::isfinite(X1[k][0]) || !std::isfinite(X1[k][1]) || !std::isfinite(X1[k][2])) { first_nan = k; break; }
-                }
-                printf("CG_PRE_GRAD: first_nan_idx=%d X1[0]=(%f,%f,%f) alpha=%f\n", 
-                       first_nan, X1[0][0], X1[0][1], X1[0][2], alpha);
-                if (first_nan >= 0)
-                    printf("CG_PRE_GRAD: X1[%d]=(%f,%f,%f)\n", first_nan, X1[first_nan][0], X1[first_nan][1], X1[first_nan][2]);
-                // Print all X1 NaN locations
-                for (size_t k = 0; k < N; k++) {
-                    if (!std::isfinite(X1[k][0]) || !std::isfinite(X1[k][1]) || !std::isfinite(X1[k][2]))
-                        printf("  NAN_AT[%d]=(%f,%f,%f)\n", (int)k, X1[k][0], X1[k][1], X1[k][2]);
-                }
             }
             sycl::group_barrier(cta);
             g1 = gradient(X1);
@@ -1820,30 +1786,8 @@ struct ForceField
 
             s = -g1 + beta * s;
             g0 = g1;
-// Normalize Search Direction using MaxNorm or 2Norm
-#if USE_MAX_NORM == 1
-            s_norm = sycl::reduce_over_group(cta, sycl::max(sycl::max(s.x, s.y), s.z), sycl::greater<real_t>{});
-#else
-            // DEBUG: check for NaN in dot(s,s) before reduce
-            {
-                real_t local_dot = dot(s, s);
-                real_t sum_dots = sycl::reduce_over_group(cta, local_dot, sycl::plus<real_t>{});
-                if (node_id == 0 && i == 0) {
-                    printf("CG_ITER0: local_dot[0]=%f sum_dots=%f sqrt=%f g1[0]=(%f,%f,%f) s[0]=(%f,%f,%f)\n", 
-                           local_dot, sum_dots, SQRT(sum_dots), g1[0], g1[1], g1[2], s[0], s[1], s[2]);
-                }
-                s_norm = SQRT(sum_dots);
-            }
-#endif
-            // DEBUG: detect first NaN
-            if (node_id == 0 && (!std::isfinite(s_norm) || !std::isfinite(alpha) || !std::isfinite(beta))) {
-                printf("CG_NAN: iter=%d alpha=%f beta=%f s_norm=%f g0_norm2=%f X[0]=(%f,%f,%f)\n", 
-                       (int)i, alpha, beta, s_norm, g0_norm2, X[0][0], X[0][1], X[0][2]);
-            }
+            s_norm = SQRT(sycl::reduce_over_group(cta, dot(s, s), sycl::plus<real_t>{}));
             s /= s_norm;
-
-            // if (node_id == 0) printf("s_norm = %f\n", s_norm);
-            // printf("s = (%f, %f, %f)\n", s[0], s[1], s[2]);
         }
     }
 };
@@ -1880,10 +1824,11 @@ static SyclEvent forcefield_optimize_view_batch_impl(
     assert(Q->get_device().get_info<sycl::info::device::local_mem_size>() >= (size_t)local_mem_bytes_required);
 
     SyclEventImpl ffopt_done = Q->submit([&](sycl::handler& h) {
-        sycl::local_accessor<T,1>      sdata(N*2, h);
-        sycl::local_accessor<coord3d,1> X(N, h);
-        sycl::local_accessor<coord3d,1> X1(N, h);
-        sycl::local_accessor<coord3d,1> X2(N, h);
+        // Combine all per-workgroup local memory into a single local_accessor<T,1>.
+        // Layout: [sdata: 2N*T][X: N*coord3d][X1: N*coord3d][X2: N*coord3d]
+        // With T elements as units, coord3d = 3*T elements -> total = 2N + 3*3*N = 11N elements of T.
+        const size_t local_T_count = (size_t)N * 11;
+        sycl::local_accessor<T,1> local_pool(local_T_count, h);
 
         h.parallel_for<ForceFieldOptimizeViewBatchKernel<FFT,T,K>>(
             sycl::nd_range(sycl::range{(size_t)N*capacity}, sycl::range{(size_t)N}),
@@ -1895,6 +1840,16 @@ static SyclEvent forcefield_optimize_view_batch_impl(
                 if (statuses[bid].is_not_set(StatusEnum::NOT_CONVERGED)) return;
                 if (statuses[bid].is_set(StatusEnum::FAILED_3D) || statuses[bid].is_set(StatusEnum::CONVERGED_3D)) return;
 
+                // Slice the unified pool into named regions.
+                T* pool_ptr = static_cast<T*>(local_pool.get_pointer());
+                T*       sdata_ptr = pool_ptr;                    // 2*N elements of T
+                coord3d* X_ptr     = reinterpret_cast<coord3d*>(pool_ptr + 2 * N);     // N coord3d
+                coord3d* X1_ptr    = X_ptr + N;                                        // N coord3d
+                coord3d* X2_ptr    = X1_ptr + N;                                       // N coord3d
+                std::span<coord3d> X (X_ptr,  (size_t)N);
+                std::span<coord3d> X1(X1_ptr, (size_t)N);
+                std::span<coord3d> X2(X2_ptr, (size_t)N);
+
                 const auto cubic_neighbours_acc = A_cubic.subspan(bid * N, N);
                 auto X_acc = as_span<coord3d>(xyz.subspan(bid * N, N));
 
@@ -1905,12 +1860,12 @@ static SyclEvent forcefield_optimize_view_batch_impl(
                 X[tid] = X_acc[tid];
                 sycl::group_barrier(cta);
 
-                ForceField<FFT,T,K> FF(nodeG, constants, cta, sdata.get_pointer());
+                ForceField<FFT,T,K> FF(nodeG, constants, cta, sdata_ptr);
 
                 auto convergence_check = [&]() {
                     coord3d rel_bond_err, rel_angle_err, rel_dihedral_err;
                     for (int j = 0; j < 3; j++) {
-                        auto arc = typename ForceField<FFT,T,K>::ArcData(tid, j, std::span<coord3d>(static_cast<coord3d*>(X.get_pointer()), N), nodeG);
+                        auto arc = typename ForceField<FFT,T,K>::ArcData(tid, j, X, nodeG);
                         rel_bond_err[j]     = std::abs(arc.bond()     - constants.r0[j])         / constants.r0[j];
                         rel_angle_err[j]    = std::abs(arc.angle()    - constants.angle0[j])     / constants.angle0[j];
                         rel_dihedral_err[j] = std::abs(arc.dihedral() - constants.inner_dih0[j]) / constants.inner_dih0[j];
@@ -1926,10 +1881,10 @@ static SyclEvent forcefield_optimize_view_batch_impl(
                     }
                 };
 
-                FF.CG(std::span<coord3d>(static_cast<coord3d*>(X.get_pointer()), N), std::span<coord3d>(static_cast<coord3d*>(X1.get_pointer()), N), std::span<coord3d>(static_cast<coord3d*>(X2.get_pointer()), N), std::max(iterations - 1, size_t(0)));
-                auto E1 = FF.energy(std::span<coord3d>(static_cast<coord3d*>(X.get_pointer()), N));
-                FF.CG(std::span<coord3d>(static_cast<coord3d*>(X.get_pointer()), N), std::span<coord3d>(static_cast<coord3d*>(X1.get_pointer()), N), std::span<coord3d>(static_cast<coord3d*>(X2.get_pointer()), N), std::min(size_t(1), iterations));
-                auto E2 = FF.energy(std::span<coord3d>(static_cast<coord3d*>(X.get_pointer()), N));
+                FF.CG(X, X1, X2, std::max(iterations - 1, size_t(0)));
+                auto E1 = FF.energy(X);
+                FF.CG(X, X1, X2, std::min(size_t(1), iterations));
+                auto E2 = FF.energy(X);
                 if ((std::abs(E1 - E2)/N < std::numeric_limits<T>::epsilon()*1e2) || ((size_t)iters[bid] >= max_iterations))
                     check_convergence = true;
                 if (check_convergence) convergence_check();
