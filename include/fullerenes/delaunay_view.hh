@@ -1396,11 +1396,13 @@ struct DelaunayView {
   bool tie_break_self_loop(int v, int h_loop, DelaunayWorkspace& ws,
                            Metric&& m = Metric{}, Transport&& tr = Transport{}) {
     if (status != Status::Ok) return false;
-    const int slots[2] = {h_loop, h_loop ^ 1};
+    // (`slots` would be the natural name, but it is a Qt macro keyword --
+    //  this header must stay includable from a Qt TU.)
+    const int loop_he[2] = {h_loop, h_loop ^ 1};
     double theta[2] = {0.0, 0.0};
     for (int i = 0; i < 2; i++) {
       ws.tie_side[i].clear();
-      const int start = cw(slots[i] ^ 1), stop = cw(slots[i]);
+      const int start = cw(loop_he[i] ^ 1), stop = cw(loop_he[i]);
       long guard = 0;
       for (int g = start; g != stop; g = cw(g)) {
         theta[i] += he_angle[g];

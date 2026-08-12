@@ -56,8 +56,6 @@ void register_generated_Polyhedron(py::class_<pyf::PyGeom<Polyhedron, Polyhedron
     cls.def("volume_divergence", [](W& w) { return w.view().volume_divergence(); });
     cls.def("diameter", [](W& w) { return w.view().diameter(); });
     cls.def("width_height_depth", [](W& w) { return pyf::coord3d_copy(w.view().width_height_depth()); });
-    cls.def("inertia_matrix", [](W& w) { return pyf::matrix3d_copy(w.view().inertia_matrix()); });
-    cls.def("principal_axes", [](W& w) { return pyf::matrix3d_copy(w.view().principal_axes()); });
     cls.def("is_invalid", [](W& w) { return w.view().is_invalid(); });
     cls.def("is_cubic", [](W& w) { return w.view().is_cubic(); });
     cls.def("is_triangulation", [](W& w) { return w.view().is_triangulation(); });

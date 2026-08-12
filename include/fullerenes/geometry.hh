@@ -215,6 +215,16 @@ struct coord3 {
 
 using coord3d = coord3<double>;
 
+// The mean of a point set -- equivalently the centroid of unit point masses at
+// `points`.  The unindexed counterpart of face_t::centroid / tri_t::centroid,
+// which average a point set selected by indices.
+template<typename T = double>
+inline coord3<T> mean(std::span<const coord3<T>> points) {
+  coord3<T> c;
+  for(const coord3<T>& p: points) c += p;
+  return c/(T)points.size();
+}
+
 struct matrix2d {
   double A[4];
   matrix2d(const double *v) { for(int i=0;i<4;i++) A[i] = v[i]; }
@@ -277,7 +287,9 @@ struct matrix3d {
 
     return sqrt(norm);
   }
-  
+
+  double trace() const { return values[0] + values[4] + values[8]; }
+
   matrix3d operator*(const matrix3d& B) const {
     const matrix3d &A(*this);
     matrix3d C;
@@ -423,8 +435,7 @@ struct matrix3d {
     // spurious O(sqrt(eps)) spread for a clustered spectrum, so a gap test on
     // them would misclassify an isotropic matrix and then divide by a collapsed
     // null direction.)  Every direction is then an eigenvector.
-    const double trace = S(0,0)+S(1,1)+S(2,2);
-    matrix3d dev(S); for(int i=0;i<3;i++) dev(i,i) -= trace/3.0;
+    matrix3d dev(S); for(int i=0;i<3;i++) dev(i,i) -= S.trace()/3.0;
 
     if(dev.norm() > 1e-12*fscale){
       // Most isolated eigenvalue: largest minimum gap to the other two.  Its
@@ -502,7 +513,15 @@ struct matrix3d {
   static matrix3d unit_matrix(){
     return matrix3d(1,0,0,0,1,0,0,0,1);
   }
-  
+
+  // Rotation by `angle` radians about the axis `k` (normalised here), by
+  // Rodrigues' formula R = Id + sin(angle) K + (1 - cos(angle)) K^2 with
+  // K = cross_matrix(k/|k|).  The 3D counterpart of matrix2d::rotation.
+  static matrix3d rotation(const coord3d& k, double angle){
+    const matrix3d K(cross_matrix(k/k.norm()));
+    return unit_matrix() + K*sin(angle) + (K*K)*(1-cos(angle));
+  }
+
   friend ostream& operator<<(ostream& S, const matrix3d &M)
   {
     S << LIST_OPEN; for(int i=0;i<3;i++) S << vector<double>(&M.values[i*3],&M.values[(i+1)*3]) << (i+1<3?',':LIST_CLOSE);

@@ -792,7 +792,7 @@ DelaunayTriangulation::geodesic_disks(const std::vector<int>& sources, double R,
                                       DiskMetric metric) const {
   const double kInf = std::numeric_limits<double>::infinity();
   std::vector<GeodesicDisk> disks;
-  for (int s : sources) disks.push_back({s, {}});
+  for (int s : sources) disks.push_back({s, {}});   // ORDER CONTRACT: disks[i].source == sources[i]
   std::vector<double> dist(nv, kInf);
   std::vector<int>    owner(nv, -1);    // index into sources/disks of the claiming source
   std::vector<char>   frozen(nv, 0);
@@ -822,6 +822,8 @@ DelaunayTriangulation::geodesic_disks(const std::vector<int>& sources, double R,
       }
     }
   }
+  // disks[i].source == sources[i] holds throughout: disks were built in `sources` order and
+  // never reordered; owner[] indexes into them. Callers rely on this 1:1 ordering.
   return disks;
 }
 

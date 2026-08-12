@@ -17,6 +17,13 @@ add_executable(kegle kegle.cc)
 add_executable(mol2pov mol2pov.cc)
 add_executable(generate-herd generate-herd.cc)
 add_executable(generate-balanced generate-balanced.cc)
+# NOT BUILT.  density.cc is commented out here; gaudi.cc and gs-ex.cc are not
+# listed at all, and neither still compiles against the current API (gaudi.cc:498
+# push_back()s onto .points, which is now a std::span; gs-ex.cc:309 calls
+# dual(10,true) against a nullary dual()).  Consequence for anyone auditing the
+# inertia-tensor call sites: those three carry align_with_axes(MassModel::Atoms)
+# like the five live ones, but the pinning there is ASSERTED, not verified by a
+# compiler.  See PolyhedronView::inertia_matrix in include/fullerenes/graphview.hh.
 # add_executable(density density.cc)
 # add_executable(rspilist-to-python-and-mol2 rspilist-to-python-and-mol2.cc)
 # add_executable(geodesics geodesics.cc)

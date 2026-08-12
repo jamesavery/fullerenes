@@ -543,7 +543,7 @@ int main(int ac, char **av)
   cout << "P: " << P << endl;  
 
     P.move_to_origin();
-    P.align_with_axes();
+    P.align_with_axes(MassModel::Atoms);
 
   {
     ofstream mol2(("output/"+basename+".mol2").c_str());

@@ -74,7 +74,9 @@ enum class Code {
     OK,
     IDT_COMPUTE,           // DelaunayTriangulation::compute threw
     ALEXANDROV,            // Layer II: any non-validating solver outcome
-    NON_SIMPLICIAL,        // iDT carries a self-loop / is not well-formed
+    NON_SIMPLICIAL,        // non-embeddable iDT: self-loop / non-triangle face, or
+                           // Alexandrov FAIL_NOT_SIMPLE (metric not realizable as a
+                           // simple convex polytope). Multi-edges are ACCEPTED.
     EMBED,                 // some cell admits no consistent chart (or lmap threw)
     COVERAGE,              // some non-cone vertex claimed 0 or >= 3 times
     INTERPOLATE,           // Layer II: interpolate_cell threw

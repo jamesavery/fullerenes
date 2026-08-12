@@ -54,7 +54,7 @@ int main(int ac, char **av)
       continue;
     }
     P.move_to_origin();
-    P.align_with_axes();       
+    P.align_with_axes(MassModel::Atoms);
     Polyhedron::to_file(P,s.str()+"-P.mol2");
     Polyhedron::to_file(P,s.str()+"-P.xyz"); 
     

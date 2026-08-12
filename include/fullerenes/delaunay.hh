@@ -618,6 +618,10 @@ struct DelaunayTriangulation : DelaunayView, DelaunayStorage {
   // geodesic Voronoi cell clipped at R. Disjoint by construction (no vertex in two
   // disks). Edge metric relaxes along edges; Unfold also runs the triangle wavefront
   // across each incident face within a cell (cross-cell seams stay on the edge metric).
+  //
+  // ORDER CONTRACT: the result is 1:1 with `sources` and in the same order --
+  // result[i].source == sources[i] for every i (each source seeds its own disk at the
+  // minimal distance 0, so it always owns itself). Callers may index the two in lockstep.
   std::vector<GeodesicDisk> geodesic_disks(const std::vector<int>& sources, double R,
                                            DiskMetric metric) const;
 

@@ -238,8 +238,29 @@ PlanarGraph PlanarGraph::from_ascii(FILE *file)
   // characters (newline, separator, EOF) are left in the stream so a
   // caller may iterate multiple records.
   //
-  // Throws std::runtime_error on EOF before the record, on unterminated
-  // input, or on a parse failure.
+  // NOT AN ORIENTATION BOUNDARY -- a TRUSTED FORMAT, like planarcode.  The
+  // record IS the rotation system: to_ascii writes the rows in their stored
+  // cyclic order precisely so that "neighbour list is a unique representation of
+  // the graph that preserves orientation" (its comment above), and this reads
+  // them back verbatim.  Re-sorting them here would be the opposite of reading
+  // the file -- it would discard the one thing the format exists to carry, and
+  // (nothing having coordinates) could only put back the mirror embedding.
+  //
+  // Nor does it VERIFY the genus, though a real predicate now exists.  This
+  // format's second job is diagnostic: the claude-projects validator harness
+  // dumps the graph of a failing isomer through to_ascii so the failure can be
+  // reloaded and studied, and a dump whose bug IS its rotation system must
+  // still load.  What is checked below is what a record can be wrong about
+  // regardless of any topological claim -- an index naming no vertex, or an arc
+  // with no reverse, neither of which is a graph at all.
+  //
+  // @post   the returned rows are, in order, the rows in the file
+  // @pre    oriented: the file's rows are a consistent orientation.  A caller
+  //         that does not trust its source checks with oriented_surface() /
+  //         require_oriented_surface(); this function will not check for it.
+  // @throws std::runtime_error on EOF before the record, on unterminated input,
+  //         on a parse failure, on an out-of-range vertex index, or on
+  //         asymmetric adjacency
 
   // 1) Consume the record into a buffer by counting bracket balance.
   std::string buf;
@@ -304,7 +325,22 @@ PlanarGraph PlanarGraph::from_ascii(FILE *file)
     }
   }
 
-  return PlanarGraph(Graph(Spanify::OwnedDenseGraph<node_t>(adj)));
+  // 3) The two things the record can be wrong about on its own terms.  The range
+  // check comes first because an out-of-range index is an out-of-bounds read the
+  // moment anything walks the rows -- including the symmetry check below.
+  const int N = int(adj.size());
+  for(int u=0;u<N;u++)
+    for(node_t v: adj[u])
+      if(v < 0 || v >= N)
+        throw std::runtime_error("PlanarGraph::from_ascii: row " + std::to_string(u)
+                                 + " names vertex " + std::to_string(int(v))
+                                 + ", which is outside [0," + std::to_string(N) + ")");
+
+  PlanarGraph G{Graph(Spanify::OwnedDenseGraph<node_t>(adj))};
+  if(!G.adjacency_is_symmetric())
+    throw std::runtime_error("PlanarGraph::from_ascii: adjacency is not symmetric -- some arc "
+                             "u->v in the record has no reverse v->u, so it is not a graph");
+  return G;
 }
 
 PlanarGraph PlanarGraph::from_spiral(FILE *f, const size_t index)  {
