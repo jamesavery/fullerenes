@@ -363,7 +363,7 @@ size_t PlanarGraphView::count_perfect_matchings() const
 }
 
 
-vector<coord3d> PlanarGraphView::zero_order_geometry(double scalerad) const
+vector<coord3d> PlanarGraphView::tutte_sphere_geometry(double scalerad) const
 {
   vector<coord2d> flat_layout = tutte_layout();
   vector<coord2d> angles(layout2d::spherical_projection(*this, flat_layout));
