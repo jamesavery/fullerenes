@@ -111,40 +111,8 @@ void Graph::apply_permutation(const Permutation& pi)
   repoint();
 }
 
-int  GraphView::arc_ix(node_t u, node_t v) const
-{
-  return find(u, v);
-}
-
-// Successor to v in oriented neigbhours of u
-node_t GraphView::next(node_t u, node_t v) const
-{
-  const auto &nu((*this)[u]);
-  int j = arc_ix(u,v);
-  if(j>=0) return nu[(j+1)%nu.size()];
-  else return -1;
-}
-
-// Predecessor to v in oriented neigbhours of u
-node_t GraphView::prev(node_t u, node_t v) const
-{
-  const auto &nu((*this)[u]);
-  int j = arc_ix(u,v);
-  if(j>=0) return nu[(j-1+nu.size())%nu.size()];
-  return -1;            // u-v is not an edge in a triangulation
-}
-
-// Successor to v in face containing directed edge u->v
-node_t GraphView::next_on_face(node_t u, node_t v) const
-{
-  return prev(v,u);
-}
-
-// Predecessor to v in face containing directed edge u->v
-node_t GraphView::prev_on_face(node_t u, node_t v) const
-{
-  return next(v,u);
-}
+// arc_ix / next / prev / next_on_face / prev_on_face are inline in
+// graphview.hh so device code can call them.
 
 // ---------------------------------------------------------------------------
 // Orientation: which surface the rotation system embeds the graph in.  The

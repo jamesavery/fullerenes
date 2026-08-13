@@ -110,11 +110,30 @@ struct GraphView : Spanify::RSRAdjacencyView<node_t> {
     using RSRAdjacencyView::prev;
     using RSRAdjacencyView::next_on_face;
 
-    int  arc_ix(node_t u, node_t v) const;
-    node_t next(node_t u, node_t v) const;
-    node_t prev(node_t u, node_t v) const;
-    node_t next_on_face(node_t u, node_t v) const;
-    node_t prev_on_face(node_t u, node_t v) const;
+    // Inline so device code can call them: these five are the vocabulary for
+    // walking a rotation system.
+    //
+    // Total -- -1 for "not an arc", never an exception.  A caller for which a
+    // missing arc is a contract violation raises that itself.
+    int arc_ix(node_t u, node_t v) const { return find(u, v); }
+
+    // Successor to v in the oriented neighbours of u.
+    node_t next(node_t u, node_t v) const {
+        const std::span<const node_t> nu = (*this)[u];
+        const int j = arc_ix(u, v);
+        return j >= 0 ? nu[(j + 1) % nu.size()] : -1;
+    }
+
+    // Predecessor to v in the oriented neighbours of u.
+    node_t prev(node_t u, node_t v) const {
+        const std::span<const node_t> nu = (*this)[u];
+        const int j = arc_ix(u, v);
+        return j >= 0 ? nu[(j - 1 + nu.size()) % nu.size()] : -1;
+    }
+
+    // Successor / predecessor to v in the face containing the arc u->v.
+    node_t next_on_face(node_t u, node_t v) const { return prev(v, u); }
+    node_t prev_on_face(node_t u, node_t v) const { return next(v, u); }
 
     // --- Topology queries ---
 
@@ -274,14 +293,19 @@ struct PlanarGraphView : GraphView {
     arc_t get_face_representation(arc_t e, int Fmax=INT_MAX) const;
     vector<arc_t> compute_face_representations(int Fmax=INT_MAX) const;
 
+    // The size of the face containing the arc u->v; 0 if the walk runs off a
+    // missing arc or does not close within max_face steps, so a non-oriented
+    // rotation system cannot spin forever.
+    static constexpr int max_face = 64;
     int face_size(node_t u, node_t v) const {
         int d = 1;
-        node_t u0 = u;
+        const node_t u0 = u;
         while (v != u0) {
-            node_t w = v;
+            const node_t w = v;
             v = next_on_face(u, v);
+            if (v < 0) return 0;
             u = w;
-            d++;
+            if (++d > max_face) return 0;
         }
         return d;
     }
@@ -332,7 +356,22 @@ struct PlanarGraphView : GraphView {
     vector<coord2d> tutte_layout_direct(const face_t& outer_face, const vector<coord2d>& outer_coords) const;
 
     // --- Geometry ---
-    vector<coord3d> zero_order_geometry(double scalerad=4) const;
+    // Tutte layout -> sphere shells.  One specific construction, available to
+    // callers that want it by name (e.g. to compare against the
+    // eisenstein-paint methods); subtypes inherit it.
+    // @pre  the rotation system is consistently oriented (otherwise
+    //           tutte_layout falls back to shortest_cycle for the outer face)
+    // @post returns N points on a sphere of average bond length scalerad*1.5,
+    //           centred on their centroid
+    vector<coord3d> tutte_sphere_geometry(double scalerad=4) const;
+
+    // The best initial geometry for this type.  Subtypes point it at the
+    // tightest construction their structure allows -- FullereneGraphView at
+    // eisenstein_paint_geometry -- so which method runs, and what the argument
+    // means, follow the type.  Callers wanting a specific method name it.
+    vector<coord3d> zero_order_geometry(double scalerad=4) const {
+        return tutte_sphere_geometry(scalerad);
+    }
 };
 
 // ---------------------------------------------------------------------------
