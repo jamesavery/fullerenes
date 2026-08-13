@@ -86,13 +86,12 @@ struct GeodesicDisk {
 // Failure contract: a transport-detected failure (the clamp band, a
 // degenerate development, an exhausted arena) trips the DCEL's Status latch
 // and the owner converts it to a throw at its boundary (throw_on_status).
-// A REMOVAL's transport failure is commit-or-nothing: the plan hooks run
-// before any mutation and splice_fan early-outs on the latch, so complex and
-// tracker are unchanged.  A FLIP's is not: the view's flip_edge has no
-// status check between the plan hook and the first write, so the diagonal is
-// rewired, the commit hook then refuses, and the complex is left poisoned --
-// as it is by a throw from the DCEL surgery itself (splice_fan deep
-// invariants), per the file's deep-invariant convention.
+// Both surgeries are COMMIT-OR-NOTHING under a transport failure: the plan
+// hooks run before any mutation, and each body checks the latch before its
+// first write (flip_edge returns false; splice_fan early-outs), so complex
+// and tracker are unchanged.  (A throw from the DCEL surgery itself --
+// splice_fan's deep invariants -- still leaves the complex poisoned, per the
+// file's deep-invariant convention; that is a different failure class.)
 // bisect_multi_edges and split_face are NOT transport-hooked and throw
 // when tracking is active.  Copies of a tracking complex snapshot the
 // tracker: transport applies only to the copy you mutate.
