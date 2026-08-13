@@ -3,10 +3,37 @@
 #include <sys/types.h>
 #include <type_traits>
 #include "fullerenes/graph.hh"
+#include "fullerenes/owned.hh"
 
 
 namespace BuckyGen {
-  
+
+  // buckygen's payload stride: it emits a fullerene dual, whose maximum degree
+  // is 6, as rows of this width with -1 padding.  Taken from the view type so
+  // the enumerator and the storage layout state the width once.
+  inline constexpr int BUCKYGEN_DMAX = FullereneDualView::default_dmax;
+
+  // Size an owning graph/dual type to hold one buckygen dual -- Nv vertices at
+  // BUCKYGEN_DMAX, the payload's own width, whatever the destination type's
+  // default stride is -- and return the view the enumerator fills.
+  //
+  // Reuse is the normal case (one destination filled in a loop): storage is
+  // reallocated only when the shape changes, and any twin table is dropped
+  // because it describes the previous graph.
+  template<class G_t> requires owning_graph<G_t>
+  FullereneDualView dual_slot(G_t& out, node_t Nv) {
+    if((node_t)out.N != Nv || out.dmax != BUCKYGEN_DMAX ||
+       out.owned_neighbours.size() != (size_t)Nv*BUCKYGEN_DMAX){
+      out.owned_neighbours.assign((size_t)Nv*BUCKYGEN_DMAX, node_t(-1));
+      out.owned_deg.assign((size_t)Nv, 0);
+      out.N    = Nv;
+      out.dmax = BUCKYGEN_DMAX;
+    }
+    if constexpr (requires { out.owned_twin; }) out.owned_twin.clear();
+    out.repoint();
+    return FullereneDualView(out.N, out.dmax, out.neighbours, out.deg);
+  }
+
   typedef struct {
     pid_t pid{};
     pid_t parent_pid{};        // captured pre-fork; the child polls getppid() against it
@@ -34,7 +61,15 @@ namespace BuckyGen {
     vector<int>         reasm_fill{}, reasm_got{}, reasm_nchunks{};
 
     buckygen_queue new_worker(int worker_index);
-    bool next_fullerene(Graph& G);
+
+    // Fill a caller-provided dual view (see the free next_fullerene below).
+    bool next_fullerene(FullereneDualView dst);
+
+    // ... or any owning graph/dual type, sized here to the dual's own stride.
+    template<class G_t> requires owning_graph<G_t>
+    bool next_fullerene(G_t& out) {
+      return next_fullerene(dual_slot(out, (node_t)Nvertices));
+    }
 
     void stop_all();           // idempotent: reaps + clears worker_processes
 
@@ -59,20 +94,17 @@ namespace BuckyGen {
   // WORKER_FINISHED -- becomes a no-op rather than killpg'ing a reaped/reused pid).
   void stop(buckygen_queue& Q);
 
-  bool next_fullerene(buckygen_queue& Q, Graph& G);
+  // Fill a caller-provided dual view -- the body every spelling reaches.  The
+  // caller owns the memory; it may be anything addressable, a device
+  // (shared-USM) slot included, so a batch can have each dual written straight
+  // into the arena its kernels read.
+  bool next_fullerene(buckygen_queue& Q, FullereneDualView dst);
 
-  // Backward-compatibility shim: fill any owned graph/triangulation type
-  // (Triangulation, FullereneDual, ...) directly. buckygen emits a dual
-  // triangulation; we fill a Graph, then deep-copy its adjacency into `out`.
-  // In the view-based hierarchy these owned types no longer derive from Graph,
-  // so the Graph& overload above cannot bind them.
-  template<class G_t>
-    requires (!std::is_same_v<std::remove_cv_t<G_t>, Graph>)
+  // ... or an owning graph/dual type (Graph, Triangulation, FullereneDual,
+  // ...), sized here and then filled through the same body.
+  template<class G_t> requires owning_graph<G_t>
   bool next_fullerene(buckygen_queue& Q, G_t& out) {
-    Graph G;
-    bool r = next_fullerene(Q, G);
-    if (r) out = G;
-    return r;
+    return next_fullerene(Q, dual_slot(out, (node_t)Q.Nvertices));
   }
 }
 

@@ -21,6 +21,19 @@
 #include <variant>
 #include <type_traits>
 
+// An owning adjacency type: it holds the storage its view spans point into,
+// and can repoint them after that storage moves or is resized.  Owned<View>
+// and Graph both satisfy it, so a filler can be written once against any
+// owner rather than once per concrete graph class.
+template<typename G>
+concept owning_graph = requires(G& g) {
+    g.owned_neighbours;
+    g.owned_deg;
+    g.repoint();
+    g.N;
+    g.dmax;
+};
+
 namespace owned_detail {
     // Fallback: no geometry member → use coord3d as a dummy (never actually stored).
     template<typename V, bool HasGeom>
