@@ -144,6 +144,11 @@ public:
                             // in the patch optimizer where the analytical Hessian is tractable.
   bool opt_convex_constraint = false;
   bool opt_skip_post_reflect = false;
+  double opt_reflect_threshold = 0.05;  // In-loop reflection: every iteration, vertices with
+                            // h < -opt_reflect_threshold*L are mirrored through their
+                            // neighbour-centroid plane before the step -- the fold-escape
+                            // operator that keeps a cold-start descent out of folded
+                            // (convex, wrong-basin) minima.  0 disables.
   OptMethod opt_method = OptMethod::LBFGS;  // Optimization method for optimize() (m=10)
 
   // Constructors

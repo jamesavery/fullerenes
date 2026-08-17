@@ -20,9 +20,22 @@
 // 1e-10 s's); both line searches start at alpha = 1 as the parent does.
 //
 // Convexity restoration (reflect/hull loops BETWEEN optimize calls)
-// stays with the caller exactly as in the parent pipeline; only the
+// stays with the caller exactly as in the parent pipeline; the
 // post-optimization strict-convexity cleanup lives here, as it does in
 // the parent optimize().
+//
+// In-loop reflection (cfg.reflect_threshold): at the top of every
+// iteration, vertices with h < -reflect_threshold L are mirrored
+// through their neighbour-centroid plane BEFORE the step (the parent's
+// pre-2026-03-08 "periodic reflection", the DESIGN S3.3 between-steps
+// Projection realized at this driver's altitude).  It is the
+// fold-escape operator for cold starts: a descent from a fragile
+// (Tutte-sphere) start folds a pentagon cap on the way down and, left
+// alone, converges into a CONVEX wrong-basin minimum that no
+// post-convergence reflect/hull pass can touch (C50 ang_max 94.13 vs
+// the 75-degree guard; claude-projects/optimize/validation/
+// C50-ANGMAX-INVESTIGATION.md).  Reflecting the fold as it forms keeps
+// the descent in the equilateral basin.  0 disables.
 // =====================================================================
 
 #include "fullerenes/optim/core.hh"
@@ -56,6 +69,7 @@ struct DeltaConfig {
   double k_conv = 0;
   bool convex_constraint = false; // STEIHAUG: reject convex->concave steps
   bool skip_post_reflect = false; // caller handles convexity cleanup
+  double reflect_threshold = 0.05; // in-loop reflection of h < -thr L (0 = off)
   FILE* log = nullptr;            // parent-format diagnostic lines (~20/run)
 };
 
@@ -65,6 +79,7 @@ struct DeltaResult {
   int n_concave = 0;
   int iters = 0;
   int n_energy = 0, n_grad = 0, n_hv = 0;
+  int n_reflected = 0;            // vertices mirrored by in-loop reflection
   uint32_t flags = 0;
   // The unified budget in AET eval-cost units (the model's 1:2:7).
   double work() const {
@@ -202,6 +217,20 @@ inline DeltaResult delta_optimize(DeltahedronView<double> D,
     else ++stag_count;
   };
 
+  // In-loop reflection (header comment): mirror the vertices folded
+  // deeper than reflect_threshold L, re-evaluate at the mirrored point.
+  // D.points aliases x, so the mirrored geometry is the iterate.
+  // Returns the number of vertices moved (0: nothing changed).
+  auto reflect_step = [&]() {
+    if (!(cfg.reflect_threshold > 0)) return 0;
+    const int n_r = D.reflect_concave(D.points, cfg.reflect_threshold * L, cfg.fixed);
+    if (n_r > 0) {
+      out.n_reflected += n_r;
+      f = fg(x, g);
+    }
+    return n_r;
+  };
+
   // Polak-Ribiere direction update d <- -g + beta d from (g, gp),
   // shared by the CG method and the post-cleanup CG polish.
   auto pr_direction = [&]() {
@@ -236,6 +265,10 @@ inline DeltaResult delta_optimize(DeltahedronView<double> D,
     for (int iter = 0;; ++iter) {
       out.iters = iter + 1;
       if (out.work() >= max_work) break;
+      // Reflect before the step (parent order: reflect, phase, stop);
+      // the direction is kept -- the descent check below resets it if
+      // the mirrored gradient made it an ascent direction.
+      const bool reflected = iter > 0 && reflect_step() > 0;
       if (phase_transition(iter)) {
         f = fg(x, g);
         for (std::size_t i = 0; i < n; ++i) d[i] = -g[i];
@@ -254,9 +287,9 @@ inline DeltaResult delta_optimize(DeltahedronView<double> D,
       if (log_interval > 0 && iter % log_interval == 0) {
         const double dd = la::dot(d, d);
         const double alpha = dd > 0 ? (la::dot(x, d) - la::dot(xp, d)) / dd : 0;
-        fprintf(cfg.log, "  CG %4d: E=%.6f |g|=%.4e gmax*L=%.4e a=%.3e cv=%.4f ang=%.2e ph=%d\n",
+        fprintf(cfg.log, "  CG %4d: E=%.6f |g|=%.4e gmax*L=%.4e a=%.3e cv=%.4f ang=%.2e ph=%d%s\n",
                 iter, f, la::nrm2(g), gmax_L(g), alpha, edge_cv(),
-                D.max_angle_relerr(), phase);
+                D.max_angle_relerr(), phase, reflected ? " R" : "");
       }
       pr_direction();
     }
@@ -271,6 +304,10 @@ inline DeltaResult delta_optimize(DeltahedronView<double> D,
     for (int iter = 0;; ++iter) {
       out.iters = iter + 1;
       if (out.work() >= max_work) break;
+      // Reflect before the step; the geometry changed outside the
+      // quasi-Newton model, so the history is dropped (as the parent).
+      const bool reflected = iter > 0 && reflect_step() > 0;
+      if (reflected) policy.reset(st);
       if (phase_transition(iter)) {
         f = fg(x, g);
         policy.reset(st);
@@ -303,9 +340,9 @@ inline DeltaResult delta_optimize(DeltahedronView<double> D,
         double hmin = 1.0;
         for (int v = 0; v < N; ++v)
           if (!(has_fixed && cfg.fixed[v])) hmin = std::min(hmin, h_log[v]);
-        fprintf(cfg.log, "  LB %4d: E=%.6f |g|=%.4e gmax*L=%.4e a=%.3e cv=%.4f ang=%.2e hmin=%+.4f ph=%d h=%d\n",
+        fprintf(cfg.log, "  LB %4d: E=%.6f |g|=%.4e gmax*L=%.4e a=%.3e cv=%.4f ang=%.2e hmin=%+.4f ph=%d h=%d%s\n",
                 iter, f, la::nrm2(g), gmax_L(g), alpha, edge_cv(),
-                D.max_angle_relerr(), hmin, phase, st.stored);
+                D.max_angle_relerr(), hmin, phase, st.stored, reflected ? " R" : "");
       }
     }
   }
@@ -319,6 +356,10 @@ inline DeltaResult delta_optimize(DeltahedronView<double> D,
     for (int iter = 0;; ++iter) {
       out.iters = iter + 1;
       if (out.work() >= max_work) break;
+      // Reflect before the step; the constrained variant's h reference
+      // follows the mirrored geometry.  The radius is kept (parent).
+      const bool reflected = iter > 0 && reflect_step() > 0;
+      if (reflected && cfg.convex_constraint) D.aet_h_values(D.points, h_current, cfg.fixed);
       if (phase_transition(iter)) {
         f = fg(x, g);
         tr.Delta = 0.5 * L;                        // reset radius on phase change
@@ -362,18 +403,18 @@ inline DeltaResult delta_optimize(DeltahedronView<double> D,
         out.flags |= Result::STEP_REJECTED;
       }
       if (log_interval > 0 && iter % log_interval == 0)
-        fprintf(cfg.log, "  ST %4d: E=%.6f |g|=%.4e gmax*L=%.4e |z|=%.2e D=%.2e rho=%.2f ang=%.2e in=%d ph=%d %s\n",
+        fprintf(cfg.log, "  ST %4d: E=%.6f |g|=%.4e gmax*L=%.4e |z|=%.2e D=%.2e rho=%.2f ang=%.2e in=%d ph=%d %s%s\n",
                 iter, f, la::nrm2(g), gmax_L(g), la::nrm2(z), tr.Delta, rho,
                 D.max_angle_relerr(), out.n_hv - hv_before - 1, phase,
-                accepted ? "acc" : "REJ");
+                accepted ? "acc" : "REJ", reflected ? " R" : "");
     }
   }
 
   out.gmax_L = gmax_L(g);
   const bool stagnated = !converged && stag_count >= stag_window;
   if (cfg.log)
-    fprintf(cfg.log, "  %s done: %d iters, E=%.6f gmax*L=%.4e cv=%.4f %s\n",
-            method_name, out.iters, f, out.gmax_L, edge_cv(),
+    fprintf(cfg.log, "  %s done: %d iters, E=%.6f gmax*L=%.4e cv=%.4f refl=%d %s\n",
+            method_name, out.iters, f, out.gmax_L, edge_cv(), out.n_reflected,
             converged ? "CONVERGED" : stagnated ? "STAGNATED" : "budget");
 
   // Post-optimization strict-convexity cleanup, exactly as the parent:

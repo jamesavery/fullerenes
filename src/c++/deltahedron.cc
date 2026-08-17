@@ -2989,6 +2989,7 @@ OptResult Deltahedron::optimize(std::span<const coord3d> initial_geometry, doubl
   cfg.k_conv            = opt_k_conv;
   cfg.convex_constraint = opt_convex_constraint;
   cfg.skip_post_reflect = opt_skip_post_reflect;
+  cfg.reflect_threshold = opt_reflect_threshold;
   cfg.log               = opt_log;
 
   const optim::DeltaResult r = optim::delta_optimize(*this, cfg);
