@@ -2,7 +2,8 @@
 #include "fullerenes/isomerdb.hh"
 
 #include <stdexcept>
-// TODO: Hov! Isomer count is wrong when reading text database. Find and fix!
+#include <cmath>
+#include <cstring>
 
 string IsomerDB::database_path = FULLERENE_DATABASE_PATH;
 
@@ -39,6 +40,275 @@ vector< vector<size_t> > IsomerDB::symmetry_count_data[2] = {{{1},{},{1},{1},{1,
 
 
 // ------------------------------ Functions ------------------------------
+
+// ---- Fortran formatted-field primitives (edit descriptors Aw, Iw, Fw.d) ----
+//
+// The database is written and read by Fortran FORMAT statements, so the
+// text layer below is a column-exact emulation of the edit descriptors those
+// statements use -- nothing more.  Input: Fortran BLANK='NULL' semantics
+// (blanks anywhere in a numeric field are ignored, an all-blank field is 0).
+// Output: right-justified in the field; a value that does not fit throws
+// instead of the Fortran behaviour (a field of asterisks -- silent loss).
+
+static string_view fortran_field(const string& s, int& pos, int len, const char* descriptor)
+{
+  if(pos < 0 || len < 0 || size_t(pos) + size_t(len) > s.size())
+    throw std::invalid_argument(string("Fortran ") + descriptor + " field at column " +
+                                to_string(pos+1) + " runs past the end of the record");
+  string_view f(s.data() + pos, len);
+  pos += len;
+  return f;
+}
+
+void IsomerDB::fortran_readA(char *result, const string& s, int& pos, int len)
+{
+  string_view f = fortran_field(s, pos, len, "A");
+  memcpy(result, f.data(), len);
+}
+
+long IsomerDB::fortran_readI(const string& s, int& pos, int len)
+{
+  string_view f = fortran_field(s, pos, len, "I");
+  long v = 0; bool negative = false, sign_seen = false, digit_seen = false;
+  for(char c: f){
+    if(c == ' ') continue;
+    if((c == '-' || c == '+') && !sign_seen && !digit_seen){ sign_seen = true; negative = (c=='-'); continue; }
+    if(c >= '0' && c <= '9'){ v = 10*v + (c-'0'); digit_seen = true; continue; }
+    throw std::invalid_argument("Fortran I" + to_string(len) + " field '" + string(f) + "' is not an integer");
+  }
+  return negative? -v : v;
+}
+
+double IsomerDB::fortran_readF(const string& s, int& pos, int len)
+{
+  string_view f = fortran_field(s, pos, len, "F");
+  string compact;                          // the field with blanks removed
+  for(char c: f) if(c != ' ') compact += c;
+  if(compact.empty()) return 0;
+  // Fortran F input accepts [sign] digits [. digits] [exponent]; the database
+  // only ever holds plain decimals, and a field without a decimal point would
+  // silently take an implied scale (Fw.d) -- refuse anything but sign, digits
+  // and one point.
+  size_t points = 0, digits = 0;
+  for(size_t i=0;i<compact.size();i++){
+    char c = compact[i];
+    if(c == '.') points++;
+    else if(c >= '0' && c <= '9') digits++;
+    else if(!((c == '-' || c == '+') && i == 0))
+      throw std::invalid_argument("Fortran F" + to_string(len) + " field '" + string(f) + "' is not a decimal number");
+  }
+  if(points != 1 || digits == 0)
+    throw std::invalid_argument("Fortran F" + to_string(len) + " field '" + string(f) + "' is not a decimal number");
+  return strtod(compact.c_str(), nullptr);
+}
+
+string IsomerDB::fortran_writeI(long v, int len)
+{
+  string digits = to_string(v);
+  if((int)digits.size() > len)
+    throw std::invalid_argument("value " + digits + " does not fit a Fortran I" + to_string(len) + " field");
+  return string(len - digits.size(), ' ') + digits;
+}
+
+string IsomerDB::fortran_writeF(double v, int len, int decimals)
+{
+  char buf[64];
+  int n = snprintf(buf, sizeof buf, "%*.*f", len, decimals, v);
+  if(n < 0 || n > len)
+    throw std::invalid_argument("value " + to_string(v) + " does not fit a Fortran F" +
+                                to_string(len) + "." + to_string(decimals) + " field");
+  return string(buf, n);
+}
+
+// ---- One text record: cursor with the file/line context for diagnostics ----
+namespace {
+
+struct PDBRecord {
+  const string& line; const string& filename; size_t lineno; int pos = 0;
+
+  [[noreturn]] void fail(const string& what) const {
+    throw_db_error("readPDB", "line " + to_string(lineno) + ": " + what +
+                   " in record '" + line + "' of database file", filename);
+  }
+  string A(int w)     { try { string b(w, ' '); IsomerDB::fortran_readA(b.data(), line, pos, w); return b; } catch(const std::invalid_argument& e){ fail(e.what()); } }
+  long   I(int w)     { try { return IsomerDB::fortran_readI(line, pos, w); } catch(const std::invalid_argument& e){ fail(e.what()); } }
+  double F(int w)     { try { return IsomerDB::fortran_readF(line, pos, w); } catch(const std::invalid_argument& e){ fail(e.what()); } }
+  // wX skip, checking that the skipped columns hold what the writing FORMAT
+  // put there (a misaligned parse cannot pass this).
+  void   X(int w, string_view expect) {
+    string_view got;
+    try { got = fortran_field(line, pos, w, "X"); } catch(const std::invalid_argument& e){ fail(e.what()); }
+    if(got != expect) fail("expected '" + string(expect) + "' at column " + to_string(pos-w+1) + ", found '" + string(got) + "'");
+  }
+  void   done() const { if(size_t(pos) != line.size()) fail("trailing characters after column " + to_string(pos)); }
+  // Values stored in one-byte fields must fit them (silent truncation is a bug).
+  u_int8_t u8(long v, const char* what) const {
+    if(v < 0 || v > 255) fail(string(what) + " = " + to_string(v) + " does not fit the 8-bit database field");
+    return u_int8_t(v);
+  }
+};
+
+// Structural checks shared by both text layouts.
+void check_rspi(const PDBRecord& r, const u_int8_t* RSPI, int N)
+{
+  const int Nfaces = N/2 + 2;
+  for(int i=0;i<12;i++){
+    if(RSPI[i] < 1 || RSPI[i] > Nfaces)
+      r.fail("RSPI[" + to_string(i) + "] = " + to_string(RSPI[i]) + " outside [1," + to_string(Nfaces) + "]");
+    if(i > 0 && RSPI[i] <= RSPI[i-1])
+      r.fail("RSPI not strictly ascending at position " + to_string(i));
+  }
+}
+
+// Compact record: A3,12I3,{5I2,6I2 | 3I2},I2,I1,F7.5[,I7],6I3
+IsomerDB::Entry parse_compact_record(PDBRecord& r, int N, bool IPR, bool with_ncycham)
+{
+  IsomerDB::Entry e{};
+  string group = r.A(3); memcpy(e.group, group.data(), 3);
+  for(int i=0;i<12;i++) e.RSPI[i] = r.u8(r.I(3), "RSPI");
+  if(!IPR){
+    for(int i=0;i<5;i++) e.PNI[i] = r.u8(r.I(2), "PNI");
+    for(int i=0;i<6;i++) e.HNI[i] = r.u8(r.I(2), "HNI");
+  } else {
+    // Only HNI k=3..5 are stored: every pentagon of an IPR isomer has 0
+    // pentagon neighbours and no hexagon has fewer than 3 hexagon neighbours.
+    e.PNI[0] = 12;
+    for(int i=3;i<6;i++) e.HNI[i] = r.u8(r.I(2), "HNI");
+  }
+  e.NeHOMO    = r.u8(r.I(2), "NeHOMO");
+  e.NedgeHOMO = r.u8(r.I(1), "NedgeHOMO");
+  e.HLgap     = r.F(7);
+  if(with_ncycham){
+    long h = r.I(7);
+    if(h < 0 || h > INT32_MAX) r.fail("ncycham = " + to_string(h) + " out of range");
+    e.ncycham = int(h);
+  }
+  for(int i=0;i<6;i++) e.INMR[i] = r.u8(r.I(3), "INMR");
+  r.done();
+  check_rspi(r, e.RSPI, N);
+  return e;
+}
+
+// Verbose record (the program's printed isomer list), spiral.f/isomer.f
+// format 608 (with Hamilton-cycle count) / 607 (without):
+//   1X,I8,2X,A3,1X,12I4,2X,'(',5(I2,','),I2,')  ',I2,2X,'(',6(I2,','),I3,')  ',
+//   F8.5,2X,I2,1X,I2,1X,F8.5,1X,A6[,2X,I9],2X,3(I3,' x',I3,:,',')
+// i.e. number, group, RSPI, (PNI k=0..5), Np, (HNI k=0..6), sigma_h, NeHOMO,
+// NedgeHOMO, HLgap, closed/open[, ncycham], NMR pattern.  The columns the
+// compact format does not store are all derived (util.f IPentInd / HexInd,
+// isomer.f Printdatabase) and are verified against the stored ones here.
+// The leading isomer number is the record's index in the FULL list of the
+// size; a filtered listing (the Nontrivial/ files) keeps the original
+// numbers, so the invariant the reader can hold every file to is "strictly
+// increasing" -- a full list's completeness is the caller's check against
+// number_isomers().
+IsomerDB::Entry parse_verbose_record(PDBRecord& r, int N, bool IPR, bool with_ncycham, long& last_number)
+{
+  IsomerDB::Entry e{};
+  r.X(1, " ");
+  long number = r.I(8);
+  if(number <= last_number)
+    r.fail("isomer number " + to_string(number) + " does not increase (previous " + to_string(last_number) + ")");
+  last_number = number;
+  r.X(2, "  ");
+  string group = r.A(3); memcpy(e.group, group.data(), 3);
+  r.X(1, " ");
+  for(int i=0;i<12;i++) e.RSPI[i] = r.u8(r.I(4), "RSPI");
+
+  long PNI[6], HNI[7];
+  r.X(3, "  (");
+  for(int k=0;k<6;k++){ PNI[k] = r.I(2); r.X(1, k<5? ",": ")"); }
+  r.X(2, "  ");
+  long Np = r.I(2);
+  r.X(3, "  (");
+  for(int k=0;k<6;k++){ HNI[k] = r.I(2); r.X(1, ","); }
+  HNI[6] = r.I(3);
+  r.X(1, ")");
+  double sigmah = r.F(10);            // 2X,F8.5
+  r.X(1, " ");
+  long NeHOMO = r.I(3), NedgeHOMO = r.I(3);
+  double HLgap = r.F(9);              // 1X,F8.5
+  r.X(1, " ");
+  string shell = r.A(6);
+  long ncycham = 0;
+  if(with_ncycham){
+    r.X(1, " ");
+    ncycham = r.I(10);                // 2X,I9 written; CompressDatabase reads 1X,I10
+    if(ncycham <= 0) r.fail("Hamilton-cycle count " + to_string(ncycham) + " in a file declaring Hamilton counts");
+    if(ncycham > INT32_MAX) r.fail("ncycham = " + to_string(ncycham) + " out of range");
+  }
+  r.X(2, "  ");
+  // NMR pattern: 1..3 groups of I3,' x',I3 separated by ','.
+  int nmr_len = int(r.line.size()) - r.pos;
+  if(nmr_len != 8 && nmr_len != 17 && nmr_len != 26)
+    r.fail("NMR pattern '" + r.line.substr(r.pos) + "' is not 1-3 'nnn xnnn' groups");
+  for(int k=0;k<(nmr_len+1)/9;k++){
+    if(k > 0) r.X(1, ",");
+    e.INMR[2*k]   = r.u8(r.I(3), "INMR");
+    r.X(2, " x");
+    e.INMR[2*k+1] = r.u8(r.I(3), "INMR");
+  }
+  r.done();
+
+  // The derived columns must agree with the stored ones.
+  long pni_sum = 0, pni_moment = 0;
+  for(int k=0;k<5;k++){ pni_sum += PNI[k]; pni_moment += k*PNI[k]; }
+  pni_moment += 5*PNI[5];
+  if(pni_sum + PNI[5] != 12) r.fail("pentagon neighbour indices do not sum to 12");
+  if(Np != pni_moment/2)     r.fail("Np = " + to_string(Np) + " != IPentInd(PNI) = " + to_string(pni_moment/2));
+  long hni_sum = 0;
+  for(int k=0;k<7;k++) hni_sum += HNI[k];
+  if(hni_sum != N/2 - 10)    r.fail("hexagon neighbour indices do not sum to " + to_string(N/2-10));
+  // sigma_h = standard deviation of the hexagon-neighbour count over the
+  // hexagons (util.f HexInd).  The C110-C120 listings were printed by a
+  // program version whose HexInd summed only k=3..6, so both readings are
+  // accepted -- the column is derived and dropped either way.
+  auto hexind = [&](int kmin){
+    long n = 0, hk = 0, hk2 = 0;
+    for(int k=kmin;k<7;k++){ n += HNI[k]; hk += k*HNI[k]; hk2 += k*k*HNI[k]; }
+    return n? sqrt(fabs(double(hk2)/n - pow(double(hk)/n,2))) : 0.0;
+  };
+  const double sigmah_all = hexind(0), sigmah_k3 = hexind(3), sigmah_tol = 5.1e-6;   // F8.5 rounding
+  if(fabs(sigmah - sigmah_all) > sigmah_tol && fabs(sigmah - sigmah_k3) > sigmah_tol)
+    r.fail("sigma_h = " + to_string(sigmah) + " != HexInd(HNI) = " + to_string(sigmah_all) +
+           " (nor the legacy k>=3 value " + to_string(sigmah_k3) + ")");
+  string shell_expected = (2*NedgeHOMO == NeHOMO)? "closed" : "open  ";
+  if(shell != shell_expected) r.fail("shell '" + shell + "' inconsistent with NeHOMO/NedgeHOMO");
+  if(IPR && (PNI[0] != 12 || HNI[0] || HNI[1] || HNI[2]))
+    r.fail("non-IPR neighbour indices in an IPR file");
+
+  for(int k=0;k<5;k++) e.PNI[k] = r.u8(PNI[k], "PNI");
+  for(int k=0;k<6;k++) e.HNI[k] = r.u8(HNI[k], "HNI");
+  e.NeHOMO    = r.u8(NeHOMO, "NeHOMO");
+  e.NedgeHOMO = r.u8(NedgeHOMO, "NedgeHOMO");
+  e.HLgap     = HLgap;
+  e.ncycham   = int(ncycham);
+  check_rspi(r, e.RSPI, N);
+  return e;
+}
+
+// A verbose data record starts with the isomer number right-justified in
+// columns 1-9 (1X,I8); the trailer lines the program prints afterwards
+// ("Lowest number of Hamiltonian cycles ...", " Highest Np= ...") do not.
+bool looks_like_verbose_record(const string& line)
+{
+  if(line.size() < 9) return false;
+  bool digit = false;
+  for(int i=0;i<9;i++){
+    char c = line[i];
+    if(c >= '0' && c <= '9') digit = true;
+    else if(c != ' ') return false;
+  }
+  return digit;
+}
+
+void rtrim(string& s)
+{
+  while(!s.empty() && (s.back() == '\r' || s.back() == ' ' || s.back() == '\t')) s.pop_back();
+}
+
+}  // namespace
+
 bool IsomerDB::writeBinary(const string filename) const
 {
   FILE *f = fopen(filename.c_str(),"wb");
@@ -159,68 +429,117 @@ IsomerDB IsomerDB::readBinary(int N, bool IPR, string extension) {
   return readBinary(filename);
 }
 
-IsomerDB IsomerDB::readPDB(int N, bool IPR, string extension) {
-  string filename;
-  if(IPR)
-    filename= database_path+"/IPR/c"+pad_string(to_string(N),3,'0')+"IPR"+extension+".database";      
-  else 
-    filename= database_path+"/All/c"+pad_string(to_string(N),3,'0')+"all"+extension+".database";
+string IsomerDB::PDBfilename(int N, bool IPR, string extension)
+{
+  return database_path + (IPR? "/IPR/c" : "/All/c") + pad_string(to_string(N),3,'0')
+                       + (IPR? "IPR" : "all") + extension + ".database";
+}
 
+IsomerDB IsomerDB::readPDB(int N, bool IPR, string extension)
+{
+  const string filename = PDBfilename(N, IPR, extension);
+  IsomerDB DB = readPDB(filename);
+  if(DB.N != N || DB.IPR != IPR)
+    throw_db_error("readPDB", "header says C" + to_string(DB.N) + (DB.IPR? " IPR" : " all") +
+                   " but C" + to_string(N) + (IPR? " IPR" : " all") + " was requested from database file",
+                   filename);
+  return DB;
+}
+
+IsomerDB IsomerDB::readPDB(const string& filename)
+{
   ifstream dbfile(filename.c_str());
   if(!dbfile)
     throw_db_error("readPDB", string("cannot open database file (")
                    + strerror(errno) + ")", filename);
 
+  // Header.  Compact files: Format(I3,2I1) -- exactly five characters.
+  // Verbose listings: Format(I5,2I2) as printed by spiral.f (some hand-fixed
+  // to "N IP IH"), read list-directed by util.f CompressDatabase -- three
+  // blank-separated integers.
   string line;
-  int Nread,IP,IH, pos=0;
   if(!getline(dbfile,line))
     throw_db_error("readPDB", "empty database file", filename);
-
-  Nread = fortran_readI(line,pos,3);
-  IP = fortran_readI(line,pos,1);
-  IH = fortran_readI(line,pos,1);
-  if(Nread <= 0)
-    throw_db_error("readPDB", "malformed header line '" + line +
-                   "' in database file", filename);
-
-  IsomerDB DB(Nread,IP,IH);
-    
-  /* 
-     IP=0,IH=1:  1004 Format(A3,12I3,5I2,6I2,I2,I1,F7.5,I7,6I3)
-     IP=0,IH=0:  1007 Format(A3,12I3,5I2,6I2,I2,I1,F7.5,6I3)
-     IP=1,IH=1:  1008 Format(A3,12I3,3I2,I2,I1,F7.5,I7,6I3)
-     IP=1,IH=0:  1009 Format(A3,12I3,3I2,I2,I1,F7.5,6I3)
-  */
-  while(getline(dbfile,line)){
-    int pos = 0;
-    Entry e{};
-    fortran_readA(e.group,line,pos,3);
-    for(int i=0;i<12;i++) e.RSPI[i] = fortran_readI(line,pos,3);
-    if(IP==0){
-      // Formats 1004/1007: 5I2 pentagon indices, 6I2 hexagon indices (k=0..5).
-      for(int i=0;i<5;i++) e.PNI[i] = fortran_readI(line,pos,2);
-      for(int i=0;i<6;i++) e.HNI[i] = fortran_readI(line,pos,2);
-    } else {
-      // Formats 1008/1009: IPR files store only the k=3..5 hexagon indices.
-      for(int i=0;i<5;i++) e.PNI[i] = 0;
-      for(int i=0;i<3;i++) e.HNI[i] = 0;
-      for(int i=3;i<6;i++) e.HNI[i] = fortran_readI(line,pos,2);
-    }
-    e.NeHOMO = fortran_readI(line,pos,2);
-    e.NedgeHOMO = fortran_readI(line,pos,1);
-    e.HLgap = fortran_readF(line,pos,7);       // F7.5
-    if(IH==1) e.ncycham = fortran_readI(line,pos,7);
-    for(int i=0;i<6;i++) e.INMR[i] = fortran_readI(line,pos,3);
-    DB.entries.push_back(e);
+  rtrim(line);
+  vector<string> tokens;
+  for(size_t i=0;i<line.size();){
+    if(line[i] == ' '){ i++; continue; }
+    size_t j = i; while(j < line.size() && line[j] != ' ') j++;
+    tokens.push_back(line.substr(i,j-i)); i = j;
   }
-    
+  long Nread = 0, IP = -1, IH = -1;
+  bool verbose = false;
+  try {
+    if(tokens.size() == 1 && line.size() == 5){
+      int pos = 0;
+      Nread = fortran_readI(line,pos,3); IP = fortran_readI(line,pos,1); IH = fortran_readI(line,pos,1);
+    } else if(tokens.size() == 3){
+      int pos = 0;
+      Nread = fortran_readI(tokens[0],pos,tokens[0].size()); pos = 0;
+      IP    = fortran_readI(tokens[1],pos,tokens[1].size()); pos = 0;
+      IH    = fortran_readI(tokens[2],pos,tokens[2].size());
+      verbose = true;
+    }
+  } catch(const std::invalid_argument&){ /* reported below */ }
+  if(Nread < 20 || Nread == 22 || (Nread & 1) || (IP != 0 && IP != 1) || (IH != 0 && IH != 1))
+    throw_db_error("readPDB", "malformed header line '" + line + "' in database file", filename);
+
+  IsomerDB DB(int(Nread), IP == 1, IH == 1);
+  size_t lineno = 1;
+  bool in_trailer = false;
+  long last_number = 0;
+  while(getline(dbfile,line)){
+    lineno++;
+    rtrim(line);
+    PDBRecord r{line, filename, lineno};
+    if(!verbose){
+      if(line.empty()) r.fail("blank line");
+      DB.entries.push_back(parse_compact_record(r, DB.N, DB.IPR, DB.with_ncycham));
+    } else {
+      // Records, then the program's summary trailer; a record after the
+      // trailer has begun means the file is scrambled, not merely trailed.
+      if(!looks_like_verbose_record(line)){ in_trailer = true; continue; }
+      if(in_trailer) r.fail("isomer record after the trailer lines");
+      DB.entries.push_back(parse_verbose_record(r, DB.N, DB.IPR, DB.with_ncycham, last_number));
+    }
+  }
+
   DB.Nisomers = DB.entries.size();
   for(int i=0;i<DB.Nisomers;i++){
     const Entry &e(DB.entries[i]);
     DB.RSPIindex[vector<int>(e.RSPI,e.RSPI+12)] = i;
   }
-
   return DB;
+}
+
+// Compact text format, formats 1003 (header) and 1004/1007/1008/1009
+// (records) of isomer.f -- the same edit descriptors readPDB parses, so a
+// compact file round-trips byte for byte.
+bool IsomerDB::writePDB(const string& filename) const
+{
+  ofstream f(filename.c_str());
+  if(!f){
+    cerr << "Couldn't open database file " << filename << " for writing: " << strerror(errno) << ".\n";
+    return false;
+  }
+  f << fortran_writeI(N,3) << fortran_writeI(IPR,1) << fortran_writeI(with_ncycham,1) << "\n";
+  string record;
+  for(const Entry& e: entries){
+    record.assign(e.group, 3);
+    for(int i=0;i<12;i++) record += fortran_writeI(e.RSPI[i],3);
+    if(!IPR){
+      for(int i=0;i<5;i++) record += fortran_writeI(e.PNI[i],2);
+      for(int i=0;i<6;i++) record += fortran_writeI(e.HNI[i],2);
+    } else
+      for(int i=3;i<6;i++) record += fortran_writeI(e.HNI[i],2);
+    record += fortran_writeI(e.NeHOMO,2);
+    record += fortran_writeI(e.NedgeHOMO,1);
+    record += fortran_writeF(e.HLgap,7,5);
+    if(with_ncycham) record += fortran_writeI(e.ncycham,7);
+    for(int i=0;i<6;i++) record += fortran_writeI(e.INMR[i],3);
+    f << record << "\n";
+  }
+  return f.good();
 }
 
 int64_t IsomerDB::number_isomers(int N, const string& sym, bool IPR){
