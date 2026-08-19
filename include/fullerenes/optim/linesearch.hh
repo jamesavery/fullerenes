@@ -13,10 +13,19 @@
 //     trial point.  Bit-identical trajectories to minimize::lbfgs are
 //     a gate requirement of the wu re-expression.
 //
-//   ARMIJO_QUAD -- Deltahedron's backtracking Armijo with quadratic
-//     interpolation (alpha_q = -slope a^2 / 2(E_t - E - slope a),
-//     clamped to [0.1a, 0.5a], <= 60 backtracks, energy-only trials);
-//     the gradient is evaluated once at the accepted point.
+//   ARMIJO -- backtracking Armijo, energy-only trials, the gradient
+//     evaluated once at the accepted point.  Two shrink rules:
+//     QUAD_INTERP is Deltahedron's quadratic interpolation (alpha_q =
+//     -slope a^2 / 2(E_t - E - slope a), clamped to [0.1a, 0.5a],
+//     <= 60 backtracks by default); HALVE is the plain a *= 0.5 (the
+//     curvature-flow embed's <= 16 halvings with c1 = 0, i.e. strict
+//     decrease).  max_trials bounds either.
+//
+// Hooks (core.hh): clip caps the first trial length, veto makes a
+// trial point count as infinite energy (both conditions then shrink
+// past it; a search that ends on a vetoed point fails), post_accept
+// runs after each accepted step (nonzero => re-anchor f, g and drop
+// the step history), observe sees every iteration.
 //
 // The loop reproduces minimize::lbfgs's control flow exactly when the
 // extra Criteria (step_tol, domain predicates, work budget, stagnation
@@ -37,7 +46,8 @@
 
 namespace optim {
 
-enum class LineSearchCond { STRONG_WOLFE, ARMIJO_QUAD };
+enum class LineSearchCond { STRONG_WOLFE, ARMIJO };
+enum class Backtrack { QUAD_INTERP, HALVE };   // ARMIJO shrink rule
 
 namespace detail {
 
@@ -59,12 +69,18 @@ bool wolfe_search(FG&& fg, std::span<const double> x0,
                   std::span<const double> d, double f0, double dg0,
                   double t_init, double t_max, std::span<double> x,
                   std::span<double> g, double& f_out,
-                  double c1, double c2) {
+                  double c1, double c2, const AcceptVeto& veto = {}) {
   const std::size_t n = x0.size();
   const int max_evals = 64;
 
+  // A vetoed trial point counts as infinite energy: the non-finite
+  // branches below bracket past it exactly as they do for overflow.
   auto phi = [&](double t, double& dphi) -> double {
     for (std::size_t i = 0; i < n; ++i) x[i] = x0[i] + t * d[i];
+    if (veto && !veto(std::span<const double>(x.data(), n))) {
+      dphi = 0;
+      return std::numeric_limits<double>::infinity();
+    }
     const double fv = fg(std::span<const double>(x.data(), n), g);
     dphi = la::dot(std::span<const double>(g.data(), n), d);
     return fv;
@@ -112,37 +128,52 @@ bool wolfe_search(FG&& fg, std::span<const double> x0,
   return false;
 }
 
-// Deltahedron's backtracking Armijo with quadratic interpolation:
-// energy-only trials, alpha clamped to [0.1a, 0.5a]; gradient evaluated
-// once at the accepted point.  Like the parent, the final alpha is
-// accepted even if the Armijo test never fired (the caller's stagnation
-// logic then stops the descent).
-// @anchor  optim-armijo-quad-search
+// Backtracking Armijo: energy-only trials, shrink by quadratic
+// interpolation (Deltahedron: alpha clamped to [0.1a, 0.5a]) or by
+// halving; the gradient is evaluated once at the final point.  Like
+// the Deltahedron parent, the final alpha is accepted even if the
+// Armijo test never fired (the caller's stagnation logic then stops
+// the descent) -- EXCEPT when a veto is installed: a vetoed trial is
+// infinite energy and shrinks the step, and a search that ends on a
+// vetoed point fails (the caller restores x).
+// @anchor  optim-armijo-search
 // @pre     dg0 == dot(g(x0), d) < 0 (d is a descent direction)
-// @post    x = x0 + alpha d and f_out = f(x), g = grad f(x) for the
-//          final alpha; false iff f_out is non-finite
-// @variant 60-backtrack budget
+// @post    true => x = x0 + alpha d admissible, f_out = f(x), g = grad f(x)
+// @post    false => x is not admissible or f non-finite; caller restores
+// @variant max_trials backtracks
 template <typename EOnly, typename FG>
-bool armijo_quad_search(EOnly&& e_only, FG&& fg, std::span<const double> x0,
-                        std::span<const double> d, double f0, double dg0,
-                        double t_init, std::span<double> x,
-                        std::span<double> g, double& f_out, double c1) {
+bool armijo_search(EOnly&& e_only, FG&& fg, std::span<const double> x0,
+                   std::span<const double> d, double f0, double dg0,
+                   double t_init, std::span<double> x,
+                   std::span<double> g, double& f_out, double c1,
+                   Backtrack rule = Backtrack::QUAD_INTERP, int max_trials = 60,
+                   const AcceptVeto& veto = {}) {
   const std::size_t n = x0.size();
   double alpha = t_init;
   double f_trial = f0;
-  for (int ls = 0; ls < 60; ++ls) {
+  bool admissible = true;
+  for (int ls = 0; ls < max_trials; ++ls) {
     for (std::size_t i = 0; i < n; ++i) x[i] = x0[i] + alpha * d[i];
-    f_trial = e_only(std::span<const double>(x.data(), n));
+    admissible = !veto || veto(std::span<const double>(x.data(), n));
+    f_trial = admissible ? e_only(std::span<const double>(x.data(), n))
+                         : std::numeric_limits<double>::infinity();
     if (f_trial <= f0 + c1 * alpha * dg0) break;
-    const double denom = 2.0 * (f_trial - f0 - dg0 * alpha);
-    if (denom > 1e-30) {
-      const double alpha_q = -dg0 * alpha * alpha / denom;
-      alpha = std::max(0.1 * alpha, std::min(0.5 * alpha, alpha_q));
+    if (!admissible) {                      // no energy information: halve
+      alpha *= 0.5;
+    } else if (rule == Backtrack::QUAD_INTERP) {   // the parent's arithmetic, verbatim
+      const double denom = 2.0 * (f_trial - f0 - dg0 * alpha);
+      if (denom > 1e-30) {
+        const double alpha_q = -dg0 * alpha * alpha / denom;
+        alpha = std::max(0.1 * alpha, std::min(0.5 * alpha, alpha_q));
+      } else {
+        alpha *= 0.5;
+      }
     } else {
       alpha *= 0.5;
     }
   }
   for (std::size_t i = 0; i < n; ++i) x[i] = x0[i] + alpha * d[i];
+  if (veto && !veto(std::span<const double>(x.data(), n))) return false;
   f_out = fg(std::span<const double>(x.data(), n), g);
   return std::isfinite(f_out);
 }
@@ -153,10 +184,12 @@ template <LineSearchStep Step, class Precond = Identity>
 struct LineSearch {
   Step           step{};
   Precond        M{};
-  LineSearchCond cond     = LineSearchCond::STRONG_WOLFE;
-  double         c1       = 1e-4;   // Armijo (sufficient decrease)
-  double         c2       = 0.9;    // curvature (strong Wolfe only)
-  double         max_step = 0;      // ||step||_inf cap per iteration (0 = off)
+  LineSearchCond cond       = LineSearchCond::STRONG_WOLFE;
+  double         c1         = 1e-4;   // Armijo (sufficient decrease); 0 = strict decrease
+  double         c2         = 0.9;    // curvature (strong Wolfe only)
+  double         max_step   = 0;      // ||step||_inf cap per iteration (0 = off)
+  Backtrack      backtrack  = Backtrack::QUAD_INTERP;   // ARMIJO shrink rule
+  int            max_trials = 60;     // ARMIJO backtrack budget
 
   // Minimize prob.E in place on x.
   // @anchor  optim-linesearch-solve
@@ -166,7 +199,7 @@ struct LineSearch {
   // @variant stop.max_iters outer iterations (a safeguard, never a knob)
   template <SmoothModel Model>
   Result solve(SeqCtx ctx, const Problem<Model>& prob, std::span<double> x,
-               const Projection& project = {}) const {
+               const Hooks& hooks = {}) const {
     const std::size_t n = x.size();
     const double EPS = 1e-9;        // the Fortran zero-energy rectifier
     const Criteria& stop = prob.stop;
@@ -187,14 +220,15 @@ struct LineSearch {
     typename Step::State st(n, step);
 
     double f = fg(x, g);
+    const double g2_0 = stop.gtol_2_rel > 0 ? la::nrm2(g) : 0;
 
     int n_stag = 0;        // consecutive ftol_rel events (minimize.hh)
     int stag_count = 0;    // iterations without meaningful decrease (Deltahedron)
     for (int k = 0; k < stop.max_iters; ++k) {
       out.iters = k;
-      out.gmax  = la::inf_norm(g);
+      out.gmax  = grad_norm(stop, g);
       if (auto stopped = converged_or_stop(stop, out.gmax, g, x, stag_count,
-                                           out.work<Model>())) {
+                                           out.work<Model>(), g2_0)) {
         out.outcome = *stopped;
         break;
       }
@@ -219,19 +253,22 @@ struct LineSearch {
       std::copy(x.begin(), x.end(), xp.begin());
       std::copy(g.begin(), g.end(), gp.begin());
       const double t0 = step.first_trial(st, out.gmax);
-      const double t_max = (max_step > 0)
+      double t_max = (max_step > 0)
           ? max_step / std::max(la::inf_norm(d), 1e-300)
           : std::numeric_limits<double>::infinity();
+      if (hooks.clip) t_max = std::min(t_max, hooks.clip(x, d));   // admissible fraction of d
 
       double f_new = f;
       bool ok;
       if (cond == LineSearchCond::STRONG_WOLFE)
         ok = detail::wolfe_search(fg, xp, d, f, dg, std::min(t0, t_max), t_max,
-                                  x, std::span<double>(g), f_new, c1, c2);
+                                  x, std::span<double>(g), f_new, c1, c2,
+                                  hooks.veto);
       else
-        ok = detail::armijo_quad_search(e_only, fg, xp, d, f, dg,
-                                        std::min(t0, t_max), x,
-                                        std::span<double>(g), f_new, c1);
+        ok = detail::armijo_search(e_only, fg, xp, d, f, dg,
+                                   std::min(t0, t_max), x,
+                                   std::span<double>(g), f_new, c1,
+                                   backtrack, max_trials, hooks.veto);
       if (!ok) {
         // Restore the pre-search point; a failed search from a fresh
         // restart means no progress is possible.
@@ -271,9 +308,21 @@ struct LineSearch {
       }
       step.accepted(ctx, st, s, y, g);
       f = f_new;
+      ++out.n_accepted;
 
-      if (project) {
-        if (project(ctx, x) > 0) f = fg(x, g);   // re-anchor after projection
+      int n_post = 0;
+      if (hooks.post_accept) {
+        n_post = hooks.post_accept(ctx, x);
+        if (n_post > 0) {                 // x or the model changed underneath:
+          f = fg(x, g);                   // re-anchor; the step decides what of
+          step.invalidate(st);            // its history survives the move
+        }
+      }
+      if (hooks.observe) {
+        const double dd = la::dot(d, d);
+        const double t_taken = dd > 0 ? la::dot(s, d) / dd : 0;
+        hooks.observe(IterationView{k, f, grad_norm(stop, g), x, g, t_taken,
+                                    0, 0, 0, n_post, true, out.flags});
       }
       if (stop.step_tol > 0 && la::inf_norm(s) <= stop.step_tol) {
         out.outcome = Outcome::CONVERGED;
@@ -283,7 +332,7 @@ struct LineSearch {
     }
 
     out.f    = f;
-    out.gmax = la::inf_norm(g);
+    out.gmax = grad_norm(stop, g);
     return out;
   }
 };

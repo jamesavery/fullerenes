@@ -3013,10 +3013,12 @@ OptResult Deltahedron::optimize(std::span<const coord3d> initial_geometry, doubl
     case optim::Outcome::STAGNATED:        final_opt_result = OptResult::STAGNATED;        break;
     case optim::Outcome::BUDGET_EXHAUSTED: final_opt_result = OptResult::BUDGET_EXHAUSTED; break;
     case optim::Outcome::CONSTRAINT_STUCK: final_opt_result = OptResult::CONVEXITY_STUCK;  break;
-    // delta_optimize never produces these two; a budget label is the
+    // delta_optimize never produces these three (its two-phase
+    // continuation is always terminal); a budget label is the
     // least-wrong fallback for a safeguard-class stop.
     case optim::Outcome::STEP_FAILED:
-    case optim::Outcome::INFEASIBLE:       final_opt_result = OptResult::BUDGET_EXHAUSTED; break;
+    case optim::Outcome::INFEASIBLE:
+    case optim::Outcome::SATURATED:        final_opt_result = OptResult::BUDGET_EXHAUSTED; break;
   }
   return final_opt_result;
 }

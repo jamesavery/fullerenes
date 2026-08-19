@@ -161,7 +161,10 @@ enum class Outcome {
   BUDGET_EXHAUSTED,   // work/iteration safeguard tripped (a defect, not a result)
   STEP_FAILED,        // line search / subproblem could not make progress
   INFEASIBLE,         // iterate left the feasible region (constrained paths)
-  CONSTRAINT_STUCK    // feasibility restoration failed (reflect/hull, SQP)
+  CONSTRAINT_STUCK,   // feasibility restoration failed (reflect/hull, SQP)
+  SATURATED           // a Continuation stopped before its terminal parameters
+                      // (driver.hh: !cont.terminal() at exit; schedule-level
+                      // exhaustion, not stagnation of an inner solve)
 };
 
 constexpr const char* outcome_name(Outcome o) {
@@ -172,6 +175,7 @@ constexpr const char* outcome_name(Outcome o) {
     case Outcome::STEP_FAILED:      return "STEP_FAILED";
     case Outcome::INFEASIBLE:       return "INFEASIBLE";
     case Outcome::CONSTRAINT_STUCK: return "CONSTRAINT_STUCK";
+    case Outcome::SATURATED:        return "SATURATED";
   }
   return "?";
 }
@@ -179,8 +183,9 @@ constexpr const char* outcome_name(Outcome o) {
 struct Result {
   Outcome  outcome  = Outcome::BUDGET_EXHAUSTED;
   double   f        = 0;      // final value
-  double   gmax     = 0;      // final ||g||_inf
+  double   gmax     = 0;      // final gradient norm in Criteria::gnorm's convention
   int      iters    = 0;      // outer iterations taken
+  int      n_accepted = 0;    // accepted steps (line search: = iters; trust region: iters - rejections)
   int      n_energy = 0;      // energy-only oracle calls
   int      n_grad   = 0;      // energy+gradient oracle calls
   int      n_hv     = 0;      // Hessian-vector products
@@ -212,9 +217,26 @@ struct Result {
 // ---------------------------------------------------------------------
 using DomainPredicate = std::function<bool(std::span<const double> x)>;
 
+// The gradient-norm CONVENTION the gtol_inf test (and Result::gmax) use:
+//   FLAT_INF   max_i |g_i|                        (minimize.hh / wu)
+//   FLAT_2     ||g||_2
+//   BLOCK_INF  scale * max_b ||g_b||_2 over consecutive blocks of
+//              `block` entries (Deltahedron's gmax_L: block = 3,
+//              scale = L -- the per-vertex 2-norm, scaled to be
+//              dimensionless in the edge length)
+// Frozen (gauge) entries are zero in g, so a block norm over all
+// blocks equals the parent's max over FREE vertices.
+enum class GradNorm { FLAT_INF, FLAT_2, BLOCK_INF };
+
 struct Criteria {
-  double gtol_inf = 0;      // ||g||_inf <= gtol_inf
+  GradNorm gnorm = GradNorm::FLAT_INF;   // convention for gtol_inf / Result::gmax
+  int      gnorm_block = 1;              // BLOCK_INF: entries per block
+  double   gnorm_scale = 1;              // BLOCK_INF: multiplier
+
+  double gtol_inf = 0;      // gnorm(g) <= gtol_inf
   double gtol_2   = 0;      // ||g||_2   <= gtol_2
+  double gtol_2_rel = 0;    // ||g||_2 <= gtol_2_rel * ||g_0||_2, g_0 = the solve's
+                            // first gradient (Deltahedron's phase-1 exit: 0.01)
   double ftol_rel = 0;      // 2|df| <= ftol_rel (|f1|+|f0|+1e-9), required on
                             // TWO consecutive iterations (minimize.hh semantics)
   double step_tol = 0;      // ||step||_inf <= step_tol
@@ -227,6 +249,27 @@ struct Criteria {
   double    max_work          = 0;   // ceiling on eval_costs-weighted work (0 = off)
   int       stagnation_window = 0;   // iters without meaningful decrease -> STAGNATED (0 = off)
 };
+
+// The gradient norm in the Criteria's convention (header note above).
+// @post  FLAT_INF: max|g_i|; FLAT_2: ||g||_2; BLOCK_INF: scale * max over
+//        blocks of the block 2-norm (a trailing partial block counts)
+inline double grad_norm(const Criteria& c, std::span<const double> g) {
+  switch (c.gnorm) {
+    case GradNorm::FLAT_INF: return la::inf_norm(g);
+    case GradNorm::FLAT_2:   return la::nrm2(g);
+    case GradNorm::BLOCK_INF: {
+      const std::size_t b = (std::size_t)std::max(1, c.gnorm_block);
+      double m = 0;
+      for (std::size_t i = 0; i < g.size(); i += b) {
+        double s = 0;
+        for (std::size_t j = i; j < std::min(i + b, g.size()); ++j) s += g[j] * g[j];
+        m = std::max(m, std::sqrt(s));
+      }
+      return m * c.gnorm_scale;
+    }
+  }
+  return la::inf_norm(g);
+}
 
 // ---------------------------------------------------------------------
 // Gauge -- eliminated degrees of freedom: rigid-motion gauge fixing and
@@ -260,29 +303,76 @@ struct Problem {
   Criteria             stop{};
 };
 
-// Between-steps feasibility projection (DESIGN.md 3.3): a points->points
-// operator the paradigm applies after accepted steps when supplied
-// (Deltahedron's reflect/hull).  Distinct from the ConstraintSet/barrier
-// mechanism by signed-off decision; unification deferred.
-using Projection = std::function<int(SeqCtx, std::span<double> x)>;  // returns #modified
+// ---------------------------------------------------------------------
+// Hooks -- the paradigm loops' extension points (DESIGN.md 10.2).  Each
+// has at least two customers among the drivers that used to hand-roll
+// their loops around the missing one; all default-empty, zero cost
+// when unused.
+//
+//   clip         before the trial: the max admissible fraction s in
+//                (0, 1] of the proposed step d from x (line search:
+//                caps the first trial t; trust region: scales the
+//                subproblem step and caps the radius at the length
+//                taken).  Alexandrov's F(T)-feasible step, the embed's
+//                fraction-to-boundary.
+//   veto         on a trial point: false = the point is inadmissible --
+//                a trust region rejects the step (CVX_REJECTED), a line
+//                search treats it as infinite energy and keeps
+//                backtracking.  Deltahedron's convex-constraint gate,
+//                the embed's nonlinear feasibility check.
+//   post_accept  after an accepted step: may move x (a points->points
+//                projection: Deltahedron's reflect/hull, DESIGN.md 3.3)
+//                or mutate the MODEL through its own capture
+//                (Alexandrov's weighted-Delaunay re-flip); returns the
+//                number of changes.  Nonzero => the paradigm re-anchors
+//                f, g at x and drops the step's history.
+//   observe      once per iteration, a read-only IterationView (all
+//                diagnostic logging lives here, not in the loops).
+// ---------------------------------------------------------------------
+struct IterationView {
+  int      iter      = 0;
+  double   f         = 0;      // energy after this iteration
+  double   gmax      = 0;      // gradient norm (Criteria::gnorm convention)
+  std::span<const double> x, g;
+  double   step_len  = 0;      // line search: t taken; trust region: ||step||_2
+  double   radius    = 0;      // trust region: Delta after this iteration's update
+  double   rho       = 0;      // trust region: reduction ratio (0 for line search)
+  int      n_inner   = 0;      // trust region: subproblem HVPs this iteration
+  int      n_post    = 0;      // changes reported by post_accept this iteration
+  bool     accepted  = true;
+  uint32_t flags     = 0;      // Result flag bits raised so far
+};
+using StepClip   = std::function<double(std::span<const double> x, std::span<const double> d)>;
+using AcceptVeto = std::function<bool(std::span<const double> x_trial)>;
+using PostAccept = std::function<int(SeqCtx, std::span<double> x)>;
+using Observer   = std::function<void(const IterationView&)>;
+
+struct Hooks {
+  StepClip   clip;
+  AcceptVeto veto;
+  PostAccept post_accept;
+  Observer   observe;
+};
 
 // THE convergence battery: the disjunction-of-enabled-tests semantics
 // (header note above) written once, shared by every paradigm loop AND
 // the delta driver.  Returns the outcome that fired, or nullopt to
 // keep iterating.  gmax is the caller's gradient norm in ITS
-// convention (flat inf-norm for the paradigms; the delta driver passes
-// its L-scaled per-vertex norm and gates it against gtol_inf).  The
-// ftol_rel two-consecutive test stays with the accept path (it needs
-// f0/f1), as does step_tol.
+// convention (grad_norm(stop, g)); g2_0 is ||g||_2 at the solve's
+// start for the relative test.  The ftol_rel two-consecutive test
+// stays with the accept path (it needs f0/f1), as does step_tol.
 // @anchor optim-converged-or-stop
 // @post   result == CONVERGED    iff an enabled tolerance/predicate fired
 // @post   result == STAGNATED    iff the stagnation window tripped
 // @post   result == BUDGET_EXHAUSTED iff the work ceiling tripped
 inline std::optional<Outcome> converged_or_stop(
     const Criteria& stop, double gmax, std::span<const double> g,
-    std::span<const double> x, int stag_count, double work_now) {
+    std::span<const double> x, int stag_count, double work_now,
+    double g2_0 = 0) {
   if (stop.gtol_inf > 0 && gmax <= stop.gtol_inf) return Outcome::CONVERGED;
   if (stop.gtol_2 > 0 && std::sqrt(la::dot(g, g)) <= stop.gtol_2)
+    return Outcome::CONVERGED;
+  if (stop.gtol_2_rel > 0 && g2_0 > 0 && la::nrm2(g) <= stop.gtol_2_rel * g2_0)
     return Outcome::CONVERGED;
   if (!stop.domain.empty() &&
       std::any_of(stop.domain.begin(), stop.domain.end(),

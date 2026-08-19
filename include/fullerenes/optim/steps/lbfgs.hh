@@ -28,7 +28,9 @@ namespace optim {
 struct LBFGS {
   using paradigm = line_search_tag;
 
-  int m = 10;   // history pairs
+  int  m = 10;                    // history pairs
+  bool unit_first_trial = false;  // true: first trial t0 = 1 always (Deltahedron);
+                                  // false: minimize.hh's 1/gmax on an empty history (wu)
 
   struct State {
     std::vector<std::vector<double>> S, Y;   // ring buffers of (s, y)
@@ -43,6 +45,7 @@ struct LBFGS {
   };
 
   void reset(State& st) const { st.stored = 0; }
+  void invalidate(State& st) const { st.stored = 0; }   // curvature pairs straddle the move
 
   bool has_history(const State& st) const { return st.stored > 0; }
 
@@ -93,6 +96,7 @@ struct LBFGS {
 
   // First-iteration trial step scaled by the gradient (minimize.hh t0).
   double first_trial(const State& st, double gmax) const {
+    if (unit_first_trial) return 1.0;
     return (st.stored == 0) ? std::min(1.0, 1.0 / std::max(gmax, 1e-12))
                             : 1.0;
   }
