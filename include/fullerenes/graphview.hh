@@ -17,6 +17,8 @@
 // adds vector storage for any view type.
 
 #include <stdexcept>
+#include <array>
+#include <cmath>
 
 #include "fullerenes/dense_graph.hh"
 #include "fullerenes/geometry.hh"
@@ -224,9 +226,13 @@ struct GraphView : Spanify::RSRAdjacencyView<node_t> {
     vector<node_t> shortest_cycle(const vector<node_t>& prefix, const int max_depth) const;
     vector<int> multiple_source_shortest_paths(const vector<node_t>& sources, const unsigned int max_depth=INT_MAX) const;
 
-    // --- Hamiltonian paths ---
-    int hamiltonian_count() const;
-    int hamiltonian_count(node_t current_node, vector<bool>& used_edges, vector<bool>& used_nodes, vector<node_t>& path, const vector<int>& distances) const;
+    // --- Hamiltonian cycles ---
+    // Number of undirected Hamiltonian cycles, each counted once (the
+    // convention of IsomerDB's ncycham).  Babic's backtracking with the
+    // exclusion rule of the legacy hamilton.f HamiltonCyc, generalised to any
+    // degree.  Definition staged in claude-projects/unfortran/src/hamiltonian.cc
+    // until promotion.
+    int64_t hamiltonian_count() const;
 
     // --- Geometry helpers ---
     coord2d centre2d(const vector<coord2d>& layout) const;
@@ -638,9 +644,36 @@ struct TriangulationView : PlanarGraphView {
 // FullereneDualView: dual of a fullerene (triangulation with 12 degree-5
 // vertices, rest degree 6).
 // ---------------------------------------------------------------------------
+
+// The pentagon and hexagon neighbour indices of a fullerene (Raghavachari;
+// Fowler & Manolopoulos, An Atlas of Fullerenes; legacy spiral.f
+// DualAnalyze): P[k] = number of pentagons with k pentagon neighbours
+// (k = 0..5, sum 12), H[k] = number of hexagons with k hexagon neighbours
+// (k = 0..6, sum N/2 - 10).
+struct NeighbourIndices {
+    std::array<uint8_t,6> P{};
+    std::array<uint8_t,7> H{};
+};
+// Np = number of pentagon-pentagon adjacencies = sum_k k P[k] / 2
+// (legacy util.f IPentInd).
+inline int pentagon_adjacencies(const NeighbourIndices& ni) {
+    int m = 0; for (int k = 0; k < 6; k++) m += k * ni.P[k]; return m / 2;
+}
+// sigma_h = standard deviation of the hexagon-neighbour count over the
+// hexagons with k >= kmin neighbours (legacy util.f HexInd, kmin = 0; an
+// older program version summed only k >= 3).  0 when there are none.
+inline double hexagon_index(const NeighbourIndices& ni, int kmin = 0) {
+    long n = 0, hk = 0, hk2 = 0;
+    for (int k = kmin; k < 7; k++) { n += ni.H[k]; hk += k * ni.H[k]; hk2 += k * k * ni.H[k]; }
+    return n ? std::sqrt(std::fabs(double(hk2)/n - std::pow(double(hk)/n, 2))) : 0.0;
+}
+
 struct FullereneDualView : TriangulationView {
     using TriangulationView::TriangulationView;
     static constexpr uint8_t default_dmax = 6;
+
+    // The pentagon/hexagon neighbour indices of this dual.
+    NeighbourIndices neighbour_indices() const;
 
     bool get_rspi(node_t f1, node_t f2, node_t f3,
                   vector<int>& r, jumplist_t& j, bool general=true) const;

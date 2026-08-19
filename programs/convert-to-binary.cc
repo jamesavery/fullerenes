@@ -12,7 +12,7 @@ int main(int ac, char **av)
 
   string filename = outdir+"/c"+pad_string(to_string(N),3)+(IPR?"IPR":"all")+".bin";
 
-  if(DB.writeBinary(filename) != true) return -2;
+  if(DB.writeBinary(filename) != IsomerDB::WriteStatus::Ok) return -2;
     
   return 0;
 }

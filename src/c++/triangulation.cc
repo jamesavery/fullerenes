@@ -1559,6 +1559,18 @@ spiral_nomenclature FullereneDualView::name(bool rarest_start) const
 			     rarest_start);  
 }
 
+NeighbourIndices FullereneDualView::neighbour_indices() const
+{
+  NeighbourIndices ni;
+  for(node_t u=0;u<N;u++){
+    const int du = degree(u);
+    int same = 0;
+    for(node_t v: nbrs(u)) same += (degree(v) == du);
+    if(du == 5) ni.P[same]++; else ni.H[same]++;
+  }
+  return ni;
+}
+
 // call for one general spiral and extract the pentagon indices
 bool FullereneDualView::get_rspi(const node_t f1, const node_t f2, const node_t f3, vector<int>& rspi, jumplist_t& jumps, const bool general) const
 {
