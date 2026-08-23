@@ -44,6 +44,25 @@ public:
     u_int8_t INMR[6];		// NMR pattern: INMR[2i] orbits of size INMR[2i+1], i=0..2 (unused pairs 0)
 
     IsomerDB::RSPI rspi() const { IsomerDB::RSPI r; std::copy(RSPI, RSPI+12, r.begin()); return r; }
+    // A filled HOMO level: the Fortran's closed/open distinction, and the
+    // condition under which HLgap is a gap rather than the stored 0.
+    bool closed_shell() const { return 2*NedgeHOMO == NeHOMO; }
+    // An isolated-pentagon isomer: no pentagon has a pentagon neighbour, and
+    // (equivalently) no hexagon has fewer than 3 hexagon neighbours.  The IPR
+    // file layout stores only the columns this leaves free.
+    bool is_ipr() const { return PNI[0] == 12 && !HNI[0] && !HNI[1] && !HNI[2]; }
+    // The invariants of a database record of a C_N isomer in a file with
+    // these flags: RSPI 12 face positions in [1, N/2+2] strictly ascending;
+    // PNI(k), k<5, summing to at most the 12 pentagons, and PNI = (12,0,0,0,0)
+    // with no hexagon below 3 hexagon neighbours in an IPR file; HNI(k), k<6,
+    // summing to at most the N/2-10 hexagons; NMR orbits accounting for every
+    // atom; 1 <= NeHOMO <= 2*NedgeHOMO with NedgeHOMO >= 1; HLgap >= 0 and
+    // zero exactly for an open shell (the Fortran convention); a Hamilton
+    // count present exactly when the file carries them.  They hold over the
+    // entire corpus.  Empty string = valid; otherwise the first violation,
+    // for the caller to place in its own context.
+    // @anchor isomer-record-invariants
+    string invariant_violation(int N, bool IPR, bool with_ncycham) const;
     // The spiral as the graph constructors take it (FullereneGraph(N, rspi),
     // FullereneDual(N, rspi)): 0-based positions.
     vector<int> rspi_zero_based() const { vector<int> r(RSPI, RSPI+12); for(int& x: r) x--; return r; }
@@ -108,10 +127,9 @@ public:
   // Preamble and trailer lines (table header, summary statistics) are
   // ignored.
   //
-  // Every record is held to the invariants of a fullerene record (RSPI in
-  // [1, N/2+2] ascending, PNI/HNI sums, NMR orbits summing to N, HOMO
-  // occupation, gap zero exactly for an open shell, Hamilton count present
-  // exactly when the header says so) -- see check_entry in isomerdb.cc.
+  // Every record is held to Entry::invariant_violation (@ref
+  // isomer-record-invariants), the same predicate writePDB refuses to write
+  // a violation of.
   //
   // @throws std::runtime_error on a missing file, a malformed header, any
   //         record that does not parse column-exactly or violates an

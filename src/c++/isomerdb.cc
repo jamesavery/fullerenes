@@ -63,6 +63,34 @@ IsomerDB::Entry IsomerDB::Entry::with_neighbour_indices(Entry e, const Neighbour
   return e;
 }
 
+// @anchor isomer-record-invariants
+string IsomerDB::Entry::invariant_violation(int N, bool IPR, bool with_ncycham) const
+{
+  const int Nfaces = N/2 + 2;
+  for(int i=0;i<12;i++){
+    if(RSPI[i] < 1 || RSPI[i] > Nfaces)
+      return "RSPI[" + to_string(i) + "] = " + to_string(int(RSPI[i])) + " outside [1," + to_string(Nfaces) + "]";
+    if(i > 0 && RSPI[i] <= RSPI[i-1])
+      return "RSPI not strictly ascending at position " + to_string(i);
+  }
+  int pni = 0, hni = 0, nmr = 0;
+  for(int k=0;k<5;k++) pni += PNI[k];
+  for(int k=0;k<6;k++) hni += HNI[k];
+  for(int k=0;k<3;k++) nmr += int(INMR[2*k]) * int(INMR[2*k+1]);
+  if(pni > 12)        return "pentagon neighbour indices sum to " + to_string(pni) + " > 12";
+  if(hni > N/2 - 10)  return "hexagon neighbour indices sum to " + to_string(hni) + " > " + to_string(N/2-10);
+  if(IPR && !is_ipr())return "non-IPR neighbour indices in an IPR file";
+  if(nmr != N)        return "NMR pattern accounts for " + to_string(nmr) + " atoms, not " + to_string(N);
+  if(NedgeHOMO < 1 || NeHOMO < 1 || NeHOMO > 2*NedgeHOMO)
+    return "HOMO occupation " + to_string(int(NeHOMO)) + " electrons in " + to_string(int(NedgeHOMO)) + " orbitals";
+  if(HLgap < 0)       return "negative HOMO-LUMO gap";
+  if((HLgap == 0) == closed_shell())
+    return "HOMO-LUMO gap " + to_string(HLgap) + " inconsistent with the shell (gap is 0 exactly for an open shell)";
+  if(with_ncycham ? ncycham < 1 : ncycham != 0)
+    return "Hamilton-cycle count " + to_string(ncycham) + (with_ncycham? " in a file declaring Hamilton counts" : " in a file without Hamilton counts");
+  return "";
+}
+
 // ---- One text record: a fortran:: cursor with the file/line context for diagnostics ----
 namespace {
 
@@ -95,42 +123,12 @@ struct RecordCursor {
   }
 };
 
-// The invariants every database record satisfies, checked for both text
-// layouts (the compact format stores nothing redundant, so these are the
-// only checks it admits; all hold over the entire corpus):
-//   RSPI: 12 face positions in [1, N/2+2], strictly ascending;
-//   PNI(k), k<5, sum to at most 12 pentagons; an IPR entry has PNI = (12,0,0,0,0)
-//   and no hexagon with fewer than 3 hexagon neighbours;
-//   HNI(k), k<6, sum to at most the N/2-10 hexagons;
-//   NMR: the orbits account for every atom, sum_i INMR[2i]*INMR[2i+1] == N;
-//   HOMO: 1 <= NedgeHOMO, 1 <= NeHOMO <= 2*NedgeHOMO; HLgap >= 0 and zero
-//   exactly for an open shell (2*NedgeHOMO != NeHOMO: the Fortran convention);
-//   ncycham >= 1 when the file carries Hamilton counts, 0 otherwise.
+// The record invariants (Entry::invariant_violation) placed in this file's
+// context: which line of which file the offending record came from.
 void check_entry(const RecordCursor& r, const IsomerDB::Entry& e, int N, bool IPR, bool with_ncycham)
 {
-  const int Nfaces = N/2 + 2;
-  for(int i=0;i<12;i++){
-    if(e.RSPI[i] < 1 || e.RSPI[i] > Nfaces)
-      r.fail("RSPI[" + to_string(i) + "] = " + to_string(int(e.RSPI[i])) + " outside [1," + to_string(Nfaces) + "]");
-    if(i > 0 && e.RSPI[i] <= e.RSPI[i-1])
-      r.fail("RSPI not strictly ascending at position " + to_string(i));
-  }
-  int pni = 0, hni = 0, nmr = 0;
-  for(int k=0;k<5;k++) pni += e.PNI[k];
-  for(int k=0;k<6;k++) hni += e.HNI[k];
-  for(int k=0;k<3;k++) nmr += int(e.INMR[2*k]) * int(e.INMR[2*k+1]);
-  if(pni > 12)          r.fail("pentagon neighbour indices sum to " + to_string(pni) + " > 12");
-  if(hni > N/2 - 10)    r.fail("hexagon neighbour indices sum to " + to_string(hni) + " > " + to_string(N/2-10));
-  if(IPR && (e.PNI[0] != 12 || pni != 12 || e.HNI[0] || e.HNI[1] || e.HNI[2]))
-    r.fail("non-IPR neighbour indices in an IPR file");
-  if(nmr != N)          r.fail("NMR pattern accounts for " + to_string(nmr) + " atoms, not " + to_string(N));
-  if(e.NedgeHOMO < 1 || e.NeHOMO < 1 || e.NeHOMO > 2*e.NedgeHOMO)
-    r.fail("HOMO occupation " + to_string(int(e.NeHOMO)) + " electrons in " + to_string(int(e.NedgeHOMO)) + " orbitals");
-  if(e.HLgap < 0)       r.fail("negative HOMO-LUMO gap");
-  if((e.HLgap == 0) != (2*e.NedgeHOMO != e.NeHOMO))
-    r.fail("HOMO-LUMO gap " + to_string(e.HLgap) + " inconsistent with the shell (gap is 0 exactly for an open shell)");
-  if(with_ncycham ? e.ncycham < 1 : e.ncycham != 0)
-    r.fail("Hamilton-cycle count " + to_string(e.ncycham) + (with_ncycham? " in a file declaring Hamilton counts" : " in a file without Hamilton counts"));
+  const string why = e.invariant_violation(N, IPR, with_ncycham);
+  if(!why.empty()) r.fail(why);
 }
 
 // Compact record: A3,12I3,{5I2,6I2 | 3I2},I2,I1,F7.5[,I7],6I3
@@ -223,6 +221,17 @@ VerboseColumns read_verbose_columns(RecordCursor& r, bool with_ncycham)
   return c;
 }
 
+// sigma_h as an older version of the printing program computed it: HexInd
+// over the hexagons with at least 3 hexagon neighbours only.  A quirk of one
+// program version, kept here where the files it printed are read -- the
+// library's hexagon_index means the strain parameter and nothing else.
+double legacy_hexagon_index_k3(const NeighbourIndices& ni)
+{
+  long n = 0, hk = 0, hk2 = 0;
+  for(int k=3;k<7;k++){ n += ni.H[k]; hk += k*ni.H[k]; hk2 += k*k*ni.H[k]; }
+  return n? sqrt(fabs(double(hk2)/n - pow(double(hk)/n,2))) : 0.0;
+}
+
 // The derived columns must agree with the stored ones.  sigma_h: the legacy
 // C110 listing was assembled from batches run by two program versions, one
 // whose HexInd summed only k = 3..6 (records of both kinds interleave within
@@ -230,18 +239,15 @@ VerboseColumns read_verbose_columns(RecordCursor& r, bool with_ncycham)
 // column is derived and dropped either way.
 void check_derived_columns(const RecordCursor& r, const VerboseColumns& c, int N)
 {
-  int p = 0, h = 0;
-  for(int k=0;k<6;k++) p += c.ni.P[k];
-  for(int k=0;k<7;k++) h += c.ni.H[k];
-  if(p != 12)        r.fail("pentagon neighbour indices do not sum to 12");
-  if(h != N/2 - 10)  r.fail("hexagon neighbour indices do not sum to " + to_string(N/2-10));
+  if(pentagons(c.ni) != 12)      r.fail("pentagon neighbour indices do not sum to 12");
+  if(hexagons(c.ni) != N/2 - 10) r.fail("hexagon neighbour indices do not sum to " + to_string(N/2-10));
   const int Np = pentagon_adjacencies(c.ni);
   if(c.Np != Np)     r.fail("Np = " + to_string(c.Np) + " != IPentInd(PNI) = " + to_string(Np));
   const double sigmah_tol = 5.1e-6;   // F8.5 rounding
-  if(fabs(c.sigmah - hexagon_index(c.ni, 0)) > sigmah_tol && fabs(c.sigmah - hexagon_index(c.ni, 3)) > sigmah_tol)
-    r.fail("sigma_h = " + to_string(c.sigmah) + " != HexInd(HNI) = " + to_string(hexagon_index(c.ni, 0)) +
-           " (nor the legacy k>=3 value " + to_string(hexagon_index(c.ni, 3)) + ")");
-  const string shell_expected = (2*c.e.NedgeHOMO == c.e.NeHOMO)? "closed" : "open  ";
+  if(fabs(c.sigmah - hexagon_index(c.ni)) > sigmah_tol && fabs(c.sigmah - legacy_hexagon_index_k3(c.ni)) > sigmah_tol)
+    r.fail("sigma_h = " + to_string(c.sigmah) + " != HexInd(HNI) = " + to_string(hexagon_index(c.ni)) +
+           " (nor the legacy k>=3 value " + to_string(legacy_hexagon_index_k3(c.ni)) + ")");
+  const string shell_expected = c.e.closed_shell()? "closed" : "open  ";
   if(c.shell != shell_expected) r.fail("shell '" + c.shell + "' inconsistent with NeHOMO/NedgeHOMO");
 }
 
@@ -549,11 +555,13 @@ IsomerDB IsomerDB::readPDB(const string& filename)
 // that does not fit its field, a full disk) never leaves a partial file.
 IsomerDB::WriteStatus IsomerDB::writePDB(const string& filename) const
 {
-  if(IPR)   // the IPR layout stores PNI k=1..4 and HNI k=0..2 implicitly as 0 (and PNI k=0 as 12)
-    for(const Entry& e: entries)
-      if(e.PNI[0] != 12 || e.PNI[1] || e.PNI[2] || e.PNI[3] || e.PNI[4] || e.HNI[0] || e.HNI[1] || e.HNI[2])
-        throw std::invalid_argument("IsomerDB::writePDB: the IPR layout cannot hold an entry with PNI=" + join(e.PNI,5) +
-                                    " HNI=" + join(e.HNI,6) + " (not an IPR isomer)");
+  // Refuse to write what the file could not be read back as: the IPR layout
+  // stores none of the columns an IPR isomer leaves at their fixed values.
+  for(const Entry& e: entries){
+    const string why = e.invariant_violation(N, IPR, with_ncycham);
+    if(!why.empty())
+      throw std::invalid_argument("IsomerDB::writePDB: " + why + " in entry " + join(e.RSPI,12,","));
+  }
   const string tmpname = filename + ".part";
   {
     ofstream f(tmpname.c_str());

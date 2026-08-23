@@ -1561,14 +1561,19 @@ spiral_nomenclature FullereneDualView::name(bool rarest_start) const
 			     rarest_start);  
 }
 
+// The two-bin histogram of same_degree_neighbours over the pentagons (degree
+// 5) and hexagons (degree 6) of the dual.  The @pre is what bounds the bin
+// index: a degree-d vertex has at most d same-degree neighbours, and P/H hold
+// 6/7 bins.
 NeighbourIndices FullereneDualView::neighbour_indices() const
 {
   NeighbourIndices ni;
   for(node_t u=0;u<N;u++){
     const int du = degree(u);
-    int same = 0;
-    for(node_t v: nbrs(u)) same += (degree(v) == du);
-    if(du == 5) ni.P[same]++; else ni.H[same]++;
+    if(du != 5 && du != 6)
+      throw std::invalid_argument("FullereneDualView::neighbour_indices: vertex " + to_string(u) +
+                                  " has degree " + to_string(du) + ", not 5 or 6: not a fullerene dual");
+    if(du == 5) ni.P[same_degree_neighbours(u)]++; else ni.H[same_degree_neighbours(u)]++;
   }
   return ni;
 }

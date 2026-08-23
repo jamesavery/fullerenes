@@ -254,6 +254,15 @@ struct GraphView : Spanify::RSRAdjacencyView<node_t> {
     vector<OrientedSurface> component_surfaces(const vector<int>& genus = {}) const;
 
     bool adjacency_is_symmetric() const;
+
+    // How many of u's neighbours have u's own degree -- the quantity the
+    // pentagon/hexagon neighbour indices are the histogram of.
+    // @post result <= degree(u)
+    int same_degree_neighbours(node_t u) const {
+        int n = 0;
+        for (node_t v : nbrs(u)) n += (degree(v) == degree(u));
+        return n;
+    }
     bool has_separating_triangles() const;
 
     // --- Connectivity and shortest paths ---
@@ -269,12 +278,22 @@ struct GraphView : Spanify::RSRAdjacencyView<node_t> {
     vector<int> multiple_source_shortest_paths(const vector<node_t>& sources, const unsigned int max_depth=INT_MAX) const;
 
     // --- Hamiltonian cycles ---
-    // Number of undirected Hamiltonian cycles, each counted once (the
-    // convention of IsomerDB's ncycham).  Babic's backtracking with the
-    // exclusion rule of the legacy hamilton.f HamiltonCyc, generalised to any
-    // degree.  Definition staged in claude-projects/unfortran/src/hamiltonian.cc
-    // until promotion.
-    int64_t hamiltonian_count() const;
+    // The number of Hamiltonian cycles of this graph, counted as UNDIRECTED
+    // cycles -- each once, not once per traversal direction.  That is the
+    // convention of IsomerDB's ncycham field and of the legacy Fortran
+    // HamiltonCyc (hamilton.f), whose backtracking (Babic's) this
+    // implements, generalised from cubic graphs to any degree.
+    //
+    // Connectivity is NOT required: a disconnected graph has no Hamiltonian
+    // cycle, and the search's distance bound returns 0 for it.
+    //
+    // @anchor hamiltonian-cycle-count
+    // @pre  simple: adjacency_is_symmetric() &&
+    //           none_of(indices(N), [&](node_t u){ return edge_exists({u,u}); })
+    // @post nonnegative: result >= 0
+    // @post small: implies(N < 3, result == 0)
+    // @time exponential in N: ~1 min per isomer at C110, ~20 ms at C60
+    int64_t hamiltonian_cycle_count() const;
 
     // --- Geometry helpers ---
     coord2d centre2d(const vector<coord2d>& layout) const;
@@ -696,18 +715,23 @@ struct NeighbourIndices {
     std::array<uint8_t,6> P{};
     std::array<uint8_t,7> H{};
 };
-// Np = number of pentagon-pentagon adjacencies = sum_k k P[k] / 2
+inline int pentagons(const NeighbourIndices& ni) { int n = 0; for (int k = 0; k < 6; k++) n += ni.P[k]; return n; }
+inline int hexagons (const NeighbourIndices& ni) { int n = 0; for (int k = 0; k < 7; k++) n += ni.H[k]; return n; }
+
+// Np = the number of pentagon-pentagon adjacencies = sum_k k P[k] / 2
 // (legacy util.f IPentInd).
 inline int pentagon_adjacencies(const NeighbourIndices& ni) {
     int m = 0; for (int k = 0; k < 6; k++) m += k * ni.P[k]; return m / 2;
 }
-// sigma_h = standard deviation of the hexagon-neighbour count over the
-// hexagons with k >= kmin neighbours (legacy util.f HexInd, kmin = 0; an
-// older program version summed only k >= 3).  0 when there are none.
-inline double hexagon_index(const NeighbourIndices& ni, int kmin = 0) {
-    long n = 0, hk = 0, hk2 = 0;
-    for (int k = kmin; k < 7; k++) { n += ni.H[k]; hk += k * ni.H[k]; hk2 += k * k * ni.H[k]; }
-    return n ? std::sqrt(std::fabs(double(hk2)/n - std::pow(double(hk)/n, 2))) : 0.0;
+// sigma_h = the standard deviation of the hexagon-neighbour count over the
+// hexagons -- the strain parameter (legacy util.f HexInd).  0 when there are
+// no hexagons (C20).
+inline double hexagon_index(const NeighbourIndices& ni) {
+    const int n = hexagons(ni);
+    if (!n) return 0.0;
+    long hk = 0, hk2 = 0;
+    for (int k = 0; k < 7; k++) { hk += k * ni.H[k]; hk2 += k * k * ni.H[k]; }
+    return std::sqrt(std::fabs(double(hk2)/n - std::pow(double(hk)/n, 2)));
 }
 
 struct FullereneDualView : TriangulationView {
@@ -715,6 +739,8 @@ struct FullereneDualView : TriangulationView {
     static constexpr uint8_t default_dmax = 6;
 
     // The pentagon/hexagon neighbour indices of this dual.
+    // @pre  fullerene_dual: all_of(indices(N), [&](node_t u){ return degree(u) == 5 || degree(u) == 6; })
+    // @post pentagons(result) == 12 && hexagons(result) == N - 12
     NeighbourIndices neighbour_indices() const;
 
     bool get_rspi(node_t f1, node_t f2, node_t f3,
