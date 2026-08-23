@@ -25,6 +25,8 @@ public:
   static PointGroup FullereneSymmetries[28];
 
   string to_string() const;
+  // One of the 28 point groups a fullerene can have (Fowler & Manolopoulos).
+  bool is_fullerene_group() const;
 
   friend std::ostream& operator<<(ostream& S, const PointGroup& G){
     S << G.to_string();

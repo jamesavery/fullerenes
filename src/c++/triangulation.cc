@@ -1578,6 +1578,14 @@ NeighbourIndices FullereneDualView::neighbour_indices() const
   return ni;
 }
 
+vector<int> FullereneDualView::regular_rspi() const
+{
+  vector<int> rspi; jumplist_t jumps;
+  if(get_rspi(rspi, jumps, /*general=*/false, /*pentagon_start=*/true) ||
+     get_rspi(rspi, jumps, /*general=*/false, /*pentagon_start=*/false)) return rspi;
+  return {};
+}
+
 // call for one general spiral and extract the pentagon indices
 bool FullereneDualView::get_rspi(const node_t f1, const node_t f2, const node_t f3, vector<int>& rspi, jumplist_t& jumps, const bool general) const
 {

@@ -63,31 +63,134 @@ IsomerDB::Entry IsomerDB::Entry::with_neighbour_indices(Entry e, const Neighbour
   return e;
 }
 
+// The l stored bins of an 8-bit record column, separated.
+static string join(const u_int8_t *v, int l, const char* sep = ",")
+{
+  string s;
+  for(int i=0;i<l;i++) s += (i? sep : "") + std::to_string(int(v[i]));
+  return s;
+}
+
+// ---- The record as a value: its fields, its differences, its rendering ----
+
+const char* IsomerDB::field_name(Field f)
+{
+  switch(f){
+    case Field::Group:     return "group";      case Field::RSPI:      return "RSPI";
+    case Field::PNI:       return "PNI";        case Field::HNI:       return "HNI";
+    case Field::NeHOMO:    return "NeHOMO";     case Field::NedgeHOMO: return "NedgeHOMO";
+    case Field::HLgap:     return "HLgap";      case Field::Ncycham:   return "ncycham";
+    case Field::INMR:      return "NMR";        default:               return "?";
+  }
+}
+
+vector<IsomerDB::Field> IsomerDB::fields_of(Field fields)
+{
+  vector<Field> fs;
+  for(uint32_t bit = 1; bit <= uint32_t(Field::INMR); bit <<= 1)
+    if(!!(fields & Field(bit))) fs.push_back(Field(bit));
+  return fs;
+}
+
+string IsomerDB::field_names(Field fields)
+{
+  string s;
+  for(Field f: fields_of(fields)) s += (s.empty()? "" : " ") + string(field_name(f));
+  return s;
+}
+
+const char* IsomerDB::EntryResult::code_name(Code c)
+{
+  switch(c){
+    case Code::Ok:                return "ok";
+    case Code::NoRegularSpiral:   return "no_regular_spiral";
+    case Code::NotRepresentable:  return "not_representable";
+    case Code::UnknownPointGroup: return "unknown_point_group";
+  }
+  return "?";
+}
+
+IsomerDB::Field IsomerDB::Entry::diff(const Entry& b, Field fields, float HLgap_tol) const
+{
+  Field d = Field::None;
+  if(!!(fields & Field::Group)     && memcmp(group, b.group, 3))    d = d | Field::Group;
+  if(!!(fields & Field::RSPI)      && memcmp(RSPI, b.RSPI, 12))     d = d | Field::RSPI;
+  if(!!(fields & Field::PNI)       && memcmp(PNI, b.PNI, 5))        d = d | Field::PNI;
+  if(!!(fields & Field::HNI)       && memcmp(HNI, b.HNI, 6))        d = d | Field::HNI;
+  if(!!(fields & Field::NeHOMO)    && NeHOMO != b.NeHOMO)           d = d | Field::NeHOMO;
+  if(!!(fields & Field::NedgeHOMO) && NedgeHOMO != b.NedgeHOMO)     d = d | Field::NedgeHOMO;
+  if(!!(fields & Field::HLgap)     && fabs(HLgap - b.HLgap) > HLgap_tol) d = d | Field::HLgap;
+  if(!!(fields & Field::Ncycham)   && ncycham != b.ncycham)         d = d | Field::Ncycham;
+  if(!!(fields & Field::INMR)      && memcmp(INMR, b.INMR, 6))      d = d | Field::INMR;
+  return d;
+}
+
+string IsomerDB::Entry::to_string_rspi(const IsomerDB::RSPI& r)
+{
+  string s;
+  for(u_int8_t p: r) s += fortran::write_I(p, 4);
+  return s;
+}
+
+string IsomerDB::Entry::to_string() const
+{
+  string s(group, 3);
+  s += to_string_rspi(rspi());
+  s += "  PNI " + join(PNI,5) + "  HNI " + join(HNI,6) +
+       "  Ne " + std::to_string(int(NeHOMO)) + " deg " + std::to_string(int(NedgeHOMO)) +
+       " gap " + fortran::write_F(HLgap, 7, 5) +
+       "  ham " + std::to_string(ncycham) + "  NMR " + join(INMR,6);
+  return s;
+}
+
+IsomerDB::Entry IsomerDB::Entry::with_rspi(Entry e, const vector<int>& rspi_zero_based)
+{
+  if(rspi_zero_based.size() != 12)
+    throw std::invalid_argument("IsomerDB::Entry::with_rspi: " + std::to_string(rspi_zero_based.size()) + " positions, not 12");
+  for(int i=0;i<12;i++){
+    const long p = rspi_zero_based[i] + 1;      // the record stores 1-based positions
+    if(p < 1 || p > 255)
+      throw std::invalid_argument("IsomerDB::Entry::with_rspi: face position " + std::to_string(p) + " does not fit the 8-bit record field");
+    e.RSPI[i] = u_int8_t(p);
+  }
+  return e;
+}
+
+IsomerDB::Entry IsomerDB::Entry::with_point_group(Entry e, const PointGroup& pg)
+{
+  const string name = pg.to_string();
+  if(!pg.is_fullerene_group() || name.size() > 3)
+    throw std::invalid_argument("IsomerDB::Entry::with_point_group: '" + name + "' is not one of the 28 fullerene point groups");
+  const string padded = pad_string(name, 3, ' ');   // right-justified, as stored
+  memcpy(e.group, padded.data(), 3);
+  return e;
+}
+
 // @anchor isomer-record-invariants
 string IsomerDB::Entry::invariant_violation(int N, bool IPR, bool with_ncycham) const
 {
   const int Nfaces = N/2 + 2;
   for(int i=0;i<12;i++){
     if(RSPI[i] < 1 || RSPI[i] > Nfaces)
-      return "RSPI[" + to_string(i) + "] = " + to_string(int(RSPI[i])) + " outside [1," + to_string(Nfaces) + "]";
+      return "RSPI[" + std::to_string(i) + "] = " + std::to_string(int(RSPI[i])) + " outside [1," + std::to_string(Nfaces) + "]";
     if(i > 0 && RSPI[i] <= RSPI[i-1])
-      return "RSPI not strictly ascending at position " + to_string(i);
+      return "RSPI not strictly ascending at position " + std::to_string(i);
   }
   int pni = 0, hni = 0, nmr = 0;
   for(int k=0;k<5;k++) pni += PNI[k];
   for(int k=0;k<6;k++) hni += HNI[k];
   for(int k=0;k<3;k++) nmr += int(INMR[2*k]) * int(INMR[2*k+1]);
-  if(pni > 12)        return "pentagon neighbour indices sum to " + to_string(pni) + " > 12";
-  if(hni > N/2 - 10)  return "hexagon neighbour indices sum to " + to_string(hni) + " > " + to_string(N/2-10);
+  if(pni > 12)        return "pentagon neighbour indices sum to " + std::to_string(pni) + " > 12";
+  if(hni > N/2 - 10)  return "hexagon neighbour indices sum to " + std::to_string(hni) + " > " + std::to_string(N/2-10);
   if(IPR && !is_ipr())return "non-IPR neighbour indices in an IPR file";
-  if(nmr != N)        return "NMR pattern accounts for " + to_string(nmr) + " atoms, not " + to_string(N);
+  if(nmr != N)        return "NMR pattern accounts for " + std::to_string(nmr) + " atoms, not " + std::to_string(N);
   if(NedgeHOMO < 1 || NeHOMO < 1 || NeHOMO > 2*NedgeHOMO)
-    return "HOMO occupation " + to_string(int(NeHOMO)) + " electrons in " + to_string(int(NedgeHOMO)) + " orbitals";
+    return "HOMO occupation " + std::to_string(int(NeHOMO)) + " electrons in " + std::to_string(int(NedgeHOMO)) + " orbitals";
   if(HLgap < 0)       return "negative HOMO-LUMO gap";
   if((HLgap == 0) == closed_shell())
-    return "HOMO-LUMO gap " + to_string(HLgap) + " inconsistent with the shell (gap is 0 exactly for an open shell)";
+    return "HOMO-LUMO gap " + std::to_string(HLgap) + " inconsistent with the shell (gap is 0 exactly for an open shell)";
   if(with_ncycham ? ncycham < 1 : ncycham != 0)
-    return "Hamilton-cycle count " + to_string(ncycham) + (with_ncycham? " in a file declaring Hamilton counts" : " in a file without Hamilton counts");
+    return "Hamilton-cycle count " + std::to_string(ncycham) + (with_ncycham? " in a file declaring Hamilton counts" : " in a file without Hamilton counts");
   return "";
 }
 
@@ -358,13 +461,6 @@ void build_rspi_index(IsomerDB& DB, const string& filename)
   for(int i=0;i<DB.Nisomers;i++) DB.RSPIindex[DB.entries[i].rspi()] = i;
   if((int)DB.RSPIindex.size() != DB.Nisomers)
     throw_db_error("readPDB", to_string(DB.Nisomers - DB.RSPIindex.size()) + " records repeat the RSPI of an earlier record in database file", filename);
-}
-
-string join(const u_int8_t *v, int l, const char* sep = ",")
-{
-  string s;
-  for(int i=0;i<l;i++) s += (i? sep : "") + to_string(int(v[i]));
-  return s;
 }
 
 // fopen with closing on every exit path.

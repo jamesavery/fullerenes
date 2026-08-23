@@ -8,6 +8,7 @@
 #include <errno.h>
 
 #include "fullerenegraph.hh"
+#include "symmetry.hh"
 
 using namespace std;
 
@@ -32,6 +33,25 @@ public:
   // database's primary key.
   using RSPI = std::array<u_int8_t,12>;
 
+  // A field of a record, as a set: which columns a producer fills, and which
+  // ones two records differ in.
+  //
+  // The producer masks name where a column comes from, not what it is:
+  // FromDual needs only the dual graph, FromPointGroup the Symmetry class,
+  // FromSpectrum a Hueckel analysis, Ncycham a Hamilton-cycle count (minutes
+  // per isomer at C110, so it is never implied).
+  enum class Field : uint32_t {
+    None = 0,
+    Group = 1u<<0, RSPI = 1u<<1, PNI = 1u<<2, HNI = 1u<<3,
+    NeHOMO = 1u<<4, NedgeHOMO = 1u<<5, HLgap = 1u<<6, Ncycham = 1u<<7, INMR = 1u<<8,
+    FromDual        = RSPI | PNI | HNI,
+    FromPointGroup  = Group | INMR,
+    FromSpectrum    = NeHOMO | NedgeHOMO | HLgap,
+    All             = FromDual | FromPointGroup | FromSpectrum | Ncycham,
+  };
+
+  struct EntryResult;          // what Entry::from_dual produced, or why not (below)
+
   struct Entry {
     char group[3];		// point group, right-justified in 3 chars (" Ih", "C2v")
     u_int8_t RSPI[12];		// canonical ring-spiral pentagon positions, 1-based, ascending
@@ -43,7 +63,33 @@ public:
     int ncycham;		// number of Hamilton cycles (0 when the file has none: with_ncycham false)
     u_int8_t INMR[6];		// NMR pattern: INMR[2i] orbits of size INMR[2i+1], i=0..2 (unused pairs 0)
 
+    // --- the record as a value ---
     IsomerDB::RSPI rspi() const { IsomerDB::RSPI r; std::copy(RSPI, RSPI+12, r.begin()); return r; }
+    PointGroup point_group() const { return PointGroup(string(group, 3)); }
+    // The stored gap is the exact gap rounded to the F7.5 column, so two
+    // records agree when the column cannot tell them apart: half an F7.5 ulp
+    // (5e-6, attained -- two C60 isomers sit exactly on a rounding boundary
+    // and round the other way), plus the float half-ulps of the two stored
+    // values (<= 1.2e-7 for a gap < 3), plus the eigensolver's own ~1e-8.
+    static constexpr float HLgap_column_tol = 5.2e-6f;
+    // The largest Hamilton-cycle count the text format's I7 column can hold.
+    static constexpr int   ncycham_max = 9999999;
+
+    // The fields of `fields` in which this record and b differ.  Gaps count as
+    // equal when they are within HLgap_tol -- exact by default, since two
+    // records READ from the database carry the same rounded column; pass
+    // HLgap_column_tol when one side was computed.
+    Field diff(const Entry& b, Field fields = Field::All, float HLgap_tol = 0.f) const;
+    string to_string() const;
+    static string to_string_rspi(const IsomerDB::RSPI& r);   // 12 face positions, I4 each
+
+    // The record of the isomer whose dual is D: the fields in `producers` are
+    // computed (RSPI always -- it is the key), the others left zero.  The
+    // canonical RSPI is FullereneDualView::regular_rspi, the database's key.
+    // Definition staged in claude-projects/unfortran until HueckelAnalysis and
+    // hamiltonian_cycle_count are promoted.
+    // @anchor isomer-record-from-dual
+    static EntryResult from_dual(const FullereneDualView& D, Field producers);
     // A filled HOMO level: the Fortran's closed/open distinction, and the
     // condition under which HLgap is a gap rather than the stored 0.
     bool closed_shell() const { return 2*NedgeHOMO == NeHOMO; }
@@ -68,18 +114,58 @@ public:
     vector<int> rspi_zero_based() const { vector<int> r(RSPI, RSPI+12); for(int& x: r) x--; return r; }
     // The neighbour indices as stored: PNI k<5, HNI k<6; the dropped top
     // bins are derived (P[5] = 12 - sum, H[6] = N/2-10 - sum).
+    // @pre  sums: pentagons(ni) == 12 && hexagons(ni) == N/2 - 10
+    // @post result.neighbour_indices(N) == ni
     NeighbourIndices neighbour_indices(int N) const;
     static Entry with_neighbour_indices(Entry e, const NeighbourIndices& ni);
+    // @pre  ascending: rspi_zero_based.size() == 12 && is_sorted(rspi_zero_based) && rspi_zero_based[0] >= 0
+    static Entry with_rspi(Entry e, const vector<int>& rspi_zero_based);
+    static Entry with_point_group(Entry e, const PointGroup& pg);
   };
+
+  // What Entry::from_dual produced, or why it could not.  Only Ok leaves
+  // `entry` meaningful.
+  struct EntryResult {
+    enum class Code {
+      Ok,
+      NoRegularSpiral,    // every start needs a jump: the isomer has no ring
+                          // spiral of the kind the database keys on
+      NotRepresentable,   // a value no record column can hold (a face position
+                          // or NMR orbit above 255, a Hamilton count above I7,
+                          // more than 3 NMR orbit sizes)
+      UnknownPointGroup,  // Symmetry did not classify it as one of the 28
+                          // fullerene point groups
+    };
+    Code   code = Code::Ok;
+    Entry  entry{};
+    string why;                      // the reason; nonempty iff code != Ok
+    bool   ok() const { return code == Code::Ok; }
+    static const char* code_name(Code c);
+    const char* name() const { return code_name(code); }
+    static EntryResult error(Code c, string why) { return {c, Entry{}, std::move(why)}; }
+  };
+
+  // The name of one field, and the fields of a set, for diagnostics.
+  static const char* field_name(Field f);
+  static string      field_names(Field fields);      // "group NMR"
+  // The single fields of a set, in bit order -- the iteration word.
+  static vector<Field> fields_of(Field fields);
 
   vector<Entry> entries;
   map<RSPI, int> RSPIindex;      // RSPI -> index into entries
 
-  // The entry with this RSPI, or nullptr.
+  // The entry with this RSPI, or nullptr; and its 0-based position, or -1.
   const Entry* find(const RSPI& rspi) const {
-    auto it = RSPIindex.find(rspi);
-    return it == RSPIindex.end()? nullptr : &entries[it->second];
+    const int i = index_of(rspi);
+    return i < 0? nullptr : &entries[i];
   }
+  int index_of(const RSPI& rspi) const {
+    auto it = RSPIindex.find(rspi);
+    return it == RSPIindex.end()? -1 : it->second;
+  }
+  // The columns this file carries: every one but the Hamilton count when the
+  // header says it has none.
+  Field stored_fields() const { return with_ncycham? Field::All : Field::All & ~Field::Ncycham; }
 
   static string database_path;
 
@@ -159,6 +245,13 @@ public:
   static vector<size_t> Nisomers_data[2];
   static vector< vector<string> > symmetries_data[2];
   static vector< vector<size_t> > symmetry_count_data[2];
+
+  // Field is a set: the usual algebra, so a caller can say
+  // stored_fields() & ~Field::RSPI without casting.
+  friend constexpr Field operator|(Field a, Field b) { return Field(uint32_t(a) | uint32_t(b)); }
+  friend constexpr Field operator&(Field a, Field b) { return Field(uint32_t(a) & uint32_t(b)); }
+  friend constexpr Field operator~(Field a)          { return Field(~uint32_t(a) & uint32_t(Field::All)); }
+  friend constexpr bool  operator!(Field a)          { return uint32_t(a) == 0; }
 
   IsomerDB(int N=-1, bool IPR = false, bool IH=false,
 	   vector<Entry> entries=vector<Entry>()) :
