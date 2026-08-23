@@ -342,8 +342,8 @@ double legacy_hexagon_index_k3(const NeighbourIndices& ni)
 // column is derived and dropped either way.
 void check_derived_columns(const RecordCursor& r, const VerboseColumns& c, int N)
 {
-  if(pentagons(c.ni) != 12)      r.fail("pentagon neighbour indices do not sum to 12");
-  if(hexagons(c.ni) != N/2 - 10) r.fail("hexagon neighbour indices do not sum to " + to_string(N/2-10));
+  if(pentagon_count(c.ni) != 12)      r.fail("pentagon neighbour indices do not sum to 12");
+  if(hexagon_count(c.ni) != N/2 - 10) r.fail("hexagon neighbour indices do not sum to " + to_string(N/2-10));
   const int Np = pentagon_adjacencies(c.ni);
   if(c.Np != Np)     r.fail("Np = " + to_string(c.Np) + " != IPentInd(PNI) = " + to_string(Np));
   const double sigmah_tol = 5.1e-6;   // F8.5 rounding

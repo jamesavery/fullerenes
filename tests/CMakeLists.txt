@@ -13,6 +13,15 @@ if(GTest_FOUND)
   target_link_libraries(edge-surgery-test fullerenes GTest::GTest GTest::Main)
   add_test(NAME edge-surgery-test COMMAND edge-surgery-test)
 
+  add_executable(pentagon-test pentagon-test.cc)
+  # Uses batch::Batch, whose storage is SyclVector in a SYCL build (see view-test).
+  if(ENABLE_SYCL)
+    target_link_libraries(pentagon-test fullerenes sycl_fullerene_lib GTest::GTest GTest::Main)
+  else()
+    target_link_libraries(pentagon-test fullerenes GTest::GTest GTest::Main)
+  endif()
+  add_test(NAME pentagon-test COMMAND pentagon-test)
+
   add_executable(gc-transform-test gc-transform-test.cc)
   target_link_libraries(gc-transform-test fullerenes GTest::GTest GTest::Main)
   add_test(NAME gc-transform-test COMMAND gc-transform-test)

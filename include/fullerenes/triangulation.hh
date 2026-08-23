@@ -21,11 +21,54 @@ public:
 };
 
 
+// A THIN allocation wrapper over Owned<FullereneDualView> (which stays
+// ignorant of pentagons): its whole job beyond the base is to own the
+// pentagon list's backing -- constant-size and address-stable for the
+// object's lifetime -- and keep the view's span pointing at it across
+// construction, copy and move.  All pentagon logic, initialisation
+// included, is FullereneDualView's; the converting constructor merely
+// invokes the view's establishing call at its boundary.
 class FullereneDual : public Owned<FullereneDualView> {
   using base_t = Owned<FullereneDualView>;
+
+  void repoint_pentagons() { this->pentagons = std::span<node_t>(owned_pentagons); }
 public:
-  FullereneDual() = default;
-  FullereneDual(const GraphView& g) : base_t(g) {}
+  pentagon_storage_t<FullereneDualView> owned_pentagons{};
+
+  FullereneDual() { repoint_pentagons(); }
+  // Allocate an N-vertex dual to be filled row by row; the pentagon list is
+  // stale until the producer derives it (construction phase).
+  explicit FullereneDual(int N) : base_t(N) { repoint_pentagons(); }
+  // Deep copy + establish: the view derives its list from the copied graph
+  // (throws pentagon_error when g is not a fullerene dual).  This is the one
+  // conversion path, so every construction from a foreign graph establishes.
+  FullereneDual(const GraphView& g) : base_t(g) {
+    repoint_pentagons();
+    if (this->N > 0) this->derive_pentagons();
+  }
+
+  FullereneDual(const FullereneDual& o)
+    : base_t(o), owned_pentagons(o.owned_pentagons) { repoint_pentagons(); }
+  FullereneDual(FullereneDual&& o) noexcept
+    : base_t(std::move(o)), owned_pentagons(o.owned_pentagons) {
+    repoint_pentagons();
+    o.pentagons = {};
+  }
+  FullereneDual& operator=(const FullereneDual& o) {
+    base_t::operator=(o);
+    owned_pentagons = o.owned_pentagons;
+    repoint_pentagons();
+    return *this;
+  }
+  FullereneDual& operator=(FullereneDual&& o) noexcept {
+    if (this != &o) {
+      base_t::operator=(std::move(o));
+      owned_pentagons = o.owned_pentagons;
+      repoint_pentagons();
+      o.pentagons = {};
+    }
+    return *this;
+  }
 
   FullereneDual(const int N, const general_spiral& rspi) : FullereneDual(N,rspi.spiral_code,rspi.jumps) {}
   FullereneDual(const int N, const vector<int>& rspi, const jumplist_t& jumps = jumplist_t()) {

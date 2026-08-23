@@ -18,13 +18,14 @@
 //     repoint them when stamping per-entry views.
 //
 //   static std::array<std::size_t, V::n_fields>
-//     V::get_size_factors(int N, int dmax)
-//       Per-vertex multiplicity of each field.  The number of elements
-//       in field k for one batch entry with `N` vertices and row stride
-//       `dmax` is  N * size_factors[k].
+//     V::get_element_counts(int N, int dmax)
+//       Element count of each field for ONE batch entry -- absolute counts,
+//       not per-vertex factors, so N-proportional fields (neighbours: N*dmax)
+//       and constant-size fields (FullereneDualView's 12 pentagon ids) ride
+//       the same law.
 //
 // Views that add fields (e.g. PolyhedronView<T> adds `points`) override
-// n_fields / to_tuple / get_size_factors to extend the base graph tuple.
+// n_fields / to_tuple / get_element_counts to extend the base graph tuple.
 //
 // No external trait table is needed: batchability is expressed entirely
 // by the view type itself.
@@ -46,31 +47,25 @@ concept batchable_view =
         { V::n_fields } -> std::convertible_to<std::size_t>;
         { v.to_tuple() };
         { cv.to_tuple() };
-        { V::get_size_factors(0, 0) }
+        { V::get_element_counts(0, 0) }
             -> std::same_as<std::array<std::size_t, V::n_fields>>;
     };
 
 // -- Layout compatibility --------------------------------------------------
 
-// Two batchable views share a layout iff their size_factor arrays agree
-// element-wise for the given (N, dmax).  This is the prerequisite for
+// Two batchable views share a layout iff their element counts agree
+// field-wise for the given (N, dmax).  This is the prerequisite for
 // batch-of-A to be reinterpretable as batch-of-B (e.g. slicing a
 // PolyhedronView batch into its underlying graph layout).
 template<class A, class B>
 constexpr bool layout_compatible(int N, int dmax) {
     constexpr std::size_t K =
         A::n_fields < B::n_fields ? A::n_fields : B::n_fields;
-    auto a = A::get_size_factors(N, dmax);
-    auto b = B::get_size_factors(N, dmax);
+    auto a = A::get_element_counts(N, dmax);
+    auto b = B::get_element_counts(N, dmax);
     for (std::size_t k = 0; k < K; ++k)
         if (a[k] != b[k]) return false;
     return true;
-}
-
-// Total element count in field `k` per batch entry.
-template<class V>
-constexpr std::size_t field_element_count(std::size_t k, int N, int dmax) {
-    return std::size_t(N) * V::get_size_factors(N, dmax)[k];
 }
 
 } // namespace batch

@@ -114,7 +114,7 @@ public:
     vector<int> rspi_zero_based() const { vector<int> r(RSPI, RSPI+12); for(int& x: r) x--; return r; }
     // The neighbour indices as stored: PNI k<5, HNI k<6; the dropped top
     // bins are derived (P[5] = 12 - sum, H[6] = N/2-10 - sum).
-    // @pre  sums: pentagons(ni) == 12 && hexagons(ni) == N/2 - 10
+    // @pre  sums: pentagon_count(ni) == 12 && hexagon_count(ni) == N/2 - 10
     // @post result.neighbour_indices(N) == ni
     NeighbourIndices neighbour_indices(int N) const;
     static Entry with_neighbour_indices(Entry e, const NeighbourIndices& ni);

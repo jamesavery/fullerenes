@@ -125,15 +125,15 @@ struct RSRAdjacencyView {
     // Batchability contract (see include/fullerenes/batch/batchable.hh).
     //
     // Tuple of span-typed fields in canonical order: {neighbours, deg, twin}.
-    // Per-field size factor: element count per vertex = factor, so the total
-    // number of elements in field k for one batch entry with N vertices is
-    // N * size_factor[k].
-    //   neighbours : dmax per vertex  (N * dmax total)
-    //   deg        : 1    per vertex  (N      total)
-    //   twin       : dmax per vertex  (N * dmax total; empty until computed)
+    // get_element_counts gives each field's element count for ONE batch entry
+    // -- absolute counts, so N-proportional and constant-size fields ride the
+    // same law:
+    //   neighbours : N * dmax
+    //   deg        : N
+    //   twin       : N * dmax  (empty until computed)
     //
     // Derived views that add span fields (e.g. PolyhedronView adds `points`)
-    // override n_fields / to_tuple / get_size_factors to extend the tuple.
+    // override n_fields / to_tuple / get_element_counts to extend the tuple.
     // -----------------------------------------------------------------------
     static constexpr std::size_t n_fields = 3;
 
@@ -145,8 +145,8 @@ struct RSRAdjacencyView {
     }
 
     static constexpr std::array<std::size_t, n_fields>
-    get_size_factors(int /*N*/, int dmax) {
-        return { (std::size_t)dmax, (std::size_t)1, (std::size_t)dmax };
+    get_element_counts(int N, int dmax) {
+        return { (std::size_t)N * dmax, (std::size_t)N, (std::size_t)N * dmax };
     }
 
     // --- operator[] returns span over active entries ---
@@ -602,7 +602,7 @@ static_assert(std::is_trivially_copyable_v<RSRAdjacencyView<uint16_t>>,
 // (graph + geometry) atomically transferable through Batch<V>/BatchQueue<V>.
 //
 // Canonical tuple order: {neighbours, deg, twin, points}.  The first three
-// fields' size_factors match RSRAdjacencyView, so a BatchView<RSRPolyhedronView>
+// fields' element counts match RSRAdjacencyView, so a BatchView<RSRPolyhedronView>
 // can be sliced into a BatchView<RSRAdjacencyView> via as_adjacency_view().
 // ---------------------------------------------------------------------------
 template<typename T, typename K = int32_t>
@@ -637,8 +637,8 @@ struct RSRPolyhedronView : RSRAdjacencyView<K> {
     }
 
     static constexpr std::array<std::size_t, n_fields>
-    get_size_factors(int /*N*/, int dmax) {
-        return { (std::size_t)dmax, (std::size_t)1, (std::size_t)dmax, (std::size_t)1 };
+    get_element_counts(int N, int dmax) {
+        return { (std::size_t)N * dmax, (std::size_t)N, (std::size_t)N * dmax, (std::size_t)N };
     }
 };
 

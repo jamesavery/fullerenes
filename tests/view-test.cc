@@ -27,6 +27,7 @@ static_assert(batch::batchable_view<DeltahedronView<double>>);
 static_assert(GraphView::n_fields         == 3);
 static_assert(CubicGraphView::n_fields    == 3);
 static_assert(TriangulationView::n_fields == 3);
+static_assert(FullereneDualView::n_fields == 4);
 static_assert(PolyhedronView<double>::n_fields == 4);
 static_assert(DeltahedronView<double>::n_fields == 4);
 
@@ -44,22 +45,31 @@ static_assert([]{
 }());
 
 // ---------------------------------------------------------------------------
-// Phase 1 contract: runtime checks of to_tuple() / size factors
+// Phase 1 contract: runtime checks of to_tuple() / element counts
 // ---------------------------------------------------------------------------
-TEST(BatchContract, GraphSizeFactors) {
-    auto f = GraphView::get_size_factors(60, 10);
-    EXPECT_EQ(f[0], 10u);  // neighbours = dmax per vertex
-    EXPECT_EQ(f[1], 1u);   // deg = 1 per vertex
-    EXPECT_EQ(f[2], 10u);  // twin = dmax per vertex
+TEST(BatchContract, GraphElementCounts) {
+    auto f = GraphView::get_element_counts(60, 10);
+    EXPECT_EQ(f[0], 600u);  // neighbours = N * dmax
+    EXPECT_EQ(f[1], 60u);   // deg = N
+    EXPECT_EQ(f[2], 600u);  // twin = N * dmax
 }
 
-TEST(BatchContract, PolyhedronSizeFactors) {
-    auto f = PolyhedronView<double>::get_size_factors(60, 10);
+TEST(BatchContract, PolyhedronElementCounts) {
+    auto f = PolyhedronView<double>::get_element_counts(60, 10);
     ASSERT_EQ(f.size(), 4u);
-    EXPECT_EQ(f[0], 10u);
-    EXPECT_EQ(f[1], 1u);
-    EXPECT_EQ(f[2], 10u);
-    EXPECT_EQ(f[3], 1u);  // points = 1 per vertex
+    EXPECT_EQ(f[0], 600u);
+    EXPECT_EQ(f[1], 60u);
+    EXPECT_EQ(f[2], 600u);
+    EXPECT_EQ(f[3], 60u);   // points = N
+}
+
+TEST(BatchContract, FullereneDualElementCounts) {
+    auto f = FullereneDualView::get_element_counts(32, 6);
+    ASSERT_EQ(f.size(), 4u);
+    EXPECT_EQ(f[0], 192u);
+    EXPECT_EQ(f[1], 32u);
+    EXPECT_EQ(f[2], 192u);
+    EXPECT_EQ(f[3], 12u);   // pentagons: the constant-size field
 }
 
 TEST(BatchContract, ToTupleAliasesGraphFields) {
