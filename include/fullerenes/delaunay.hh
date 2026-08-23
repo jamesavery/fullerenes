@@ -491,6 +491,34 @@ struct DelaunayTriangulation : DelaunayView, DelaunayStorage {
   //         vertices) -- loud, never a silently wrong reduction.
   void remove_flat_vertices_exact(const std::function<void(int)>& on_pop = {});
 
+  // The exact-regime entry boundary as a value: derive the integer squared
+  // lengths from he_length and VERIFY both exactness preconditions loudly
+  // (the shared body remove_flat_vertices_exact and
+  // canonical_completion_exact enter through).  For callers that need an
+  // ExactIntegerMetric of their own, e.g. exact post-reduction surgery.
+  // @throws std::runtime_error when the current metric is not exact.
+  std::vector<long long> verified_exact_lsq_carry() const;
+
+  // Canonical completion of the Delaunay tesselation (the view body's doc,
+  // delaunay_view.hh, carries the algorithm and the full contract):
+  // retriangulate every cocircular cell as the fan from its canonical
+  // corner, so the triangulation handed downstream is a function of the
+  // labeled input complex alone -- independent of the flip order that
+  // produced it.  Exact regime (derives and verifies the Lsq carry exactly
+  // as remove_flat_vertices_exact; same loud preconditions), and checks
+  // the is_delaunay() precondition itself.  Tesselation-invariant,
+  // Delaunay-preserving, idempotent.  Refusal classes, counted per cell
+  // and left untouched, never guessed at: .ambiguous (periodic boundary
+  // rotation word: no label-determined apex) and .nondisk (a component
+  // failing the disk Euler count -- provably absent on reduced complexes).
+  // Transport-hooked: with tracking active, tracked points ride the flips.
+  // NOT transactional: a throw can leave the complex part-completed with
+  // the status latched.
+  // @throws std::runtime_error on a non-Delaunay complex, a non-exact
+  //         metric, a walk that fails to close, a refused tight flip, or
+  //         the fan-conversion step budget (via the Status latch).
+  DelaunayView::CompletionStats canonical_completion_exact();
+
   // Renumber the live vertices to 0..n_live-1 (dropping removed ones) and
   // shrink nv, rewriting he_origin and the per-vertex arrays. Needed after a
   // removal that leaves live vertices scattered (the metric-based path, which
