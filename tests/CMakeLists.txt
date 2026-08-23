@@ -9,6 +9,10 @@ target_link_libraries(extract-graph fullerenes)
 target_compile_definitions(extract-graph PRIVATE FULLERENE_ROOT="${CMAKE_SOURCE_DIR}")
 
 if(GTest_FOUND)
+  add_executable(edge-surgery-test edge-surgery-test.cc)
+  target_link_libraries(edge-surgery-test fullerenes GTest::GTest GTest::Main)
+  add_test(NAME edge-surgery-test COMMAND edge-surgery-test)
+
   add_executable(gc-transform-test gc-transform-test.cc)
   target_link_libraries(gc-transform-test fullerenes GTest::GTest GTest::Main)
   add_test(NAME gc-transform-test COMMAND gc-transform-test)

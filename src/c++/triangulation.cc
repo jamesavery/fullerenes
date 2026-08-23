@@ -325,7 +325,9 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
   // calling insert_edge through the derived pointer produces
   // incorrect neighbour ordering in the planar embedding.
   GraphView& g = *this;
-  auto ins = [&g](const arc_t& e, node_t su, node_t sv){ g.insert_edge(e, su, sv); };
+  // Hint form: the windup names boundary nodes whose edges arrive later in
+  // the wind, so the successor may legitimately not be a neighbour yet.
+  auto ins = [&g](const arc_t& e, node_t su, node_t sv){ g.insert_edge_hint(e, su, sv); };
 
   // ── Initialize: place first two nodes ────────────────────────────────
   B.push_back({0, spiral_string[0] - 1});

@@ -215,6 +215,11 @@ struct Owned : View {
     }
 
     // --- Twin computation (allocates owned_twin) ---
+    // @pre  symmetric: every arc has a reverse -- violation throws
+    //       graph_surgery_error{AsymmetricAdjacency} (this function is the
+    //       from-scratch oracle the surgery tests compare against, so its
+    //       guard must hold in every build configuration, not only -O0).
+    // @post twin: twin_is_valid()
     void compute_twin() {
         owned_twin.resize(this->N * this->dmax, 0);
         this->twin = std::span<uint8_t>(owned_twin);
@@ -222,7 +227,9 @@ struct Owned : View {
             for (int i = 0; i < this->deg[u]; ++i) {
                 node v = this->neighbours[u * this->dmax + i];
                 int j = this->find(v, u);
-                assert(j >= 0);
+                if (j < 0)
+                    this->surgery_fail("compute_twin",
+                                       GraphView::Code::AsymmetricAdjacency, u, v);
                 owned_twin[u * this->dmax + i] = uint8_t(j);
             }
         }
@@ -246,19 +253,27 @@ struct Owned : View {
     }
 
     // --- Resize (owned only -- reallocates) ---
+    // A computed twin stays the right SHAPE (new rows have no live arcs, so
+    // validity is untouched); has_twin() must never outlive the size it
+    // promises.
     void resize(int new_N) {
         owned_neighbours.resize(new_N * this->dmax, node(-1));
         owned_deg.resize(new_N, 0);
+        if (!owned_twin.empty()) owned_twin.resize(new_N * this->dmax, 0);
         this->N = node(new_N);
         if constexpr (has_geometry) owned_points.resize(new_N);
         repoint();
     }
 
     // --- Push/pop vertex rows (owned only) ---
+    // @post twin (if present) keeps its shape; a pushed row's arcs have no
+    //       reverses yet, so its twin entries are STALE until recomputed
+    //       (construction-phase, as for the per-row primitives).
     void push_back(const std::vector<node>& row) {
         assert(int(row.size()) <= this->dmax);
         owned_neighbours.resize((this->N + 1) * this->dmax, node(-1));
         owned_deg.push_back(uint8_t(row.size()));
+        if (!owned_twin.empty()) owned_twin.resize((this->N + 1) * this->dmax, 0);
         repoint();
         for (int i = 0; i < int(row.size()); ++i)
             this->neighbours[this->N * this->dmax + i] = row[i];
@@ -274,6 +289,7 @@ struct Owned : View {
         this->N--;
         owned_neighbours.resize(this->N * this->dmax);
         owned_deg.resize(this->N);
+        if (!owned_twin.empty()) owned_twin.resize(this->N * this->dmax);
         if constexpr (has_geometry) {
             owned_points.resize(this->N);
         }

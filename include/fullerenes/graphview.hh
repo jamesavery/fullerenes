@@ -100,7 +100,49 @@ struct GraphView : Spanify::RSRAdjacencyView<node_t> {
     GraphView() = default;
 
     // --- Edge operations (mutate through spans) ---
+    // Ensure-edge, successor-ASSERTING: the new arc lands right before
+    // suc_uv in u's rotation (resp. suc_vu in v's); -1 appends at the end
+    // of the row.  The successor encodes the embedding -- it decides which
+    // face the edge splits -- so a named successor that is NOT a neighbour
+    // means the caller's picture of the rotation is wrong and throws
+    // (until 2026-08 this case silently appended, embedding the edge at an
+    // arbitrary cyclic position).
+    // @anchor graph-insert-edge
+    // @pre  vertices: size_t(e.first) < size_t(N) && size_t(e.second) < size_t(N)
+    // @pre  successors: (suc_uv < 0 || find(e.first, suc_uv) >= 0)
+    //               && (suc_vu < 0 || find(e.second, suc_vu) >= 0)
+    // @pre  (the slot core's @pre when the edge is absent -- rsr-insert-edge-slots)
+    // @post twin: twin_is_valid()
+    // @post returns was_present: true means the edge already existed and
+    //       NOTHING was changed; false means it was inserted
+    // @throws graph_surgery_error{VertexOutOfRange, SuccessorNotNeighbour}
+    //         and the slot core's codes
     bool insert_edge(const arc_t& e, const node_t suc_uv=-1, const node_t suc_vu=-1);
+
+    // Ensure-edge with HINT positioning: same as insert_edge except that a
+    // named-but-absent successor means APPEND rather than throw.  This is
+    // the incremental-construction idiom (the spiral windup names boundary
+    // nodes whose edges arrive later in the wind); a caller who KNOWS its
+    // successor is a neighbour should call insert_edge, which makes a
+    // wrong successor loud instead of silently repositioning the edge.
+    // @anchor graph-insert-edge-hint
+    // @pre  vertices: size_t(e.first) < size_t(N) && size_t(e.second) < size_t(N)
+    // @pre  (the slot core's @pre when the edge is absent -- rsr-insert-edge-slots)
+    // @post twin: twin_is_valid()
+    // @post returns was_present, as for insert_edge
+    // @throws graph_surgery_error{VertexOutOfRange} and the slot core's codes
+    bool insert_edge_hint(const arc_t& e, const node_t hint_uv=-1, const node_t hint_vu=-1);
+
+    // Remove the edge as a symmetric arc pair.  Presence in ONE direction
+    // only is corrupted adjacency and throws (until 2026-08 this case
+    // silently removed the surviving half-arc, hiding the corruption).
+    // @anchor graph-remove-edge
+    // @pre  vertices: size_t(e.first) < size_t(N) && size_t(e.second) < size_t(N)
+    // @pre  symmetric: (find(e.first, e.second) >= 0) == (find(e.second, e.first) >= 0)
+    // @post twin: twin_is_valid()
+    // @post returns was_present: true means the edge existed and was
+    //       removed; false means it was absent and nothing changed
+    // @throws graph_surgery_error{VertexOutOfRange, SelfLoop, NotMutualPair}
     bool remove_edge(const edge_t& e);
     bool edge_exists(const edge_t& e) const;
     void flip_all_orientations();
