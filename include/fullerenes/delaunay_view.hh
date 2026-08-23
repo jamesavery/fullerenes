@@ -1203,8 +1203,11 @@ struct DelaunayView {
   // compares its cells by the same key SHAPE over the caller's label map;
   // the two orders coincide when that map is monotone, identity included.)
   // Fan conversion flips only tight (exactly cocircular) edges, which are
-  // zero-energy Delaunay moves inside the cell's circle, so the tesselation
-  // and the metric are unchanged and the complex stays Delaunay.
+  // zero-energy Delaunay moves inside the cell's circle, so the
+  // tesselation, the SURFACE metric, and every vertex cone angle are
+  // unchanged (the edge-length field is not: each flip trades one diagonal
+  // of a cyclic quadrilateral for the other) and the complex stays
+  // Delaunay.
   //
   // AMBIGUOUS CELLS: a periodic rotation word (several corners share the
   // minimal rotation) admits no label-determined apex; such a cell is
@@ -1215,10 +1218,16 @@ struct DelaunayView {
   // triangulated disks without interior vertices, where the boundary walk
   // crosses each of the d-3 interior edges once from each side.  A
   // component failing that Euler count (X != 2*(d-3)) is COUNTED as
-  // nondisk and left untouched, before any flip.  An interior vertex of a
-  // cocircular cell sees total angle 2*pi -- it is FLAT -- so on a reduced
-  // complex (no live flat vertices) this class is provably empty; the gate
-  // defends the general entry.
+  // nondisk and left untouched, before any flip.  The count is NECESSARY,
+  // not sufficient (interior vertices of total degree 6n cancel in it);
+  // correctness on accepted cells rests on the geometry: by the
+  // empty-circumdisk property a cocircular cell of a Delaunay complex has
+  // no interior vertices at all (an all-tight star chains its four-point
+  // concyclicity conditions onto ONE circle, putting the vertex ON it),
+  // provided the cell develops injectively.  The gate plus the fan
+  // budget are the fail-loud backstop for corrupt or non-embedded
+  // complexes outside that argument's scope (CANONICAL-TESSELATION.md
+  // section 3 carries the derivation).
   //
   // Exact regime only (ExactIntegerMetric): tightness is the integer form
   // F == 0 and the corner keys read the exact carry through m.lsq.  A
@@ -2000,9 +2009,10 @@ DelaunayView::canonical_completion(const ExactIntegerMetric& m, Transport&& tr) 
 
     // Disk gate: a triangulated disk with d boundary edges and no interior
     // vertices has exactly d-3 interior edges, each crossed once from each
-    // side: X == 2*(d-3).  Anything else (an interior vertex -- provably
-    // flat, so absent from reduced complexes -- or a non-simply-connected
-    // component) is refused by name BEFORE any flip.
+    // side: X == 2*(d-3).  A failing component is refused by name BEFORE
+    // any flip.  Necessary, not sufficient -- on a Delaunay complex the
+    // empty-circumdisk property excludes interior vertices outright, and
+    // the fan budget backstops the rest (banner above).
     if (X != 2 * (d - 3)) { st.nondisk++; continue; }
 
     // Canonical corner: the least rotation of the boundary word, entries

@@ -510,7 +510,9 @@ struct DelaunayTriangulation : DelaunayView, DelaunayStorage {
   // Delaunay-preserving, idempotent.  Refusal classes, counted per cell
   // and left untouched, never guessed at: .ambiguous (periodic boundary
   // rotation word: no label-determined apex) and .nondisk (a component
-  // failing the disk Euler count -- provably absent on reduced complexes).
+  // failing the disk Euler count -- on a Delaunay complex with embedded
+  // cells the class is provably empty by the empty-circumdisk property;
+  // the gate is the fail-loud backstop beyond that scope).
   // Transport-hooked: with tracking active, tracked points ride the flips.
   // NOT transactional: a throw can leave the complex part-completed with
   // the status latched.
