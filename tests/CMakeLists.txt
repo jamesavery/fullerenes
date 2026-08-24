@@ -13,6 +13,10 @@ if(GTest_FOUND)
   target_link_libraries(edge-surgery-test fullerenes GTest::GTest GTest::Main)
   add_test(NAME edge-surgery-test COMMAND edge-surgery-test)
 
+  add_executable(arc-nav-test arc-nav-test.cc)
+  target_link_libraries(arc-nav-test fullerenes GTest::GTest GTest::Main)
+  add_test(NAME arc-nav-test COMMAND arc-nav-test)
+
   add_executable(pentagon-test pentagon-test.cc)
   # Uses batch::Batch, whose storage is SyclVector in a SYCL build (see view-test).
   if(ENABLE_SYCL)

@@ -182,7 +182,18 @@ struct RSRAdjacencyView {
         return -1;
     }
 
-    // --- Arc-index navigation (O(1) per call, except find_arc which is O(degree)) ---
+    // --- Arc-index navigation: the rotation-system words ------------------
+    // O(1) per call except find_arc (O(degree)).  target reads an arc's
+    // head; next/prev are sigma/sigma^-1, reverse_arc is alpha, and
+    // next_on_face walks the face orbit -- the vocabulary rotation-system
+    // algorithms compose from; the laws each word carries are on its
+    // declaration, pinned by tests/arc-nav-test.cc.
+
+    // THE live-arc predicate: what every "@pre live:" below cites and what
+    // require_live_arc enforces.  Total: no read outside the arrays.
+    bool is_live_arc(arcix_t a) const {
+        return size_t(a.first) < size_t(N) && int(a.second) < degree(a.first);
+    }
 
     arcix_t find_arc(K u, K v) const {
         return {u, uint8_t(find(u, v))};
@@ -199,23 +210,33 @@ struct RSRAdjacencyView {
     size_t  arcid(arcix_t a)  const { return arcid(a.first, a.second); }
     arcix_t arc_of(size_t id) const { return {K(id / dmax), uint8_t(id % dmax)}; }
 
+    // @pre live: is_live_arc(a)
     K target(arcix_t a) const {
-        return neighbours[a.first * dmax + a.second];
+        return neighbours[arcid(a)];
     }
 
+    // sigma: the cyclic successor in the source's rotation.
+    // @pre  live: is_live_arc(a)  (an empty row would divide by zero)
+    // @post orbit: next^degree(a.first) is the identity on a's row
     arcix_t next(arcix_t a) const {
         auto [u, i] = a;
         uint8_t d = deg[u];
         return {u, uint8_t((i + 1) % d)};
     }
 
+    // sigma^-1: prev(next(a)) == a and next(prev(a)) == a.
+    // @pre live: is_live_arc(a)  (an empty row would divide by zero)
     arcix_t prev(arcix_t a) const {
         auto [u, i] = a;
         uint8_t d = deg[u];
         return {u, uint8_t((i + d - 1) % d)};
     }
 
-    // @pre twin: has_twin()  (violation throws graph_surgery_error{TwinAbsent})
+    // alpha: the same edge traversed the other way, read off the twin table.
+    // @pre  live: is_live_arc(a)
+    // @pre  twin: has_twin()
+    // @post involution: !twin_is_valid() || reverse_arc(result) == a
+    // @throws graph_surgery_error{TwinAbsent} when !has_twin()
     arcix_t reverse_arc(arcix_t a) const {
         if (!has_twin())
             surgery_fail("reverse_arc", graph_surgery_error::Code::TwinAbsent,
@@ -226,8 +247,16 @@ struct RSRAdjacencyView {
         return {v, j};
     }
 
+    // The next arc around the face: cross the edge, then step BACKWARDS in
+    // the target's rotation -- the library's one face convention, the same
+    // walk the vertex-pair form next_on_face(u,v) = prev(v,u) spells
+    // (graphview.hh, planar_csr.hh) and oriented_surface() orbits.  With
+    // CCW rotations this traces each face once; its orbit count satisfies
+    // Euler's formula.  (Until 2026-08-24 this overload stepped FORWARDS,
+    // walking the mirror face of its own vertex-pair sibling; it had no
+    // callers, and arc-nav-test now pins the direction.)
     arcix_t next_on_face(arcix_t a) const {
-        return next(reverse_arc(a));
+        return prev(reverse_arc(a));
     }
 
     // =======================================================================
@@ -265,7 +294,7 @@ struct RSRAdjacencyView {
     using Code = graph_surgery_error::Code;
 
     // THE twin-validity predicate -- the definition every @pre/@post twin
-    // clause in this section cites.  Empty twin is vacuously valid; else
+    // clause in this header cites.  Empty twin is vacuously valid; else
     // every live arc's entry names a live slot of a valid target row that
     // points back at it (its reverse), both ways (involution).  The RSR
     // sibling of validate(PlanarCSR) in planar_csr.hh.  Total: survives
@@ -293,8 +322,8 @@ struct RSRAdjacencyView {
     // New edge u--v landing in the corner after a_u (in u's rotation) and
     // after a_v (in v's).
     // @anchor rsr-insert-edge-at
-    // @pre  live_u: size_t(a_u.first) < size_t(N) && int(a_u.second) < degree(a_u.first)
-    // @pre  live_v: size_t(a_v.first) < size_t(N) && int(a_v.second) < degree(a_v.first)
+    // @pre  live_u: is_live_arc(a_u)
+    // @pre  live_v: is_live_arc(a_v)
     // @pre  (the slot core's @pre, at slots slot_after(a_u) / slot_after(a_v))
     // @post target(result.first) == a_v.first && target(result.second) == a_u.first
     // @post twin: twin_is_valid()
@@ -313,7 +342,7 @@ struct RSRAdjacencyView {
     // insert_edge_at without a find.  An endpoint whose degree drops to 0
     // has no corner left; its arcix comes back with slot no_slot.
     // @anchor rsr-remove-edge-at
-    // @pre  live: size_t(a.first) < size_t(N) && int(a.second) < degree(a.first)
+    // @pre  live: is_live_arc(a)
     // @pre  (the slot core's @pre)
     // @post result == {vacated_corner(u, s_u), vacated_corner(v, s_v)}
     // @post twin: twin_is_valid()
@@ -451,7 +480,7 @@ struct RSRAdjacencyView {
     }
 
     void require_live_arc(const char* op, arcix_t a) const {
-        if (size_t(a.first) >= size_t(N) || int(a.second) >= deg[a.first])
+        if (!is_live_arc(a))
             surgery_fail(op, Code::NotLiveArc, a.first, K(-1),
                          " (arc slot " + std::to_string(int(a.second)) + ")");
     }
