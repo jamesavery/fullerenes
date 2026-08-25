@@ -22,6 +22,7 @@
 #include <span>
 #include <type_traits>
 
+#include "fullerenes/diamond_forms.hh"
 #include "fullerenes/eisenstein.hh"
 
 // ============================================================================
@@ -50,8 +51,8 @@ inline constexpr double lsq_integrality_band = 1e-9; // |len^2 - round| relative
 
 // Heron product: H(a,b,c) = (a+b+c)(-a+b+c)(a-b+c)(a+b-c) = 16*Area^2.
 // Returns 0 if the triangle inequality is violated.
-// (The squared-length integer form heron_product_sq lives in eisenstein.hh,
-// beside the lattice primitives that consume it.)
+// (The squared-length form heron_product_sq lives ring-generically in
+// metric_forms.hh; eisenstein.hh pins its exact-integer instantiation.)
 inline double heron_product(double a, double b, double c) {
   double s1 = -a + b + c;
   double s2 =  a - b + c;
@@ -138,9 +139,10 @@ struct Length {
 // classifies the edge -- > 0 Delaunay, == 0 cocircular (tight), < 0 must
 // flip -- as the sign of one integer linear form, tolerance-free.
 // Convexity at an endpoint is the same shape (Q*tau_upper + P*tau_lower),
-// with the second endpoint the SAME predicate on the reversed diamond (the
-// reversal involution sigma(e,a,b,c,d) = (e,b,a,d,c); whole-diamond
-// quantities are sigma-invariant, per-endpoint ones transform by sigma).
+// with the second endpoint the SAME predicate on the reversed diamond.
+// The five fields, the four numerators and the reversal involution are
+// the shared DiamondForms skeleton (diamond_forms.hh, which states the
+// sigma-involution once for every exact diamond classifier).
 //
 // Degeneracy: a diamond with a degenerate or non-lattice side (tau <= 0)
 // is OUTSIDE the predicates' domain and classifies as none of
@@ -154,20 +156,16 @@ struct Length {
 // arithmetic (the inductive envelope; hostile larger values are out of
 // contract -- heron_product_sq overflows int64 near 1.2e9).
 // ============================================================================
-struct DiamondSq {
-  long long e, a, b, c, d;   // squared lengths
+struct DiamondSq : DiamondForms<long long> {
+  DiamondSq() = default;
+  DiamondSq(long long e_, long long a_, long long b_, long long c_,
+            long long d_)
+      : DiamondForms<long long>{e_, a_, b_, c_, d_} {}
+  DiamondSq(const DiamondForms<long long>& f) : DiamondForms<long long>(f) {}
 
-  // sigma, the reversal involution: the diamond read from the diagonal's
-  // other endpoint.  sigma(sigma(D)) = D.
-  DiamondSq reversed() const { return {e, b, a, d, c}; }
-
-  // The law-of-cosines numerators (squared coordinates): s_* are the
-  // cotangent numerators at the two apexes, P/Q the endpoint-convexity
-  // numerators at the origin endpoint u.
-  long long s_upper() const { return a + b - e; }
-  long long s_lower() const { return c + d - e; }
-  long long P() const { return e + a - b; }
-  long long Q() const { return e + c - d; }
+  DiamondSq reversed() const {
+    return DiamondSq{DiamondForms<long long>::reversed()};
+  }
 
   // The lattice area numbers of the two triangles (H = 3*tau^2); -1 when a
   // side bounds no lattice triangle, 0 when degenerate.

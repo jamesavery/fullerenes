@@ -493,6 +493,9 @@ struct AlexandrovIDTCubic {
 
   // Circumradius of the flat regular unit-edge pentagon: the kis spoke
   // length from a pentagon center to its corners (hexagon spokes are 1).
+  // FLOAT SHADOW of the exact authority: 25*R5^2 == the ring constant
+  // Real30::lsq_pentagon_spoke() (fullerenes/cyclotomic.hh); the two are
+  // gated at double rounding by test_cyclotomic_algebra's [I] bridge.
   static inline const double R5 = 0.5 / std::sin(M_PI / 5);
 
   // The n-generic B-I solver.  Configure knobs before build()/solve(),

@@ -139,7 +139,7 @@ class is constrained, not impossible, off the reduced-dual hypothesis.)
 The minimal lattice realization of the k = 2 half-turn shape is an
 inscribed rectangle: sides² {1, 3}, diameter² 4 (two 30-60-90 lattice
 triangles, tau = 2, F == 0 on the diagonal exactly).
-`claude-projects/delaunay/tools/smoke_canonical_completion` builds a flat
+`claude-projects/delaunay/tools/test_canonical_completion_branches` builds a flat
 torus from two such rectangles — its vertices are flat 2π points, so it
 realizes the ambiguity BRANCH rather than §4's reduced-dual hypothesis
 class — whose cells carry period-2 boundary words, (u,1),(x,3),(u,1),(x,3)
