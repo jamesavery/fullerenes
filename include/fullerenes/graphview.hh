@@ -18,7 +18,9 @@
 
 #include <stdexcept>
 #include <array>
+#include <span>
 #include <cmath>
+#include <cfloat>
 #include <variant>   // std::monostate (pentagon_storage_t's non-bearing branch)
 
 #include "fullerenes/dense_graph.hh"
@@ -277,6 +279,27 @@ struct GraphView : Spanify::RSRAdjacencyView<node_t> {
     vector<node_t> shortest_cycle(node_t s, const int max_depth) const;
     vector<node_t> shortest_cycle(const vector<node_t>& prefix, const int max_depth) const;
     vector<int> multiple_source_shortest_paths(const vector<node_t>& sources, const unsigned int max_depth=INT_MAX) const;
+
+    // --- Adjacency spectrum ---
+    // The eigenvalues of the adjacency matrix, DESCENDING (the order the pi
+    // system fills in: the Perron root first).  A[u][v] counts u-v arcs, so a
+    // multigraph gets its own spectrum.  Computed with the in-house BLAS-free
+    // cyclic Jacobi (LinAlg::jacobi_eig): the symmetry precondition is
+    // CHECKED here rather than inferred from the solver's guard, because an
+    // asymmetric matrix does not trip that guard -- it converges quietly to
+    // numbers that are not the spectrum.  The guard has never tripped on a
+    // symmetric input in this repo's sweeps (cubic C20-C100, cycles to
+    // N = 400, K_n to n = 100), and a trip is reported as what it is.
+    // @anchor adjacency-spectrum
+    // @pre  symmetric: adjacency_is_symmetric()
+    // @post size: result.size() == size_t(N)
+    // @post descending: is_sorted_descending(result)
+    // @post perron_regular: implies(all_of(indices(N), [&](node_t v){ return degree(v) == degree(0); }),
+    //                               fabs(result[0] - degree(0)) < 1e-9)
+    // @throws std::logic_error when the adjacency is not symmetric (a graph bug)
+    // @throws std::runtime_error when cyclic Jacobi exhausts its sweep budget
+    // @time O(sweeps*N^3) -- ~1 ms at N=60, ~5 ms at N=100  @space O(N^2)
+    vector<double> adjacency_spectrum() const;
 
     // --- Hamiltonian cycles ---
     // The number of Hamiltonian cycles of this graph, counted as UNDIRECTED
@@ -701,6 +724,35 @@ struct TriangulationView : PlanarGraphView {
     // `apply_permutation(pi)` on a copy to materialise the sorted graph.
     Permutation sort_flat_last() const;
 };
+
+// --- Spectral graph invariants -------------------------------------------
+// Functions of a graph's adjacency spectrum alone (GraphView::adjacency_spectrum),
+// with no reference to any electron count -- the Hueckel module reports them,
+// but they belong to the graph.
+
+// The Estrada index EE(G) = sum_i exp(x_i) (Estrada 2000): the
+// subgraph-centrality trace tr e^A = sum_k tr A^k / k!.
+// @pre  nonempty: !spectrum.empty()
+double estrada_index(std::span<const double> spectrum);
+
+// The bipartivity beta(G) = sum_i cosh(x_i) / sum_i exp(x_i) (Estrada &
+// Rodriguez-Velazquez 2005): the even-walk share of EE(G).  In exact
+// arithmetic beta = (1 + EE(-A)/EE(A))/2, so beta > 1/2 always, and
+// 1 - beta = (sum_{k odd} tr A^k / k!)/EE(A), so beta == 1 IFF the graph has
+// no closed walk of odd length, i.e. iff it is bipartite.  Computed values
+// land within a few ulps of that, on either side -- hence the slack below,
+// and never test it with ==.
+// @pre  nonempty: !spectrum.empty()
+// @post half_to_one: result >= 0.5 && result <= 1 + 8*spectrum.size()*DBL_EPSILON
+double bipartivity(std::span<const double> spectrum);
+
+// The spectral moments M(k) = sum_i x_i^k = tr A^k, k = 0..15: the number of
+// closed k-walks.  For a SIMPLE LOOPLESS graph M(0) = N, M(1) = 0,
+// M(2) = 2|E| and M(3) = 6*#triangles -- exactly in the integers, to a few
+// eigensolver ulps here.  The 16 is the legacy report's width (hueckel.f
+// nspec = 15).
+// @pre  nonempty: !spectrum.empty()
+std::array<double, 16> spectral_moments(std::span<const double> spectrum);
 
 // ---------------------------------------------------------------------------
 // FullereneDualView: dual of a fullerene (triangulation with 12 degree-5
