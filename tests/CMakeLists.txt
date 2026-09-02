@@ -132,6 +132,12 @@ if(GTest_FOUND)
   target_link_libraries(planargraph-ascii-test fullerenes GTest::GTest GTest::Main)
   add_test(NAME planargraph-ascii-test COMMAND planargraph-ascii-test)
 
+  # Own main: --sizes N,N,... widens the database sweep; the default list is
+  # what CTest runs, and the database-dependent cases skip when it is absent.
+  add_executable(hueckel-test hueckel-test.cc)
+  target_link_libraries(hueckel-test fullerenes GTest::GTest)
+  add_test(NAME hueckel-test COMMAND hueckel-test)
+
   add_executable(isomerdb-test isomerdb-test.cc)
   target_link_libraries(isomerdb-test fullerenes GTest::GTest GTest::Main)
   add_test(NAME isomerdb-test COMMAND isomerdb-test)
