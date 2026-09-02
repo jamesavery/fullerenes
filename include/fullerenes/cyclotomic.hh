@@ -591,6 +591,12 @@ inline SignOr sign_real(const Real30& v, SignTrace* tr = nullptr) {
   return detail::sign_real_exact(v, tr);
 }
 
+// The ring's order, three-way: sign(a - b).  Z[gamma] is a subring of R,
+// so this IS the real order; nullopt = refused as sign_real refuses.
+inline SignOr compare(const Real30& a, const Real30& b, SignTrace* tr = nullptr) {
+  return sign_real(a - b, tr);
+}
+
 // ---------------------------------------------------------------------------
 // Exact division (the flip divides by 2e).  See the file banner's EXACT
 // DIVISION paragraph for the scheme and its guarantees; the trace reports
@@ -734,6 +740,78 @@ inline std::optional<Real30> exact_div(const Real30& numerator,
   }
   if (tr) tr->refusal = Refusal::NotDivisible;
   return std::nullopt;
+}
+
+// ---------------------------------------------------------------------------
+// Zeta30: Z[zeta_30] as the rank-2 module over Z[gamma] with basis
+// {1, zeta}, zeta = zeta_30 = e^{i pi/15}, zeta^2 = gamma zeta - 1.  The
+// POINT ring: kis module points (x kPointScale) are Zeta30 values, and
+// the carried quantities fall out exactly --
+//   lsq(u)      = |u|^2       = u.x^2 + gamma u.x u.y + u.y^2   (Real30)
+//   wedge(u, v) = the delta-normalized cross product = x y' - y x'
+// (with 16 Area^2 = (2 - gamma_2) wedge^2, whitepaper @ref eq:heron).
+// RUN-PATH since layer 2: the CyclotomicMetric's star development
+// (delaunay_cyclotomic.hh) develops flat stars in this module -- the
+// tenth policy word the flat-vertex removal needs; construction and
+// cross-check uses stay too (the walk identity as five_pentagon_spoke).
+// KINSHIP: this is the same quadratic-tower body as Eisenstein
+// (eisenstein.hh) at the trace gamma = 1 = 2 cos(pi/3) -- product,
+// conjugation (zeta -> gamma - zeta), norm x^2 + gamma x y + y^2, and the
+// wedge x y' - y x' all specialize term-for-term; the two stay separate
+// because Eisenstein is the unchecked, device-legal, int-based hot path
+// and this is the checked tier.
+// ---------------------------------------------------------------------------
+struct Zeta30 {
+  Real30 x, y;   // x + y * zeta
+
+  bool ok() const { return x.ok && y.ok; }
+
+  static Zeta30 integer(long long n) { return {Real30::integer(n), {}}; }
+  static Zeta30 zeta_pow(int k) {
+    k = ((k % 30) + 30) % 30;
+    Zeta30 r = integer(1);
+    const Zeta30 z{{}, Real30::integer(1)};
+    for (int i = 0; i < k; i++) r = r * z;
+    return r;
+  }
+  // The walk identity (whitepaper @ref eq:walk): the kPointScale-scaled
+  // pentagon spoke 5 R5 zeta_60^9 = 2 + z^-3 + z^3 + z^6 + 2 z^9 + z^12
+  // (z = zeta_30) -- sigma-even, hence HERE, one conductor down from its
+  // two sigma-odd factors.
+  static Zeta30 five_pentagon_spoke() {
+    return integer(2) + zeta_pow(-3) + zeta_pow(3) + zeta_pow(6) +
+           2 * zeta_pow(9) + zeta_pow(12);
+  }
+
+  bool is_zero() const { return x.is_zero() && y.is_zero(); }
+  friend bool operator==(const Zeta30& u, const Zeta30& v) {
+    return u.x == v.x && u.y == v.y;
+  }
+  friend Zeta30 operator+(const Zeta30& u, const Zeta30& v) {
+    return {u.x + v.x, u.y + v.y};
+  }
+  friend Zeta30 operator-(const Zeta30& u, const Zeta30& v) {
+    return {u.x - v.x, u.y - v.y};
+  }
+  Zeta30 operator-() const { return {-x, -y}; }
+  friend Zeta30 operator*(long long n, const Zeta30& u) {
+    return {n * u.x, n * u.y};
+  }
+  // (x + y zeta)(x' + y' zeta) with zeta^2 = gamma zeta - 1.
+  friend Zeta30 operator*(const Zeta30& u, const Zeta30& v) {
+    return {u.x * v.x - u.y * v.y,
+            u.x * v.y + u.y * v.x + Real30::gamma() * (u.y * v.y)};
+  }
+  // Complex conjugation: zeta -> gamma - zeta.
+  Zeta30 conj() const { return {x + Real30::gamma() * y, -y}; }
+
+  // |u|^2, a Real30 (the identity (conj(u) u).y == 0 holds by algebra).
+  Real30 lsq() const { return x * x + Real30::gamma() * (x * y) + y * y; }
+};
+
+// The delta-normalized wedge of two vectors: Im(conj(u) v)/sin(pi/15).
+inline Real30 wedge(const Zeta30& u, const Zeta30& v) {
+  return u.x * v.y - u.y * v.x;
 }
 
 // ---------------------------------------------------------------------------

@@ -1,4 +1,5 @@
 #include "fullerenes/delaunay.hh"
+#include "fullerenes/delaunay_cyclotomic.hh"
 
 #include <cmath>
 #include <algorithm>
@@ -287,7 +288,7 @@ namespace {
 // on_pop / verbose_removal diagnostics to the observer policy, and converts
 // a non-Ok status to the documented throws.
 template <class Metric>
-void run_flat_removal(DelaunayTriangulation& D, Metric&& m,
+void run_flat_removal(DelaunayTriangulation& D, const char* op, Metric&& m,
                       const std::function<void(int)>& on_pop)
 {
   auto count_live = [&]() {
@@ -325,7 +326,7 @@ void run_flat_removal(DelaunayTriangulation& D, Metric&& m,
   } else {
     D.DelaunayView::remove_flat_vertices(ws, m, NoTransport{}, obs);
   }
-  D.throw_on_status("remove_flat_vertices");
+  D.throw_on_status(op);
 
   if (D.verbose_removal) {
     std::fprintf(stderr, "[remove_flat] done: removed %lld, %d live remain\n",
@@ -339,7 +340,7 @@ void run_flat_removal(DelaunayTriangulation& D, Metric&& m,
 void DelaunayTriangulation::remove_flat_vertices(double flat_tol,
                                                  const std::function<void(int)>& on_pop)
 {
-  run_flat_removal(*this, BandedFloatMetric{flat_tol}, on_pop);
+  run_flat_removal(*this, "remove_flat_vertices", BandedFloatMetric{flat_tol}, on_pop);
 }
 
 // The exact-regime entry boundary (paper sec:exactness), shared by
@@ -379,7 +380,8 @@ derive_exact_lsq_carry(const DelaunayTriangulation& D, const char* op)
     if (D.v_out[v] < 0) continue;
     // DelaunayView:: qualification: the owner's vector-returning curvature()
     // name-hides the view's per-vertex form.
-    if (std::abs(D.DelaunayView::curvature(v) - D.cone_excess(v) * pi_3) > 1e-6)
+    if (std::abs(D.DelaunayView::curvature(v) - D.cone_excess(v) * pi_3) >
+        delaunay_detail::curvature_agreement_band)
       throw std::runtime_error(
           std::string(op) + ": curvature at v=" + std::to_string(v) +
           " disagrees with its integer cone excess (not the equilateral labeling)");
@@ -391,7 +393,61 @@ void DelaunayTriangulation::remove_flat_vertices_exact(const std::function<void(
 {
   std::vector<long long> Lsq =
       derive_exact_lsq_carry(*this, "remove_flat_vertices_exact");
-  run_flat_removal(*this, ExactIntegerMetric{std::span<long long>(Lsq)}, on_pop);
+  run_flat_removal(*this, "remove_flat_vertices_exact",
+                   ExactIntegerMetric{std::span<long long>(Lsq)}, on_pop);
+}
+
+// The cyclotomic carry AFTER the removal: derived from the fresh kis DCEL
+// and verified loudly (the entry boundary, delaunay_cyclotomic.hh), then
+// the flat removal under the STATEFUL metric (the flip and ear transports
+// ride inside it, so one instance lives across the run).  The value
+// returned is the only exact description of the reduced complex: the
+// exact lengths and wedges are not recoverable from the float shadows, and
+// the entry boundary's fresh-kis premise no longer holds.
+static cyclotomic::CyclotomicKisCarry
+reduced_cyclotomic_kis_carry(DelaunayTriangulation& D, int n_centres,
+                             std::span<const int> centre_size, const char* op,
+                             const std::function<void(int)>& on_pop)
+{
+  cyclotomic::CyclotomicKisCarry carry =
+      cyclotomic::derive_cyclotomic_kis_carry(D, n_centres, centre_size, op);
+  cyclotomic::CyclotomicMetric m = carry.metric();
+  run_flat_removal(D, op, m, on_pop);
+  return carry;
+}
+
+// The canonical completion under a metric, transport-hooked (the tail both
+// completion owner words share).
+template <class Metric>
+static DelaunayView::CompletionStats
+complete_under(DelaunayTriangulation& D, const char* op, Metric&& m)
+{
+  return with_transport(D, op, [&](auto&& tr) {
+    return D.DelaunayView::canonical_completion(m, tr);
+  });
+}
+
+void DelaunayTriangulation::remove_flat_vertices_cyclotomic_kis(
+    int n_centres, std::span<const int> centre_size,
+    const std::function<void(int)>& on_pop)
+{
+  reduced_cyclotomic_kis_carry(*this, n_centres, centre_size,
+                               "remove_flat_vertices_cyclotomic_kis", on_pop);
+}
+
+DelaunayView::CompletionStats
+DelaunayTriangulation::remove_and_complete_cyclotomic_kis(
+    int n_centres, std::span<const int> centre_size,
+    const std::function<void(int)>& on_pop)
+{
+  // Removal, then completion, on ONE carry.  The removal's post-condition
+  // (Delaunay under the metric) is the completion's precondition, so no
+  // separate Delaunay check stands between them.
+  cyclotomic::CyclotomicKisCarry carry = reduced_cyclotomic_kis_carry(
+      *this, n_centres, centre_size, "remove_and_complete_cyclotomic_kis",
+      on_pop);
+  cyclotomic::CyclotomicMetric m = carry.metric();
+  return complete_under(*this, "remove_and_complete_cyclotomic_kis", m);
 }
 
 std::vector<long long> DelaunayTriangulation::verified_exact_lsq_carry() const
@@ -411,9 +467,7 @@ DelaunayView::CompletionStats DelaunayTriangulation::canonical_completion_exact(
   std::vector<long long> Lsq =
       derive_exact_lsq_carry(*this, "canonical_completion_exact");
   const ExactIntegerMetric m{std::span<long long>(Lsq)};
-  return with_transport(*this, "canonical_completion_exact", [&](auto&& tr) {
-    return DelaunayView::canonical_completion(m, tr);
-  });
+  return complete_under(*this, "canonical_completion_exact", m);
 }
 
 std::vector<int> DelaunayTriangulation::compact_vertices()

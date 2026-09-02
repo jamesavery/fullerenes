@@ -491,6 +491,23 @@ struct DelaunayTriangulation : DelaunayView, DelaunayStorage {
   //         vertices) -- loud, never a silently wrong reduction.
   void remove_flat_vertices_exact(const std::function<void(int)>& on_pop = {});
 
+  // The FLATTENED-KIS exact removal driver (the third regime,
+  // fullerenes/delaunay_cyclotomic.hh; mathematics in
+  // claude-projects/delaunay/cyclotomic-idt.tex): derives + verifies the
+  // cyclotomic (lsq, wedge, curvature-index) carry from THIS fresh kis
+  // DCEL -- face-centre vertices first (kis ids < n_centres),
+  // centre_size their face sizes, 5 or 6 -- and runs the flat removal
+  // under CyclotomicMetric, so every geometric decision is an exact rank-4
+  // ring sign (flatness is the combinatorial curvature index).  Loud entry
+  // boundary like remove_flat_vertices_exact.
+  // @throws std::runtime_error when the DCEL is not a fresh FULLERENE kis
+  //         complex under this centre bookkeeping (edge/face classes,
+  //         curvature indices, Gauss-Bonnet sum k = 60 all verified); the
+  //         usual view trips convert to throws as in remove_flat_vertices.
+  void remove_flat_vertices_cyclotomic_kis(
+      int n_centres, std::span<const int> centre_size,
+      const std::function<void(int)>& on_pop = {});
+
   // The exact-regime entry boundary as a value: derive the integer squared
   // lengths from he_length and VERIFY both exactness preconditions loudly
   // (the shared body remove_flat_vertices_exact and
@@ -520,6 +537,22 @@ struct DelaunayTriangulation : DelaunayView, DelaunayStorage {
   //         metric, a walk that fails to close, a refused tight flip, or
   //         the fan-conversion step budget (via the Status latch).
   DelaunayView::CompletionStats canonical_completion_exact();
+
+  // The FLATTENED-KIS removal followed by its canonical completion: the
+  // removal of remove_flat_vertices_cyclotomic_kis, then the canonical
+  // completion (the view body's doc above), both under ONE cyclotomic
+  // carry.  The two operations are one owner word here because the exact
+  // lengths and wedges are not recoverable from the float shadows once the
+  // removal has run, and the entry boundary demands a FRESH kis complex,
+  // which no longer exists (the dual chain's pair,
+  // remove_flat_vertices_exact + canonical_completion_exact, re-derives
+  // its integer carry instead).  Entry boundary and throws as the removal
+  // word's; the completion runs on the removal's post-condition (Delaunay
+  // under the metric) with no separate check, and carries the view body's
+  // completion contract.
+  DelaunayView::CompletionStats remove_and_complete_cyclotomic_kis(
+      int n_centres, std::span<const int> centre_size,
+      const std::function<void(int)>& on_pop = {});
 
   // Renumber the live vertices to 0..n_live-1 (dropping removed ones) and
   // shrink nv, rewriting he_origin and the per-vertex arrays. Needed after a

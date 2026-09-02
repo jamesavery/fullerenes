@@ -48,6 +48,8 @@ inline constexpr double tie_cocircular_tol = 1e-12; // tie-break spoke test
 inline constexpr double default_flat_tol   = 1e-6;  // equilateral-metric flatness band
 inline constexpr double lsq_integrality_band = 1e-9; // |len^2 - round| relative band
                                                      // for entering the exact regime
+inline constexpr double curvature_agreement_band = 1e-6; // |float curvature - exact
+                                                     // cone excess| for entering it
 
 // Heron product: H(a,b,c) = (a+b+c)(-a+b+c)(a-b+c)(a+b-c) = 16*Area^2.
 // Returns 0 if the triangle inequality is violated.

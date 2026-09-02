@@ -257,9 +257,11 @@ struct NoRemovalObserver {
 // sec:exactness).  Each policy carries the COMPLETE predicate-and-length
 // vocabulary the machinery consults -- flatness, the three edge
 // predicates, the flipped length, the ear acceptance, the star
-// preparation, the tie-break side order, and the edge-length write -- so
-// the algorithms contain no regime branches at all; the two regimes are
-// two small objects a proof can cite separately.  Definitions follow
+// preparation, the removal commit, the tie-break side order, and the
+// edge-length write; the exact regimes add the three-way order of two
+// squared lengths the canonical completion keys by (exact_metric below)
+// -- so the algorithms contain no regime branches at all; each regime is
+// one small object a proof can cite separately.  Definitions follow
 // DelaunayView (their operations read it).
 //
 // The pipeline entry point is the selector -- compute(T) (equilateral
@@ -270,6 +272,19 @@ struct NoRemovalObserver {
 // ============================================================================
 struct BandedFloatMetric;
 struct ExactIntegerMetric;
+struct DelaunayView;
+
+// The exact regimes: the policies that can ORDER two squared lengths
+// exactly (compare_lsq(V, a, b) == sign(L^2(a) - L^2(b)), three-way).
+// The canonical completion's corner key is a total order on the cell's
+// boundary word, so a completion exists exactly for these policies:
+// ExactIntegerMetric and CyclotomicMetric model the concept,
+// BandedFloatMetric does not -- the banded completion's absence, as a
+// type rather than a convention.
+template <typename M>
+concept exact_metric = requires(M m, DelaunayView& V, int a, int b) {
+  { m.compare_lsq(V, a, b) } -> std::convertible_to<int>;
+};
 
 // The input surface the view-level build reads: a triangulation presented
 // as a ROTATION SYSTEM -- row u is the CCW cyclic order of u's neighbours,
@@ -1196,12 +1211,14 @@ struct DelaunayView {
   // cocircular polygons; Bobenko-Springborn), but the triangulation of each
   // cell is a flip-history artifact.  This pass retriangulates every
   // cocircular cell as the FAN from its canonical corner -- the corner whose
-  // boundary rotation word, entries (origin vertex id, integer squared
+  // boundary rotation word, entries (origin vertex id, exact squared
   // length) in walk order, is lexicographically minimal -- so the completed
   // triangulation is a function of the labeled input complex alone,
-  // independent of the flip order that produced it.  (canonical_tesselation
-  // compares its cells by the same key SHAPE over the caller's label map;
-  // the two orders coincide when that map is monotone, identity included.)
+  // independent of the flip order that produced it.  (Under
+  // ExactIntegerMetric, canonical_tesselation compares its cells by the
+  // same key SHAPE over the caller's label map, and the two orders coincide
+  // when that map is monotone, identity included; its integer length key
+  // does not describe the cyclotomic regime.)
   // Fan conversion flips only tight (exactly cocircular) edges, which are
   // zero-energy Delaunay moves inside the cell's circle, so the
   // tesselation, the SURFACE metric, and every vertex cone angle are
@@ -1229,14 +1246,21 @@ struct DelaunayView {
   // complexes outside that argument's scope (CANONICAL-TESSELATION.md
   // section 3 carries the derivation).
   //
-  // Exact regime only (ExactIntegerMetric): tightness is the integer form
-  // F == 0 and the corner keys read the exact carry through m.lsq.  A
-  // banded-metric completion needs a key design of its own and is
-  // deliberately absent.
+  // Exact regimes only (exact_metric: ExactIntegerMetric, CyclotomicMetric):
+  // tightness is the exact cocircular word and the corner keys are ordered
+  // by the exact three-way m.compare_lsq -- the one word the completion
+  // ADDS to the policy vocabulary; the rest of what it asks for (cocircular,
+  // and flip_edge's convex / flipped / set_edge_length) the machinery
+  // already had.  A banded-metric completion needs a key design of its own
+  // and is deliberately absent: BandedFloatMetric does not model
+  // exact_metric.
   //
-  // @pre  is_delaunay() under m (post lawson_sweep / reduction; the owner
-  //       entry checks it).  On a non-Delaunay complex tight components
-  //       are not inscribed polygons and flips may be refused.
+  // @pre  is_delaunay() under m (post lawson_sweep / reduction).  The owner
+  //       entries establish it: canonical_completion_exact checks the float
+  //       is_delaunay(); the cyclotomic owner enters straight from the
+  //       removal whose post-condition it is.  On a non-Delaunay complex
+  //       tight components are not inscribed polygons and flips may be
+  //       refused.
   // @post on Ok: every fanned cell is the canonical fan; the tesselation
   //       is unchanged; the complex is Delaunay; a second call flips
   //       nothing (idempotent).
@@ -1247,10 +1271,9 @@ struct DelaunayView {
   // NOT transactional: on any trip the complex is left part-completed with
   // the status latched; the trip is loud and terminal, never silent.
   // ==========================================================================
-  // (Body below ExactIntegerMetric, with the other exact-regime bodies.)
-  template <class Transport = NoTransport>
-  CompletionStats canonical_completion(const ExactIntegerMetric& m,
-                                       Transport&& tr = Transport{});
+  // (Body below the policies, with the other exact-regime bodies.)
+  template <exact_metric Metric, class Transport = NoTransport>
+  CompletionStats canonical_completion(Metric&& m, Transport&& tr = Transport{});
 
   // -------------------------------------------------------------------------
   // Vertex removal machinery.
@@ -1475,6 +1498,8 @@ struct DelaunayView {
 
     ws.new_faces.clear();
     splice_fan(v, ws, m);
+    if (status != Status::Ok) return;
+    m.commit_star(*this, ws, v);   // per-face carry (cyclotomic wedge) lands
     if (status != Status::Ok) return;
 
     if constexpr (tracking) tr.commit_removal(ws.new_faces.live(), v);
@@ -1856,10 +1881,14 @@ static_assert(std::tuple_size_v<decltype(std::declval<DelaunayView>().to_tuple()
               "to_tuple arity must equal n_fields");
 
 // ============================================================================
-// The two metric policies (declared before DelaunayView; banner there).
+// The metric policies (declared before DelaunayView; banner there).
 // Each is the complete vocabulary of one regime -- flatness, the three edge
 // predicates, the flipped length, the ear acceptance, the star preparation,
-// the tie-break side order, and the paired edge-length write.
+// the removal commit, the tie-break side order, and the paired edge-length
+// write; the exact regime adds compare_lsq, the three-way order of two
+// squared lengths (exact_metric).  (The third regime, CyclotomicMetric for
+// the flattened kis surface, lives in delaunay_cyclotomic.hh with its
+// exact-ring carry.)
 // ============================================================================
 
 // General metrics: the float Diamond predicates with the named tolerance
@@ -1882,6 +1911,10 @@ struct BandedFloatMetric {
     V.he_length[h] = V.he_length[V.twin(h)] = l.len;
   }
   void prepare_star(DelaunayView&, DelaunayWorkspace&, int /*v*/) const {}
+  // The removal commit hook: fires after splice_fan wires the ear faces.
+  // Regimes whose carry has per-FACE state (the cyclotomic wedge) write it
+  // here; length-only regimes have nothing to commit.
+  void commit_star(DelaunayView&, DelaunayWorkspace&, int /*v*/) const {}
   Length ear(DelaunayView&, const FanPolygon& fan, int pp, int pi, int pn) const {
     return {delaunay_detail::ear_length_if_acceptable(fan, pp, pi, pn), 0};
   }
@@ -1915,10 +1948,14 @@ struct ExactIntegerMetric {
   bool cocircular(const DelaunayView& V, int h) const {
     return V.diamond_sq(h, Lsq).is_cocircular();
   }
-  // The exact squared length of h -- the regime's key word (the canonical
-  // completion's corner keys read it; a banded metric has no exact key,
-  // which is why the banded completion is deliberately absent).
-  long long lsq(const DelaunayView&, int h) const { return Lsq[h]; }
+  // The exact order of two squared lengths, three-way -- the exact_metric
+  // word (the canonical completion's corner keys are ordered by it; a
+  // banded metric has no exact order, which is why the banded completion
+  // is deliberately absent).
+  // @post result == sign(Lsq[a] - Lsq[b])
+  int compare_lsq(const DelaunayView&, int a, int b) const {
+    return (Lsq[a] > Lsq[b]) - (Lsq[a] < Lsq[b]);
+  }
   std::optional<Length> flipped(DelaunayView& V, int h) const {
     auto fsq = V.diamond_sq(h, Lsq).flipped_length_sq();
     if (!fsq) {
@@ -1942,6 +1979,7 @@ struct ExactIntegerMetric {
   void prepare_star(DelaunayView& V, DelaunayWorkspace& ws, int v) const {
     V.develop_fan_lattice(v, ws, *this);
   }
+  void commit_star(DelaunayView&, DelaunayWorkspace&, int /*v*/) const {}
   Length ear(DelaunayView& V, const FanPolygon& fan, int pp, int pi, int pn) const {
     const long long dsq = delaunay_detail::ear_diag_sq_if_acceptable(fan.P, pp, pi, pn);
     if (dsq == 0) return {0, 0};
@@ -1959,13 +1997,14 @@ struct ExactIntegerMetric {
 };
 
 // ---------------------------------------------------------------------------
-// Exact-regime bodies (defined here because they read ExactIntegerMetric):
-// the canonical completion, then the exact lattice developments.
+// Exact-regime bodies: the canonical completion (policy-templated; its key
+// word compare_lsq exists only on the exact policies), then the exact
+// lattice developments (which read ExactIntegerMetric).
 // ---------------------------------------------------------------------------
 
-template <class Transport>
+template <exact_metric Metric, class Transport>
 DelaunayView::CompletionStats
-DelaunayView::canonical_completion(const ExactIntegerMetric& m, Transport&& tr) {
+DelaunayView::canonical_completion(Metric&& m, Transport&& tr) {
   CompletionStats st;
   if (status != Status::Ok) return st;
 
@@ -2018,14 +2057,14 @@ DelaunayView::canonical_completion(const ExactIntegerMetric& m, Transport&& tr) 
     // Canonical corner: the least rotation of the boundary word, entries
     // (origin vertex id, exact squared length) in walk order, with its
     // multiplicity.  Rotations compare by simultaneous walk: O(d^2),
-    // allocation-free; cells are small.
+    // allocation-free; cells are small.  (A refused exact order trips
+    // inside compare_lsq; the status check below ends the cell.)
     auto rot_cmp = [&](int s1, int s2) {
       int a = s1, b = s2;
       for (int i = 0; i < d; i++) {
         if (he_origin[a] != he_origin[b])
           return he_origin[a] < he_origin[b] ? -1 : 1;
-        const long long la = m.lsq(*this, a), lb = m.lsq(*this, b);
-        if (la != lb) return la < lb ? -1 : 1;
+        if (const int c = m.compare_lsq(*this, a, b)) return c;
         a = advance(a);
         b = advance(b);
       }
