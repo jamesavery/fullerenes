@@ -538,10 +538,10 @@ struct FullereneGraphView : CubicGraphView {
                                        int opt_method=3, double ftol=1e-12) const;
 
     vector<coord3d> optimized_geometry(
-        const InitialGeometry f_initial = &FullereneGraphView::eisenstein_paint_geometry, 
+        const InitialGeometry f_initial = &FullereneGraphView::eisenstein_paint_geometry,
         double initial_scalar = 1.44,
         int opt_method=3, double ftol=1e-12) const {
-            vector<coord3d> initial_geometry = (this->*f_initial)(1.44);          
+            vector<coord3d> initial_geometry = (this->*f_initial)(initial_scalar);
             return optimized_geometry(initial_geometry, opt_method, ftol);
         }
 };
