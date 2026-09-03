@@ -75,21 +75,10 @@ public:
     return B*N/(N/2+2.0);
   }
 
-  double Estrada() const {
-    double E = 0;
-
-    // Needs eigenvalues -- should diagonalization be done at
-    // initialization, or only if Estrada or bipartivity is needed?
-    //    for(int u=0;u<N;u++) E += exp(lambda[u]);
-    return E;
-  }
-  
-  double bipartivity() const {
-    double E = Estrada(), B = 0;
-    // Needs eigenvalues
-    //    for(int u=0;u<N;u++) B += cosh(lambda[u]);
-    return B/E;
-  }
+  // The Estrada index and the bipartivity used to be stubs here, returning
+  // 0 and 0/0 for want of an eigensolver.  They are real functions now, of
+  // the spectrum rather than of this class: estrada_index(spectrum) and
+  // bipartivity(spectrum) in graphview.hh, over g.adjacency_spectrum().
 
   bool check_all() const {
     // TODO: check the various relations and invariants hold

@@ -4,48 +4,57 @@
 char LIST_OPEN='[';
 char LIST_CLOSE=']';
 
-// Returns true if edge existed prior to call, false if not
-bool GraphView::remove_edge(const edge_t& e)
+// The one slot resolver both insert wrappers share; they differ ONLY in
+// this policy for a named-but-absent successor.
+enum class SuccessorPolicy { Assert,   // absent successor is a contract violation
+                             Hint };   // absent successor means append
+
+// The linear slot at which the new arc lands in w's row: before `suc` when
+// named and present, appended when suc < 0 -- and, under Hint only, also
+// appended when named but absent.
+static int insert_slot(const GraphView& G, const char* op, SuccessorPolicy policy,
+                       node_t w, node_t suc)
 {
-  node_t u = e.first, v = e.second;
-  bool value = false;
-
-  int pos_uv = find(u, v);
-  if(pos_uv >= 0){ erase_at(u, pos_uv); value = true; }
-  int pos_vu = find(v, u);
-  if(pos_vu >= 0){ erase_at(v, pos_vu); value = true; }
-
-  return value;
+  if(suc < 0) return G.degree(w);                  // explicit append
+  const int pos = G.find(w, suc);
+  if(pos >= 0) return pos;
+  if(policy == SuccessorPolicy::Hint) return G.degree(w);
+  G.surgery_fail(op, GraphView::Code::SuccessorNotNeighbour, w, suc);
 }
 
-// Returns true if edge existed prior to call, false if not
-// insert v right before suc_uv in the list of neighbours of u
-// insert u right before suc_vu in the list of neighbours of v
-bool GraphView::insert_edge(const arc_t& e, const node_t suc_uv, const node_t suc_vu)
+// Contract: graphview.hh.
+bool GraphView::remove_edge(const edge_t& e)
 {
-  if(edge_exists(e)) return true;	// insert_edge must be idempotent
-
+  require_vertices("remove_edge", e.first, e.second);
   const node_t u = e.first, v = e.second;
 
-  assert(u>=0 && v>=0);
-  int oldsize_u = degree(u), oldsize_v = degree(v);
+  const int s_u = find(u, v), s_v = find(v, u);
+  if(s_u < 0 && s_v < 0) return false;
+  remove_edge_slots(u, s_u, v, s_v);   // mutual-pair check throws on asymmetry
+  return true;
+}
 
-  if(suc_uv < 0) push_back(u, v);
-  else {
-    int pos = find(u, suc_uv);
-    insert_at(u, v, pos >= 0 ? pos : degree(u));
-  }
+// Contract: graphview.hh.
+bool GraphView::insert_edge(const arc_t& e, const node_t suc_uv, const node_t suc_vu)
+{
+  require_vertices("insert_edge", e.first, e.second);
+  if(edge_exists(e)) return true;	// ensure semantics: present -> no-op
 
-  if(u != v){
-    if(suc_vu < 0) push_back(v, u);
-    else {
-      int pos = find(v, suc_vu);
-      insert_at(v, u, pos >= 0 ? pos : degree(v));
-    }
-  }
+  const node_t u = e.first, v = e.second;
+  insert_edge_slots(u, insert_slot(*this, "insert_edge", SuccessorPolicy::Assert, u, suc_uv),
+                    v, insert_slot(*this, "insert_edge", SuccessorPolicy::Assert, v, suc_vu));
+  return false;
+}
 
-  assert(degree(u) == oldsize_u+1 && degree(v) == oldsize_v+1);
+// Contract: graphview.hh.
+bool GraphView::insert_edge_hint(const arc_t& e, const node_t hint_uv, const node_t hint_vu)
+{
+  require_vertices("insert_edge_hint", e.first, e.second);
+  if(edge_exists(e)) return true;	// ensure semantics: present -> no-op
 
+  const node_t u = e.first, v = e.second;
+  insert_edge_slots(u, insert_slot(*this, "insert_edge_hint", SuccessorPolicy::Hint, u, hint_uv),
+                    v, insert_slot(*this, "insert_edge_hint", SuccessorPolicy::Hint, v, hint_vu));
   return false;
 }
 
@@ -111,40 +120,8 @@ void Graph::apply_permutation(const Permutation& pi)
   repoint();
 }
 
-int  GraphView::arc_ix(node_t u, node_t v) const
-{
-  return find(u, v);
-}
-
-// Successor to v in oriented neigbhours of u
-node_t GraphView::next(node_t u, node_t v) const
-{
-  const auto &nu((*this)[u]);
-  int j = arc_ix(u,v);
-  if(j>=0) return nu[(j+1)%nu.size()];
-  else return -1;
-}
-
-// Predecessor to v in oriented neigbhours of u
-node_t GraphView::prev(node_t u, node_t v) const
-{
-  const auto &nu((*this)[u]);
-  int j = arc_ix(u,v);
-  if(j>=0) return nu[(j-1+nu.size())%nu.size()];
-  return -1;            // u-v is not an edge in a triangulation
-}
-
-// Successor to v in face containing directed edge u->v
-node_t GraphView::next_on_face(node_t u, node_t v) const
-{
-  return prev(v,u);
-}
-
-// Predecessor to v in face containing directed edge u->v
-node_t GraphView::prev_on_face(node_t u, node_t v) const
-{
-  return next(v,u);
-}
+// arc_ix / next / prev / next_on_face / prev_on_face are inline in
+// graphview.hh so device code can call them.
 
 // ---------------------------------------------------------------------------
 // Orientation: which surface the rotation system embeds the graph in.  The

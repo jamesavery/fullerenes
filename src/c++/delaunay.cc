@@ -147,159 +147,27 @@ DelaunayTriangulation::from_intrinsic_metric(const Triangulation& T,
 // vertex_angle_sum, is_flat -- are header-inline on DelaunayView.)
 
 // ============================================================================
-// Point transport (flip-tape) helpers
+// Point tracking: the owner's session control.
 // See claude-projects/delaunay-fillin/DESIGN-cubic-exact-paint.md and the
-// tracker banner in delaunay.hh.  Transport happens inside the two
-// topology-changing operations (flip_edge, remove_flat_vertex); everything
-// here is planar geometry over the operations' own isometric developments.
+// tracker banner in delaunay.hh.  The transport itself -- the state view,
+// the clamp policy and TrackerTransport, the policy the view's surgery
+// bodies call -- is header-inline in delaunay_transport.hh over spans, so
+// this owner and a device kernel run ONE body; here it is instantiated over
+// the owner's own storage.
 // ============================================================================
-
-namespace {
-
-// Barycentric coordinates of p in the planar triangle (A, B, C), CCW.
-// Returns the minimum coordinate (negative iff p lies outside).
-double planar_barycentric(double px, double py,
-                          double ax, double ay,
-                          double bx, double by,
-                          double cx, double cy,
-                          double out[3])
-{
-  const double d = (bx - ax) * (cy - ay) - (cx - ax) * (by - ay);  // 2*area > 0 (CCW)
-  out[0] = ((bx - px) * (cy - py) - (cx - px) * (by - py)) / d;
-  out[1] = ((cx - px) * (ay - py) - (ax - px) * (cy - py)) / d;
-  out[2] = 1.0 - out[0] - out[1];
-  return std::min({out[0], out[1], out[2]});
-}
-
-// Apply the clamp policy (tracker banner): [-CLAMP_TOL, 0) clamps to 0 with
-// accounting; below -CLAMP_TOL, or any non-finite coordinate (a degenerate
-// development), throws (wrong-side transport bug, not noise).
-void clamp_barycentric(DelaunayTriangulation::PointTracker& tk,
-                       double b[3], const char* who)
-{
-  if (!std::isfinite(b[0]) || !std::isfinite(b[1]) || !std::isfinite(b[2]))
-    throw std::runtime_error(std::string(who) +
-        ": non-finite tracked-point barycentric (degenerate development)");
-  double neg = 0;
-  for (int i = 0; i < 3; i++) if (b[i] < neg) neg = b[i];
-  if (neg < -DelaunayTriangulation::PointTracker::CLAMP_TOL)
-    throw std::runtime_error(std::string(who) +
-        ": tracked-point barycentric " + std::to_string(neg) +
-        " below -CLAMP_TOL (transport bug, not roundoff)");
-  if (neg < 0) {
-    tk.n_clamped++;
-    if (-neg > tk.max_clamp) tk.max_clamp = -neg;
-  }
-  double s = 0;
-  for (int i = 0; i < 3; i++) { if (b[i] < 0) b[i] = 0; s += b[i]; }
-  for (int i = 0; i < 3; i++) b[i] /= s;
-}
-
-// One tracked point EXPRESSED IN THE DEVELOPMENT: its index in
-// tracker.points and its coordinates in the operation's isometric planar
-// development.  idx == -1 marks a point being seeded (the removed flat
-// vertex itself, at the development's origin).
-struct DevelopedPoint { int idx; double x, y; };
-
-// The development of one POST-operation face: its three corner positions,
-// in the slot order the face's half-edge cycle will have.  The face id is
-// resolved at commit time by the caller.
-struct DevelopedTriangle { double x0, y0, x1, y1, x2, y2; };
-
-// The re-expression of a developed point in the post-operation charts:
-// which candidate triangle hosts it, and its barycentric coordinates there.
-struct Relocation { int cand; double b[3]; };
-
-// Re-express one developed point: choose the candidate triangle where the
-// point's minimum barycentric is largest, then clamp.  Deterministic on
-// shared edges -- the winning chart depends only on the development
-// coordinates, never on which source face supplied the point -- and
-// boundary points cannot fall through.  Pure computation over the
-// development: a clamp throw here fires BEFORE the caller has mutated
-// anything (the commit-or-nothing property of both transport hooks).
-Relocation relocate(DelaunayTriangulation::PointTracker& tk,
-                    double px, double py,
-                    const std::vector<DevelopedTriangle>& cands, const char* who)
-{
-  Relocation out{-1, {0, 0, 0}};
-  double best_m = -std::numeric_limits<double>::infinity();
-  for (size_t i = 0; i < cands.size(); i++) {
-    const DevelopedTriangle& t = cands[i];
-    double b[3];
-    const double m = planar_barycentric(px, py, t.x0, t.y0, t.x1, t.y1,
-                                        t.x2, t.y2, b);
-    if (m > best_m) {
-      best_m = m; out.cand = (int)i;
-      out.b[0] = b[0]; out.b[1] = b[1]; out.b[2] = b[2];
-    }
-  }
-  clamp_barycentric(tk, out.b, who);
-  return out;
-}
-
-// Express every tracked point of face f in the operation's development:
-// the barycentric combination of f's slot corners (current cycle order),
-// where `corner` maps each half-edge of the cycle to its origin's
-// development position.  Appends to `out`; reads the tracker only.
-template <class CornerFn>
-void develop_bucket(const DelaunayTriangulation& D, int f, CornerFn corner,
-                    std::vector<DevelopedPoint>& out)
-{
-  if ((int)D.tracker.by_face.size() <= f) return;
-  const std::vector<int>& bucket = D.tracker.by_face[f];
-  if (bucket.empty()) return;
-  const auto h = D.face_halfedges(f);
-  double x0, y0, x1, y1, x2, y2;
-  corner(h[0], x0, y0); corner(h[1], x1, y1); corner(h[2], x2, y2);
-  for (int idx : bucket) {
-    const DelaunayTriangulation::TrackedPoint& p = D.tracker.points[idx];
-    out.push_back({idx, p.b[0]*x0 + p.b[1]*x1 + p.b[2]*x2,
-                        p.b[0]*y0 + p.b[1]*y1 + p.b[2]*y2});
-  }
-}
-
-// Commit precomputed relocations: point idx >= 0 moves to its new chart;
-// idx == -1 seeds a new tracked point with label seed_label.  face_of_cand
-// maps each candidate triangle to its (post-operation) face id.  Cannot
-// fail: every Relocation was verified by relocate() before any mutation.
-void commit_relocations(DelaunayTriangulation& D,
-                        const std::vector<DevelopedPoint>& pts,
-                        const std::vector<Relocation>& rel,
-                        const std::vector<int>& face_of_cand,
-                        int seed_label)
-{
-  for (size_t i = 0; i < pts.size(); i++) {
-    const int f = face_of_cand[rel[i].cand];
-    if (pts[i].idx < 0) {
-      const int idx = (int)D.tracker.points.size();
-      D.tracker.points.push_back({seed_label, f,
-          {rel[i].b[0], rel[i].b[1], rel[i].b[2]}});
-      D.tracker.bucket(f).push_back(idx);
-    } else {
-      DelaunayTriangulation::TrackedPoint& p = D.tracker.points[pts[i].idx];
-      p.face = f;
-      p.b[0] = rel[i].b[0]; p.b[1] = rel[i].b[1]; p.b[2] = rel[i].b[2];
-      D.tracker.bucket(f).push_back(pts[i].idx);
-    }
-  }
-}
-
-}  // namespace
-
-std::vector<int>& DelaunayPointTracker::bucket(int f)
-{
-  if ((int)by_face.size() <= f) by_face.resize(f + 1);
-  return by_face[f];
-}
 
 void DelaunayTriangulation::enable_point_tracking()
 {
-  if (!tracker.points.empty())
+  if (tracker.view.n != 0)
     throw std::runtime_error(
         "enable_point_tracking: tracker already carries points "
         "(one tracking session per complex; stale state would be transported)");
   tracker.active = true;
-  if ((int)tracker.by_face.size() < nf) tracker.by_face.resize(nf);
+  // The buckets index every face slot the surgery may allocate.  The point
+  // capacity here covers a removal pass on its own; track_point and
+  // reserve_for_removals grow it for registered points plus their seeds.
+  tracker.ensure_capacity(tracked_points_cap(nv), nf_cap);
+  tracker.view.reset();
 }
 
 int DelaunayTriangulation::track_point(int label, int face,
@@ -313,166 +181,52 @@ int DelaunayTriangulation::track_point(int label, int face,
       std::fabs(b0 + b1 + b2 - 1.0) > 1e-9)
     throw std::runtime_error("track_point: barycentrics must be finite and sum to 1");
   double b[3] = {b0, b1, b2};
-  clamp_barycentric(tracker, b, "track_point");
-  const int idx = (int)tracker.points.size();
-  tracker.points.push_back({label, face, {b[0], b[1], b[2]}});
-  tracker.bucket(face).push_back(idx);
+  if (!clamp_barycentric(tracker.view, b))
+    throw std::runtime_error(
+        "track_point: barycentric below -CLAMP_TOL or non-finite "
+        "(outside the clamp band, not roundoff)");
+  tracker.ensure_capacity(tracker.view.n + 1, nf_cap);
+  const int idx = tracker.view.n++;
+  tracker.view.label[idx] = label;
+  tracker.view.face[idx]  = face;
+  for (int i = 0; i < 3; i++) tracker.view.b_of(idx)[i] = b[i];
+  tracker.view.bucket_push(face, idx);
   return idx;
 }
 
-// ============================================================================
-// TrackerTransport: the host-side transport policy.  Reproduces the
-// flip-tape transport (DESIGN-cubic-exact-paint.md 4.1/4.2) through the
-// view's surgery bodies: plan hooks develop and re-express every tracked
-// point BEFORE any mutation (a clamp throw fires with complex and tracker
-// untouched -- commit-or-nothing), commit hooks store the precomputed
-// relocations after the surgery.
-//
-// The mathematics: for a surgery S re-triangulating a flat region R, the
-// transport is the composition
-//     T_S  =  express_post^-1  o  express_pre
-// where express_pre maps (face, barycentric) -> R^2 through the
-// PRE-surgery triangles' isometric development of R, and express_post^-1
-// locates the planar point in the POST-surgery triangles of the SAME
-// development.  Both chart sets develop R isometrically, so T_S fixes the
-// intrinsic surface point (the transport lemma).  Both halves are computed
-// before the first write -- the post-charts are determined by the planned
-// surgery -- which is what makes the failure contract commit-or-nothing.
-// (The exact-transport rework will type this composition over lattice
-// charts, unifying it with the atlas's point-location vocabulary.)
-//
-// Flip development: u = (0,0), v = (e,0), B above, D below; positions keyed
-// per HALF-EDGE (slot anchoring), so repeated-corner faces transport the
-// same.  The post-flip charts are (B, D, v) -> fh and (D, B, u) -> ft.
-// Star development: the FanPolygon IS the isometric development (apex at
-// the origin); the removed vertex seeds a tracked point with label = v.
-// @post (transport) each point's intrinsic surface position is unchanged:
-//       the developments are isometries, re-expression only changes
-//       coordinates.
-// ============================================================================
+// --- Delaunay operations: owner wrappers over the view machinery ---
+
 namespace {
 
-struct TrackerTransport {
-  DelaunayTriangulation& T;
-  std::vector<DevelopedPoint>    carry;
-  std::vector<Relocation>        rel;
-  std::vector<DevelopedTriangle> charts;
-  std::vector<std::array<int,3>> new_tris;
-  // The star protocol (plan_star .. commit_removal) holds carry/rel across
-  // the surgery; a flip planned INSIDE that window would clobber them.  The
-  // surgery bodies never flip (asserted here), so the two protocols can
-  // share the buffers.
-  bool star_in_flight = false;
-
-  // The owner instantiates this policy only when the tracker is active, so
-  // the trait is compile-time true (the single gate is the owner's
-  // selection).
-  static constexpr bool tracking() { return true; }
-
-  void plan_flip(int h, int fh, int ft) {
-    if (star_in_flight)
-      throw std::runtime_error("TrackerTransport: flip planned inside a star "
-                               "protocol (surgery bodies must not flip)");
-    carry.clear(); rel.clear();
-    const int t  = h ^ 1;
-    const int h1 = T.he_next[h], h2 = T.he_next[h1];
-    const int h4 = T.he_next[t], h5 = T.he_next[h4];
-    const double e_dev = T.he_length[h];
-    const double lvB = T.he_length[h1], lBu = T.he_length[h2];
-    const double luD = T.he_length[h4], lDv = T.he_length[h5];
-    const double xB = (e_dev * e_dev + lBu * lBu - lvB * lvB) / (2 * e_dev);
-    const double yB =  std::sqrt(std::max(0.0, lBu * lBu - xB * xB));
-    const double xD = (e_dev * e_dev + luD * luD - lDv * lDv) / (2 * e_dev);
-    const double yD = -std::sqrt(std::max(0.0, luD * luD - xD * xD));
-    auto corner = [&](int he, double& x, double& y) {
-      if      (he == h)  { x = 0;     y = 0;  }
-      else if (he == h1) { x = e_dev; y = 0;  }
-      else if (he == h2) { x = xB;    y = yB; }
-      else if (he == t)  { x = e_dev; y = 0;  }
-      else if (he == h4) { x = 0;     y = 0;  }
-      else               { x = xD;    y = yD; }   // h5
-    };
-    develop_bucket(T, fh, corner, carry);
-    develop_bucket(T, ft, corner, carry);
-    if (carry.empty()) return;
-    const std::vector<DevelopedTriangle> fcharts = {
-      {xB, yB, xD, yD, e_dev, 0.0},   // cand 0 -> face fh (B, D, v)
-      {xD, yD, xB, yB, 0.0,   0.0}};  // cand 1 -> face ft (D, B, u)
-    rel.reserve(carry.size());
-    for (const DevelopedPoint& c : carry)
-      rel.push_back(relocate(T.tracker, c.x, c.y, fcharts, "flip_edge transport"));
-    T.tracker.bucket(fh).clear();
-    T.tracker.bucket(ft).clear();
+// The owner glue shared by the transport-hooked wrappers: run a view body
+// under the active transport policy, then convert a non-Ok status to the
+// documented throws.  (The removal drivers keep their own glue -- they
+// interpose reserve_for_removals and an observer; fold them in when a
+// prepare hook earns its keep.)
+template <class Body>
+auto with_transport(DelaunayTriangulation& D, const char* op, Body&& body)
+{
+  auto run = [&](auto&& tr) {
+    auto r = body(tr);
+    D.throw_on_status(op);
+    return r;
+  };
+  if (D.tracker.active) {
+    TrackerTransport tr{D, D.tracker.view, D.tracker.carry};
+    return run(tr);
   }
-
-  void commit_flip(int fh, int ft) {
-    // f_he[fh] = h and f_he[ft] = t were set by the rewire, so the chart
-    // slot orders (B, D, v) / (D, B, u) match the anchoring convention.
-    // A non-empty carry IS the planned-flip fact (HEAD's own condition).
-    if (carry.empty()) return;
-    commit_relocations(T, carry, rel, {fh, ft}, /*seed_label*/ -1);
-    carry.clear(); rel.clear();
-  }
-
-  void plan_star(int /*v*/, const FanPolygon& fan) {
-    star_in_flight = true;
-    carry.clear(); rel.clear(); new_tris.clear(); charts.clear();
-    carry.push_back({-1, 0.0, 0.0});                    // the seeded apex
-    for (int i = 0; i < fan.k; i++) {
-      const int j = (i + 1) % fan.k;
-      auto corner = [&](int he, double& x, double& y) {
-        if      (he == fan.spoke_he[i])  { x = 0;        y = 0; }
-        else if (he == fan.inner_rim[i]) { x = fan.x(i); y = fan.y(i); }
-        else                             { x = fan.x(j); y = fan.y(j); }
-      };
-      develop_bucket(T, T.he_face[fan.spoke_he[i]], corner, carry);
-    }
-  }
-
-  void plan_charts(const FanPolygon& fan, const FanTriangulation& tri) {
-    for (int ti = 0; ti < tri.n_triangles; ti++)
-      new_tris.push_back({tri.triangles[ti].v0, tri.triangles[ti].v1,
-                          tri.triangles[ti].v2});
-    charts.reserve(new_tris.size());
-    for (const auto& tv : new_tris)
-      charts.push_back({fan.x(tv[0]), fan.y(tv[0]),
-                        fan.x(tv[1]), fan.y(tv[1]),
-                        fan.x(tv[2]), fan.y(tv[2])});
-    rel.reserve(carry.size());
-    for (const DevelopedPoint& c : carry)
-      rel.push_back(relocate(T.tracker, c.x, c.y, charts,
-                             "remove_flat_vertex transport"));
-    // All re-expressions verified: clear the source buckets before the
-    // surgery recycles their face slots.
-    for (int i = 0; i < fan.k; i++)
-      T.tracker.bucket(T.he_face[fan.spoke_he[i]]).clear();
-  }
-
-  void commit_removal(std::span<const int> faces, int v) {
-    std::vector<int> f(faces.begin(), faces.end());
-    commit_relocations(T, carry, rel, f, /*seed_label*/ v);
-    carry.clear(); rel.clear();
-    star_in_flight = false;
-  }
-};
+  return run(NoTransport{});
+}
 
 }  // namespace
-
-// --- Delaunay operations: owner wrappers over the view machinery ---
 
 bool DelaunayTriangulation::flip_edge(int h)
 {
   // Owner wrappers serve the general (float-metric) API surface -- weighted
   // flips, post-reduction surgery -- so they instantiate the banded policy.
-  bool r;
-  if (tracker.active) {
-    TrackerTransport tr{*this};
-    r = DelaunayView::flip_edge(h, BandedFloatMetric{}, tr);
-  } else {
-    r = DelaunayView::flip_edge(h);
-  }
-  throw_on_status("flip_edge");
-  return r;
+  return with_transport(*this, "flip_edge", [&](auto&& tr) {
+    return DelaunayView::flip_edge(h, BandedFloatMetric{}, tr);
+  });
 }
 
 int DelaunayTriangulation::lawson_sweep()
@@ -480,16 +234,10 @@ int DelaunayTriangulation::lawson_sweep()
   // Sweep-only workspace: k_max = 0 (no fan machinery), O(nh) bytes.
   HostDelaunayWorkspace ws({.nv0 = nv, .k_max = 0, .nh_explicit = nh});
   ws.sweep_in_stack.clear_all();
-  int flips;
-  if (tracker.active) {
-    TrackerTransport tr{*this};
-    flips = DelaunayView::flip_to_delaunay(ws.lawson_stack, ws.sweep_in_stack,
-                                           BandedFloatMetric{}, tr);
-  } else {
-    flips = DelaunayView::flip_to_delaunay(ws.lawson_stack, ws.sweep_in_stack);
-  }
-  throw_on_status("lawson_sweep");
-  return flips;
+  return with_transport(*this, "lawson_sweep", [&](auto&& tr) {
+    return DelaunayView::flip_to_delaunay(ws.lawson_stack, ws.sweep_in_stack,
+                                          BandedFloatMetric{}, tr);
+  });
 }
 
 int DelaunayTriangulation::flip_to_delaunay()
@@ -519,7 +267,8 @@ void DelaunayTriangulation::remove_flat_vertex(int v)
   // self-loops can push it past the vertex count).  O(nh) bytes.
   HostDelaunayWorkspace ws({.nv0 = nv, .k_max = nh, .nh_explicit = nh});
   if (tracker.active) {
-    TrackerTransport tr{*this};
+    tracker.reserve_for_removals(1, nf_cap);   // this removal's seed
+    TrackerTransport tr{*this, tracker.view, tracker.carry};
     DelaunayView::remove_flat_vertex(v, ws, BandedFloatMetric{}, tr);
   } else {
     DelaunayView::remove_flat_vertex(v, ws);
@@ -569,7 +318,9 @@ void run_flat_removal(DelaunayTriangulation& D, Metric&& m,
 
   HostDelaunayWorkspace ws({.nv0 = D.nv, .k_max = D.nh, .nh_explicit = D.nh});
   if (D.tracker.active) {
-    TrackerTransport tr{D};
+    // At most every live vertex is removed, each seeding one point.
+    D.tracker.reserve_for_removals(D.nv, D.nf_cap);
+    TrackerTransport tr{D, D.tracker.view, D.tracker.carry};
     D.DelaunayView::remove_flat_vertices(ws, m, tr, obs);
   } else {
     D.DelaunayView::remove_flat_vertices(ws, m, NoTransport{}, obs);
@@ -591,75 +342,92 @@ void DelaunayTriangulation::remove_flat_vertices(double flat_tol,
   run_flat_removal(*this, BandedFloatMetric{flat_tol}, on_pop);
 }
 
-void DelaunayTriangulation::remove_flat_vertices_exact(const std::function<void(int)>& on_pop)
+// The exact-regime entry boundary (paper sec:exactness), shared by
+// remove_flat_vertices_exact and canonical_completion_exact.  The Lsq carry
+// is DERIVED from the current metric and VERIFIED -- entering the exact
+// regime on a metric it does not describe would be a silent wrong answer,
+// so both preconditions are loud:
+//   - every live he_length must square to a positive in-envelope integer
+//     within the integrality band (a from_intrinsic_metric complex, or
+//     the half-lengths bisect_multi_edges introduces, fail here);
+//   - the float curvature must agree with the integer cone excess at
+//     every live vertex (a complex with split_face / bisect-inserted
+//     vertices fails here: their v_orig_degree is not the equilateral
+//     labeling the exact flatness predicate reads).
+// The carry is transient (sized nh_cap: the machinery may allocate up to
+// capacity): the surviving he_length values are square roots of integers,
+// which the post-hoc utilities (canonical tesselation) recover exactly
+// through the same integrality boundary.
+static std::vector<long long>
+derive_exact_lsq_carry(const DelaunayTriangulation& D, const char* op)
 {
-  // The exact-regime driver (paper sec:exactness).  The Lsq carry is
-  // DERIVED from the current metric and VERIFIED -- entering the exact
-  // regime on a metric it does not describe would be a silent wrong answer,
-  // so both preconditions are loud:
-  //   - every live he_length must square to a positive in-envelope integer
-  //     within the integrality band (a from_intrinsic_metric complex, or
-  //     the half-lengths bisect_multi_edges introduces, fail here);
-  //   - the float curvature must agree with the integer cone excess at
-  //     every live vertex (a complex with split_face / bisect-inserted
-  //     vertices fails here: their v_orig_degree is not the equilateral
-  //     labeling the exact flatness predicate reads).
-  // The carry is transient (sized nh_cap: the machinery may allocate up to
-  // capacity): the surviving he_length values are square roots of integers,
-  // which the post-hoc utilities (canonical tesselation) recover exactly
-  // through the same integrality boundary.
   using delaunay_detail::lsq_integrality_band;
   const double pi_3 = std::numbers::pi_v<double> / 3.0;
-  std::vector<long long> Lsq((std::size_t)nh_cap, 0);
-  for (int h = 0; h < nh; h++) {
-    if (!alive(h)) continue;
-    const double sq = he_length[h] * he_length[h];
+  std::vector<long long> Lsq((std::size_t)D.nh_cap, 0);
+  for (int h = 0; h < D.nh; h++) {
+    if (!D.alive(h)) continue;
+    const double sq = D.he_length[h] * D.he_length[h];
     const long long n = std::llround(sq);
     if (n < 1 || n > exact_lsq_max ||
         std::abs(sq - (double)n) > lsq_integrality_band * std::max(1.0, sq))
       throw std::runtime_error(
-          "remove_flat_vertices_exact: he_length[" + std::to_string(h) +
+          std::string(op) + ": he_length[" + std::to_string(h) +
           "] does not square to a positive in-envelope integer (not an exact metric)");
     Lsq[h] = n;
   }
-  for (int v = 0; v < nv; v++) {
-    if (v_out[v] < 0) continue;
+  for (int v = 0; v < D.nv; v++) {
+    if (D.v_out[v] < 0) continue;
     // DelaunayView:: qualification: the owner's vector-returning curvature()
     // name-hides the view's per-vertex form.
-    if (std::abs(DelaunayView::curvature(v) - cone_excess(v) * pi_3) > 1e-6)
+    if (std::abs(D.DelaunayView::curvature(v) - D.cone_excess(v) * pi_3) > 1e-6)
       throw std::runtime_error(
-          "remove_flat_vertices_exact: curvature at v=" + std::to_string(v) +
+          std::string(op) + ": curvature at v=" + std::to_string(v) +
           " disagrees with its integer cone excess (not the equilateral labeling)");
   }
+  return Lsq;
+}
+
+void DelaunayTriangulation::remove_flat_vertices_exact(const std::function<void(int)>& on_pop)
+{
+  std::vector<long long> Lsq =
+      derive_exact_lsq_carry(*this, "remove_flat_vertices_exact");
   run_flat_removal(*this, ExactIntegerMetric{std::span<long long>(Lsq)}, on_pop);
+}
+
+std::vector<long long> DelaunayTriangulation::verified_exact_lsq_carry() const
+{
+  return derive_exact_lsq_carry(*this, "verified_exact_lsq_carry");
+}
+
+DelaunayView::CompletionStats DelaunayTriangulation::canonical_completion_exact()
+{
+  // The geometric precondition, checked here so a violation reads as what
+  // it is -- the view would otherwise report a refused flip on a
+  // non-inscribed tight component as a corrupt carry.
+  if (!is_delaunay())
+    throw std::runtime_error(
+        "canonical_completion_exact: complex is not Delaunay "
+        "(run lawson_sweep / the reduction first)");
+  std::vector<long long> Lsq =
+      derive_exact_lsq_carry(*this, "canonical_completion_exact");
+  const ExactIntegerMetric m{std::span<long long>(Lsq)};
+  return with_transport(*this, "canonical_completion_exact", [&](auto&& tr) {
+    return DelaunayView::canonical_completion(m, tr);
+  });
 }
 
 std::vector<int> DelaunayTriangulation::compact_vertices()
 {
-  // Live vertices (v_out >= 0) get fresh contiguous indices in their current
-  // order; dead vertices are dropped. Half-edge origins and the per-vertex
-  // arrays are rewritten; nv shrinks to the live count.
-  std::vector<int> new_of_old(nv, -1), new_to_old;
-  for (int v = 0; v < nv; v++)
-    if (v_out[v] >= 0) { new_of_old[v] = (int)new_to_old.size(); new_to_old.push_back(v); }
-  int nlive = (int)new_to_old.size();
-
-  for (int h = 0; h < nh; h++)
-    if (he_origin[h] >= 0) he_origin[h] = new_of_old[he_origin[h]];
-
-  std::vector<int>    nout(nlive);
-  std::vector<double> ncone(nlive);
-  std::vector<int>    ndeg(nlive);
-  for (int w = 0; w < nlive; w++) {
-    int o = new_to_old[w];
-    nout[w]  = v_out[o];
-    ncone[w] = v_cone_angle[o];
-    ndeg[w]  = v_orig_degree[o];
-  }
-  owned_v_out = std::move(nout);
-  owned_v_cone_angle = std::move(ncone);
-  owned_v_orig_degree = std::move(ndeg);
-  nv = nlive;
+  // Owner wrapper over the view-level body (delaunay_view.hh — the in-place
+  // compaction the device batch pipelines run): owned scratch in, the owned
+  // per-vertex vectors trimmed to the live count after.
+  std::vector<int> new_to_old(nv), new_of_old(nv);
+  const int nlive = DelaunayView::compact_vertices(new_to_old, new_of_old);
+  throw_on_status("compact_vertices");
+  new_to_old.resize(nlive);
+  owned_v_out.resize(nlive);
+  owned_v_cone_angle.resize(nlive);
+  owned_v_orig_degree.resize(nlive);
   repoint();
   return new_to_old;
 }
@@ -831,25 +599,23 @@ DelaunayTriangulation::canonical_tesselation(const vector<int>& vertex_labels,
       int u = he_origin[h];
       long long L = (long long)std::llround(he_length[h] * he_length[h]);
       poly.push_back({(u >= 0 && u < (int)vertex_labels.size()) ? vertex_labels[u] : u, L});
-      // Advance: walk the cell boundary CCW.  Within the cell, tight edges
-      // are interior, so step into the adjacent triangle until the next
+      // Advance via the named cell-boundary step (next_cell_boundary --
+      // the one body the canonical completion walks too).  Within the
+      // cell, tight edges are interior; the step crosses them to the next
       // boundary edge.
-      int h_next = he_next[h];
-      int safety = 0;
-      while (tight[h_next]) {
-        h_next = he_next[h_next ^ 1];
-        if (++safety > nh)
-          // Deep invariant failure: two silently-empty results would
-          // compare equal, so fail loud instead of returning a sentinel.
-          throw std::runtime_error(
-              "canonical_tesselation: cell-boundary walk from half-edge " +
-              std::to_string(h_start) + " failed to close after " +
-              std::to_string(nh) + " interior-edge (tight) steps, stuck at "
-              "half-edge " + std::to_string(h_next) + "; the tight mask "
-              "encloses a cell -- a well-formed iDT tesselation always closes. "
-              "(Thrown rather than returning an empty tesselation, which a "
-              "legitimately empty iDT also yields and so could not signal this.)");
-      }
+      const int h_next =
+          next_cell_boundary(h, [&](int g) { return (bool)tight[g]; });
+      if (h_next < 0)
+        // Deep invariant failure: two silently-empty results would
+        // compare equal, so fail loud instead of returning a sentinel.
+        throw std::runtime_error(
+            "canonical_tesselation: cell-boundary walk from half-edge " +
+            std::to_string(h_start) + " failed to close after " +
+            std::to_string(nh) + " interior-edge (tight) steps; the tight "
+            "mask encloses a cell -- a well-formed iDT tesselation always "
+            "closes. (Thrown rather than returning an empty tesselation, "
+            "which a legitimately empty iDT also yields and so could not "
+            "signal this.)");
       h = h_next;
     } while (h != h_start);
     T.cells.push_back(min_rotation(poly));

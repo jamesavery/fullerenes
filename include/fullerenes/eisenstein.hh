@@ -12,6 +12,8 @@
 #include <string>
 #include <numeric>
 
+#include "metric_forms.hh"
+
 using namespace std;
 
 /*
@@ -101,6 +103,16 @@ public:
   }
   int norm2() const { return first*first + first*second + second*second; }
   double norm() const { return sqrt(norm2()); }
+
+  // The l1 norm |a| + |b|: the displacement bound of the raster walk
+  // (the s of walk_max_steps' contract) and the size variable of the
+  // paint scratch-capacity formulas.  Widen-then-negate (INT_MIN-safe),
+  // spelled without std::labs so the body is device-legal.
+  long l1_norm() const {
+    const long a = first  < 0 ? -(long)first  : first;
+    const long b = second < 0 ? -(long)second : second;
+    return a + b;
+  }
 
   Eisenstein abs() const { return Eisenstein(::abs(first),::abs(second)); }
 
@@ -449,12 +461,11 @@ inline long long norm2_ll(Eisenstein z) {
 }
 
 // The Heron product in SQUARED-length coordinates, exact over the integers:
-// for squared sides x = a^2, y = b^2, z = c^2,
-//   H(x,y,z) = 2(xy + yz + zx) - (x^2 + y^2 + z^2) = 16*Area^2,
-// equivalently 4xy - (x + y - z)^2.  Negative iff the triangle inequality
-// fails.
+// for squared sides x = a^2, y = b^2, z = c^2: the ring-generic identity
+// lives in metric_forms.hh (one spelling for the integer and cyclotomic
+// regimes); this overload pins the exact-integer instantiation.
 inline long long heron_product_sq(long long x, long long y, long long z) {
-  return 2*(x*y + y*z + x*z) - (x*x + y*y + z*z);
+  return metric_forms::heron_product_sq<long long>(x, y, z);
 }
 
 // The lattice area number tau of a triangle with integer squared sides: on

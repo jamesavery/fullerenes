@@ -28,7 +28,7 @@
 
 [meta]
 # Provided by the hand-written core (bind_*_common) or batchability contract noise.
-skip = ["is_a_fullerene", "to_tuple", "get_size_factors", "polar_mapping"]
+skip = ["is_a_fullerene", "to_tuple", "get_element_counts", "polar_mapping"]
 # Top-level .pyi function stubs (module funcs, hand-written like preamble_klass).
 pyi_module_functions = [
   'def version() -> str: ...',

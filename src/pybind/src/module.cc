@@ -19,6 +19,7 @@
 #include <cstdint>
 
 #include "fullerenes/isomerdb.hh"
+#include "fullerenes/graphview.hh"   // pentagon_error
 
 namespace py = pybind11;
 
@@ -33,6 +34,17 @@ void register_symmetry(py::module_& m);
 
 PYBIND11_MODULE(_fullerenes, m) {
     m.doc() = "Python bindings for the fullerene library.";
+
+    // pentagon_error is a contract violation on the caller's input (e.g.
+    // from_arrays handed a graph that is not a fullerene dual) -- surface it
+    // as ValueError like the neighbouring input validation, not the
+    // RuntimeError that std::logic_error would default to.
+    py::register_exception_translator([](std::exception_ptr p) {
+        try { if (p) std::rethrow_exception(p); }
+        catch (const pentagon_error& e) {
+            PyErr_SetString(PyExc_ValueError, e.what());
+        }
+    });
 
     // Pure pybind<->Python string marshalling (no .so boundary crossed).
     m.def("version", []() -> std::string {

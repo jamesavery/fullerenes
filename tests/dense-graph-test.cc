@@ -248,24 +248,35 @@ TEST_P(ToVectorsRoundTrip, CubicGraph) {
 INSTANTIATE_TEST_SUITE_P(Sizes, ToVectorsRoundTrip, ::testing::Values(20, 60, 80));
 
 // ---------------------------------------------------------------------------
-// Degree overflow guard: must abort with a clear message, not segfault
+// Degree overflow guard: must throw graph_surgery_error{RowFull} with a
+// diagnosis, not segfault (was an abort until 2026-08)
 // ---------------------------------------------------------------------------
 
-TEST(DenseOverflowDeathTest, PushBackOverflow) {
+TEST(DenseOverflowTest, PushBackOverflow) {
     S::OwnedDenseGraph<> g(1, 3);
     g.push_back(0, 1);
     g.push_back(0, 2);
     g.push_back(0, 3);
-    // Vertex 0 is now full (deg=3, dmax=3). Next push_back must abort.
-    EXPECT_DEATH(g.push_back(0, 4),
-                 "degree overflow at vertex 0.*deg=3.*dmax=3");
+    // Vertex 0 is now full (deg=3, dmax=3). Next push_back must refuse.
+    try {
+        g.push_back(0, 4);
+        FAIL() << "push_back on a full row did not throw";
+    } catch (const S::graph_surgery_error& e) {
+        EXPECT_EQ(e.code, S::graph_surgery_error::Code::RowFull);
+        EXPECT_EQ(e.u, 0);
+    }
 }
 
-TEST(DenseOverflowDeathTest, InsertAtOverflow) {
+TEST(DenseOverflowTest, InsertAtOverflow) {
     S::OwnedDenseGraph<> g(2, 2);
     g.push_back(1, 10);
     g.push_back(1, 20);
-    // Vertex 1 is now full (deg=2, dmax=2). insert_at must abort.
-    EXPECT_DEATH(g.insert_at(1, 30, 1),
-                 "degree overflow at vertex 1.*deg=2.*dmax=2");
+    // Vertex 1 is now full (deg=2, dmax=2). insert_at must refuse.
+    try {
+        g.insert_at(1, 30, 1);
+        FAIL() << "insert_at on a full row did not throw";
+    } catch (const S::graph_surgery_error& e) {
+        EXPECT_EQ(e.code, S::graph_surgery_error::Code::RowFull);
+        EXPECT_EQ(e.u, 1);
+    }
 }

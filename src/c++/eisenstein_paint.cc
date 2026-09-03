@@ -8,6 +8,7 @@
 #include "fullerenes/eisenstein.hh"
 #include "fullerenes/eisenstein_raster.hh"
 #include "fullerenes/eisenstein_tikz.hh"
+#include "fullerenes/delaunay_geometry.hh"   // lsq_integrality_band (the float->exact entry)
 #include "fullerenes/delaunay_strip.hh"
 
 #include <algorithm>
@@ -425,64 +426,56 @@ bool strips_consistent(const EdgeStrip& e01, const EdgeStrip& e12, const EdgeStr
 
 // A lattice development of the cell: a valid (P0, P1, P2) corner
 // placement in F's frame -- one per sector-0 representative of N01
-// whose induced apex P2 (its direction is fixed by the metric) is a
-// lattice point meeting the remaining norm constraints and CCW
-// orientation.  The count is a(N(gcd(P1, P2))) + [delta | sqrt(N01)]
+// that admits a lattice apex P2 with the remaining squared norms and
+// CCW orientation.  The count is a(N(gcd(P1, P2))) + [delta | sqrt(N01)]
 // -- see the eisenstein_paint_tables.hh banner for THE statement --
 // typically 1 or 2 but UNBOUNDED over the isomer space (C980's cells
 // admit 4), so callers must never cap it.  Picking which development
 // matches the SURFACE geodesics is the walker's job (in embed_cell).
 struct Development { Eisenstein P0, P1, P2; };
 
-// One cell's iDT metric datum: CCW corner ids, the squared side norms
-// and the interior angle at corner 0 -- the input of the chart-frame
-// construction.  THE one derivation; embed_cell and
-// cell_developments both open with it.  @pre D.f_he[f] >= 0.
-struct CellMetric {
-    std::array<int, 3> corners;
-    double L20 = 0, alpha_0 = 0;
-    long   N01 = 0, N12 = 0, N20 = 0;
-};
+// Owning form of the float->exact trust boundary (the total body
+// checked_integer_norm_total lives in eisenstein_paint_tables.hh -- one
+// body): throws the per-edge diagnosis on refusal.
+long checked_integer_norm(double L, int f)
+{
+    if (const auto N = checked_integer_norm_total(L)) return *N;
+    throw PaintError(Code::EMBED,
+        "cell_metric: cell " + std::to_string(f) + " edge length^2 = " +
+        std::to_string(L * L) + " is not integer within the integrality band");
+}
 
+// Owning form of cell_metric_total (eisenstein_paint_tables.hh -- one
+// body); on refusal the per-edge boundary is re-run to name the
+// offending edge.
 CellMetric cell_metric(const DelaunayView& D, int f)
 {
+    if (const auto m = cell_metric_total(D, f)) return *m;
     const int h0 = D.f_he[f];
     const int h1 = D.he_next[h0];
     const int h2 = D.he_next[h1];
-    CellMetric m;
-    m.corners = { D.he_origin[h0], D.he_origin[h1], D.he_origin[h2] };
-    const double L01 = D.he_length[h0];
-    m.L20     = D.he_length[h2];
-    m.N01     = (long)std::lround(L01 * L01);
-    m.N12     = (long)std::lround(D.he_length[h1] * D.he_length[h1]);
-    m.N20     = (long)std::lround(m.L20 * m.L20);
-    m.alpha_0 = D.he_angle[h0];   // the interior angle at corner 0
-    return m;
+    for (int h : { h0, h1, h2 }) checked_integer_norm(D.he_length[h], f);
+    throw PaintError(Code::EMBED,     // can't happen: some edge refused above
+        "cell_metric: cell " + std::to_string(f) +
+        " refused with every edge norm integral");
 }
 
+// Owning form of for_each_development (eisenstein_paint_tables.hh --
+// one body; it carries the exact-apex statement).  Replaces the float
+// construction (atan2 of the base + the acos'd interior angle +
+// L20*cos/sin + lattice rounding) whose result was certified by
+// exactly the norm-and-orientation identities that are the placement's
+// postcondition -- same accepted set, no transcendentals, no
+// dependence on he_angle/he_length beyond the integer norms.
 std::vector<Development>
-enumerate_developments(double L20, double alpha_0,
-                       long N01, long N12, long N20)
+enumerate_developments(long N01, long N12, long N20)
 {
     std::vector<Development> out;
     const Eisenstein P0(0, 0);
-    std::vector<Eisenstein> P1_candidates = sector0_reps_of_norm((int)N01);
-
-    for (Eisenstein P1 : P1_candidates) {
-        auto [P1x, P1y] = P1.coord();
-        const double theta_01 = std::atan2(P1y, P1x);
-        const double theta_02 = theta_01 + alpha_0;
-        const double P2x = L20 * std::cos(theta_02);
-        const double P2y = L20 * std::sin(theta_02);
-        const Eisenstein P2(std::pair<double,double>{P2x, P2y});
-
-        if ((long)P2.norm2() == N20
-            && (long)(P2 - P1).norm2() == N12
-            && wedge(P1, P2) > 0)
-        {
-            out.push_back({P0, P1, P2});
-        }
-    }
+    for_each_development(N01, N12, N20, [&](Eisenstein P1, Eisenstein P2) {
+        out.push_back({P0, P1, P2});
+        return true;
+    });
     return out;
 }
 
@@ -530,7 +523,7 @@ Cell embed_cell(const DelaunayTriangulation& D,
     // cross-edge consistent -- unique by the cell-development lemma
     // (first_consistent_triple) -- searched in deterministic order.
     for (const Development& C :
-         enumerate_developments(m.L20, m.alpha_0, m.N01, m.N12, m.N20)) {
+         enumerate_developments(m.N01, m.N12, m.N20)) {
         const MetaTriangle M = { C.P0, C.P1, C.P2 };
         const std::array<Eisenstein, 3> P = { C.P0, C.P1, C.P2 };
         std::array<std::vector<EdgeStrip>, 3> cand;
@@ -680,23 +673,16 @@ void require_all_charted(const DelaunayTriangulation& D,
 }
 
 // append_scan_rows -- the ONE row-table derivation, shared by the
-// post-embed flatten and the candidate builder: append one triangle
-// scan's rows and return its block.  Empty scanlines keep the scan's
-// own (a_left > a_right) values, so both derivations produce identical
-// bytes.
+// post-embed flatten and the candidate builder: the owning wrapper of
+// append_scan_rows_into (eisenstein_paint_tables.hh -- the device batch
+// builder runs the same body).
 ScanBlock append_scan_rows(std::vector<ScanRow>& rows, const ScanLines& scan)
 {
-    ScanBlock sb;
-    sb.b_min = scan.b_min;
-    sb.b_max = scan.b_max;
-    sb.rows_first = (int32_t)rows.size();
-    int32_t running = 0;
-    for (const ScanLine& sl : scan.lines) {
-        rows.push_back(ScanRow{sl.a_left, sl.a_right, running});
-        if (!sl.empty()) running += sl.a_right - sl.a_left + 1;
-    }
-    sb.n_entries = running;
-    return sb;
+    const long need = std::max(0L, (long)scan.b_max - scan.b_min + 1);
+    long nrows = (long)rows.size();
+    rows.resize(rows.size() + (std::size_t)need);
+    return append_scan_rows_into(rows, nrows, scan.lines,
+                                 scan.b_min, scan.b_max);
 }
 
 // Flatten one cell's lattice map into the CSR: the row table comes from
@@ -830,15 +816,11 @@ VertexOccurrence locate_vertex(const SurfaceParametrization& P, int v) {
 
 // =====================================================================
 // cell_developments: every admissible lattice development, CSR by cell.
+// Owning wrapper of cell_developments_into (eisenstein_paint_tables.hh)
+// -- ONE body.  The wrapper owns only storage policy (grow on the
+// capacity sentinel: the count is unbounded, so the owner never refuses
+// on capacity) and the throw conversion of the degenerate sentinel.
 // =====================================================================
-
-namespace {
-
-// Smallest power of two >= x, floored at 64 (open-addressing scratch
-// wants pow2 extents with load-factor headroom).
-int64_t pow2_ceil64(int64_t x) { int64_t p = 64; while (p < x) p <<= 1; return p; }
-
-}  // namespace
 
 CellDevelopments cell_developments(const ::DelaunayView& D,
                                    const SortedDual& S)
@@ -847,69 +829,51 @@ CellDevelopments cell_developments(const ::DelaunayView& D,
     cd.nf       = D.nf;
     cd.N_sorted = (int32_t)S.T.N;
     cd.n_cones  = S.n_cones;
-    cd.cells.assign(cd.nf, CellCorners{});
-    cd.dev_first.assign(cd.nf + 1, 0);
-    cd.entry_capacity_first.assign(cd.nf + 1, 0);
+    cd.cells.resize(cd.nf);
+    cd.dev_first.resize(cd.nf + 1);
+    cd.entry_capacity_first.resize(cd.nf + 1);
 
-    long s_max = 0;    // max |a|+|b| over development frame edges
-
-    for (int f = 0; f < cd.nf; ++f) {
-        cd.dev_first[f] = (int32_t)cd.frames.size();
-        if (D.f_he[f] < 0) continue;    // dead slot: 0 developments
-
-        const CellMetric m = cell_metric(D, f);
-        cd.cells[f] = CellCorners{ m.corners[0], m.corners[1], m.corners[2] };
-
-        // The development count is unbounded over the isomer space
-        // (see the header banner for the formula; C980's cells admit
-        // 4), hence the CSR.  A live cell with NO development has an
-        // unrealizable metric: refuse loudly.
-        const auto devs =
-            enumerate_developments(m.L20, m.alpha_0, m.N01, m.N12, m.N20);
-        if (devs.empty())
-            throw PaintError(Code::EMBED,
-                "cell_developments: live cell " + std::to_string(f) +
-                " admits no lattice development");
-
-        // Per-development frame + triangle scan (append_scan_rows: the
-        // same row derivation the post-selection flatten uses).
-        int32_t cap_f = 0;
-        for (const Development& C : devs) {
-            const Eisenstein P1 = C.P1, P2 = C.P2;
-            cd.frames.push_back(CellFrame{ P1.first, P1.second, P2.first, P2.second });
-            for (Eisenstein e : { P1, P2 - P1, C.P0 - P2 }) {
-                const long sd = std::labs(e.first) + std::labs(e.second);
-                if (sd > s_max) s_max = sd;
-            }
-            const ScanBlock sb =
-                append_scan_rows(cd.rows, scan_triangle(C.P0, P1, P2));
-            cd.scans.push_back(sb);
-            const int32_t n_rows = sb.b_max - sb.b_min + 1;
-            if (n_rows > cd.rows_cap) cd.rows_cap = n_rows;
-            if (sb.n_entries > cap_f) cap_f = sb.n_entries;
-        }
-        if (cap_f > cd.max_cell_entries) cd.max_cell_entries = cap_f;
-        cd.entry_capacity_first[f + 1] = cap_f;
+    // Start at the bounded-executor slab shape and double on the
+    // capacity sentinel; the final successful run writes every byte, so
+    // the growth path cannot influence the result.
+    int64_t fcap = (int64_t)cd.nf * max_cell_developments;
+    int64_t lcap = 64;
+    long rc;
+    DevelopmentSizing sizing;
+    int32_t fail_cell = -1;
+    for (;;) {
+        cd.frames.resize((std::size_t)fcap);
+        cd.scans.resize((std::size_t)fcap);
+        cd.rows.resize((std::size_t)(fcap * lcap));
+        std::vector<ScanLine> lines((std::size_t)lcap);
+        CellDevelopmentsOut out;
+        out.cells = cd.cells;
+        out.dev_first = cd.dev_first;
+        out.frames = cd.frames;
+        out.scans = cd.scans;
+        out.rows = cd.rows;
+        out.entry_capacity_first = cd.entry_capacity_first;
+        rc = cell_developments_into(D, cd.N_sorted, cd.n_cones, out, lines);
+        if (rc != -2) { sizing = out.sizing; fail_cell = out.fail_cell; break; }
+        fcap *= 2;
+        lcap *= 2;
     }
-    cd.dev_first[cd.nf] = (int32_t)cd.frames.size();
-    for (int f = 0; f < cd.nf; ++f)    // exclusive prefix
-        cd.entry_capacity_first[f + 1] += cd.entry_capacity_first[f];
-    cd.entries_capacity = cd.entry_capacity_first[cd.nf];
+    if (rc == -1) {
+        (void)cell_metric(D, fail_cell);   // throws the per-edge diagnosis
+                                           // when the metric is the cause
+        throw PaintError(Code::EMBED,
+            "cell_developments: live cell " + std::to_string(fail_cell) +
+            " admits no non-degenerate lattice development");
+    }
 
-    // Scratch capacity formulas (properties of the data; any executor
-    // sizing embed/enumerate scratch reads these):
-    //  * walk registration: distinct keys are T_sorted vertex ids, and a
-    //    walk registers <= 3 vertices per pushed face with <=
-    //    walk_max_steps faces per primitive sub-walk, so
-    //    min(N_sorted, 3*(walk_max_steps+2)) bounds the live count; x2
-    //    keeps the open-addressing load factor comfortable.
-    //  * boundary map: a qualifying walk to displacement s = |a|+|b|
-    //    pushes <= 3s faces, so <= 3*(3s+1)+3 registrations per edge,
-    //    three edges; x2 headroom.
-    cd.wcap = pow2_ceil64(
-        2 * (std::min<int64_t>(cd.N_sorted, 3 * (int64_t)(walk_max_steps + 2)) + 8));
-    cd.bcap = pow2_ceil64(2 * (3 * (3 * s_max + 4) * 3 + 16));
-
+    cd.frames.resize((std::size_t)sizing.n_frames);
+    cd.scans.resize((std::size_t)sizing.n_frames);
+    cd.rows.resize((std::size_t)sizing.n_rows);
+    cd.rows_cap         = sizing.rows_cap;
+    cd.max_cell_entries = sizing.max_cell_entries;
+    cd.entries_capacity = sizing.entries_capacity;
+    cd.wcap             = sizing.wcap;
+    cd.bcap             = sizing.bcap;
     return cd;
 }
 

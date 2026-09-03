@@ -38,7 +38,11 @@ int main(int argc, char** argv){
             T_polys(N_runs,chrono::nanoseconds(0));
         
         auto Nf = N /2 + 2;
-        G = FullereneDual(Triangulation(int(Nf)));
+        // Allocate-then-fill: the rows are written below, so the allocating
+        // constructor (pentagon list stale until derived) is the right form --
+        // the converting constructor would try to establish the invariant on
+        // an all-degree-0 graph and throw.
+        G = FullereneDual(int(Nf));
 
         auto path = "isomerspace_samples/dual_layout_" + to_string(N) + "_seed_42";
         ifstream isomer_sample(path,std::ios::binary);

@@ -62,7 +62,6 @@ extern "C" {
   void adjacency_matrix_(const graph_ptr *g, const int *outer_dim, int *adjacency);
   void get_arc_face_(const graph_ptr *g, const int *u, const int *v, int *face, int *l);
 
-//  int hamiltonian_count_(const graph_ptr *);
   int perfect_match_count_(const graph_ptr *);
   void all_pairs_shortest_path_(const graph_ptr *g, const int *max_depth, const int *outer_dim, int *D);
   void vertex_depth_(const graph_ptr *g, const int *outer_face, const int *of_length, 
@@ -224,7 +223,6 @@ graph_ptr dual_graph_(const graph_ptr *g){
   graph_ptr pg = new PlanarGraph((*g)->dual_graph(is_fullerene? 6 : 3));
   return pg;
 }
-//int hamiltonian_count_(const graph_ptr *g){ return (*g)->hamiltonian_count(); }
 int perfect_match_count_(const graph_ptr *g){ return (*g)->count_perfect_matchings(); }
 
 fullerene_graph_ptr halma_fullerene_(const fullerene_graph_ptr *g, const int *n)

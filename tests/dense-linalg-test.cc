@@ -487,3 +487,37 @@ TEST(DenseLinalgView, SingularSolveZeroFillsThroughBothAPIs)
     EXPECT_EQ(LinAlg::det(A), 0.0);
   }
 }
+
+TEST(DenseLinalgView, VectorAssignmentsBitIdenticalToOwnerExpressions)
+{
+  // Each span word restates an owner V expression elementwise with one
+  // rounding per element -- so the results must be BIT-identical, not just
+  // close.  These are the expressions the Alexandrov solver family writes
+  // (r = r - dr, r_trial = r + delta, F -= t1*kappa1, result += r_j*basis).
+  const int n = 17;
+  const V a = random_vector(n, 3), b = random_vector(n, 5);
+  const double s = 0.37;
+
+  V x(a);
+  LinAlg::copy_into(x, b);
+  expect_bits_equal(x, b, "copy_into");
+
+  LinAlg::neg_into(x, a);
+  expect_bits_equal(x, -a, "neg_into");
+
+  x = a; LinAlg::add_into(x, b);
+  expect_bits_equal(x, a + b, "add_into");
+
+  x = a; LinAlg::sub_into(x, b);
+  expect_bits_equal(x, a - b, "sub_into");
+
+  x = a; LinAlg::add_scaled(x, s, b);
+  expect_bits_equal(x, a + b * s, "add_scaled");
+
+  x = a; LinAlg::sub_scaled(x, s, b);
+  expect_bits_equal(x, a - b * s, "sub_scaled");
+
+  const double lhs = LinAlg::sum(a);
+  const double rhs = LinAlg::dot(a, V(a.size(), 1.0));
+  EXPECT_EQ(memcmp(&lhs, &rhs, sizeof lhs), 0) << "sum must be dot(v, ones) bitwise";
+}

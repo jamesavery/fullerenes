@@ -220,16 +220,27 @@ constexpr double FEAS_SAFETY = 0.95;
 //   - solve() endgame extrapolation
 //   - Newton::polish trust-region step
 // `clipped` (if non-null) is set true iff a scale was applied.
-vector<double> feasible_step(const DelaunayTriangulation& T,
-                              const vector<double>& r_from,
-                              const vector<double>& delta,
-                              bool* clipped = nullptr) {
+// The scale s of that rule on its own: 1 if r_from + δ ∈ F(T), else
+// FEAS_SAFETY · s_max.  feasible_step is s · δ; the optimizer
+// framework's step-clip hook consumes s directly (the paradigm applies
+// the scaling, in the same order: out[i] = s * delta[i]).
+double feasible_fraction(const DelaunayTriangulation& T,
+                         const vector<double>& r_from,
+                         const vector<double>& delta,
+                         bool* clipped = nullptr) {
   vector<double> r_to(r_from.size());
   for (size_t i = 0; i < r_from.size(); i++) r_to[i] = r_from[i] + delta[i];
   double s_max = feasibility_max_step(T, r_from, r_to);
   bool clip = (s_max < 1.0);
-  double s = clip ? FEAS_SAFETY * s_max : 1.0;
   if (clipped) *clipped = clip;
+  return clip ? FEAS_SAFETY * s_max : 1.0;
+}
+
+vector<double> feasible_step(const DelaunayTriangulation& T,
+                              const vector<double>& r_from,
+                              const vector<double>& delta,
+                              bool* clipped = nullptr) {
+  const double s = feasible_fraction(T, r_from, delta, clipped);
   vector<double> out(delta.size());
   for (size_t i = 0; i < delta.size(); i++) out[i] = s * delta[i];
   return out;
@@ -1020,6 +1031,15 @@ AlexandrovSolver::ValidationStatus AlexandrovSolver::validate_polytope(
     const DelaunayTriangulation& D, const vector<double>& r,
     const vector<coord3d>& pos, PolytopeValidation* out, bool verbose) {
   using VS = AlexandrovSolver::ValidationStatus;
+  // Public entry: r/pos are caller-supplied (the instance path's were
+  // solver-sized by construction), and three ladder rungs index them by
+  // D.nv before is_convex's own check — enforce the @pre up front.
+  if ((int)r.size() < D.nv || (int)pos.size() != D.nv)
+    throw std::invalid_argument(
+        "AlexandrovSolver::validate_polytope: r.size() >= T.nv and "
+        "pos.size() == T.nv required (r " + std::to_string(r.size()) +
+        ", pos " + std::to_string(pos.size()) + ", nv " +
+        std::to_string(D.nv) + ")");
   PolytopeValidation v;
   // Early failures copy the record as computed so far (later checks keep
   // their defaults) — the `done` wrapper is the one exit path.
@@ -1269,6 +1289,13 @@ int AlexandrovSolver::jacobian_det_sign(const DelaunayTriangulation& T,
 bool AlexandrovSolver::feasible(const DelaunayTriangulation& T,
                                  const vector<double>& r) {
   return GCP::feasible(T, r);
+}
+
+double AlexandrovSolver::feasible_fraction(const DelaunayTriangulation& T,
+                                           const vector<double>& r,
+                                           const vector<double>& delta,
+                                           bool* clipped) {
+  return GCP::feasible_fraction(T, r, delta, clipped);
 }
 
 vector<double> AlexandrovSolver::feasible_step(const DelaunayTriangulation& T,

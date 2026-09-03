@@ -8,10 +8,10 @@
 //   For each of V's `n_fields` span-typed fields, Batch<V> owns one
 //   contiguous BatchAlloc<T> buffer of length
 //
-//       capacity * N * get_size_factors(N, dmax)[k].
+//       capacity * get_element_counts(N, dmax)[k].
 //
 //   Per-entry views are stamped by slicing each field buffer with
-//   `(i * N * factor[k], N * factor[k])` and repointing a value-type V
+//   `(i * counts[k], counts[k])` and repointing a value-type V
 //   through its to_tuple() reference pack.
 //
 // Scope (Phase 4)
@@ -101,11 +101,11 @@ public:
         V v;
         v.N    = typename V::node_type(N_);
         v.dmax = dmax_;
-        const auto factors = V::get_size_factors(N_, dmax_);
+        const auto counts = V::get_element_counts(N_, dmax_);
         auto vtup = v.to_tuple();
         detail::for_each_field<V>([&](auto Ic) {
             constexpr std::size_t k = Ic;
-            const std::size_t per = std::size_t(N_) * factors[k];
+            const std::size_t per = counts[k];
             std::get<k>(vtup) = std::get<k>(spans_).subspan(i * per, per);
         });
         return v;
@@ -114,11 +114,11 @@ public:
     // Sub-range with shared storage.
     BatchView slice(std::size_t offset, int count) const {
         assert(int(offset) + count <= size_);
-        const auto factors = V::get_size_factors(N_, dmax_);
+        const auto counts = V::get_element_counts(N_, dmax_);
         spans_type sub{};
         detail::for_each_field<V>([&](auto Ic) {
             constexpr std::size_t k = Ic;
-            const std::size_t per = std::size_t(N_) * factors[k];
+            const std::size_t per = counts[k];
             std::get<k>(sub) = std::get<k>(spans_).subspan(offset * per, std::size_t(count) * per);
         });
         return BatchView(N_, dmax_, count, sub);
@@ -224,16 +224,16 @@ public:
 
     // --- Mutation ---
     // Append one entry by copying each field from `v`.  The source spans
-    // in `v` must have size N * get_size_factors(N, dmax)[k].
+    // in `v` must have size get_element_counts(N, dmax)[k].
     void push_back(const V& v) {
         assert(size_ < capacity_);
         assert(v.N == typename V::node_type(N_));
         assert(v.dmax == dmax_);
-        const auto factors = V::get_size_factors(N_, dmax_);
+        const auto counts = V::get_element_counts(N_, dmax_);
         auto src = v.to_tuple();
         detail::for_each_field<V>([&](auto Ic) {
             constexpr std::size_t k = Ic;
-            const std::size_t per = std::size_t(N_) * factors[k];
+            const std::size_t per = counts[k];
             auto* dst = std::get<k>(buffers_).data() + std::size_t(size_) * per;
             const auto& s = std::get<k>(src);
             if (s.size() >= per)
@@ -253,21 +253,21 @@ public:
 
 private:
     void allocate_() {
-        const auto factors = V::get_size_factors(N_, dmax_);
+        const auto counts = V::get_element_counts(N_, dmax_);
         detail::for_each_field<V>([&](auto Ic) {
             constexpr std::size_t k = Ic;
-            const std::size_t total = std::size_t(capacity_) * std::size_t(N_) * factors[k];
+            const std::size_t total = std::size_t(capacity_) * counts[k];
             std::get<k>(buffers_).resize(total);
         });
     }
 
     // Build span_tuple covering the first `entries` entries of the buffers.
     spans_type build_spans_(int entries) const {
-        const auto factors = V::get_size_factors(N_, dmax_);
+        const auto counts = V::get_element_counts(N_, dmax_);
         spans_type spans{};
         detail::for_each_field<V>([&](auto Ic) {
             constexpr std::size_t k = Ic;
-            const std::size_t total = std::size_t(entries) * std::size_t(N_) * factors[k];
+            const std::size_t total = std::size_t(entries) * counts[k];
             using elem_t = detail::field_element_t<V, k>;
             // BatchAlloc<T> exposes T* data().  Construct the span explicitly.
             auto* p = const_cast<elem_t*>(std::get<k>(buffers_).data());

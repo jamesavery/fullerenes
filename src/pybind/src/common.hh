@@ -18,14 +18,18 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 
+#include <array>
 #include <span>
+#include <type_traits>
 #include <utility>
+#include <variant>
 #include <cstdint>
 #include <cstdio>
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <unistd.h>
 
+#include "fullerenes/graphview.hh"   // view types named by PyGraph::view()
 #include "np_interop.hh"
 
 namespace py = pybind11;
@@ -111,6 +115,11 @@ struct PyGraph {
     py::array a_neighbours, a_deg;
     int Nv = 0, dmaxv = 0;
 
+    // View-mode backing for pentagon-bearing views (FullereneDualView carries
+    // its pentagon list as a type invariant; caller arrays have no slot for
+    // it, so view() derives into this).  Monostate for every other ViewT.
+    pentagon_storage_t<ViewT> borrowed_pentagons{};
+
     PyGraph() = default;
 
     static PyGraph from_owned(OwnedT o) {
@@ -156,7 +165,18 @@ struct PyGraph {
             return static_cast<ViewT&>(owned);   // OwnedT IS-A ViewT (slice to base)
         std::span<node_t>  sn(neighbours_data(), (size_t)Nv * dmaxv);
         std::span<uint8_t> sd(deg_data(), (size_t)Nv);
-        return ViewT((node_t)Nv, dmaxv, sn, sd);
+        if constexpr (pentagon_bearing<ViewT>) {
+            // Establish the pentagon invariant over the wrapper's backing --
+            // the borrowed arrays are adjacency only.  Throws when the caller's
+            // arrays are not a fullerene dual, which is the invariant speaking.
+            // (N == 0: an empty wrapper, nothing to establish -- same escape
+            // as the owning path.)
+            ViewT v(TriangulationView((node_t)Nv, dmaxv, sn, sd),
+                    std::span<node_t>(borrowed_pentagons));
+            if (Nv > 0) v.derive_pentagons();
+            return v;
+        } else
+            return ViewT((node_t)Nv, dmaxv, sn, sd);
     }
 };
 

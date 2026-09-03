@@ -10,6 +10,9 @@
 // FullereneGraph: owned fullerene graph (3-regular, 12 pentagons, rest hex).
 // Inherits algorithm methods from FullereneGraphView via Owned<FullereneGraphView>.
 // Adds validation constructor and static C20().
+// Fullerenes C_N exist for every even N >= 20 except N = 22.
+inline bool is_fullerene_size(int N) { return N >= 20 && N != 22 && !(N & 1); }
+
 class FullereneGraph : public Owned<FullereneGraphView> {
   using base_t = Owned<FullereneGraphView>;
 public:

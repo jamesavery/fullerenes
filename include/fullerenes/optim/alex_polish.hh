@@ -2,44 +2,44 @@
 
 // =====================================================================
 // optim::alexandrov_polish -- the Alexandrov stage-4 trust-region
-// Newton polish re-expressed on the framework's components: the loop is
-// a faithful transcription of the library's internal Newton::polish
-// (delaunay_alexandrov.cc, post the 2026-07-25 stall cure), with
+// Newton polish as a framework COMPOSITION: TrustRegion<LevenbergBisect>
+// over the cell-resolved AlexKappaWD model, with two hooks --
 //
-//   * the GN-normal-equations subproblem -> LevenbergBisect::solve_subproblem
-//   * the rho-ratio radius policy       -> TrustRadius (floor 1e-14)
-//   * the F(T)-feasibility clip         -> AlexandrovSolver::feasible_step
-//   * the weighted-Delaunay flips       -> AlexandrovSolver::flip_to_weighted_delaunay
+//   clip         AlexandrovSolver::feasible_fraction (the F(T)-feasible
+//                step rule; the paradigm scales the step by it and caps
+//                the radius at the length actually taken)
+//   post_accept  AlexKappaWD::commit (adopt the accepted trial's
+//                weighted-Delaunay cell -- the parent's "adopt the copy
+//                atomically on acceptance")
 //
-// the last two through the library's public statics (single source of
-// truth; the seam exposed them for exactly this).
+// and the GN-normal-equations subproblem + rho-ratio radius policy
+// (floor 1e-14) from the paradigm.  This is a faithful re-expression of
+// the library's internal Newton::polish (delaunay_alexandrov.cc, post
+// the 2026-07-25 stall cure); the transcription-era functor that
+// hand-rolled the same loop (the signed-off "monolithic for now"
+// interim) is gone -- the hooks it was waiting for are the ones of
+// DESIGN.md 10.2.
 //
-// kappa is only piecewise-smooth across flip boundaries, so the parent's
-// two flip invariants are kept verbatim:
-//   - ENTRY: restore weighted-Delaunay before the first kappa/J
-//     evaluation (the endgame extrapolation moves r without flipping);
-//   - TRIAL: evaluate each trial on its own flipped copy (T_trial,
-//     r_trial), adopt the copy atomically on acceptance, discard on
-//     rejection -- acceptance compares true energies across cells.
-//
-// Per the signed-off "monolithic for now" decision the functor owns the
-// loop -- the clip feeds back into the radius (Delta capped at the
-// clipped step length), which the generic TrustRegion paradigm has no
-// hook for.  Installed as AlexandrovSolver::polish_override, it runs
-// inside the full production pipeline on the exact post-extrapolation
-// state -- the head-to-head arrangement validate_alex_reexpr gates on
-// (and solve() re-checks kappa < 1e-10 after the override, so a wrong
-// verdict cannot leak).  On this path AlexandrovSolver::stats_flips
-// excludes the polish's own flips (documented at the seam).
+// kappa is only piecewise-smooth across flip boundaries, so the
+// parent's two flip invariants live in the model: ENTRY (weighted-
+// Delaunay restored before the first kappa/J evaluation -- the
+// AlexKappaWD constructor) and TRIAL (every evaluation on the query
+// point's own flipped copy; commit on acceptance).  Installed as
+// AlexandrovSolver::polish_override, it runs inside the full production
+// pipeline on the exact post-extrapolation state -- the head-to-head
+// arrangement validate_alex_reexpr gates on (and solve() re-checks
+// kappa < 1e-10 after the override, so a wrong verdict cannot leak).
+// On this path AlexandrovSolver::stats_flips excludes the polish's own
+// flips (documented at the seam).
 // =====================================================================
 
+#include "fullerenes/optim/models/alex_kappa.hh"
 #include "fullerenes/optim/steps/levenberg.hh"
 #include "fullerenes/optim/trustregion.hh"
 
 #include "fullerenes/delaunay_alexandrov.hh"
 
-#include <algorithm>
-#include <utility>
+#include <span>
 #include <vector>
 
 namespace optim {
@@ -53,45 +53,30 @@ inline bool alexandrov_polish(DelaunayTriangulation& T, std::vector<double>& r,
                               double tol = 1e-10, int max_iter = 50) {
   const std::size_t n = r.size();
   const double r_avg = la::dot(r, la::V(n, 1.0)) / n;
-  TrustRadius tr{0.5 * r_avg, 2.0 * r_avg, 1e-14};
-  int rejects = 0;
 
-  AlexandrovSolver::flip_to_weighted_delaunay(T, r);   // ENTRY invariant
+  AlexKappaWD model(T, r);                        // ENTRY invariant
+  Criteria stop;
+  stop.rtol_inf  = tol;
+  stop.max_iters = max_iter;
+  Problem<AlexKappaWD> prob{model, {}, nullptr, stop};
 
-  for (int iter = 0; iter < max_iter; ++iter) {
-    const auto kappa = AlexandrovSolver::kappa(T, r);
-    if (la::max_abs(kappa) < tol) return true;
-    if (rejects > 20) break;
+  TrustRegion<LevenbergBisect> method;
+  method.Delta0      = 0.5 * r_avg;
+  method.Delta_max   = 2.0 * r_avg;
+  method.delta_floor = 1e-14;
 
-    const double E = la::energy(kappa);
-    const Mat J = AlexandrovSolver::jacobian(T, r);
+  Hooks hooks;
+  hooks.clip = [&](std::span<const double> x, std::span<const double> d) {
+    return AlexandrovSolver::feasible_fraction(T, la::V(x.begin(), x.end()),
+                                              la::V(d.begin(), d.end()));
+  };
+  hooks.post_accept = [&](SeqCtx, std::span<double> x) {
+    model.commit(x);                              // the model's cell changed, x did not
+    return 1;
+  };
 
-    const la::V delta_raw = LevenbergBisect::solve_subproblem(J, kappa, tr.Delta);
-    bool clipped;
-    const auto delta = AlexandrovSolver::feasible_step(T, r, delta_raw, &clipped);
-    const double pred = LevenbergBisect::predicted_reduction(J, kappa, delta);
-
-    la::V r_trial(n);
-    for (std::size_t i = 0; i < n; ++i) r_trial[i] = r[i] + delta[i];
-    // TRIAL invariant: kappa(r_trial) on r_trial's own weighted-Delaunay
-    // cell; adopt the copy atomically on acceptance.
-    DelaunayTriangulation T_trial = T;
-    AlexandrovSolver::flip_to_weighted_delaunay(T_trial, r_trial);
-    const double E_trial = la::energy(AlexandrovSolver::kappa(T_trial, r_trial));
-
-    const bool ok = tr.update(E - E_trial, pred, la::norm(delta));
-    // A clipped step caps the radius at the length actually taken, so
-    // the next subproblem does not repropose the infeasible direction.
-    if (clipped) tr.Delta = std::min(tr.Delta, la::norm(delta));
-
-    if (ok) {
-      r = std::move(r_trial);
-      T = std::move(T_trial);
-      rejects = 0;
-    } else
-      ++rejects;
-  }
-  return false;
+  const Result res = method.solve({}, prob, std::span<double>(r), hooks);
+  return res.outcome == Outcome::CONVERGED;
 }
 
 }  // namespace optim

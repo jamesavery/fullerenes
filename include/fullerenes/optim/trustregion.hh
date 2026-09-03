@@ -13,18 +13,24 @@
 //
 //   * lsq_oracle_tag (LevenbergBisect) -- model provides residual R and
 //     the SQUARE system matrix J; the loop is the generic form of
-//     delaunay_alexandrov's Newton::polish (minus the feasibility clip
-//     and post-accept re-flip, which stay with the Alexandrov polish
-//     functor by the signed-off "monolithic for now" decision).
-//     Convergence on Criteria::rtol_inf (max |R| < tol).
+//     delaunay_alexandrov's Newton::polish: the feasibility clip is the
+//     `clip` hook (the step is scaled by the admissible fraction and
+//     the radius capped at the length actually taken, so the next
+//     subproblem does not repropose the infeasible direction) and the
+//     weighted-Delaunay re-flip is the `post_accept` hook (the model
+//     commits the accepted point's cell).  Convergence on
+//     Criteria::rtol_inf (max |R| < tol).
 //
 //   * hvp_oracle_tag (SteihaugCG) -- model provides gradient + HVP; the
-//     loop is Deltahedron's STEIHAUG block (minus the phase machinery,
-//     which stays with the delta driver): subproblem, predicted
-//     reduction -(g'z + 1/2 z'Hz), rho-acceptance, optional acceptance
-//     veto (the convex-constraint variant: reject steps a caller-
-//     supplied predicate refuses, e.g. convex->concave transitions),
-//     stagnation and work-budget criteria.
+//     loop is Deltahedron's STEIHAUG block (minus the phase schedule,
+//     which is the delta driver's two-level continuation): subproblem,
+//     predicted reduction -(g'z + 1/2 z'Hz), rho-acceptance, the `veto`
+//     hook consulted after the rho test (the convex-constraint variant
+//     rejects convex->concave transitions, CVX_REJECTED), `post_accept`
+//     (in-loop reflection), stagnation and work-budget criteria.
+//
+// Hooks are the Hooks object of core.hh; `observe` sees every
+// iteration of either route.
 //
 // An invalid pairing (TrustRegion<LBFGS>) is rejected by the
 // TrustRegionStep constraint; a valid step over a model lacking its
@@ -76,11 +82,6 @@ struct TrustRadius {
   }
 };
 
-// Acceptance veto: a predicate on the trial point the paradigm consults
-// after the rho test (Deltahedron's convex-constraint gate).  Returning
-// false rejects the step (CVX_REJECTED).
-using AcceptVeto = std::function<bool(std::span<const double> x_trial)>;
-
 template <TrustRegionStep Step, class Precond = Identity>
 struct TrustRegion {
   Step       step{};
@@ -88,7 +89,6 @@ struct TrustRegion {
   double     Delta0      = 0;      // required: initial radius
   double     Delta_max   = 0;      // required: radius cap
   double     delta_floor = 1e-14;  // reject-shrink floor (1e-14 L for AET)
-  AcceptVeto accept_veto;          // optional (constrained variant)
 
   // --- LSQ route: Levenberg over residual + square system matrix -----
   // @anchor  optim-trustregion-solve-lsq
@@ -99,7 +99,7 @@ struct TrustRegion {
   template <class Model>
     requires std::same_as<typename Step::oracle, lsq_oracle_tag> && HasLSQ<Model>
   Result solve(SeqCtx ctx, const Problem<Model>& prob, std::span<double> x,
-               const Projection& project = {}) const {
+               const Hooks& hooks = {}) const {
     const Criteria& stop = prob.stop;
     const std::size_t m = prob.E.residual_size();
     Result out;
@@ -128,6 +128,17 @@ struct TrustRegion {
       ++out.n_grad;
 
       la::V delta = Step::solve_subproblem(J, R, tr.Delta);
+      // clip: scale the step to the admissible fraction (Alexandrov's
+      // F(T)-feasible step, FEAS_SAFETY inside the hook), BEFORE the
+      // predicted reduction, as the parent polish does.
+      bool clipped = false;
+      if (hooks.clip) {
+        const double s = hooks.clip(x, delta);
+        if (s < 1.0) {
+          clipped = true;
+          for (double& v : delta) v = s * v;
+        }
+      }
       const double pred = Step::predicted_reduction(J, R, delta);
 
       for (std::size_t i = 0; i < x.size(); ++i) x_trial[i] = x[i] + delta[i];
@@ -135,14 +146,31 @@ struct TrustRegion {
       ++out.n_energy;
       const double E_trial = la::energy(R_trial);
 
-      if (tr.update(E - E_trial, pred, la::norm(delta))) {
+      const double dnorm = la::norm(delta);
+      const double rho = TrustRadius::rho(E - E_trial, pred);
+      bool accepted = rho > 0.1;
+      if (accepted && hooks.veto && !hooks.veto(x_trial)) {
+        accepted = false;
+        out.flags |= Result::CVX_REJECTED;
+      }
+      if (accepted) tr.accept(rho, dnorm); else tr.reject();
+      // A clipped step caps the radius at the length actually taken.
+      if (clipped) tr.Delta = std::min(tr.Delta, dnorm);
+
+      int n_post = 0;
+      if (accepted) {
         std::copy(x_trial.begin(), x_trial.end(), x.begin());
         rejects = 0;
-        if (project) project(ctx, x);
+        ++out.n_accepted;
+        if (hooks.post_accept) n_post = hooks.post_accept(ctx, x);
       } else {
         ++rejects;
         out.flags |= Result::STEP_REJECTED;
       }
+      if (hooks.observe)
+        hooks.observe(IterationView{iter, accepted ? E_trial : E, la::max_abs(R),
+                                    x, R, dnorm, tr.Delta, rho, 0,
+                                    n_post, accepted, out.flags});
     }
 
     prob.E.residual(ctx, x, R);
@@ -161,7 +189,7 @@ struct TrustRegion {
   template <class Model>
     requires std::same_as<typename Step::oracle, hvp_oracle_tag> && HasHVP<Model>
   Result solve(SeqCtx ctx, const Problem<Model>& prob, std::span<double> x,
-               const Projection& project = {}) const {
+               const Hooks& hooks = {}) const {
     const std::size_t n = x.size();
     const Criteria& stop = prob.stop;
     Result out;
@@ -181,18 +209,29 @@ struct TrustRegion {
     TrustRadius tr{Delta0, Delta_max, delta_floor};
 
     double f = fg(x, g);
+    const double g2_0 = stop.gtol_2_rel > 0 ? la::nrm2(g) : 0;
     int stag_count = 0;
     for (int iter = 0; iter < stop.max_iters; ++iter) {
       out.iters = iter;
-      out.gmax  = la::inf_norm(g);
+      out.gmax  = grad_norm(stop, g);
       if (auto stopped = converged_or_stop(stop, out.gmax, g, x, stag_count,
-                                           out.work<Model>())) {
+                                           out.work<Model>(), g2_0)) {
         out.outcome = *stopped;
         break;
       }
 
+      const int hv_before = out.n_hv;
       Step::solve_subproblem(ctx, prob.E, prob.gauge, x, g, tr.Delta, z,
                              out.flags, out.n_hv);
+      const int n_inner = out.n_hv - hv_before;
+      bool clipped = false;
+      if (hooks.clip) {
+        const double s = hooks.clip(x, z);
+        if (s < 1.0) {
+          clipped = true;
+          for (double& v : z) v = s * v;
+        }
+      }
 
       // Predicted reduction -(g'z + 1/2 z'Hz).
       ++out.n_hv;
@@ -203,31 +242,42 @@ struct TrustRegion {
       const double E_trial = e_only(x_trial);
 
       const double rho = TrustRadius::rho(f - E_trial, pred);
+      const double znorm = la::nrm2(z);
       bool accepted = rho > 0.1;
-      if (accepted && accept_veto && !accept_veto(x_trial)) {
+      if (accepted && hooks.veto && !hooks.veto(x_trial)) {
         accepted = false;
         out.flags |= Result::CVX_REJECTED;
       }
 
+      int n_post = 0;
       if (accepted) {
         const double f_old = f;
         std::copy(x_trial.begin(), x_trial.end(), x.begin());
         f = fg(x, g);
-        tr.accept(rho, la::nrm2(z));
-        if (project) {
-          if (project(ctx, x) > 0) f = fg(x, g);
-        }
+        tr.accept(rho, znorm);
+        ++out.n_accepted;
+        // Stagnation is the STEP's progress (parent order), measured
+        // before any post-accept change of the point.
         if (f_old - f > 1e-15 * std::max(1.0, std::fabs(f_old))) stag_count = 0;
         else ++stag_count;
+        if (hooks.post_accept) {
+          n_post = hooks.post_accept(ctx, x);
+          if (n_post > 0) f = fg(x, g);
+        }
       } else {
         tr.reject();
         ++stag_count;                        // rejected step = no progress
         out.flags |= Result::STEP_REJECTED;
       }
+      if (clipped) tr.Delta = std::min(tr.Delta, znorm);
+      if (hooks.observe)
+        hooks.observe(IterationView{iter, f, grad_norm(stop, g), x, g, znorm,
+                                    tr.Delta, rho, n_inner, n_post, accepted,
+                                    out.flags});
     }
 
     out.f    = f;
-    out.gmax = la::inf_norm(g);
+    out.gmax = grad_norm(stop, g);
     return out;
   }
 };

@@ -32,8 +32,10 @@
 // over DelaunayWorkspace, with the Status latch as the run-path error
 // channel, the Transport policy carrying the point tracker's hooks, and the
 // Metric policy selecting the predicate regime (exact integer vs banded
-// float).  Owner-level (delaunay.hh): storage, growth, the tracked
-// TrackerTransport policy, serialization, and every allocating convenience.
+// float).  The tracking policy itself is delaunay_transport.hh's
+// TrackerTransport (span-based, so host and device share it); owner-level
+// (delaunay.hh): storage, growth, serialization, and every allocating
+// convenience.
 //
 // (See the device caveat in the banner above: eisenstein.hh, reached via
 // delaunay_geometry.hh, is the one non-device-clean include.)
@@ -223,13 +225,14 @@ struct DelaunayWorkspace {
 
 // ============================================================================
 // Transport policy: the point-tracker's hook points on the two
-// topology-changing operations.  NoTransport (the default, and the only
-// policy device code sees) is a set of empty inline no-ops -- the
-// instantiated bodies are the untracked operations exactly.  The owner's
-// tracked path supplies a host-side policy (TrackerTransport, delaunay.cc)
-// reproducing the flip-tape transport through the same surgery bodies.
-// Plan hooks run BEFORE any mutation and may throw (host policies only);
-// commit hooks run after the surgery and must not fail.
+// topology-changing operations.  NoTransport (the default) is a set of empty
+// inline no-ops -- the instantiated bodies are the untracked operations
+// exactly.  A tracked run supplies TrackerTransport
+// (delaunay_transport.hh), which carries the flip-tape transport through
+// these same surgery bodies over spans, so the host owner and a device
+// kernel instantiate ONE policy.  Plan hooks run BEFORE any mutation and
+// report failure through this file's Status latch; commit hooks run after
+// the surgery and must not fail.
 // ============================================================================
 struct NoTransport {
   static constexpr bool tracking() { return false; }
@@ -447,6 +450,28 @@ struct DelaunayView {
     iterator end()   const { return {he_origin, nh, nh}; }
   };
   LiveEdges edges() const { return {he_origin, nh}; }
+
+  // The cell-boundary successor -- the third canonical traversal, beside
+  // incident() and edges(): from a tesselation-cell boundary half-edge h,
+  // cross the interior tight edges around the corner at dest(h) by cw
+  // rotation to the cell's next boundary half-edge.  The tightness
+  // predicate is a policy, like the Metric on flip_edge; `crossings`, when
+  // given, accumulates the tight half-edges crossed (the Euler count the
+  // canonical completion's disk gate reads).
+  // @pre  !tight(h), h live.
+  // @return -1 when the corner fan fails to close within nh steps (a
+  //         malformed complex); callers translate to their failure channel
+  //         (trip on the view path, throw on the owner's const walks).
+  template <class Tight>
+  int next_cell_boundary(int h, Tight&& tight, int* crossings = nullptr) const {
+    int g = he_next[h];
+    for (int safety = 0; tight(g); ) {
+      if (crossings) ++*crossings;
+      g = cw(g);
+      if (++safety > nh) return -1;
+    }
+    return g;
+  }
 
   // -------------------------------------------------------------------------
   // Intrinsic geometry.
@@ -974,10 +999,12 @@ struct DelaunayView {
   // @error InvariantViolated (exact regime, via m.flipped): a convex
   //        diamond without a lattice diagonal, or a diagonal past the
   //        exact envelope -- both mean the Lsq carry is corrupt.
-  // The transport policy's plan hook runs before the first write (it may
-  // throw with everything untouched); commit after the rewire.  The metric
-  // policy decides convexity and the new diagonal's length in both
-  // coordinates (Length), and owns the paired he_length / Lsq write.
+  // The transport policy's plan hook runs before the first write and is
+  // COMMIT-OR-NOTHING: a plan that refuses trips the Status latch, this
+  // returns false, and the complex is untouched (@post on false).  Commit
+  // runs after the rewire.  The metric policy decides convexity and the new
+  // diagonal's length in both coordinates (Length), and owns the paired
+  // he_length / Lsq write.
   template <class Metric = BandedFloatMetric, class Transport = NoTransport>
   bool flip_edge(int h, Metric&& m = Metric{}, Transport&& tr = Transport{}) {
     if (status != Status::Ok) return false;
@@ -996,6 +1023,11 @@ struct DelaunayView {
     // face slots fh, ft by rewiring in place (avoids dealloc/realloc).
     int fh = he_face[h], ft = he_face[t];
     tr.plan_flip(h, fh, ft);
+    // The plan refused (wrong-side transport, non-finite development, or an
+    // exhausted carry): leave the diamond untouched.  Without this the
+    // rewire below would proceed while the tracked points still carry the
+    // PRE-flip charts -- every point on fh/ft silently teleported.
+    if (status != Status::Ok) return false;
 
     he_origin[h] = B;
     he_origin[t] = D;
@@ -1144,6 +1176,81 @@ struct DelaunayView {
     }
     return lawson_sweep_drain(S, in_stack, m, tr);
   }
+
+  // fanned + ambiguous + nondisk = the cocircular cells with interior
+  // (tight) edges; flips = tight flips performed.  Single-face cells carry
+  // no interior edge, are already canonical, and are not counted.
+  struct CompletionStats {
+    int fanned = 0, ambiguous = 0, nondisk = 0, flips = 0;
+    CompletionStats& operator+=(const CompletionStats& o) {
+      fanned += o.fanned; ambiguous += o.ambiguous;
+      nondisk += o.nondisk; flips += o.flips;
+      return *this;
+    }
+  };
+
+  // ==========================================================================
+  // Canonical completion: complete each cocircular cell to a triangulation.
+  //
+  // A Delaunay complex determines its TESSELATION uniquely (cells = maximal
+  // cocircular polygons; Bobenko-Springborn), but the triangulation of each
+  // cell is a flip-history artifact.  This pass retriangulates every
+  // cocircular cell as the FAN from its canonical corner -- the corner whose
+  // boundary rotation word, entries (origin vertex id, integer squared
+  // length) in walk order, is lexicographically minimal -- so the completed
+  // triangulation is a function of the labeled input complex alone,
+  // independent of the flip order that produced it.  (canonical_tesselation
+  // compares its cells by the same key SHAPE over the caller's label map;
+  // the two orders coincide when that map is monotone, identity included.)
+  // Fan conversion flips only tight (exactly cocircular) edges, which are
+  // zero-energy Delaunay moves inside the cell's circle, so the
+  // tesselation, the SURFACE metric, and every vertex cone angle are
+  // unchanged (the edge-length field is not: each flip trades one diagonal
+  // of a cyclic quadrilateral for the other) and the complex stays
+  // Delaunay.
+  //
+  // AMBIGUOUS CELLS: a periodic rotation word (several corners share the
+  // minimal rotation) admits no label-determined apex; such a cell is
+  // COUNTED and left untouched, never guessed at -- callers gate those
+  // isomers at the tesselation level.
+  //
+  // NON-DISK COMPONENTS: the fan conversion is correct exactly on
+  // triangulated disks without interior vertices, where the boundary walk
+  // crosses each of the d-3 interior edges once from each side.  A
+  // component failing that Euler count (X != 2*(d-3)) is COUNTED as
+  // nondisk and left untouched, before any flip.  The count is NECESSARY,
+  // not sufficient (interior vertices of total degree 6n cancel in it);
+  // correctness on accepted cells rests on the geometry: by the
+  // empty-circumdisk property a cocircular cell of a Delaunay complex has
+  // no interior vertices at all (an all-tight star chains its four-point
+  // concyclicity conditions onto ONE circle, putting the vertex ON it),
+  // provided the cell develops injectively.  The gate plus the fan
+  // budget are the fail-loud backstop for corrupt or non-embedded
+  // complexes outside that argument's scope (CANONICAL-TESSELATION.md
+  // section 3 carries the derivation).
+  //
+  // Exact regime only (ExactIntegerMetric): tightness is the integer form
+  // F == 0 and the corner keys read the exact carry through m.lsq.  A
+  // banded-metric completion needs a key design of its own and is
+  // deliberately absent.
+  //
+  // @pre  is_delaunay() under m (post lawson_sweep / reduction; the owner
+  //       entry checks it).  On a non-Delaunay complex tight components
+  //       are not inscribed polygons and flips may be refused.
+  // @post on Ok: every fanned cell is the canonical fan; the tesselation
+  //       is unchanged; the complex is Delaunay; a second call flips
+  //       nothing (idempotent).
+  // @error InvariantViolated: a cell-boundary walk that fails to close, or
+  //        a tight flip refused (both mean a corrupt complex or carry).
+  // @error BudgetExceeded: a fan conversion exceeding its 2d+3 step bound
+  //        (unreachable behind the disk gate; fail-loud backstop).
+  // NOT transactional: on any trip the complex is left part-completed with
+  // the status latched; the trip is loud and terminal, never silent.
+  // ==========================================================================
+  // (Body below ExactIntegerMetric, with the other exact-regime bodies.)
+  template <class Transport = NoTransport>
+  CompletionStats canonical_completion(const ExactIntegerMetric& m,
+                                       Transport&& tr = Transport{});
 
   // -------------------------------------------------------------------------
   // Vertex removal machinery.
@@ -1609,6 +1716,37 @@ struct DelaunayView {
     return status;
   }
 
+  // Compact the vertex range after removal: live vertices (v_out >= 0) get
+  // fresh contiguous indices in their current order, dead ones are dropped;
+  // he_origin and the per-vertex arrays are rewritten in place (new index
+  // <= old, ascending, so the forward rewrite over the fixed spans is
+  // safe), and nv shrinks to the live count.  new_to_old[0..nlive) reports
+  // the surviving old labels; new_of_old is scratch.  Device-legal,
+  // allocation-free; the owner's compact_vertices() wraps this with owned
+  // scratch.
+  int compact_vertices(std::span<int> new_to_old, std::span<int> new_of_old) {
+    if (status != Status::Ok) return nv;
+    if ((int)new_to_old.size() < nv || (int)new_of_old.size() < nv) {
+      trip(Status::CapacityExceeded, "compact_vertices: scratch smaller than nv",
+           (int)std::min(new_to_old.size(), new_of_old.size()));
+      return nv;
+    }
+    int nlive = 0;
+    for (int v = 0; v < nv; v++) new_of_old[v] = -1;
+    for (int v = 0; v < nv; v++)
+      if (v_out[v] >= 0) { new_of_old[v] = nlive; new_to_old[nlive++] = v; }
+    for (int h = 0; h < nh; h++)
+      if (he_origin[h] >= 0) he_origin[h] = new_of_old[he_origin[h]];
+    for (int w = 0; w < nlive; w++) {
+      const int o = new_to_old[w];
+      v_out[w]         = v_out[o];
+      v_cone_angle[w]  = v_cone_angle[o];
+      v_orig_degree[w] = v_orig_degree[o];
+    }
+    nv = nlive;
+    return nlive;
+  }
+
   // Structural well-formedness over caller-owned visited bits (>= nh):
   // every live half-edge in exactly one he_next cycle, every cycle length 3.
   bool is_well_formed(Spanify::BitSpan& visited) const {
@@ -1777,6 +1915,10 @@ struct ExactIntegerMetric {
   bool cocircular(const DelaunayView& V, int h) const {
     return V.diamond_sq(h, Lsq).is_cocircular();
   }
+  // The exact squared length of h -- the regime's key word (the canonical
+  // completion's corner keys read it; a banded metric has no exact key,
+  // which is why the banded completion is deliberately absent).
+  long long lsq(const DelaunayView&, int h) const { return Lsq[h]; }
   std::optional<Length> flipped(DelaunayView& V, int h) const {
     auto fsq = V.diamond_sq(h, Lsq).flipped_length_sq();
     if (!fsq) {
@@ -1817,8 +1959,123 @@ struct ExactIntegerMetric {
 };
 
 // ---------------------------------------------------------------------------
-// Exact lattice developments (bodies here: they read ExactIntegerMetric).
+// Exact-regime bodies (defined here because they read ExactIntegerMetric):
+// the canonical completion, then the exact lattice developments.
 // ---------------------------------------------------------------------------
+
+template <class Transport>
+DelaunayView::CompletionStats
+DelaunayView::canonical_completion(const ExactIntegerMetric& m, Transport&& tr) {
+  CompletionStats st;
+  if (status != Status::Ok) return st;
+
+  auto tight = [&](int h) { return m.cocircular(*this, h); };
+  // The named cell-boundary step, with the failure translated to a trip
+  // (returning h so the caller's status check ends the walk).
+  auto advance = [&](int h, int* crossings = nullptr) {
+    const int g = next_cell_boundary(h, tight, crossings);
+    if (g < 0) {
+      trip(Status::InvariantViolated,
+           "canonical_completion: corner fan failed to close", h);
+      return h;
+    }
+    return g;
+  };
+
+  for (int h0 = 0; h0 < nh; h0++) {
+    if (status != Status::Ok) return st;
+    if (!alive(h0) || tight(h0)) continue;
+
+    // One boundary walk: cell size d, minimal boundary half-edge (the
+    // walk-invariant cell key -- interior flips never change which slots
+    // are boundary), and X = tight half-edges crossed at the corners.
+    int d = 0, hmin = h0, X = 0;
+    {
+      int h = h0, safety = 0;
+      do {
+        if (h < hmin) hmin = h;
+        d++;
+        h = advance(h, &X);
+        if (++safety > nh) {
+          trip(Status::InvariantViolated,
+               "canonical_completion: cell boundary walk failed to close", h0);
+          return st;
+        }
+      } while (h != h0 && status == Status::Ok);
+      if (status != Status::Ok) return st;
+    }
+    if (X == 0) continue;       // single-face cell: already canonical
+    if (hmin != h0) continue;   // each cell processed once
+
+    // Disk gate: a triangulated disk with d boundary edges and no interior
+    // vertices has exactly d-3 interior edges, each crossed once from each
+    // side: X == 2*(d-3).  A failing component is refused by name BEFORE
+    // any flip.  Necessary, not sufficient -- on a Delaunay complex the
+    // empty-circumdisk property excludes interior vertices outright, and
+    // the fan budget backstops the rest (banner above).
+    if (X != 2 * (d - 3)) { st.nondisk++; continue; }
+
+    // Canonical corner: the least rotation of the boundary word, entries
+    // (origin vertex id, exact squared length) in walk order, with its
+    // multiplicity.  Rotations compare by simultaneous walk: O(d^2),
+    // allocation-free; cells are small.
+    auto rot_cmp = [&](int s1, int s2) {
+      int a = s1, b = s2;
+      for (int i = 0; i < d; i++) {
+        if (he_origin[a] != he_origin[b])
+          return he_origin[a] < he_origin[b] ? -1 : 1;
+        const long long la = m.lsq(*this, a), lb = m.lsq(*this, b);
+        if (la != lb) return la < lb ? -1 : 1;
+        a = advance(a);
+        b = advance(b);
+      }
+      return 0;
+    };
+    int best = h0, multiplicity = 1;
+    for (int j = 1, s = h0; j < d; j++) {
+      s = advance(s);
+      const int c = rot_cmp(s, best);
+      if (c < 0) { best = s; multiplicity = 1; }
+      else if (c == 0) multiplicity++;
+    }
+    if (status != Status::Ok) return st;
+    // multiplicity > 1 <=> the boundary word is periodic: no
+    // label-determined apex exists.
+    if (multiplicity > 1) { st.ambiguous++; continue; }
+
+    // Fan from the canonical corner: h stays the apex-outgoing half-edge
+    // of the current fan face.  Flip the apex-opposite edge while it is
+    // interior (each flip lands one apex diagonal, and h's face becomes
+    // (apex, b, W) with next(h) the far triangle's side); advance across
+    // the fan diagonal when it is not; the non-tight third side is the
+    // final ear.  <= d-3 flips + d-2 advances.
+    int h = best;
+    int budget = 2 * d + 3;
+    while (status == Status::Ok) {
+      if (--budget < 0) {
+        trip(Status::BudgetExceeded,
+             "canonical_completion: fan conversion step bound", best);
+        return st;
+      }
+      const int e = he_next[h];
+      if (tight(e)) {
+        if (!flip_edge(e, m, tr)) {
+          trip(Status::InvariantViolated,
+               "canonical_completion: tight edge refused to flip", e);
+          return st;
+        }
+        st.flips++;
+      } else {
+        const int g = he_next[e];
+        if (!tight(g)) break;   // final ear: fan complete
+        h = twin(g);            // next fan face around the apex corner
+      }
+    }
+    if (status != Status::Ok) return st;
+    st.fanned++;                // counted on completed fans only
+  }
+  return st;
+}
 
 inline void DelaunayView::develop_fan_lattice(int v, DelaunayWorkspace& ws,
                                               const ExactIntegerMetric& m) {

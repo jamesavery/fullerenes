@@ -3,7 +3,8 @@
 
 #include "triangulation.hh"
 #include "geometry.hh"
-#include "delaunay_view.hh"   // DelaunayView, Diamond, dcel_capacities
+#include "delaunay_view.hh"        // DelaunayView, Diamond, dcel_capacities
+#include "delaunay_transport.hh"   // DelaunayPointTrackerView, TrackerTransport
 
 #include <array>
 #include <cstdio>       // FILE* for the .idt serialization (to_ascii / from_ascii)
@@ -82,12 +83,15 @@ struct GeodesicDisk {
 // f_he[f].  Delta-complex faces may repeat corner labels (self-loop and
 // bigon faces arise transiently); slots are always unambiguous.
 //
-// Failure contract: transport-detected failures (the clamp band below, a
-// degenerate development) throw BEFORE the operation mutates anything --
-// flip_edge and remove_flat_vertex compute every placement first and only
-// then commit, so complex and tracker are unchanged on such a throw.  A
-// throw from the DCEL surgery itself (splice_fan deep invariants) poisons
-// complex and tracker alike, per the file's deep-invariant convention.
+// Failure contract: a transport-detected failure (the clamp band, a
+// degenerate development, an exhausted arena) trips the DCEL's Status latch
+// and the owner converts it to a throw at its boundary (throw_on_status).
+// Both surgeries are COMMIT-OR-NOTHING under a transport failure: the plan
+// hooks run before any mutation, and each body checks the latch before its
+// first write (flip_edge returns false; splice_fan early-outs), so complex
+// and tracker are unchanged.  (A throw from the DCEL surgery itself --
+// splice_fan's deep invariants -- still leaves the complex poisoned, per the
+// file's deep-invariant convention; that is a different failure class.)
 // bisect_multi_edges and split_face are NOT transport-hooked and throw
 // when tracking is active.  Copies of a tracking complex snapshot the
 // tracker: transport applies only to the copy you mutate.
@@ -97,30 +101,70 @@ struct GeodesicDisk {
 // the loose flat_tol regime (~1e-2, CEPS metrics) is incompatible with
 // tracking -- the seed placement throws rather than proceeding.
 // ============================================================================
-struct DelaunayTrackedPoint {
-  int    label = -1;              // caller's id (opaque to the DCEL)
-  int    face  = -1;              // containing live face
-  double b[3]  = {0, 0, 0};       // barycentric per slot; b >= 0, sum == 1
-};
 
+// The host OWNER of the tracker state: the vectors behind
+// DelaunayPointTrackerView's spans plus the transport's carry scratch (the
+// DelaunayStorage owner/view pattern -- storage here, algorithm on the view,
+// rebind() the @inv bound establisher).  The transported state, its
+// invariants and the clamp policy live on the view
+// (delaunay_transport.hh); this type is storage and growth only.
 struct DelaunayPointTracker {
   bool active = false;
-  // @inv partition: by_face[f] == { i : points[i].face == f } -- every
-  //      point indexed exactly once, under its own (live) face.  Holds
-  //      after every hooked operation; asserted by the transport tests.
-  std::vector<DelaunayTrackedPoint> points;
-  std::vector<std::vector<int>>     by_face;   // face -> indices into points
-  // FP policy: after transport, a barycentric in [-CLAMP_TOL, 0) is clamped
-  // to 0 and the triple renormalized (accounted below); below -CLAMP_TOL
-  // transport throws -- that is a wrong-side transport bug, not roundoff.
-  // Never widen the band to make a case pass.
-  static constexpr double CLAMP_TOL = 1e-9;
-  long   n_clamped = 0;
-  double max_clamp = 0;
 
-  // The by_face bucket of face f, growing the index when alloc_face has
-  // extended nf.
-  std::vector<int>& bucket(int f);
+  std::vector<int>    owned_label, owned_face, owned_next;
+  std::vector<int>    owned_head, owned_tail;      // the by-face partition
+  std::vector<double> owned_bary;
+  std::vector<int>    owned_carry_idx, owned_carry_cand;
+  std::vector<double> owned_carry_x, owned_carry_y, owned_carry_b;
+
+  DelaunayPointTrackerView view;    // the transported state
+  TransportCarry           carry;   // the plan-to-commit scratch
+
+  // @inv bound: each span is exactly the span over its vector.  The counts
+  // (view.n, the clamp accounting) survive the rebind, as the DCEL's own
+  // free-list counts do.
+  void rebind() {
+    view.label = owned_label; view.face = owned_face; view.next = owned_next;
+    view.head  = owned_head;  view.tail = owned_tail; view.bary = owned_bary;
+    carry.cidx  = owned_carry_idx; carry.rcand = owned_carry_cand;
+    carry.cx    = owned_carry_x;   carry.cy    = owned_carry_y;
+    carry.rb    = owned_carry_b;
+  }
+
+  // Monotone growth to `points_cap` tracked points over `buckets_cap` face
+  // slots; the carry follows the points' capacity (transport_carry_cap).
+  // New slots carry the empty representation (-1 / 0).  Ends in rebind().
+  void ensure_capacity(long points_cap, long buckets_cap) {
+    if ((long)owned_label.size() < points_cap) {
+      owned_label.resize(points_cap, -1);
+      owned_face .resize(points_cap, -1);
+      owned_next .resize(points_cap, -1);
+      owned_bary .resize(3 * points_cap, 0.0);
+    }
+    if ((long)owned_head.size() < buckets_cap) {
+      owned_head.resize(buckets_cap, -1);
+      owned_tail.resize(buckets_cap, -1);
+    }
+    const long C = transport_carry_cap((long)owned_label.size());
+    if ((long)owned_carry_idx.size() < C) {
+      owned_carry_idx .resize(C, -1);
+      owned_carry_cand.resize(C, -1);
+      owned_carry_x   .resize(C, 0.0);
+      owned_carry_y   .resize(C, 0.0);
+      owned_carry_b   .resize(3 * C, 0.0);
+    }
+    rebind();
+  }
+
+  // Headroom for a removal pass: every removed vertex seeds exactly ONE
+  // tracked point, ON TOP of whatever the caller already registered through
+  // track_point.  The owner grows (it holds vectors), so a tracked removal
+  // never has to refuse for want of seed slots -- which is what the
+  // enable-time sizing alone would do once the caller registers more points
+  // than the pass leaves survivors.
+  void reserve_for_removals(long n_removals, long buckets_cap) {
+    ensure_capacity((long)view.n + n_removals, buckets_cap);
+  }
 };
 
 // ============================================================================
@@ -188,15 +232,18 @@ struct HostDelaunayWorkspace : DelaunayWorkspace {
 //
 //   @inv bound:  each view span is exactly the span over its storage vector
 //                (same data pointer, same size) -- established by repoint(),
-//                which folds the two field tuples together.
+//                which folds the two field tuples together and rebinds the
+//                tracker's own spans.
 //   @inv sized:  he_*.size() == nh, v_*.size() >= nv, f_he.size() == nf.
 //
 // Resizer inventory (everything that may reallocate, each ending in
 // repoint()): the monotone ensure_* helpers (post-build growth, and the
 // construction paths, which allocate through them before the view-level
 // build), from_ascii (which establishes the arrays wholesale), and
-// compact_vertices (the one shrinking operation).  Everything else mutates
-// in place through the spans.
+// compact_vertices (the one shrinking operation).  The tracker's storage
+// has its own monotone grower (DelaunayPointTracker::ensure_capacity, ending
+// in its own rebind), driven by enable_point_tracking and track_point.
+// Everything else mutates in place through the spans.
 //
 // Why not Owned<View> (owned.hh): that template is specialized to the RSR
 // adjacency layout (neighbours/deg/twin + optional points); a tuple-driven
@@ -230,6 +277,7 @@ struct DelaunayTriangulation : DelaunayView, DelaunayStorage {
     nf_cap = (int)owned_f_he.size();
     free_edges.rebind(owned_free_edges);   // counts survive the rebind
     free_faces.rebind(owned_free_faces);
+    tracker.rebind();                      // the tracker's own @inv bound
   }
 
   // --- Growth (owner-only; the view never resizes) ---
@@ -303,6 +351,8 @@ struct DelaunayTriangulation : DelaunayView, DelaunayStorage {
     o.status_site = nullptr;
     o.status_witness = -1;
     o.repoint();
+    o.tracker.active = false; // and the empty complex tracks nothing
+    o.tracker.view.reset();
   }
   DelaunayTriangulation& operator=(const DelaunayTriangulation& o) {
     if (this != &o) {
@@ -323,6 +373,8 @@ struct DelaunayTriangulation : DelaunayView, DelaunayStorage {
       o.status_site = nullptr;
       o.status_witness = -1;
       o.repoint();
+      o.tracker.active = false;
+      o.tracker.view.reset();
     }
     return *this;
   }
@@ -331,13 +383,15 @@ struct DelaunayTriangulation : DelaunayView, DelaunayStorage {
   // operations whose points you want carried (e.g. before
   // remove_flat_vertices; the compute(..., track_removed) overload does this
   // and seeds every removed flat vertex with label = its input-label).
-  // One tracking session per complex.
+  // One tracking session per complex.  Sizes the tracker's storage at
+  // tracked_points_cap(nv) points over the face capacity (removal seeds one
+  // point per removed flat vertex; track_point grows past it).
   // @throws std::runtime_error when the tracker already carries points
   //         (stale state would be silently transported).
   void enable_point_tracking();
 
   // Register a point at (face, barycentric); returns its index in
-  // tracker.points.
+  // tracker.view.
   // @pre tracker.active; face live; b finite, >= -CLAMP_TOL componentwise,
   //      summing to 1 within 1e-9 (clamped + renormalized on registration)
   // @throws std::runtime_error on any violated precondition.
@@ -436,6 +490,36 @@ struct DelaunayTriangulation : DelaunayView, DelaunayStorage {
   //         its integer cone excess (e.g. split_face / bisect-inserted
   //         vertices) -- loud, never a silently wrong reduction.
   void remove_flat_vertices_exact(const std::function<void(int)>& on_pop = {});
+
+  // The exact-regime entry boundary as a value: derive the integer squared
+  // lengths from he_length and VERIFY both exactness preconditions loudly
+  // (the shared body remove_flat_vertices_exact and
+  // canonical_completion_exact enter through).  For callers that need an
+  // ExactIntegerMetric of their own, e.g. exact post-reduction surgery.
+  // @throws std::runtime_error when the current metric is not exact.
+  std::vector<long long> verified_exact_lsq_carry() const;
+
+  // Canonical completion of the Delaunay tesselation (the view body's doc,
+  // delaunay_view.hh, carries the algorithm and the full contract):
+  // retriangulate every cocircular cell as the fan from its canonical
+  // corner, so the triangulation handed downstream is a function of the
+  // labeled input complex alone -- independent of the flip order that
+  // produced it.  Exact regime (derives and verifies the Lsq carry exactly
+  // as remove_flat_vertices_exact; same loud preconditions), and checks
+  // the is_delaunay() precondition itself.  Tesselation-invariant,
+  // Delaunay-preserving, idempotent.  Refusal classes, counted per cell
+  // and left untouched, never guessed at: .ambiguous (periodic boundary
+  // rotation word: no label-determined apex) and .nondisk (a component
+  // failing the disk Euler count -- on a Delaunay complex with embedded
+  // cells the class is provably empty by the empty-circumdisk property;
+  // the gate is the fail-loud backstop beyond that scope).
+  // Transport-hooked: with tracking active, tracked points ride the flips.
+  // NOT transactional: a throw can leave the complex part-completed with
+  // the status latched.
+  // @throws std::runtime_error on a non-Delaunay complex, a non-exact
+  //         metric, a walk that fails to close, a refused tight flip, or
+  //         the fan-conversion step budget (via the Status latch).
+  DelaunayView::CompletionStats canonical_completion_exact();
 
   // Renumber the live vertices to 0..n_live-1 (dropping removed ones) and
   // shrink nv, rewriting he_origin and the per-vertex arrays. Needed after a
