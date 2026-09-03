@@ -39,6 +39,12 @@ struct CanonicalTesselation {
   // equality / ordering).
   std::vector<Polygon> cells;
 
+  // The cell's normal form: rotated to its lex-min rotation (oriented
+  // surface, no reverse) -- delaunay_detail::least_rotation over index
+  // positions, the one word the canonical completion's corner key uses
+  // too.  Every Polygon in `cells` is normalized.
+  static Polygon normalized(Polygon p);
+
   bool operator==(const CanonicalTesselation& o) const { return cells == o.cells; }
   bool operator!=(const CanonicalTesselation& o) const { return cells != o.cells; }
   bool operator< (const CanonicalTesselation& o) const { return cells <  o.cells; }

@@ -318,6 +318,67 @@ constexpr long degree_sum(const TriView& T) {
 }
 
 // ============================================================================
+// Combinatorics on cyclic words (no DCEL, no geometry).
+// ============================================================================
+namespace delaunay_detail {
+
+// The three-way order of two values: sign(a - b).  The shape every entry
+// order and every exact_metric compare_lsq returns.
+template <class T>
+constexpr int compare(const T& a, const T& b) { return (a > b) - (a < b); }
+
+// The least rotation of a cyclic word of length d, with its multiplicity.
+// Positions are abstract (a half-edge, an index): succ(p) is the cyclic
+// successor and entry_cmp(a, b) the three-way order of two entries; the
+// rotations are ordered by the lexicographic extension of entry_cmp along
+// d successors, and the result is the argmin -- the FIRST position
+// attaining it in successor order from start -- with the number of
+// rotations attaining it.  A refusal inside entry_cmp is the caller's to
+// notice (this fold reads only the value it returns).
+// @anchor least-rotation
+// @pre    d >= 1; succ has order d at start (succ^d(start) == start).
+// @post   result.multiplicity == d / period(w): the minimum is attained
+//         once per period, so multiplicity == 1 iff w is aperiodic.
+// @post on multiplicity == 1: result.start is the unique argmin rotation.
+// @time   O(d^2) entry comparisons by simultaneous walk, allocation-free
+//         (succ-only access; Booth's O(d) needs random access into w).
+template <class Pos>
+struct LeastRotation { Pos start; int multiplicity; };
+
+template <class Pos, class Succ, class EntryCmp>
+LeastRotation<Pos> least_rotation(Pos start, int d, Succ&& succ,
+                                  EntryCmp&& entry_cmp) {
+  auto rotation_cmp = [&](Pos a, Pos b) {
+    for (int i = 0; i < d; i++) {
+      if (const int c = entry_cmp(a, b)) return c;
+      a = succ(a);
+      b = succ(b);
+    }
+    return 0;
+  };
+  LeastRotation<Pos> r{start, 1};
+  Pos s = start;
+  for (int j = 1; j < d; j++) {
+    s = succ(s);
+    const int c = rotation_cmp(s, r.start);
+    if (c < 0) r = {s, 1};
+    else if (c == 0) r.multiplicity++;
+  }
+  return r;
+}
+
+// The least rotation of a contiguous word: the index-position instance,
+// succ(i) = (i+1) mod d, entries ordered by compare.
+template <class T>
+LeastRotation<int> least_rotation(std::span<const T> w) {
+  const int d = (int)w.size();
+  return least_rotation(0, d, [d](int i) { return (i + 1) % d; },
+                        [w](int a, int b) { return compare(w[a], w[b]); });
+}
+
+}  // namespace delaunay_detail
+
+// ============================================================================
 // DelaunayView: span SoA view of the half-edge DCEL.
 // ============================================================================
 struct DelaunayView {
@@ -478,7 +539,7 @@ struct DelaunayView {
   //         malformed complex); callers translate to their failure channel
   //         (trip on the view path, throw on the owner's const walks).
   template <class Tight>
-  int next_cell_boundary(int h, Tight&& tight, int* crossings = nullptr) const {
+  int next_cell_boundary(int h, Tight&& tight, long long* crossings = nullptr) const {
     int g = he_next[h];
     for (int safety = 0; tight(g); ) {
       if (crossings) ++*crossings;
@@ -486,6 +547,89 @@ struct DelaunayView {
       if (++safety > nh) return -1;
     }
     return g;
+  }
+  // The same step with its failure translated to a trip (the view owns the
+  // latch): on refusal h itself is returned, so a caller's status check
+  // ends its walk.
+  template <class Tight>
+  int next_cell_boundary_or_trip(int h, Tight&& tight) {
+    const int g = next_cell_boundary(h, tight);
+    if (g < 0)
+      trip(Status::InvariantViolated,
+           "next_cell_boundary: corner fan failed to close", h);
+    return g < 0 ? h : g;
+  }
+
+  // One cell of the tesselation, read off its boundary closure walk from
+  // h0 (a boundary half-edge).  visit_cell is the one closure walk:
+  // `visit(h)` is called once per boundary half-edge in walk order, and
+  // the folds below come free on it (walk_cell is the empty visitor).  A
+  // visitor-plus-fold rather than a range in LiveEdges' shape, because the
+  // walk has a VERDICT -- closed, or open in one of two ways -- and the
+  // crossings are produced by the step, not by the visited element; a range
+  // could report neither honestly.
+  // @pre  !tight(h0), h0 live.
+  struct CellWalk {
+    enum class Closure { Closed, CornerUnclosed, BoundaryUnclosed };
+    Closure closure = Closure::BoundaryUnclosed;
+    int d = 0;                 // boundary half-edges visited
+    int hmin = -1;             // minimal boundary slot: the walk-invariant
+                               // cell key (interior flips never change
+                               // which slots are boundary)
+    long long crossings = 0;   // tight half-edges crossed at the corners
+                               // (the Euler count the disk gate reads)
+    int witness = -1;          // CornerUnclosed: the half-edge whose corner
+                               // fan failed to close; otherwise h0
+    // The Euler gate for a triangulated disk with no interior vertices: d
+    // boundary edges force exactly d-3 interior ones, each crossed once
+    // from each side.  NECESSARY, not sufficient -- sufficiency is the
+    // Delaunay premise (the canonical completion's banner), not this count.
+    bool passes_disk_gate() const { return crossings == 2LL * (d - 3); }
+  };
+  template <class Tight, class Visit>
+  CellWalk visit_cell(int h0, Tight&& tight, Visit&& visit) const {
+    CellWalk C;
+    C.hmin = C.witness = h0;
+    int h = h0;
+    for (int steps = 0; steps <= nh; steps++) {
+      visit(h);
+      if (h < C.hmin) C.hmin = h;
+      C.d++;
+      const int g = next_cell_boundary(h, tight, &C.crossings);
+      if (g < 0) {
+        C.closure = CellWalk::Closure::CornerUnclosed;
+        C.witness = h;
+        return C;
+      }
+      if (g == h0) { C.closure = CellWalk::Closure::Closed; return C; }
+      h = g;
+    }
+    return C;   // BoundaryUnclosed, witness h0
+  }
+  template <class Tight>
+  CellWalk walk_cell(int h0, Tight&& tight) const {
+    return visit_cell(h0, tight, [](int) {});
+  }
+  // The cell walk with its non-closure verdicts translated to trips (the
+  // view owns the latch); on Ok the returned walk is Closed.
+  // @error InvariantViolated when the walk does not close (a corrupt
+  //        complex), witness as CellWalk::witness.
+  template <class Tight>
+  CellWalk walk_cell_or_trip(int h0, Tight&& tight) {
+    const CellWalk C = walk_cell(h0, tight);
+    switch (C.closure) {
+      case CellWalk::Closure::CornerUnclosed:
+        trip(Status::InvariantViolated,
+             "walk_cell: corner fan failed to close", C.witness);
+        break;
+      case CellWalk::Closure::BoundaryUnclosed:
+        trip(Status::InvariantViolated,
+             "walk_cell: cell boundary walk failed to close", C.witness);
+        break;
+      case CellWalk::Closure::Closed:
+        break;
+    }
+    return C;
   }
 
   // -------------------------------------------------------------------------
@@ -1267,13 +1411,59 @@ struct DelaunayView {
   // @error InvariantViolated: a cell-boundary walk that fails to close, or
   //        a tight flip refused (both mean a corrupt complex or carry).
   // @error BudgetExceeded: a fan conversion exceeding its 2d+3 step bound
-  //        (unreachable behind the disk gate; fail-loud backstop).
+  //        (unreachable on a Delaunay complex; the fail-loud backstop for
+  //        what the disk gate alone cannot exclude).
   // NOT transactional: on any trip the complex is left part-completed with
   // the status latched; the trip is loud and terminal, never silent.
   // ==========================================================================
   // (Body below the policies, with the other exact-regime bodies.)
   template <exact_metric Metric, class Transport = NoTransport>
   CompletionStats canonical_completion(Metric&& m, Transport&& tr = Transport{});
+
+  // Fan conversion of the cell C from `corner` (its apex-outgoing boundary
+  // half-edge) -- the completion's one mutating word.  h stays the
+  // apex-outgoing half-edge of the current fan face: flip the
+  // apex-opposite edge while it is interior (each flip lands one apex
+  // diagonal, and h's face becomes (apex, b, W) with next(h) the far
+  // triangle's side); advance across the fan diagonal when it is not; the
+  // non-tight third side is the final ear.  <= d-3 flips + d-2 advances,
+  // backstopped by a 2d+3 step budget.  Returns the flips made.
+  // @pre  C passes the disk gate and corner is one of its boundary
+  //       half-edges; its interior edges are all tight.
+  // @post on Ok: the cell is the fan from corner; the tesselation and the
+  //       surface metric are unchanged (only tight edges were flipped; the
+  //       edge-length field is not preserved).
+  // @error BudgetExceeded when the step bound trips (unreachable on a
+  //        Delaunay complex; the fail-loud backstop for what the disk gate
+  //        alone cannot exclude); InvariantViolated when a tight edge
+  //        refuses to flip (a corrupt complex or carry).  Both through the
+  //        latch.
+  template <class Tight, class Metric, class Transport>
+  int fan_from(const CellWalk& C, int corner, Tight&& tight, Metric&& m,
+               Transport&& tr) {
+    if (status != Status::Ok) return 0;
+    int flips = 0, h = corner, budget = 2 * C.d + 3;
+    while (status == Status::Ok) {
+      if (--budget < 0) {
+        trip(Status::BudgetExceeded, "fan_from: step bound exceeded", corner);
+        return flips;
+      }
+      const int e = he_next[h];
+      if (tight(e)) {
+        if (!flip_edge(e, m, tr)) {
+          trip(Status::InvariantViolated,
+               "fan_from: tight edge refused to flip", e);
+          return flips;
+        }
+        flips++;
+      } else {
+        const int g = he_next[e];
+        if (!tight(g)) break;   // final ear: fan complete
+        h = twin(g);            // next fan face around the apex corner
+      }
+    }
+    return flips;
+  }
 
   // -------------------------------------------------------------------------
   // Vertex removal machinery.
@@ -1954,7 +2144,7 @@ struct ExactIntegerMetric {
   // is deliberately absent).
   // @post result == sign(Lsq[a] - Lsq[b])
   int compare_lsq(const DelaunayView&, int a, int b) const {
-    return (Lsq[a] > Lsq[b]) - (Lsq[a] < Lsq[b]);
+    return delaunay_detail::compare(Lsq[a], Lsq[b]);
   }
   std::optional<Length> flipped(DelaunayView& V, int h) const {
     auto fsq = V.diamond_sq(h, Lsq).flipped_length_sq();
@@ -2009,109 +2199,37 @@ DelaunayView::canonical_completion(Metric&& m, Transport&& tr) {
   if (status != Status::Ok) return st;
 
   auto tight = [&](int h) { return m.cocircular(*this, h); };
-  // The named cell-boundary step, with the failure translated to a trip
-  // (returning h so the caller's status check ends the walk).
-  auto advance = [&](int h, int* crossings = nullptr) {
-    const int g = next_cell_boundary(h, tight, crossings);
-    if (g < 0) {
-      trip(Status::InvariantViolated,
-           "canonical_completion: corner fan failed to close", h);
-      return h;
-    }
-    return g;
+  // The cell word: its successor (the tripping cell-boundary step) and its
+  // entry order -- origin vertex id first, then the exact squared length
+  // (a refused exact order trips inside compare_lsq).
+  auto advance = [&](int h) { return next_cell_boundary_or_trip(h, tight); };
+  auto corner_entry_cmp = [&](int a, int b) -> int {
+    if (const int c = delaunay_detail::compare(he_origin[a], he_origin[b]))
+      return c;
+    return m.compare_lsq(*this, a, b);
   };
 
   for (int h0 = 0; h0 < nh; h0++) {
     if (status != Status::Ok) return st;
     if (!alive(h0) || tight(h0)) continue;
 
-    // One boundary walk: cell size d, minimal boundary half-edge (the
-    // walk-invariant cell key -- interior flips never change which slots
-    // are boundary), and X = tight half-edges crossed at the corners.
-    int d = 0, hmin = h0, X = 0;
-    {
-      int h = h0, safety = 0;
-      do {
-        if (h < hmin) hmin = h;
-        d++;
-        h = advance(h, &X);
-        if (++safety > nh) {
-          trip(Status::InvariantViolated,
-               "canonical_completion: cell boundary walk failed to close", h0);
-          return st;
-        }
-      } while (h != h0 && status == Status::Ok);
-      if (status != Status::Ok) return st;
-    }
-    if (X == 0) continue;       // single-face cell: already canonical
-    if (hmin != h0) continue;   // each cell processed once
-
-    // Disk gate: a triangulated disk with d boundary edges and no interior
-    // vertices has exactly d-3 interior edges, each crossed once from each
-    // side: X == 2*(d-3).  A failing component is refused by name BEFORE
-    // any flip.  Necessary, not sufficient -- on a Delaunay complex the
-    // empty-circumdisk property excludes interior vertices outright, and
-    // the fan budget backstops the rest (banner above).
-    if (X != 2 * (d - 3)) { st.nondisk++; continue; }
-
-    // Canonical corner: the least rotation of the boundary word, entries
-    // (origin vertex id, exact squared length) in walk order, with its
-    // multiplicity.  Rotations compare by simultaneous walk: O(d^2),
-    // allocation-free; cells are small.  (A refused exact order trips
-    // inside compare_lsq; the status check below ends the cell.)
-    auto rot_cmp = [&](int s1, int s2) {
-      int a = s1, b = s2;
-      for (int i = 0; i < d; i++) {
-        if (he_origin[a] != he_origin[b])
-          return he_origin[a] < he_origin[b] ? -1 : 1;
-        if (const int c = m.compare_lsq(*this, a, b)) return c;
-        a = advance(a);
-        b = advance(b);
-      }
-      return 0;
-    };
-    int best = h0, multiplicity = 1;
-    for (int j = 1, s = h0; j < d; j++) {
-      s = advance(s);
-      const int c = rot_cmp(s, best);
-      if (c < 0) { best = s; multiplicity = 1; }
-      else if (c == 0) multiplicity++;
-    }
+    const CellWalk C = walk_cell_or_trip(h0, tight);
     if (status != Status::Ok) return st;
-    // multiplicity > 1 <=> the boundary word is periodic: no
-    // label-determined apex exists.
+    if (C.crossings == 0) continue;   // single-face cell: already canonical
+    if (C.hmin != h0) continue;       // each cell processed once
+    // A non-disk component is refused by name BEFORE any flip.
+    if (!C.passes_disk_gate()) { st.nondisk++; continue; }
+
+    // The canonical corner: the least rotation of the boundary word; a
+    // periodic word (multiplicity > 1) has no label-determined apex.
+    const auto [corner, multiplicity] =
+        delaunay_detail::least_rotation(h0, C.d, advance, corner_entry_cmp);
+    if (status != Status::Ok) return st;
     if (multiplicity > 1) { st.ambiguous++; continue; }
 
-    // Fan from the canonical corner: h stays the apex-outgoing half-edge
-    // of the current fan face.  Flip the apex-opposite edge while it is
-    // interior (each flip lands one apex diagonal, and h's face becomes
-    // (apex, b, W) with next(h) the far triangle's side); advance across
-    // the fan diagonal when it is not; the non-tight third side is the
-    // final ear.  <= d-3 flips + d-2 advances.
-    int h = best;
-    int budget = 2 * d + 3;
-    while (status == Status::Ok) {
-      if (--budget < 0) {
-        trip(Status::BudgetExceeded,
-             "canonical_completion: fan conversion step bound", best);
-        return st;
-      }
-      const int e = he_next[h];
-      if (tight(e)) {
-        if (!flip_edge(e, m, tr)) {
-          trip(Status::InvariantViolated,
-               "canonical_completion: tight edge refused to flip", e);
-          return st;
-        }
-        st.flips++;
-      } else {
-        const int g = he_next[e];
-        if (!tight(g)) break;   // final ear: fan complete
-        h = twin(g);            // next fan face around the apex corner
-      }
-    }
+    st.flips += fan_from(C, corner, tight, m, tr);
     if (status != Status::Ok) return st;
-    st.fanned++;                // counted on completed fans only
+    st.fanned++;                      // counted on completed fans only
   }
   return st;
 }

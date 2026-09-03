@@ -614,19 +614,13 @@ vector<bool> DelaunayTriangulation::cocircular_edges(double tol) const
   return edge_mask(*this, [&](int h) { return diamond(h).is_cocircular(tol); });
 }
 
-// Lex-min cyclic rotation of a polygon boundary (oriented surface, no reverse).
-static CanonicalTesselation::Polygon
-min_rotation(const CanonicalTesselation::Polygon& p)
+CanonicalTesselation::Polygon
+CanonicalTesselation::normalized(Polygon p)
 {
-  int d = (int)p.size();
-  if (d <= 1) return p;
-  CanonicalTesselation::Polygon best = p;
-  CanonicalTesselation::Polygon rot(d);
-  for (int r = 1; r < d; r++) {
-    for (int i = 0; i < d; i++) rot[i] = p[(r + i) % d];
-    if (rot < best) best = rot;
-  }
-  return best;
+  if (p.size() <= 1) return p;
+  const auto r = delaunay_detail::least_rotation(std::span<const Polygon::value_type>(p));
+  std::rotate(p.begin(), p.begin() + r.start, p.end());
+  return p;
 }
 
 CanonicalTesselation
@@ -639,40 +633,38 @@ CanonicalTesselation
 DelaunayTriangulation::canonical_tesselation(const vector<int>& vertex_labels,
                                              const vector<bool>& tight) const
 {
-  // Walk cell boundaries.  Each non-tight half-edge h sits on exactly one
-  // cell (the one to its left in the DCEL CCW orientation).  Within a cell,
-  // tight edges are interior; we step across them with `next(twin(.))`.
+  // Walk cell boundaries (visit_cell -- the one cell traversal, shared with
+  // the canonical completion).  Each non-tight half-edge h sits on exactly
+  // one cell (the one to its left in the DCEL CCW orientation); within a
+  // cell, tight edges are interior and the walk crosses them.
   vector<bool> visited(nh, false);
   CanonicalTesselation T;
+  auto is_tight = [&](int g) { return (bool)tight[g]; };
   for (int h_start = 0; h_start < nh; h_start++) {
     if (!alive(h_start) || visited[h_start] || tight[h_start]) continue;
     CanonicalTesselation::Polygon poly;
-    int h = h_start;
-    do {
+    const CellWalk C = visit_cell(h_start, is_tight, [&](int h) {
       visited[h] = true;
-      int u = he_origin[h];
-      long long L = (long long)std::llround(he_length[h] * he_length[h]);
+      const int u = he_origin[h];
+      const long long L = (long long)std::llround(he_length[h] * he_length[h]);
       poly.push_back({(u >= 0 && u < (int)vertex_labels.size()) ? vertex_labels[u] : u, L});
-      // Advance via the named cell-boundary step (next_cell_boundary --
-      // the one body the canonical completion walks too).  Within the
-      // cell, tight edges are interior; the step crosses them to the next
-      // boundary edge.
-      const int h_next =
-          next_cell_boundary(h, [&](int g) { return (bool)tight[g]; });
-      if (h_next < 0)
-        // Deep invariant failure: two silently-empty results would
-        // compare equal, so fail loud instead of returning a sentinel.
-        throw std::runtime_error(
-            "canonical_tesselation: cell-boundary walk from half-edge " +
-            std::to_string(h_start) + " failed to close after " +
-            std::to_string(nh) + " interior-edge (tight) steps; the tight "
-            "mask encloses a cell -- a well-formed iDT tesselation always "
-            "closes. (Thrown rather than returning an empty tesselation, "
-            "which a legitimately empty iDT also yields and so could not "
-            "signal this.)");
-      h = h_next;
-    } while (h != h_start);
-    T.cells.push_back(min_rotation(poly));
+    });
+    if (C.closure != CellWalk::Closure::Closed)
+      // Deep invariant failure: two silently-empty results would
+      // compare equal, so fail loud instead of returning a sentinel.
+      throw std::runtime_error(
+          "canonical_tesselation: cell-boundary walk from half-edge " +
+          std::to_string(h_start) +
+          (C.closure == CellWalk::Closure::CornerUnclosed
+               ? " crossed " + std::to_string(nh) + " interior-edge (tight) "
+                 "steps at one corner without leaving it (the tight mask "
+                 "encloses a cell)"
+               : " never returned to its start within " +
+                 std::to_string(nh + 1) + " boundary steps") +
+          " -- a well-formed iDT tesselation always closes. (Thrown rather "
+          "than returning an empty tesselation, which a legitimately empty "
+          "iDT also yields and so could not signal this.)");
+    T.cells.push_back(CanonicalTesselation::normalized(std::move(poly)));
   }
   std::sort(T.cells.begin(), T.cells.end());
   return T;
