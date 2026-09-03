@@ -1,5 +1,5 @@
 // Law tests for the rotation-system words on RSRAdjacencyView
-// (dense_graph.hh: source/slot/arc_at, target, next/prev =
+// (dense_graph.hh: source/slot/arc_at, target, arc, next/prev =
 // sigma/sigma^-1, reverse_arc = alpha, next_on_face, arcid/arc_of,
 // find_arc).
 //
@@ -244,6 +244,23 @@ TYPED_TEST(ArcNav, SourceSlotProjectionsInvertArcAt) {
         // source is its reverse's target.
         for (auto a : this->arcs(G))
             EXPECT_EQ(G.target(G.reverse_arc(a)), V::source(a));
+    }
+}
+
+// @ref rsr-arc-value (dense_graph.hh)
+TYPED_TEST(ArcNav, ArcIsTheSourceTargetPair) {
+    using V = typename TestFixture::View;
+    // Differential: the expected pair comes straight from the fixture's
+    // rotation lists, never through the view's own reads, so a bug shared
+    // between arc's two components (a wrong arcid, say) cannot hide.
+    for (const auto& f : this->fixtures()) {
+        SCOPED_TRACE(f.name);
+        auto G = this->build(f.rot);
+        for (size_t v = 0; v < f.rot.size(); v++)
+            for (size_t k = 0; k < f.rot[v].size(); k++)
+                EXPECT_EQ(G.arc(G.arc_at(TypeParam(v), int(k))),
+                          (typename V::arc_t{TypeParam(v),
+                                             TypeParam(f.rot[v][k])}));
     }
 }
 

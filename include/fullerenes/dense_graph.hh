@@ -184,11 +184,12 @@ struct RSRAdjacencyView {
 
     // --- Arc-index navigation: the rotation-system words ------------------
     // O(1) per call except find_arc (O(degree)).  source/slot project an
-    // arc's components and arc_at rebuilds it; target reads an arc's
-    // head; next/prev are sigma/sigma^-1, reverse_arc is alpha, and
-    // next_on_face walks the face orbit -- the vocabulary rotation-system
-    // algorithms compose from; the laws each word carries are on its
-    // declaration, pinned by tests/arc-nav-test.cc.
+    // arc's components and arc_at rebuilds it; target reads an arc's head
+    // and arc(a) is its {source, target} value; next/prev are
+    // sigma/sigma^-1, reverse_arc is alpha, and next_on_face walks the
+    // face orbit -- the vocabulary rotation-system algorithms compose
+    // from; the laws each word carries are on its declaration, pinned by
+    // tests/arc-nav-test.cc.
 
     // THE live-arc predicate: what every "@pre live:" below cites and what
     // require_live_arc enforces.  Total: no read outside the arrays.
@@ -240,6 +241,18 @@ struct RSRAdjacencyView {
     K target(arcix_t a) const {
         return neighbours[arcid(a)];
     }
+
+    // The arc VALUE an index names: the {source, target} vertex pair.
+    // For code that keeps the pair as a datum (a key, a record, a trace
+    // line) -- NOT for row iteration, which reads target(a) directly.
+    // @anchor rsr-arc-value
+    // @pre  live: is_live_arc(a)
+    // @post value: result == arc_t{source(a), target(a)}
+    arc_t arc(arcix_t a) const { return {source(a), target(a)}; }
+    // arc_t converts IMPLICITLY to arcix_t (std::pair's converting
+    // constructor), so without this guard arc(arc(a)) would compile and
+    // read a target vertex as a rotation slot.
+    arc_t arc(arc_t) const = delete;
 
     // sigma: the cyclic successor in the source's rotation.
     // @pre  live: is_live_arc(a)  (an empty row would divide by zero)
