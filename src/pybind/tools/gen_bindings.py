@@ -46,7 +46,14 @@ INCLUDES = [
 # load_defined_nullary_keys). Defaults to the in-tree build, but is overridable
 # via --so: an out-of-tree build tree (or a promoted location whose build dir is
 # not <root>/build) needs to point the gate at the actual freshly-built .so.
-DEFAULT_SO = os.path.join(FULL_ROOT, "build", "src", "c++", "libfullerenes.so")
+_SO_SUFFIX = ".dylib" if sys.platform == "darwin" else ".so"
+DEFAULT_SO = os.path.join(FULL_ROOT, "build", "src", "c++", "libfullerenes" + _SO_SUFFIX)
+# The nm selector for "the symbols an importing module can actually link against".
+# ELF has a separate dynamic symbol table (-D); Mach-O has none, and its external
+# symbols are exactly the global ones (-g). Apple's nm rejects -D outright, so this
+# is a portability requirement, not a preference. Both spellings demangle with -C
+# and produce the same 'ADDR TYPE demangled-symbol' lines the parser below reads.
+NM_SELECT = "-gC" if sys.platform == "darwin" else "-DC"
 
 # --- Return-type rule table -------------------------------------------------
 # Each entry maps a normalized C++ return type to (call_wrapper, py_stub_type).
@@ -155,7 +162,7 @@ def load_defined_nullary_keys(so_path: str) -> set[str]:
         sys.exit(f"gen_bindings: {so_path} not found -- build libfullerenes.so first "
                  f"(the dead-declaration gate reads its symbols). It must also be "
                  f"up to date with the headers, or the gate miskeys.")
-    r = subprocess.run(["nm", "-DC", "--defined-only", so_path],
+    r = subprocess.run(["nm", NM_SELECT, "--defined-only", so_path],
                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if r.returncode != 0:
         sys.exit(f"gen_bindings: nm failed on {so_path}: "

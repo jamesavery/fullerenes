@@ -69,7 +69,7 @@ int main(int ac, char **av)
 
   {
     P.move_to_origin();
-    P.align_with_axes();
+    P.align_with_axes(MassModel::Atoms);
 
     Polyhedron::to_file(P,"output/"+basename+"-if.mol2");
 

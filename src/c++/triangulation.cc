@@ -71,7 +71,6 @@ void Triangulation::compute_lookup_tables(const PlanarGraph&            cubic_gr
 
   //TODO: Convert asserts to throws with useful information
   assert(triangles.size() == Nc); // Make sure triangles array is initialized before calling
-  assert(is_consistently_oriented());	  // We don't bother with non-oriented surfaces
 
   if(Fmax<1) Fmax = max_degree(); // Calculate fmax
   
@@ -1634,7 +1633,7 @@ vector<node_t> TriangulationView::vertex_numbers(vector<vector<node_t>> &permuta
 // the resulting planar graph is oriented because the input is oriented und we only remove vertices
 PlanarGraph TriangulationView::inverse_leapfrog_dual() const
 {
-  assert(is_consistently_oriented());
+  require_oriented_surface(*this, "TriangulationView::inverse_leapfrog_dual");
   PlanarGraph PG(*this);
   set<int> face_vertices, to_do_set;
 

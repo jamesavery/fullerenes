@@ -4,11 +4,28 @@ include(CheckLanguage)
 include(CMakeDependentOption)
 project(Fullerenes)
 enable_language(CXX)
-enable_language(Fortran)
-set(CMAKE_GENERATOR "Unix Makefiles" CACHE INTERNAL "" FORCE)
+
+# Core-only mode: build just libfullerenes + libbuckygen (no Fortran,
+# playground, programs, benchmarks, tests, SYCL, pybind).  This is the mode a
+# parent project uses when consuming this repo as a git submodule via
+# add_subdirectory.  NOTE for parents: cmake_minimum_required(3.5) leaves
+# CMP0077 at OLD in this directory, so set the gate as a cache variable:
+#   set(FULLERENES_CORE_ONLY ON CACHE BOOL "" FORCE)
+option(FULLERENES_CORE_ONLY
+  "Build only libfullerenes + buckygen (skip Fortran, playground, programs, benchmarks, tests, SYCL, pybind)"
+  OFF)
+
+if(NOT FULLERENES_CORE_ONLY)
+  enable_language(Fortran)
+endif()
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+  # Only when this repo is the top-level project: never rewrite a parent
+  # project's generator cache from a submodule.
+  set(CMAKE_GENERATOR "Unix Makefiles" CACHE INTERNAL "" FORCE)
+endif()
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(FULLERENE_DATABASE_PATH ${CMAKE_SOURCE_DIR}/database/ CACHE PATH "Path to fullerene database root")
+set(FULLERENE_DATABASE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/database/ CACHE PATH "Path to fullerene database root")
 set(FORTRAN_NMAX 5000 CACHE STRING "Maximum vertex count for Fortran routines using statically allocated memory")
 
 find_package(GSL)
@@ -61,6 +78,11 @@ else()
 endif()
 
 option(ENABLE_SYCL "Build SYCL GPU code (requires AdaptiveCpp)" ${ENABLE_SYCL_DEFAULT})
+if(FULLERENES_CORE_ONLY)
+  # Core-only must not let an auto-detected acpp flip the library ABI via
+  # add_compile_definitions(FULLERENES_ENABLE_SYCL=1) below.
+  set(ENABLE_SYCL OFF)
+endif()
 
 if(SYCL_COMPILER)
   message(STATUS "Found AdaptiveCpp compiler: ${SYCL_COMPILER}")
@@ -165,10 +187,11 @@ if(ENABLE_SYCL)
 endif()
 
 
-# Get the current working branch
+# Get the current working branch (CURRENT_SOURCE_DIR: report this repo's SHA
+# even when consumed as a submodule)
 execute_process(
   COMMAND git rev-parse --abbrev-ref HEAD
-  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   OUTPUT_VARIABLE GIT_BRANCH
   OUTPUT_STRIP_TRAILING_WHITESPACE
 )
@@ -176,21 +199,23 @@ execute_process(
 # Get the latest abbreviated commit hash of the working branch
 execute_process(
   COMMAND git log -1 --format=%h
-  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   OUTPUT_VARIABLE GIT_COMMIT_HASH
   OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 
 # C++ configure file
 include_directories(AFTER SYSTEM include)
-include_directories(${CMAKE_BINARY_DIR}/include/)
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/include/)
 
 # Fortran compiler flags
-if(DEFINED ENV{CRAYPE_VERSION})
-  message("Cray compiler environment detected")
-  set(CMAKE_Fortran_FLAGS "-fPIC -O3")
-else()
- set(CMAKE_Fortran_FLAGS "-fPIC -cpp -O3 -m64 -mcmodel=small")
+if(NOT FULLERENES_CORE_ONLY)
+  if(DEFINED ENV{CRAYPE_VERSION})
+    message("Cray compiler environment detected")
+    set(CMAKE_Fortran_FLAGS "-fPIC -O3")
+  else()
+    set(CMAKE_Fortran_FLAGS "-fPIC -cpp -O3 -m64 -mcmodel=small")
+  endif()
 endif()
 
 # C++ compiler flags
@@ -210,20 +235,27 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 configure_file(
-  ${CMAKE_SOURCE_DIR}/include/fullerenes/config.hh.in
-  ${CMAKE_BINARY_DIR}/include/fullerenes/config.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/fullerenes/config.hh.in
+  ${CMAKE_CURRENT_BINARY_DIR}/include/fullerenes/config.hh
   )
 
-# Fortran configure file
-configure_file(
-  ${CMAKE_SOURCE_DIR}/include/fullerenes/config.f.in
-  ${CMAKE_SOURCE_DIR}/src/fortran/config.f
-)
+if(NOT FULLERENES_CORE_ONLY)
+  # Fortran configure file.  NOTE: writes into the SOURCE tree -- gated so a
+  # pristine submodule checkout stays clean in core-only mode.
+  configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/fullerenes/config.f.in
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/fortran/config.f
+  )
+endif()
 
 
-add_subdirectory(src/fortran)
+if(NOT FULLERENES_CORE_ONLY)
+  add_subdirectory(src/fortran)
+endif()
 add_subdirectory(src/contrib)
-add_subdirectory(playground)
+if(NOT FULLERENES_CORE_ONLY)
+  add_subdirectory(playground)
+endif()
 add_subdirectory(src/c++)
 
 set(SYCL_FULLERENE_LIBS 
@@ -270,13 +302,15 @@ message("FLAGS: " ${FLAGS})
 #get_target_property(TESTVAR sycl_fullerene_lib LINK_FLAGS)
 #message("sycl_fullerene_lib LINK_FLAGS: " ${TESTVAR})
 
-add_subdirectory(programs)
-add_subdirectory(benchmarks)
-add_subdirectory(tests)
+if(NOT FULLERENES_CORE_ONLY)
+  add_subdirectory(programs)
+  add_subdirectory(benchmarks)
+  add_subdirectory(tests)
+endif()
 
 # Python bindings last: src/pybind links the `fullerenes` target (defined in
 # add_subdirectory(src/c++) above) and registers its own ctests.
-if(ENABLE_PYTHON)
+if(ENABLE_PYTHON AND NOT FULLERENES_CORE_ONLY)
   add_subdirectory(src/pybind)
 endif()
 

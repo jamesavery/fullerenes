@@ -102,6 +102,16 @@ public:
   int norm2() const { return first*first + first*second + second*second; }
   double norm() const { return sqrt(norm2()); }
 
+  // The l1 norm |a| + |b|: the displacement bound of the raster walk
+  // (the s of walk_max_steps' contract) and the size variable of the
+  // paint scratch-capacity formulas.  Widen-then-negate (INT_MIN-safe),
+  // spelled without std::labs so the body is device-legal.
+  long l1_norm() const {
+    const long a = first  < 0 ? -(long)first  : first;
+    const long b = second < 0 ? -(long)second : second;
+    return a + b;
+  }
+
   Eisenstein abs() const { return Eisenstein(::abs(first),::abs(second)); }
 
   Eisenstein div(const Eisenstein& y) const {
@@ -225,15 +235,68 @@ inline Eisenstein first_cw(Eisenstein v) {
   return best;
 }
 
+inline long long isqrt_exact(long long n);   // defined below (numeric section)
+
+// The norm-form scan's per-b leg: the a >= 0 with a^2 + a*b + b^2 == N, if
+// any.  THE solver every norm-representative entry point runs.  Header-
+// inline and allocation-free (run-path callers include the exact-metric fan
+// development).
+inline std::optional<int> a_of_norm_leg(int N, int b) {
+  const long long s = isqrt_exact(4LL * N - 3LL * b * b);
+  if (s < 0) return std::nullopt;
+  const long long two_a = s - b;
+  if (two_a < 0 || two_a % 2) return std::nullopt;
+  return (int)(two_a / 2);
+}
+
+// Allocation-free range over the sector-0 representatives (a >= 0, b >= 0)
+// of norm N, in b-order.  THE one spelling of the norm-form scan; empty for
+// N < 0 (not a norm).  Distinct unit-orbit representatives of the same norm
+// are NOT lattice-equivalent (split primes), so orbit-sensitive callers --
+// e.g. the exact fan development's anchor search -- iterate all of them.
+class Sector0Reps {
+  int N;
+public:
+  explicit Sector0Reps(int N_) : N(N_) {}
+  struct sentinel {};
+  struct iterator {
+    int N, b;
+    Eisenstein rep;
+    bool live;
+    explicit iterator(int N_) : N(N_), b(0), live(false) { seek(); }
+    void seek() {
+      for (live = false; 3LL * b * b <= 4LL * N; b++)
+        if (auto a = a_of_norm_leg(N, b)) { rep = {*a, b}; live = true; return; }
+    }
+    Eisenstein operator*() const { return rep; }
+    iterator& operator++() { b++; seek(); return *this; }
+    bool operator!=(sentinel) const { return live; }
+  };
+  iterator begin() const { return iterator(N); }
+  sentinel  end()   const { return {}; }
+};
+
+// First sector-0 representative of norm N, or nullopt when N is not an
+// Eisenstein norm.
+inline std::optional<Eisenstein> first_rep_of_norm(int N) {
+  for (Eisenstein z : Sector0Reps(N)) return z;
+  return std::nullopt;
+}
+
 // Some Eisenstein integer (a, b) with a >= 0, b >= 0 and
 // a^2 + a*b + b^2 == N.  Returns the first sector-0 representative
-// found by scanning b = 0, 1, ...; throws std::logic_error if no
-// solution exists.  Precondition: N >= 0 is a valid Eisenstein norm.
+// found by scanning b = 0, 1, ... (= first_rep_of_norm); throws
+// std::logic_error if no solution exists.
 Eisenstein eisenstein_of_norm(int N);
 
 // Enumerate ALL sector-0 Eisenstein reps (a >= 0, b >= 0) of norm N.
-// Generic norms return 1 entry; split-prime norms return 2 entries in
-// distinct rotation orbits.
+// For N >= 1 the count equals the number of ideals of Z[w] of norm N,
+// +1 when N is a perfect square (the closed sector then holds both
+// boundary points (sqrt(N),0) and (0,sqrt(N)) of one orbit): 1 for a
+// NON-square norm with a single rotation orbit, 2 for a split prime
+// (or a square with one orbit, e.g. N = 4), and UNBOUNDED in general
+// -- N = 49 has 4: (7,0), (5,3), (3,5), (0,7).  No fixed per-norm
+// cap is sound.
 std::vector<Eisenstein> sector0_reps_of_norm(int N);
 
 
@@ -388,6 +451,36 @@ inline long long isqrt_exact(long long n) {
   return -1;
 }
 
+// |z|^2 = a^2 + a*b + b^2 in int64: the width contract for components that
+// exceed the int-product envelope of Eisenstein::norm2().
+inline long long norm2_ll(Eisenstein z) {
+  const long long a = z.first, b = z.second;
+  return a*a + a*b + b*b;
+}
+
+// The Heron product in SQUARED-length coordinates, exact over the integers:
+// for squared sides x = a^2, y = b^2, z = c^2,
+//   H(x,y,z) = 2(xy + yz + zx) - (x^2 + y^2 + z^2) = 16*Area^2,
+// equivalently 4xy - (x + y - z)^2.  Negative iff the triangle inequality
+// fails.
+inline long long heron_product_sq(long long x, long long y, long long z) {
+  return 2*(x*y + y*z + x*z) - (x*x + y*y + z*z);
+}
+
+// The lattice area number tau of a triangle with integer squared sides: on
+// Z[w] every triangle satisfies H = 16*Area^2 = 3*tau^2 with tau = |wedge|
+// of its edge vectors, an integer (the Heron-Eisenstein identity, paper
+// prop:heron-eisenstein).  Returns tau >= 0 when H = 3*(perfect square),
+// else -1.  NOTE this is the NECESSARY condition for a lattice triangle,
+// not sufficient (lattice_tau(5,5,5) = 5 although 5 is not a Loeschian
+// norm); sufficiency is decided downstream by place_third_eis_total's
+// divisibility test / an empty Sector0Reps.  tau == 0 iff degenerate.
+inline long long lattice_tau(long long x, long long y, long long z) {
+  const long long H = heron_product_sq(x, y, z);
+  if (H < 0 || H % 3) return -1;
+  return isqrt_exact(H / 3);
+}
+
 // True iff P lies strictly between the origin and C (collinear, 0 < s < 1 in
 // P = s*C).  Integer-exact.
 inline bool is_on_open_segment(Eisenstein P, Eisenstein C) {
@@ -488,18 +581,38 @@ struct DegenerateTriangle : std::logic_error {
 };
 
 // The Z[w] displacement factor m+n*w of the apex over base A->B:
-//   K = |AB|2+|AC|2-|BC|2  (law of cosines),  xi = 4*|AB|2*|AC|2 - K*K,
-//   t = sqrt(xi/3),  m = (K - chi*t)/2,  n = chi*t.
+//   K = |AB|2+|AC|2-|BC|2  (law of cosines),  tau = lattice_tau of the
+//   sides (16*Area^2 = 3*tau^2),  m = (K - chi*tau)/2,  n = chi*tau.
 // nullopt iff these squared sides admit no Loeschian triangle.
 //   @pre  chirality == +-1, abs2 > 0, acs2 >= 0, bcs2 >= 0.
 inline std::optional<Eisenstein>
 apex_factor(int abs2, int acs2, int bcs2, int chirality) {
-  const int K  = acs2 + abs2 - bcs2;                              // law of cosines
-  const int xi = 4*abs2*acs2 - K*K;                               // 3*(2*area)^2
-  const int t  = (xi >= 0 && xi % 3 == 0) ? (int)isqrt_exact(xi / 3) : -1;
-  const int n  = chirality * t;
-  if (t < 0 || (K - n) % 2) return std::nullopt;
-  return Eisenstein((K - n) / 2, n);                              // m + n*w
+  const long long K   = (long long)acs2 + abs2 - bcs2;   // law of cosines
+  const long long tau = lattice_tau(abs2, acs2, bcs2);   // 16*Area^2 = 3*tau^2
+  const long long n   = chirality * tau;
+  // The parity guard is provably dead for tau >= 0: mod 2 the Heron
+  // polynomial collapses to x+y+z, so tau = tau^2 = H = K (mod 2) and
+  // K - n is always even (paper sec:exactness).  Kept as belt-and-braces.
+  if (tau < 0 || (K - n) % 2) return std::nullopt;
+  return Eisenstein((int)((K - n) / 2), (int)n);          // m + n*w
+}
+
+// Total (non-throwing) apex placement: as place_third_eis below, with ALL
+// failure modes -- degenerate base (abs2 <= 0), no Z[w] triangle for these
+// sides, or apex off-lattice for this chirality -- collapsed into nullopt.
+// The run-path form for no-throw callers (the DCEL exact-metric machinery
+// converts nullopt to a Status trip); place_third_eis keeps the loud
+// degenerate / soft off-lattice distinction for callers that prune on
+// chirality.  TOTAL means total: a zero base must yield nullopt here, not
+// reach the divisions below.
+inline std::optional<Eisenstein>
+place_third_eis_total(Eisenstein A, Eisenstein B, int abs2, int acs2, int bcs2, int chirality) {
+  if (abs2 <= 0) return std::nullopt;                             // degenerate base
+  const auto m_nw = apex_factor(abs2, acs2, bcs2, chirality);     // m + n*w, or empty
+  if (!m_nw) return std::nullopt;                                 // no Z[w] triangle
+  const Eisenstein num = (*m_nw) * (B - A);                       // (m+n*w)*(B-A)
+  if (num.first % abs2 || num.second % abs2) return std::nullopt; // off-lattice for this chi
+  return A + num / abs2;                                          // C = A + .../|AB|2
 }
 
 // Apex C of the triangle on base A->B, exact in Z[w]:
@@ -510,11 +623,9 @@ apex_factor(int abs2, int acs2, int bcs2, int chirality) {
 //         abs2 == (B - A).norm2().
 inline std::optional<Eisenstein>
 place_third_eis(Eisenstein A, Eisenstein B, int abs2, int acs2, int bcs2, int chirality) {
-  const auto m_nw = apex_factor(abs2, acs2, bcs2, chirality);     // m + n*w, or empty
-  if (!m_nw) throw DegenerateTriangle(A, B, abs2, acs2, bcs2, chirality);
-  const Eisenstein num = (*m_nw) * (B - A);                       // (m+n*w)*(B-A)
-  if (num.first % abs2 || num.second % abs2) return std::nullopt; // off-lattice for this chi
-  return A + num / abs2;                                          // C = A + .../|AB|2
+  if (!apex_factor(abs2, acs2, bcs2, chirality))
+    throw DegenerateTriangle(A, B, abs2, acs2, bcs2, chirality);
+  return place_third_eis_total(A, B, abs2, acs2, bcs2, chirality);
 }
 
 

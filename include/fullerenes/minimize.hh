@@ -28,6 +28,13 @@
 // max_iters is a safeguard against runaway loops, not a tuning knob:
 // it should never be reached, and Outcome.converged == false reports
 // the trip so callers can treat it as the defect it is.
+//
+// NOTE (2026-07-30): the algorithm graduated into the unified optimizer
+// framework -- optim::LineSearch<optim::LBFGS> (fullerenes/optimize.hh)
+// is the transcription-verified, bit-identical form, and wu::optimize
+// now runs on it.  New code should use the framework; this header stays
+// for direct callers (3Dtexture's capsid_eval) until they migrate, at
+// which point it retires.
 // =====================================================================
 
 #include <algorithm>

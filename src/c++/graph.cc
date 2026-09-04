@@ -1,4 +1,5 @@
 #include "fullerenes/graph.hh"
+#include <stdexcept>
 
 char LIST_OPEN='[';
 char LIST_CLOSE=']';
@@ -110,75 +111,160 @@ void Graph::apply_permutation(const Permutation& pi)
   repoint();
 }
 
-int  GraphView::arc_ix(node_t u, node_t v) const
-{
-  return find(u, v);
-}
+// arc_ix / next / prev / next_on_face / prev_on_face are inline in
+// graphview.hh so device code can call them.
 
-// Successor to v in oriented neigbhours of u
-node_t GraphView::next(node_t u, node_t v) const
-{
-  const auto &nu((*this)[u]);
-  int j = arc_ix(u,v);
-  if(j>=0) return nu[(j+1)%nu.size()];
-  else return -1;
-}
+// ---------------------------------------------------------------------------
+// Orientation: which surface the rotation system embeds the graph in.  The
+// mathematics and the contracts are at the declarations in graphview.hh.
+// ---------------------------------------------------------------------------
 
-// Predecessor to v in oriented neigbhours of u
-node_t GraphView::prev(node_t u, node_t v) const
+// The faces of that embedding -- the orbits of phi(u->v) = v -> next(v,u) --
+// handed to `visit` one at a time, as the vertex each orbit was entered at.
+//
+// Each orbit is traversed exactly ONCE, following phi until the walk returns to
+// its STARTING ARC.  Stopping at the starting VERTEX instead (as this walk's
+// predecessor did) cuts an orbit into one segment per visit to that vertex --
+// and a face through a cut vertex legitimately visits it more than once -- so a
+// counter over such walks counts one face several times.
+//
+// Per-arc state is a flat vector<uint8_t> indexed by the dense arc id (arcid):
+// no per-arc tree node, no O(log E) insert/find/erase.  It is also the
+// termination guard: under a permutation an orbit is a simple cycle, so
+// stepping onto an already-visited arc other than the start proves phi is not
+// one -- which is what parallel arcs and self-loops do to it, since find(v,u)
+// resolves every arc between the same pair to the SAME slot.  Without that test
+// such a walk enters a cycle not containing a0 and never returns.
+//
+// @pre  symmetric: G.adjacency_is_symmetric()   (else phi is not total)
+// @pre  simple:    no parallel arcs, no self-loops  (else phi is not injective)
+// @throws std::logic_error when either @pre is violated
+// @time O(E_dmax)
+template<typename Visit>
+static void for_each_face(const GraphView& G, Visit visit)
 {
-  const auto &nu((*this)[u]);
-  int j = arc_ix(u,v);
-  if(j>=0) return nu[(j-1+nu.size())%nu.size()];
-  return -1;            // u-v is not an edge in a triangulation
-}
+  vector<uint8_t> visited(size_t(G.N)*G.dmax, 0);
 
-// Successor to v in face containing directed edge u->v
-node_t GraphView::next_on_face(node_t u, node_t v) const
-{
-  return prev(v,u);
-}
+  for(node_t u0=0;u0<G.N;u0++)
+    for(int i0=0;i0<G.deg[u0];i0++){
+      const size_t a0 = G.arcid(u0,i0);
+      if(visited[a0]) continue;
 
-// Predecessor to v in face containing directed edge u->v
-node_t GraphView::prev_on_face(node_t u, node_t v) const
-{
-  return next(v,u);
-}
-
-bool GraphView::is_consistently_oriented() const
-{
-  // Every directed arc must lie in exactly one face cycle: walk each CW face,
-  // marking its arcs consumed; a re-visited arc means it bounds two faces. Per-arc
-  // state is a flat vector<uint8_t> indexed by the dense arc id (arcid) -- no per-arc
-  // tree node, no O(log E) insert/find/erase.
-  vector<uint8_t> pending(size_t(N)*dmax, 0);
-  for(node_t u=0;u<N;u++)
-    for(int i=0;i<deg[u];i++)
-      pending[arcid(u,i)] = 1;
-
-  for(node_t u0=0;u0<N;u0++)
-    for(int i0=0;i0<deg[u0];i0++){
-      const size_t s0 = arcid(u0,i0);
-      if(!pending[s0]) continue;
-      pending[s0] = 0;
-      node_t u = u0, v = neighbours[s0];
-      while(v != u0){                            // CW face u0 -> v -> ... -> u0
-        const int j = find(v,u);                 // position of u in v's row == next(v,u)
-        if(j < 0) return false;                  // reverse arc v->u missing: not oriented
-        const size_t s = arcid(v, (j+1)%deg[v]); // arc v->w
-        if(!pending[s]) return false;            // arc already part of another face
-        pending[s] = 0;
-        u = v; v = neighbours[s];
-      }
+      visit(u0);
+      size_t a = a0;
+      do {
+        visited[a] = 1;
+        const node_t u = G.arc_of(a).first, v = G.neighbours[a];
+        const int j = G.find(v,u);                   // v's slot holding u
+        if(j < 0)
+          throw std::logic_error("for_each_face: adjacency is not symmetric");
+        a = G.arcid(v, (j+1)%G.deg[v]);              // phi(u->v) = v -> next(v,u)
+        if(a != a0 && visited[a])
+          throw std::logic_error("for_each_face: the arc successor is not a permutation "
+                                 "-- the graph has parallel arcs or self-loops and this "
+                                 "predicate is only valid for simple graphs");
+      } while(a != a0);
     }
-  // Every directed edge is part of exactly one face <-> orientation is consistent
-  return true;
+}
+
+// Euler's verdict on one connected component, once its faces are counted:
+// chi = N - E + F = 2 - 2g, so the realised genus is (E - N + 2 - F)/2 -- an
+// integer, because every rotation system embeds in an orientable surface.
+static OrientedSurface euler_verdict(int N, int E, int F, int genus)
+{
+  const int g = (E - N + 2 - F)/2;
+  return {g == genus ? OrientedSurface::Code::Ok : OrientedSurface::Code::GenusMismatch, F, g};
+}
+
+OrientedSurface GraphView::oriented_surface(int genus) const
+{
+  const int E = int(count_edges());
+  if(N == 0 || E == 0)          return {};                                       // Degenerate
+  if(!adjacency_is_symmetric()) return {OrientedSurface::Code::AsymmetricAdjacency};
+
+  int F = 0;
+  for_each_face(*this, [&](node_t){ F++; });
+  return euler_verdict(N, E, F, genus);
+}
+
+bool GraphView::is_consistently_oriented(int genus) const
+{
+  return oriented_surface(genus).code == OrientedSurface::Code::Ok;
+}
+
+vector<OrientedSurface> GraphView::component_surfaces(const vector<int>& genus) const
+{
+  const vector<vector<node_t>> components = connected_components();
+  const int C = int(components.size());
+  vector<OrientedSurface> surfaces(C);                       // Degenerate until measured
+
+  if(!adjacency_is_symmetric()){
+    // A missing reverse arc breaks the ARC SET, not one component's topology:
+    // phi is then not a permutation, so no component has faces to compare
+    // against a claim and none gets a topological verdict.
+    for(OrientedSurface& s: surfaces) s.code = OrientedSurface::Code::AsymmetricAdjacency;
+    return surfaces;
+  }
+
+  vector<int> component_of(N,-1);
+  for(int c=0;c<C;c++) for(node_t u: components[c]) component_of[u] = c;
+
+  // E_i off the partition (N_i is the partition), and -- because a phi-orbit
+  // never leaves its component -- every face off ONE arc walk, attributed
+  // through the vertex it was entered at.  No subgraph is built.
+  vector<int> twoEc(C,0), Fc(C,0);
+  for(node_t u=0;u<N;u++) twoEc[component_of[u]] += deg[u];
+  for_each_face(*this, [&](node_t u){ Fc[component_of[u]]++; });
+
+  // Independent per component -- the tallies above are read-only from here --
+  // so this is a par::for_each / omp parallel for the day one is worth its
+  // overhead.  (par:: lives in claude-projects/parallel-primitives, which the
+  // library must not depend on; plain OpenMP is the in-library form.)
+  for(int c=0;c<C;c++){
+    const int N_c = int(components[c].size()), E_c = twoEc[c]/2;
+    surfaces[c] = E_c == 0 ? OrientedSurface{}
+                           : euler_verdict(N_c, E_c, Fc[c],
+                                           c < int(genus.size()) ? genus[c] : 0);
+  }
+  return surfaces;
+}
+
+// What the caller was handed instead of the surface it asked for.  One sentence
+// per OrientedSurface code, written once because every operation that refuses an
+// unoriented graph refuses it for one of these three reasons -- and written with
+// NUMBERS, because "not oriented" tells whoever reads the failure nothing they
+// can act on.
+static string surface_complaint(const OrientedSurface& S, int genus)
+{
+  switch(S.code){
+  case OrientedSurface::Code::Degenerate:
+    return "there is nothing to embed (no vertices, or no edges)";
+  case OrientedSurface::Code::AsymmetricAdjacency:
+    return "adjacency is not symmetric -- some arc u->v has no reverse v->u, so it "
+           "has no faces at all";
+  default:
+    return "its rotation system has " + to_string(S.faces) + " faces, hence genus "
+         + to_string(S.genus) + ", not " + to_string(genus);
+  }
+}
+
+void require_oriented_surface(const GraphView& G, const char* operation, int genus)
+{
+  const OrientedSurface S = G.oriented_surface(genus);
+  if(S.code == OrientedSurface::Code::Ok) return;
+
+  throw unoriented_surface_error(string(operation) + ": needs a consistently oriented genus-"
+                                 + to_string(genus) + " surface, but on these "
+                                 + to_string(G.N) + " vertices and "
+                                 + to_string(G.count_edges()) + " edges "
+                                 + surface_complaint(S, genus),
+                                 S, genus);
 }
 
 // TODO: Doesn't need to be planar and oriented, but is easier to write if it is. Make it work in general.
 bool GraphView::has_separating_triangles() const
 {
-  assert(is_consistently_oriented());
+  require_oriented_surface(*this, "GraphView::has_separating_triangles");
 
   for(node_t u=0;u<N;u++){
     auto nu = (*this)[u];

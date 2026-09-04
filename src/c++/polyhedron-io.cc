@@ -347,13 +347,14 @@ string Polyhedron::to_povray(double w_cm, double h_cm,
   s << "#declare facelength=array["<<fs.size()<<"]{";for(int i=0;i<int(fs.size());i++) s<< fs[i].size() << (i+1<int(fs.size())?",":"}\n\n");
 
 
-  vector<tri_t>   tris(centroid_triangulation(fs));
+  // The same surface every integral on this class runs over, from the primitive
+  // rather than from a second hand-rolled copy of it (which is what stood here
+  // until 2026-08-09, and which had drifted to no purpose).
+  const CentroidSurface  S(centroid_surface());
+  const vector<tri_t>&   tris = S.tris;
+  const vector<coord3d>& centroid_points = S.points;
   vector<int>     triface;
-  vector<coord3d> centroid_points(points.begin(),points.end());
   vector<coord3d> trinormals(tris.size()), facenormals(fs.size()), vertexnormals(points.size()+fs.size());
-
-  for(int i=0;i<int(fs.size());i++)
-    centroid_points.push_back(fs[i].centroid(points));
 
   for(int i=0;i<tris.size();i++){
     coord3d n(Tri3D(centroid_points[tris[i][0]],centroid_points[tris[i][1]],centroid_points[tris[i][2]]).n);
@@ -433,8 +434,18 @@ Polyhedron Polyhedron::from_xyz(FILE *file)
   return Polyhedron(points);
 }
 
-// Read in .mol2 files. 
+// Read in .mol2 files.
 // NB: Doesn't support full format. Can only read .mol2 files that we've written ourselves!
+//
+// ORIENTATION BOUNDARY 1 of 4 (see layout2d.hh).  A .mol2 BOND record is an
+// unordered pair of atom ids: the format has no rotation system to lose, so the
+// one this returns has to be established here or nowhere, and this is a
+// sanctioned caller of layout2d::orient_neighbours.  Its result is CHECKED --
+// the file may not describe a closed genus-0 surface at all.
+//
+// @throws mesh_io_error(InvalidTopology) when the bond list is not a planar
+//         graph, wrapping the unoriented_surface_error that says which surface
+//         it turned out to be
 Polyhedron Polyhedron::from_mol2(FILE *file)
 {
   string 
@@ -503,8 +514,16 @@ Polyhedron Polyhedron::from_mol2(FILE *file)
   P.owned_points = std::move(points);
   P.repoint();
   {
+    // The boundary act: bonds in, rotation system out, then the verdict.  A
+    // Tutte layout is crossing-free only for a planar 3-connected graph, so on
+    // anything else the CCW sort writes rows of the wrong genus -- exactly what
+    // oriented_surface() now sees, and what the assert here used to miss.
     vector<coord2d> layout = P.tutte_layout();
     layout2d::orient_neighbours(P, layout);
+    try { require_oriented_surface(P, "Polyhedron::from_mol2"); }
+    catch (const unoriented_surface_error &e) {
+      throw mesh_io_error(mesh_io_error::Code::InvalidTopology, e.what());
+    }
   }
   // faces are now computed on demand via P.faces()
   //  cout << "faces = " << P.faces << "\n";

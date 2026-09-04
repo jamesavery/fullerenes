@@ -3,9 +3,22 @@
 #include "fullerenes/polyhedron.hh"
 #include "fullerenes/layout2d.hh"
 
-// Helper: build an oriented PlanarGraph from an adjacency matrix.
-// Adjacency matrices have no orientation info, so we use planar_orient
-// to compute a correct planar embedding.
+// ORIENTATION BOUNDARY 2 of 4 (see layout2d.hh).  An adjacency MATRIX is a
+// symmetric bit table: it fixes the edge set and nothing else, so the rows built
+// from it below are in ascending index order -- an ordering with no geometric
+// meaning, which for anything bigger than a triangle is a rotation system of the
+// wrong genus.  There is no orientation here to preserve, only one to establish,
+// and this is a sanctioned caller of layout2d::planar_orient.
+//
+// The result is CHECKED, twice over: planar_orient's own verdict, and then the
+// graph's, because planar_orient returning false leaves the rows REWRITTEN and
+// still not an embedding -- a silently mis-oriented graph handed back to Fortran
+// is the failure this whole boundary exists to prevent.
+//
+// @throws unoriented_surface_error when the adjacency matrix is not a planar
+//         graph.  The extern "C" entry points below catch it: an exception must
+//         not unwind across the Fortran ABI (same contract as
+//         read_polyhedron_/read_fullerene_graph_hog_ -- NULL means failure).
 static PlanarGraph oriented_graph_from_adjacency(int Nmax, int N, const int *adjacency) {
   Graph nb(N, GRAPH_DMAX);
   for(int i=0;i<N;i++)
@@ -16,6 +29,7 @@ static PlanarGraph oriented_graph_from_adjacency(int Nmax, int N, const int *adj
       }
   Graph G(nb);
   layout2d::planar_orient(G);
+  require_oriented_surface(G, "oriented_graph_from_adjacency");
   return PlanarGraph(G);
 }
 
@@ -120,14 +134,18 @@ void adjacency_matrix_(const graph_ptr *g, const int *outer_dim, int *adjacency)
   }
 }
 
+// Both entry points stop the boundary's exception at the C linkage edge and
+// report failure the way the rest of this file already does: NULL.
 graph_ptr new_graph_(const int *nmax, const int *n, const int *adjacency){
-  return new PlanarGraph(oriented_graph_from_adjacency(*nmax, *n, adjacency));
+  try { return new PlanarGraph(oriented_graph_from_adjacency(*nmax, *n, adjacency)); }
+  catch (const std::exception &e) { fprintf(stderr,"new_graph_: %s\n", e.what()); return nullptr; }
 }
 
 void delete_graph_(graph_ptr *g){  delete (*g); }
 
 fullerene_graph_ptr new_fullerene_graph_(const int *nmax, const int *n, const int *adjacency){
-  return new FullereneGraph(oriented_graph_from_adjacency(*nmax, *n, adjacency));
+  try { return new FullereneGraph(oriented_graph_from_adjacency(*nmax, *n, adjacency)); }
+  catch (const std::exception &e) { fprintf(stderr,"new_fullerene_graph_: %s\n", e.what()); return nullptr; }
 }
 
 string fortran_string(const char *s, int max)
@@ -323,6 +341,32 @@ void get_layout2d_(const graph_ptr *g, double *points)
   }
 }
 
+// ORIENTATION BOUNDARY 4 of 4 (see layout2d.hh), and the only one whose input
+// may ALREADY be oriented -- which is why it is the only one that can be asked
+// to make things worse, and the only one that rolls back.
+//
+// What it is: Fortran computes a drawing of G (Tutte, or -- in schlegel.f -- a
+// spring/Kamada-Kawai/PPG embedding) and hands it back so the rows can be
+// re-sorted CCW in it.  Named a "layout setter", it in fact writes the ROTATION
+// SYSTEM, and layout2d::orient_neighbours is faithful to whatever drawing it is
+// given: a drawing with crossings yields a consistent orientation of a
+// higher-genus surface.  So the rows G arrived with are SAVED first and put back
+// unless the re-sorted ones are still a genus-0 embedding; on a rollback the
+// caller is told on stderr.  That is safe under both
+// readings of this function (re-import, or latent bug): the good case is
+// unchanged, and the bad case can no longer corrupt a graph that Fortran goes on
+// to use -- opt.f:410-427 feeds this graph straight into new_polyhedron() and
+// get_dihedrals(), whose contract is CCW-on-the-outside neighbour lists.
+//
+// Two further defects, DOCUMENTED not fixed (they are Fortran-side and out of
+// this refactor's scope; see the refactor-debt entry):
+//   - ABI MISMATCH.  All three Fortran callers pass THREE arguments
+//     (opt.f:414, util.f:547, schlegel.f:745 pass `layout_is_spherical`); this
+//     declaration takes two, so the flag is silently dropped and the "spherical
+//     layout" case was never handled at all.
+//   - The re-import is redundant everywhere it is currently called: all three
+//     callers build the graph with new_fullerene_graph(), i.e. through boundary
+//     2, which has already established an orientation.
 void set_layout2d_(graph_ptr *g, const double *layout_data)
 {
   PlanarGraph& G(*(*g));
@@ -330,7 +374,18 @@ void set_layout2d_(graph_ptr *g, const double *layout_data)
   for(node_t u=0;u<G.N;u++){
     layout[u] = coord2d(layout_data[u*2],layout_data[u*2+1]);
   }
+
+  vector<vector<node_t>> incoming(G.N);            // the rows G arrived with
+  for(node_t u=0;u<G.N;u++) incoming[u].assign(G[u].begin(), G[u].end());
+
   layout2d::orient_neighbours(G, layout);
+  const OrientedSurface S = G.oriented_surface();
+  if(S.code == OrientedSurface::Code::Ok) return;
+
+  for(node_t u=0;u<G.N;u++) std::copy(incoming[u].begin(), incoming[u].end(), G[u].begin());
+  fprintf(stderr,"set_layout2d_: the supplied drawing of these %d vertices is not "
+                 "crossing-free (re-sorting by it gives %d faces, hence genus %d, not 0); "
+                 "keeping the graph's own orientation.\n", G.N, S.faces, S.genus);
 }
 
 

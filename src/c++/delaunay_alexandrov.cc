@@ -259,6 +259,12 @@ double J_edge(const DelaunayTriangulation& T, const vector<double>& r, int h) {
 // Off-diagonal: J(i,j) = Σ_{edges i→j} J_e(h)
 // Diagonal:     J(i,i) = −Σ_{e: a(e)=i} cos(φ_e) · J_e(h)
 // (per-oriented-edge formula, correct for multi-edges)
+// @post symmetric BITWISE: each undirected edge's J_e is computed once
+//       and the same double is added to J(i,j) and J(j,i), so Jᵀ = J
+//       exactly in floating point (not merely in exact arithmetic).
+//       TrustRegion::solve's Gauss-Newton form J² = JᵀJ relies on this;
+//       if the construction ever changes to independent per-entry
+//       evaluations, restore an explicit transpose there.
 matrix<double> jacobian(const DelaunayTriangulation& T, const vector<double>& r) {
   int n = T.nv;
   matrix<double> J(n, n, 0.0);
@@ -430,28 +436,52 @@ static AlexandrovSolver::TrajEntry make_traj(
 
 namespace TrustRegion {
 
-// Solve the LM subproblem: find δ such that (J+λI)δ = −κ and ||δ|| ≤ Δ.
-// Bisects on λ ≥ 0.
+// Solve the trust-region subproblem for E = ½||κ||²: try the pure
+// Newton root step δ = −J⁻¹κ first (λ=0); outside the radius (or with
+// singular J), fall back to Gauss-Newton Levenberg-Marquardt on the
+// NORMAL equations, (JᵀJ + λI)δ = −Jᵀκ, bisecting on λ ≥ 0 for
+// ||δ|| ≈ Δ.
+//
+// The normal-equations form is essential, not cosmetic: J is the
+// Lorentzian Hessian of the B-I functional (one positive eigenvalue,
+// the rest negative), so the former shifted-J system (J+λI)δ = −κ was
+// singular at every λ in the negative spectrum, and its large-λ limit
+// −κ/λ has directional derivative −κᵀJκ > 0 for that signature — a
+// systematic ASCENT direction for E that made every damped recovery
+// step reject (the C134 hard stall: trust radius collapsing 13 orders
+// with κ frozen).  JᵀJ + λI is SPD for every λ > 0 — no poles,
+// ||δ(λ)|| monotone (well-posed bisection) — and its large-λ limit
+// −Jᵀκ/λ = −∇E/λ is steepest descent on E, so damped steps always
+// make progress and reject cascades terminate.
 V solve(const matrix<double>& J, const V& kappa, double Delta) {
-  // Try pure Newton (λ=0)
+  // Try pure Newton (λ=0) — identical to the pre-GN behaviour.
   auto delta = LinAlg::solve(J, -kappa);
-  if (LinAlg::is_valid(delta) && LinAlg::norm(delta) <= Delta)
+  if (LinAlg::is_usable_step(delta) && LinAlg::norm(delta) <= Delta)
     return delta;
 
-  // Bisect on λ to find (J+λI)⁻¹(-κ) with ||δ|| ≈ Δ
-  double lo = 0, hi = LinAlg::max_abs(kappa) / Delta + 1.0;
+  // J is symmetric bitwise (see jacobian() @post), so Jᵀ = J exactly
+  // and the Gauss-Newton objects need no transpose:
+  // JᵀJ = J² (SPD), via THE view-level product (dense_linalg_view.hh's
+  // matmul -- the one bit-pinned i-j-k body, shared with the batch port;
+  // matrix.hh's generic operator* is no longer on any solver path).
+  const matrix<double> JtJ = J * J;   // JtJ = J^2 (SPD); operator* delegates
+                                      // to LinAlg::matmul (@ref matmul-ijk-order)
+  const V minus_Jtk = -LinAlg::matvec(J, kappa);         // −Jᵀκ = −∇E
+
+  // Bisect on λ to find (JᵀJ+λI)⁻¹(−Jᵀκ) with ||δ|| ≈ Δ
+  double lo = 0, hi = LinAlg::max_abs(minus_Jtk) / Delta + 1.0;
   for (int probe = 0; probe < 10; probe++) {
-    delta = LinAlg::solve_shifted(J, -kappa, hi);
-    if (LinAlg::is_valid(delta) && LinAlg::norm(delta) <= Delta) break;
+    delta = LinAlg::solve_shifted(JtJ, minus_Jtk, hi);
+    if (LinAlg::is_usable_step(delta) && LinAlg::norm(delta) <= Delta) break;
     hi *= 4;
   }
   for (int bis = 0; bis < 20; bis++) {
     double mid = 0.5 * (lo + hi);
-    delta = LinAlg::solve_shifted(J, -kappa, mid);
-    if (!LinAlg::is_valid(delta) || LinAlg::norm(delta) > Delta) lo = mid;
+    delta = LinAlg::solve_shifted(JtJ, minus_Jtk, mid);
+    if (!LinAlg::is_usable_step(delta) || LinAlg::norm(delta) > Delta) lo = mid;
     else hi = mid;
   }
-  return LinAlg::solve_shifted(J, -kappa, hi);
+  return LinAlg::solve_shifted(JtJ, minus_Jtk, hi);
 }
 
 // Predicted reduction: E(κ) − E(κ + J·δ) where E = ½||·||².
@@ -565,7 +595,7 @@ int flip_to_weighted_delaunay(DelaunayTriangulation& T, const vector<double>& r)
 namespace Continuation {
 
 // Homotopy velocity dr/dt = J⁻¹κ₁ along κ(r)=t·κ₁ (the un-normalized tangent
-// direction). Returns an invalid vector (LinAlg::is_valid == false) if J is
+// direction). Returns an invalid vector (LinAlg::is_usable_step == false) if J is
 // singular.
 V dr_dt(const matrix<double>& J, const V& kappa1) {
   return LinAlg::solve(J, kappa1);
@@ -623,7 +653,7 @@ int newton_correct(const DelaunayTriangulation& T, V& r, const V& target,
     V F = GCP::kappa(T, r) - target;
     if (LinAlg::max_abs(F) < tol) return nit;
     auto dr = LinAlg::solve(GCP::jacobian(T, r), F);
-    if (!LinAlg::is_valid(dr)) return -1;
+    if (!LinAlg::is_usable_step(dr)) return -1;
     r = r - dr;
   }
   return max_iter;
@@ -654,7 +684,7 @@ StepResult natural_step(const DelaunayTriangulation& T,
                         const matrix<double>& J, double dt) {
   double t1 = t0 - dt;
   auto v = dr_dt(J, kappa1);
-  if (!LinAlg::is_valid(v)) return {-1, t1, r0};
+  if (!LinAlg::is_usable_step(v)) return {-1, t1, r0};
   V r = r0 - v * dt;
   int nit = newton_correct(T, r, kappa1 * t1, CORRECTOR_TOL, CORRECTOR_MAX_ITER);
   return nit < 0 ? StepResult{-1, t1, r0} : StepResult{nit, t1, std::move(r)};
@@ -749,6 +779,21 @@ namespace Newton {
 // Minimize E = ½||κ||² using LM trust-region Newton.
 // Returns (converged, final_kappa).
 // If `out_trace` is non-null, records one TraceEntry per iteration.
+//
+// κ is only piecewise-smooth: crossing a flip boundary (θ_e = π)
+// changes the weighted-Delaunay cell, and κ/J evaluated on the stale
+// triangulation disagree with the true energy.  Two invariants keep
+// every evaluation inside its correct cell:
+//   - ENTRY: the endgame extrapolation moves r without flipping, so the
+//     iterate can arrive past a boundary (θ > π); restore
+//     weighted-Delaunay before the first κ/J evaluation.  (Without this
+//     the C134 stall: 21 straight rejects with Δ shrinking 13 orders,
+//     κ frozen, because flips only ran after ACCEPTED steps.)
+//   - TRIAL: evaluate each trial on its own flipped copy (T_trial,
+//     r_trial), so acceptance compares true energies across cells; on
+//     acceptance adopt the copy atomically, on rejection discard it.
+//     (Without this the C124 soft stall: all-reject collapse at a
+//     feasible point near a boundary.)
 pair<bool, double> polish(DelaunayTriangulation& T, V& r,
                            double tol = 1e-10, int max_iter = 50,
                            std::vector<AlexandrovSolver::TraceEntry>* out_trace = nullptr,
@@ -761,6 +806,8 @@ pair<bool, double> polish(DelaunayTriangulation& T, V& r,
   double Delta = 0.5 * r_avg, Delta_max = 2.0 * r_avg;
   int rejects = 0;
   int flips_local = flips_cum ? *flips_cum : 0;
+
+  flips_local += Topology::flip_to_weighted_delaunay(T, r);   // ENTRY invariant
 
   for (int iter = 0; iter < max_iter; iter++) {
     auto kappa = GCP::kappa(T, r);
@@ -782,7 +829,12 @@ pair<bool, double> polish(DelaunayTriangulation& T, V& r,
     auto   delta     = GCP::feasible_step(T, r, delta_raw, &clipped);
     double pred      = TrustRegion::predicted_reduction(J, kappa, delta);
     V      r_trial   = r + delta;
-    double E_trial   = energy(GCP::kappa(T, r_trial));
+    // TRIAL invariant: κ(r_trial) on r_trial's own weighted-Delaunay
+    // cell.  The copy snapshots any active point tracker; adopting it on
+    // acceptance keeps transport commit-or-nothing.
+    DelaunayTriangulation T_trial = T;
+    int    trial_flips = Topology::flip_to_weighted_delaunay(T_trial, r_trial);
+    double E_trial   = energy(GCP::kappa(T_trial, r_trial));
 
     auto [ok, D2] = TrustRegion::update(E - E_trial, pred, norm(delta), Delta, Delta_max);
     // If we clipped, cap Δ at the step we actually took so the next
@@ -792,7 +844,8 @@ pair<bool, double> polish(DelaunayTriangulation& T, V& r,
       out_trace->push_back(make_trace('N', iter, 0.0, Delta, ok ? 1 : 0, kappa, J));
     if (ok) {
       r = r_trial;
-      flips_local += Topology::flip_to_weighted_delaunay(T, r);
+      T = std::move(T_trial);
+      flips_local += trial_flips;
       rejects = 0;
     } else rejects++;
 
@@ -963,10 +1016,23 @@ const char* AlexandrovSolver::status_str(ValidationStatus s) {
 //                   Outward normal taken from the half-edge CCW
 //                   convention; defensive precondition rejects
 //                   inverted-volume positions.
-static AlexandrovSolver::ValidationStatus validate_polytope(
-    AlexandrovSolver& S, const vector<coord3d>& pos) {
+AlexandrovSolver::ValidationStatus AlexandrovSolver::validate_polytope(
+    const DelaunayTriangulation& D, const vector<double>& r,
+    const vector<coord3d>& pos, PolytopeValidation* out, bool verbose) {
   using VS = AlexandrovSolver::ValidationStatus;
-  const DelaunayTriangulation& D = S.D;
+  // Public entry: r/pos are caller-supplied (the instance path's were
+  // solver-sized by construction), and three ladder rungs index them by
+  // D.nv before is_convex's own check — enforce the @pre up front.
+  if ((int)r.size() < D.nv || (int)pos.size() != D.nv)
+    throw std::invalid_argument(
+        "AlexandrovSolver::validate_polytope: r.size() >= T.nv and "
+        "pos.size() == T.nv required (r " + std::to_string(r.size()) +
+        ", pos " + std::to_string(pos.size()) + ", nv " +
+        std::to_string(D.nv) + ")");
+  PolytopeValidation v;
+  // Early failures copy the record as computed so far (later checks keep
+  // their defaults) — the `done` wrapper is the one exit path.
+  auto done = [&](VS s) { if (out) *out = v; return s; };
 
   // ── SIMPLICITY ──────────────────────────────────────────────────────
   //   T̄(0) must be a simple polygonal tesselation with F ≥ 3.
@@ -978,28 +1044,28 @@ static AlexandrovSolver::ValidationStatus validate_polytope(
   //   |θ − π| ≲ 1e-7 once Newton converges; if the continuation stalls
   //   before that (κ residual > tol), the F ≥ 3 check catches the
   //   resulting degeneracy.
-  S.stats_t0_simplicial = AlexandrovSolver::is_simplicial(D);  // diagnostic only
+  v.t0_simplicial = AlexandrovSolver::is_simplicial(D);  // diagnostic only
   vector<int> labels(D.nv);
   std::iota(labels.begin(), labels.end(), 0);
-  auto tbar = AlexandrovSolver::polytope_tesselation(D, S.r, labels);
-  S.stats_tbar_n_cells = tbar.n_cells();
-  S.stats_tbar_simple_polygonal = AlexandrovSolver::is_simple_polygonal(tbar);
+  auto tbar = AlexandrovSolver::polytope_tesselation(D, r, labels);
+  v.tbar_n_cells = tbar.n_cells();
+  v.tbar_simple_polygonal = AlexandrovSolver::is_simple_polygonal(tbar);
 
-  bool simple = S.stats_tbar_simple_polygonal && S.stats_tbar_n_cells >= 3;
+  bool simple = v.tbar_simple_polygonal && v.tbar_n_cells >= 3;
   if (!simple) {
-    if (S.verbose)
+    if (verbose)
       printf("  VALIDATION (simplicity) failed: T̄(0) simple_polygonal=%d, "
              "n_cells=%d (need F≥3), T(0) simplicial=%d (diagnostic).\n",
-             S.stats_tbar_simple_polygonal, S.stats_tbar_n_cells,
-             S.stats_t0_simplicial);
-    return VS::FAIL_NOT_SIMPLE;
+             v.tbar_simple_polygonal, v.tbar_n_cells,
+             v.t0_simplicial);
+    return done(VS::FAIL_NOT_SIMPLE);
   }
 
   // Compute volume_norm = |V| / ⟨ℓ⟩³ for the well-formedness gate and
   // diagnostic stat.
   double volume = std::abs(signed_volume6(D, pos)) / 6.0;
   double mean_l = mean_edge_length(D);
-  S.stats_volume_norm = volume / (mean_l * mean_l * mean_l);
+  v.volume_norm = volume / (mean_l * mean_l * mean_l);
 
   // ── WELL-FORMEDNESS ─────────────────────────────────────────────────
   //   Non-degenerate volume AND embedded surface (no 3D self-intersection).
@@ -1017,24 +1083,24 @@ static AlexandrovSolver::ValidationStatus validate_polytope(
   //     so that any failure (numerical or otherwise) is flagged with
   //     its true cause rather than swept into a different bucket.
   constexpr double VOLUME_NORM_DEGENERATE = 0.01;
-  bool well_formed_volume = std::isfinite(S.stats_volume_norm) &&
-                              S.stats_volume_norm >= VOLUME_NORM_DEGENERATE;
-  S.stats_polytope_no_self_intersect =
+  bool well_formed_volume = std::isfinite(v.volume_norm) &&
+                              v.volume_norm >= VOLUME_NORM_DEGENERATE;
+  v.no_self_intersect =
       !AlexandrovSolver::has_self_intersection(D, pos);
   // Volume gate first, then self-intersection gate.  Order is the order
   // of stats_status when multiple fail.
   if (!well_formed_volume) {
-    if (S.verbose)
+    if (verbose)
       printf("  VALIDATION (well-formedness/volume) failed: vol_norm=%.3e "
              "(threshold %.2e).\n",
-             S.stats_volume_norm, VOLUME_NORM_DEGENERATE);
-    return VS::FAIL_VOLUME_DEGENERATE;
+             v.volume_norm, VOLUME_NORM_DEGENERATE);
+    return done(VS::FAIL_VOLUME_DEGENERATE);
   }
-  if (!S.stats_polytope_no_self_intersect) {
-    if (S.verbose)
+  if (!v.no_self_intersect) {
+    if (verbose)
       printf("  VALIDATION (well-formedness/self-intersection) failed: "
              "two non-adjacent triangles cross in 3D.\n");
-    return VS::FAIL_SELF_INTERSECTING;
+    return done(VS::FAIL_SELF_INTERSECTING);
   }
 
   // ── CONVEXITY ───────────────────────────────────────────────────────
@@ -1044,15 +1110,15 @@ static AlexandrovSolver::ValidationStatus validate_polytope(
   //   non-convex configuration.  Outward normal taken from the half-
   //   edge CCW convention; defensive precondition inside is_convex
   //   verifies signed volume is strictly positive.
-  S.stats_polytope_convex = AlexandrovSolver::is_convex(D, pos);
-  if (!S.stats_polytope_convex) {
-    if (S.verbose)
+  v.convex = AlexandrovSolver::is_convex(D, pos);
+  if (!v.convex) {
+    if (verbose)
       printf("  VALIDATION (convexity) failed: some vertex sticks out "
              "beyond a face plane.\n");
-    return VS::FAIL_NOT_CONVEX;
+    return done(VS::FAIL_NOT_CONVEX);
   }
 
-  return VS::OK;
+  return done(VS::OK);
 }
 
 // The 5-step B-I algorithm: initial radii → continuation (κ(r)=t·κ₁, t:1→0)
@@ -1097,6 +1163,7 @@ vector<coord3d> AlexandrovSolver::solve() {
   // polish_override (incubation seam, see header) replaces the internal
   // polish on the identical post-extrapolation state; the internal
   // trace/diag recorders are not populated on that path.
+  constexpr double KAPPA_POLISH_TOL = 1e-10;
   bool ok;
   double mk;
   if (polish_override) {
@@ -1104,7 +1171,7 @@ vector<coord3d> AlexandrovSolver::solve() {
     mk = LinAlg::max_abs(GCP::kappa(D, r));
   } else {
     int polish_flips = stats_flips;
-    std::tie(ok, mk) = Newton::polish(D, r, 1e-10, 50,
+    std::tie(ok, mk) = Newton::polish(D, r, KAPPA_POLISH_TOL, 50,
                                       trace_jacobian ? &trace : nullptr,
                                       record_diag ? &diag_trace : nullptr,
                                       record_trajectory ? &trajectory : nullptr,
@@ -1129,13 +1196,33 @@ vector<coord3d> AlexandrovSolver::solve() {
     return pos;   // empty
   }
 
-  if (mk > 0.01) {
+  // Acceptance = the polish's converged verdict AND the κ residual
+  // itself below the polish target.  For the internal polish the two
+  // are equivalent (ok ⟺ max|κ| < tol); the residual check is the
+  // numerical backstop for the polish_override seam, whose ok verdict
+  // would otherwise be trusted unchecked.  The former 0.01 band
+  // accepted stalled solves with κ up to 1e-2 as OK, leaking κ-scale
+  // edge errors into the reconstruction (delaunay-fillin failing
+  // suite, 2026-07-25); any residual stall now fails loudly here.
+  // NB max_abs poisons NaN to +inf, so a NaN κ cannot pass.
+  if (!ok || !(mk < KAPPA_POLISH_TOL)) {
     stats_status = ValidationStatus::FAIL_KAPPA_NOT_CONVERGED;
     return pos;   // failed-but-inspectable positions
   }
 
-  // 5. Validation: the three-property gate (see validate_polytope above).
-  stats_status = validate_polytope(*this, pos);
+  // 5. Validation: the three-property gate (the public static — one
+  //    ladder for this instance path and for external (T, r, pos) callers),
+  //    with the per-check record copied into the stats_* diagnostics.
+  {
+    PolytopeValidation pv;
+    stats_status = validate_polytope(D, r, pos, &pv, verbose);
+    stats_t0_simplicial            = pv.t0_simplicial;
+    stats_tbar_n_cells             = pv.tbar_n_cells;
+    stats_tbar_simple_polygonal    = pv.tbar_simple_polygonal;
+    stats_volume_norm              = pv.volume_norm;
+    stats_polytope_no_self_intersect = pv.no_self_intersect;
+    stats_polytope_convex          = pv.convex;
+  }
   return pos;
 }
 

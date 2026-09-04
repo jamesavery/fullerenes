@@ -66,9 +66,10 @@ struct ConePrescription {
 // `deficits`, if given, overrides the default equal pi/3-per-disk split: deficits[i] is
 // the total curvature confined into cones[i]'s disk (in place of the fixed pi/3), so
 // disks may carry unequal shares -- e.g. a measured cubic metric whose cones carry a
-// varying number of incident pentagons. Must be empty or the same size as `cones`.
-// The Sigma K* = 4*pi rescale still runs, so Gauss-Bonnet holds regardless (a no-op up
-// to FP drift when the deficits already sum to 4*pi, as they do by construction for the
+// varying number of incident pentagons. Must be empty or the same size as `cones`, and
+// (when non-empty) must sum to 4*pi (Gauss-Bonnet) -- both are checked, throwing
+// otherwise. The Sigma K* = 4*pi rescale still runs afterwards, a no-op up to FP drift
+// since the deficits already sum to 4*pi (as they do by construction for the
 // per-pentagon-count case).
 ConePrescription confine_curvature(DelaunayTriangulation surface,
                                    const std::vector<ConeSite>& cones,

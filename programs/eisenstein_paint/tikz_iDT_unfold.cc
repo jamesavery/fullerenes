@@ -6,8 +6,8 @@
 // Usage:
 //   eisenstein_paint_tikz_iDT_unfold N IPR idx [start_cell|-1] [out_prefix] [seeds=K]
 //
-// seeds=K  try K different seed cells (default 20 = all cells) and keep
-//          the unfolding with the fewest cone tears.
+// seeds=K  try K different seed cells (default 20) and keep the
+//          unfolding placing the most cells, ties by fewest cone tears.
 //
 // Outputs:
 //   <prefix>.tex    TikZ standalone of the spanning-tree unfolding
@@ -54,41 +54,34 @@ int main(int argc, char** argv) {
     }
     if (T.N == 0) { std::fprintf(stderr, "isomer not found\n"); return 1; }
 
-    ep::SortedDual S_d = ep::sorted_dual(T);
-    ep::DualPolytope Pl = ep::realize_dual(S_d);
-    const Triangulation& T_sorted = S_d.T;
-    const DelaunayTriangulation& D = Pl.D;
-    auto cells_em      = ep::embed_all_cells(D, T_sorted);
-    std::vector<ep::LatticeMap> lmaps(cells_em.size());
-    for (size_t fi = 0; fi < cells_em.size(); ++fi)
-        if (cells_em[fi].ok)
-            lmaps[fi] = ep::enumerate_cell_lattice(cells_em[fi], T_sorted);
+    try {
+        ep::SortedDual S_d = ep::sorted_dual(T);
+        ep::DualPolytope Pl = ep::realize_dual(S_d);
+        const Triangulation& T_sorted = S_d.T;
+        const DelaunayTriangulation& D = Pl.D;
 
-    // Adapter: bundle (Cell, LatticeMap) into the lib-side CellPlacement
-    // type unfold_iDT consumes.
-    std::vector<CellPlacement> cells(cells_em.size());
-    for (size_t fi = 0; fi < cells_em.size(); ++fi) {
-        const ep::Cell& F = cells_em[fi];
-        cells[fi] = { F.cell_id, F.corners[0], F.corners[1], F.corners[2],
-                      F.P[0], F.P[1], F.P[2],
-                      F.ok ? lmaps[fi].entries
-                           : std::vector<std::pair<Eisenstein, int>>{},
-                      F.ok };
+        // The per-cell charts unfold_iDT consumes, as the paint
+        // pipeline's flat tables.
+        ep::SurfaceParametrization param = ep::parametrize(D, S_d);
+
+        LatticeUnfolding U = unfold_iDT(D, param.view(), start, seeds);
+
+        char tikz_path[256], txt_path[256];
+        std::snprintf(tikz_path, sizeof tikz_path, "%s.tex", prefix);
+        std::snprintf(txt_path,  sizeof txt_path,  "%s.txt", prefix);
+        std::ofstream tikz(tikz_path);
+        std::ofstream txt(txt_path);
+        dump_lattice_unfolding_tikz(U, T_sorted, tikz, txt);
+
+        std::printf("C%d %s idx %d: placed %d iDT cells, %d cone tears, "
+                    "%zu cones covered\n",
+                    N, IPR ? "IPR" : "gen", idx, U.n_cells, U.n_tears,
+                    U.cone_positions.size());
+        std::printf("  wrote %s\n  wrote %s\n", tikz_path, txt_path);
+    } catch (const ep::PaintError& e) {
+        std::fprintf(stderr, "tikz_iDT_unfold: paint stage %s: %s\n",
+                     ep::code_name(e.code), e.what());
+        return 1;
     }
-
-    LatticeUnfolding U = unfold_iDT(D, cells, start, seeds);
-
-    char tikz_path[256], txt_path[256];
-    std::snprintf(tikz_path, sizeof tikz_path, "%s.tex", prefix);
-    std::snprintf(txt_path,  sizeof txt_path,  "%s.txt", prefix);
-    std::ofstream tikz(tikz_path);
-    std::ofstream txt(txt_path);
-    dump_lattice_unfolding_tikz(U, T_sorted, tikz, txt);
-
-    std::printf("C%d %s idx %d: placed %d iDT cells, %d cone tears, "
-                "%zu cones covered\n",
-                N, IPR ? "IPR" : "gen", idx, U.n_cells, U.n_tears,
-                U.cone_positions.size());
-    std::printf("  wrote %s\n  wrote %s\n", tikz_path, txt_path);
     return 0;
 }

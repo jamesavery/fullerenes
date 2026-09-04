@@ -22,10 +22,12 @@
 //                         flat-diagonal multi-edges on exactly-
 //                         symmetric isomers -- the charts handle them;
 //                         simpliciality is NOT required here.)
-//   evaluate(A, ...)   -- integer barycentric combination of the three
-//                         corner anchors per cell, gcd-reduced on edge
-//                         points so adjacent cells produce bit-identical
-//                         output across shared edges (idempotent paint).
+//   evaluate_sorted(A, ...) -- integer barycentric combination of the
+//                         three corner anchors per cell, gcd-reduced on
+//                         edge points so adjacent cells produce
+//                         bit-identical output across shared edges
+//                         (idempotent paint); result in sorted labels.
+//   evaluate(A, ...)   -- the same, back-permuted to original labels.
 //
 // Cubic-metric geometry (cubic_geometry): the carbon-atom geometry
 // EXACTLY on the cubic Alexandrov polytope (the convex realization of
@@ -55,10 +57,14 @@
 // dual_geometry / cubic_geometry never throw and return a Status.
 // =====================================================================
 
+#include "fullerenes/barycentric.hh"          // barycentric_combine (header-inline)
+#include "fullerenes/delaunay_transport.hh"   // DelaunayPointTrackerView
 #include "fullerenes/eisenstein_paint.hh"
 #include "fullerenes/deltahedron.hh"
 #include "fullerenes/geometry.hh"
 
+#include <cstdint>
+#include <span>
 #include <vector>
 
 namespace eisenstein_paint {
@@ -74,6 +80,14 @@ struct DualPolytope {
     // the intrinsic charts, never fed back into them.
     DelaunayTriangulation D;
     std::vector<coord3d>  cone_pos;    // one per cone, sorted labels
+
+    // The solve's converged radii r_v (B-I: r_v = |p_v| from the apex), one
+    // per D vertex in sorted labels.  Exposed because the polytope's
+    // 2-skeleton is unreachable without them: AlexandrovSolver::
+    // inessential_edges(D, r) and polytope_tesselation(D, r, labels) both
+    // need r, and T-bar -- not the flip-dependent triangulation -- is the
+    // unique, comparable form of a realized cone metric.
+    std::vector<double>   r;
 
     // The polytope as a library Deltahedron (cone iDT 1-skeleton +
     // positions; 12 vertices with degrees up to 11 for fullerene duals
@@ -103,24 +117,43 @@ DualPolytope realize_dual(const SortedDual& S);
 // bit-identical 3D output across the shared edge).
 //
 // Preconditions:
-//   - F.ok == true
+//   - corners/frame belong to one charted cell; entries are its lattice
+//     points (scanline-major)
 //   - anchors.size() == n_cones, finite values
 //   - pos3d.size() >= the charted complex's vertex count
-void interpolate_cell(const Cell& F,
-                      const LatticeMap& lmap,
+// The (frame, corners, entries) form is the mathematical core; the
+// (V, f) form projects a cell out of the tables (@pre 0 <= f < V.nf,
+// V.cell_live(f)) and reads n_cones from the view.
+void interpolate_cell(CellFrame frame, CellCorners corners,
+                      std::span<const LatticePoint> entries,
                       const std::vector<coord3d>& anchors,
                       int n_cones,
+                      std::vector<coord3d>& pos3d,
+                      int cell_id_for_diag = -1);
+void interpolate_cell(const ParamTablesView& V, int f,
+                      const std::vector<coord3d>& anchors,
                       std::vector<coord3d>& pos3d);
 
 // Evaluate every chart of A against `anchors` (position of cone c at
-// anchors[c], c < A.n_cones) and back-permute to ORIGINAL labels via
-// `perm` (= SortedDual::perm).  The complex A was charted on must have
-// flat cells w.r.t. the surface the anchors live on -- i.e. A must be
-// parametrize(P.D, S) for a realized polytope P whose cone positions
-// are the anchors.  Throws PaintError(INTERPOLATE).
+// anchors[c], c < A.n_cones), in SORTED (T_sorted) labels: the result
+// has A.T.N entries, cones c < n_cones at anchors[c] verbatim, every
+// other vertex by barycentric interpolation in its cell's chart
+// (on-edge vertices idempotently from both adjacent cells).  CAUTION:
+// pair the result with the SORTED graph (A's T / SortedDual::T) --
+// indexing it by original labels is plausible-looking wrong output;
+// use evaluate below when original labels are wanted.  The
+// complex A was charted on must have flat cells w.r.t. the surface the
+// anchors live on -- i.e. A must be parametrize(P.D, S) for a realized
+// polytope P whose cone positions are the anchors.  Throws
+// PaintError(INTERPOLATE).
+std::vector<coord3d> evaluate_sorted(const SurfaceParametrization& A,
+                                     const std::vector<coord3d>& anchors);
+
+// evaluate = back-permutation o evaluate_sorted: the same positions
+// re-indexed to ORIGINAL labels via A's own stored permutation
+// (= SortedDual::perm at parametrize time; perm[u_orig] = u_sorted).
 std::vector<coord3d> evaluate(const SurfaceParametrization& A,
-                              const std::vector<coord3d>& anchors,
-                              const Permutation& perm);
+                              const std::vector<coord3d>& anchors);
 
 // =====================================================================
 // The realized cubic polytope.
@@ -157,8 +190,100 @@ struct CubicRealization {
     std::vector<coord3d> dual_coords;    // size Nv, dual-vertex labels
 };
 
+// The failure modes of the evaluation body below, as a named value with a
+// witness: a device kernel cannot throw, so the body returns them and the
+// owning evaluate_tracked_complex converts each to its documented throw.
+enum class TrackedEval {
+    OK,
+    CAPACITY,        // an output or bookkeeping span smaller than the counts
+    CONE_NOT_CUBIC,  // witness = the cone whose kis id is a dual vertex
+    DEAD_CELL,       // witness = a tracked point on a dead / out-of-range cell
+    TRACKED_TWICE,   // witness = a kis label written twice or out of range
+    COVERAGE,        // witness = the first unwritten kis vertex
+};
+struct TrackedEvalResult { TrackedEval code = TrackedEval::OK; int witness = -1; };
+
+// evaluate_tracked_into -- THE evaluation body over CALLER storage
+// (device-legal: no allocation, no throw).  Cones take their exact solver
+// positions; every tracked kis vertex is the barycentric combination of its
+// kappa=0 cell's three cone corners -- exactly ON the polytope surface,
+// since the cell is a flat piece of it.  Split by kis label: label >= Nv is
+// cubic vertex (label - Nv), label < Nv is dual vertex label.  Coordinates
+// are scaled by `bond` and written as coord3<T> (the lib's unit-bond
+// coordinates at bond = 1).  The owning evaluate_tracked_complex below
+// wraps it -- ONE body.
+//
+// @pre  D is the solved cone complex and cone_pos / cone_kis_vertex its
+//       per-cone positions and kis ids (>= D.nv entries each); tk is the
+//       tracker D carried through the reduction and the solve; the four
+//       output spans hold 2*Nv-4 / Nv entries
+// @post OK => every cubic and every dual slot written exactly once
+//       (cones + tracked points partition the kis vertices), have_cubic /
+//       have_dual left as that coverage record
+template <class T>
+inline TrackedEvalResult evaluate_tracked_into(const DelaunayView& D,
+                                               std::span<const coord3d> cone_pos,
+                                               const DelaunayPointTrackerView& tk,
+                                               std::span<const int> cone_kis_vertex,
+                                               int Nv, double bond,
+                                               std::span<coord3<T>> cubic,
+                                               std::span<coord3<T>> dual,
+                                               std::span<std::uint8_t> have_cubic,
+                                               std::span<std::uint8_t> have_dual)
+{
+    const int Nc = 2 * Nv - 4;
+    if ((long)cubic.size() < Nc || (long)dual.size() < Nv ||
+        (long)have_cubic.size() < Nc || (long)have_dual.size() < Nv ||
+        (long)cone_pos.size() < D.nv || (long)cone_kis_vertex.size() < D.nv)
+        return {TrackedEval::CAPACITY, -1};
+    for (int u = 0; u < Nc; ++u) { have_cubic[u] = 0; cubic[u] = coord3<T>(0, 0, 0); }
+    for (int u = 0; u < Nv; ++u) { have_dual[u]  = 0; dual[u]  = coord3<T>(0, 0, 0); }
+
+    const auto write = [&](std::span<coord3<T>> out, int i, const coord3d& x) {
+        out[i] = coord3<T>((T)(x[0] * bond), (T)(x[1] * bond), (T)(x[2] * bond));
+    };
+
+    // Cones: exact solver positions.  Cone i is kis vertex Nv + U_i (its
+    // cubic vertex in T.triangles() order).
+    for (int i = 0; i < D.nv; ++i) {
+        const int U = cone_kis_vertex[i] - Nv;
+        if (U < 0 || U >= Nc) return {TrackedEval::CONE_NOT_CUBIC, i};
+        write(cubic, U, cone_pos[i]);
+        have_cubic[U] = 1;
+    }
+
+    // Tracked kis vertices: barycentric combination against their kappa=0
+    // cell's cone positions.  face_vertices order == the slot anchoring.
+    for (std::int32_t p = 0; p < tk.n; ++p) {
+        const int f = tk.face[p];
+        if (f < 0 || f >= D.nf || D.f_he[f] < 0) return {TrackedEval::DEAD_CELL, p};
+        const std::array<int, 3> vs = D.face_vertices(f);
+        const coord3d x = barycentric_combine(tk.b_of(p), cone_pos[vs[0]],
+                                              cone_pos[vs[1]], cone_pos[vs[2]]);
+        const int label = tk.label[p];
+        if (label >= Nv) {
+            const int U = label - Nv;
+            if (U >= Nc || have_cubic[U]) return {TrackedEval::TRACKED_TWICE, label};
+            write(cubic, U, x);
+            have_cubic[U] = 1;
+        } else {
+            if (label < 0 || have_dual[label]) return {TrackedEval::TRACKED_TWICE, label};
+            write(dual, label, x);
+            have_dual[label] = 1;
+        }
+    }
+
+    // Coverage: cones + tracked points partition the kis vertices, so every
+    // cubic vertex and every dual vertex must be written.
+    // @anchor cubic-coverage
+    for (int u = 0; u < Nc; ++u) if (!have_cubic[u]) return {TrackedEval::COVERAGE, Nv + u};
+    for (int u = 0; u < Nv; ++u) if (!have_dual[u])  return {TrackedEval::COVERAGE, u};
+    return {};
+}
+
 // The cubic counterpart of evaluate(): evaluate the tracked kis complex
 // on the polytope.  Nv = the dual triangulation's vertex count (= T.N).
+// Host, allocating; owning wrapper of evaluate_tracked_into at bond = 1.
 // @pre  C from realize_cubic(T): every tracked label in range, cones'
 //       kis ids in the cubic-vertex range
 // @post coverage: every cubic vertex and every dual vertex written

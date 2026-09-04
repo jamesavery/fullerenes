@@ -8,8 +8,8 @@
 // Near-constant amortised cost (inverse-Ackermann) per find/unite.
 //
 // Used wherever the codebase needs connected components / orbit partitions
-// (e.g. Symmetry::equivalence_classes, compute_orbits) so the algorithm lives
-// in one named place rather than being re-inlined per call site.
+// (e.g. Symmetry::equivalence_classes) so the algorithm lives in one named
+// place rather than being re-inlined per call site.
 class UnionFind {
   std::vector<int> parent_, size_;
 

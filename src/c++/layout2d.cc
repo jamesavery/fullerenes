@@ -12,15 +12,18 @@ using namespace std;
 
 namespace layout2d {
 
-// Orient a planar graph by computing a Tutte embedding and sorting
-// neighbours by angle. For 3-connected planar graphs (fullerenes),
-// this produces a consistent planar embedding.
+// BOUNDARY-ONLY -- the contract, the four sanctioned callers and the reason
+// internal code must not be a fifth are at the declaration in layout2d.hh.
 //
-// Returns true if the graph is planar, false otherwise.
+// Tutte-embed G through a face found by shortest cycle (for a 3-connected
+// planar graph the shortest cycle through an arc IS a face boundary), then sort
+// each row CCW in that embedding.  The returned bool is G's verdict on the
+// result and is the caller's only evidence that anything was established: on
+// false G's rows have been rewritten and are still not a planar embedding.
 bool planar_orient(GraphView& G)
 {
   const int N = G.N;
-  if(N == 0) return true;
+  if(N == 0 || G.deg[0] == 0) return false;   // nothing to embed, and no arc to seed the face walk
 
   // Find a face of the graph using BFS shortest cycle through an edge.
   // For 3-connected planar graphs, the shortest cycle through any edge
@@ -40,6 +43,10 @@ bool planar_orient(GraphView& G)
   return G.is_consistently_oriented();
 }
 
+// BOUNDARY-ONLY, and unchecked -- see layout2d.hh.  Whether the rows this
+// writes are a planar embedding is entirely `layout`'s business: a drawing with
+// crossings produces a consistent orientation of a HIGHER-GENUS surface, which
+// only the caller's oriented_surface() check can catch.
 void orient_neighbours(GraphView& G, const vector<coord2d>& layout)
 {
   for(node_t u=0;u<G.N;u++){

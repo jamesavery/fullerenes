@@ -264,11 +264,7 @@ coord2d GraphView::centre2d(const vector<coord2d>& layout) const {
   return centre/double(layout.size());
 }
 
-coord3d GraphView::centre3d(std::span<const coord3d> layout) const {
-  coord3d centre(0,0,0);
-  for(node_t u=0;u<layout.size();u++) centre += layout[u];
-  return centre/double(layout.size());
-}
+coord3d GraphView::centre3d(std::span<const coord3d> layout) const { return mean(layout); }
 
 
 // to_latex and to_povray moved to layout2d.cc

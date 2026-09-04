@@ -9,7 +9,9 @@
 #include <array>
 #include <cmath>
 #include <numeric>
+#include <span>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 namespace {
@@ -30,29 +32,26 @@ double weight(CurvatureMode mode, std::pair<int,double> member, int cone,
   return 0.0;
 }
 
-// Spread pi/3 (or, with explicit `deficits`, cone_ids[i]'s deficits[i]) over each
-// (disjoint) disk in proportion to the mode's weight, then rescale to Sigma K* = 4pi --
-// a no-op up to rounding when the per-disk shares already sum to 4pi (the equal-pi/3
-// case, or a `deficits` input that sums to 4pi by construction), kept only to kill FP
-// drift; skipped when there are no cones. The four modes ARE this one operation; only
-// weight() changes. `cone_ids[i]` <-> `deficits[i]` (parallel to the caller's `cones`);
-// every disk.source is one of cone_ids (geodesic_disks seeds exactly at `sources`).
+// Spread pi/3 (or, with explicit `deficits`, disk i's deficits[i]) over each (disjoint)
+// disk in proportion to the mode's weight, then rescale to Sigma K* = 4pi -- a no-op up
+// to rounding when the per-disk shares already sum to 4pi (the equal-pi/3 case, or a
+// `deficits` input that sums to 4pi by construction), kept only to kill FP drift; skipped
+// when there are no cones. The four modes ARE this one operation; only weight() changes.
+// `deficits[i]` is disk i's budget: geodesic_disks returns disks 1:1 with its `sources`
+// in order (disks[i].source == sources[i], its ORDER CONTRACT), and confine_curvature
+// seeds those sources in `cones` order, so deficits[i] <-> cones[i].
 std::vector<double> prescribe_curvature(const DelaunayTriangulation& D,
                                         const std::vector<GeodesicDisk>& disks,
                                         CurvatureMode mode, double R,
-                                        const std::vector<int>& cone_ids,
                                         std::span<const double> deficits) {
   const std::vector<double> K = mode == CurvatureMode::Shape ? D.curvature()
                                                              : std::vector<double>{};
   const double sigma = R / std::sqrt(2.0*std::log(100.0));   // 99% of the 2D mass within R
 
   std::vector<double> kstar(D.nv, 0.0);
-  for (const GeodesicDisk& disk : disks) {
-    double per_disk = M_PI/3.0;
-    if (!deficits.empty()) {
-      const auto it = std::find(cone_ids.begin(), cone_ids.end(), disk.source);
-      per_disk = deficits[it - cone_ids.begin()];
-    }
+  for (size_t di = 0; di < disks.size(); di++) {
+    const GeodesicDisk& disk = disks[di];
+    const double per_disk = deficits.empty() ? M_PI/3.0 : deficits[di];
     std::vector<double> w(disk.members.size());
     for (size_t i = 0; i < w.size(); i++) w[i] = weight(mode, disk.members[i], disk.source, sigma, K);
     const double total = std::accumulate(w.begin(), w.end(), 0.0);
@@ -115,11 +114,17 @@ ConePrescription confine_curvature(DelaunayTriangulation surface,
                                    const std::vector<ConeSite>& cones,
                                    double R, CurvatureMode mode, DiskMetric disk_metric,
                                    std::span<const double> deficits) {
-  if (!deficits.empty() && deficits.size() != cones.size())
-    throw std::runtime_error("confine_curvature: deficits.size() must equal cones.size()");
+  if (!deficits.empty()) {
+    if (deficits.size() != cones.size())
+      throw std::runtime_error("confine_curvature: deficits.size() must equal cones.size()");
+    double sum = 0; for (double d : deficits) sum += d;
+    if (std::fabs(sum - 4.0*M_PI) > 1e-6)
+      throw std::runtime_error("confine_curvature: deficits sum to " + std::to_string(sum)
+                               + ", not 4*pi (Gauss-Bonnet)");
+  }
   std::vector<int> cone_ids;
   for (const ConeSite& cone : cones) cone_ids.push_back(insert_cone(surface, cone));
   std::vector<GeodesicDisk> disks = surface.geodesic_disks(cone_ids, R, disk_metric);
-  std::vector<double>       kstar = prescribe_curvature(surface, disks, mode, R, cone_ids, deficits);
+  std::vector<double>       kstar = prescribe_curvature(surface, disks, mode, R, deficits);
   return { std::move(surface), std::move(cone_ids), std::move(kstar) };
 }

@@ -49,6 +49,7 @@ DualPolytope realize_dual(const SortedDual& S) {
     A.D        = std::move(P.D);
     P.cone_pos = A.solve();
     P.D        = std::move(A.D);
+    P.r        = std::move(A.r);   // carried out for T-bar (see DualPolytope::r)
     if (A.valid()) return P;
 
     using VS = AlexandrovSolver::ValidationStatus;
@@ -91,41 +92,54 @@ Deltahedron DualPolytope::deltahedron() const {
 // Chart evaluation.
 // =====================================================================
 
-void interpolate_cell(const Cell& F,
-                      const LatticeMap& lmap,
+void interpolate_cell(CellFrame frame, CellCorners corners,
+                      std::span<const LatticePoint> entries,
                       const std::vector<coord3d>& anchors,
                       int n_cones,
-                      std::vector<coord3d>& pos3d)
+                      std::vector<coord3d>& pos3d,
+                      int cell_id_for_diag)
 {
-    if (!F.ok)
-        paint_throw("eisenstein_paint::interpolate_cell: F.ok=false");
     if ((int)anchors.size() != n_cones)
         paint_throw("eisenstein_paint::interpolate_cell: anchors size %zu != n_cones %d",
                     anchors.size(), n_cones);
-    const long g = wedge(F.P[1] - F.P[0], F.P[2] - F.P[0]);
+    const Eisenstein P0(0, 0);
+    const Eisenstein P1(frame.p1a, frame.p1b);
+    const Eisenstein P2(frame.p2a, frame.p2b);
+    const long g = wedge(P1 - P0, P2 - P0);
     if (g <= 0)
         paint_throw("eisenstein_paint::interpolate_cell(cell %d): g=%ld <= 0",
-                    F.cell_id, g);
-    const coord3d& C0 = anchors[F.corners[0]];
-    const coord3d& C1 = anchors[F.corners[1]];
-    const coord3d& C2 = anchors[F.corners[2]];
+                    cell_id_for_diag, g);
+    const coord3d& C0 = anchors[corners.c0];
+    const coord3d& C1 = anchors[corners.c1];
+    const coord3d& C2 = anchors[corners.c2];
 
-    for (const auto& [p, vid] : lmap.entries) {
-        if (vid < n_cones) continue;       // cone -- pre-painted
-        const IntBary bw = integer_barycentric(p, F.P[0], F.P[1], F.P[2]);
+    for (const LatticePoint& e : entries) {
+        if (e.vid < n_cones) continue;     // cone -- pre-painted
+        const Eisenstein p = e.pos();
+        const IntBary bw = integer_barycentric(p, P0, P1, P2);
         if (bw.n0 < 0 || bw.n1 < 0 || bw.n2 < 0 || bw.denom != g)
             paint_throw("eisenstein_paint::interpolate_cell(cell %d): bad "
                         "barycentric for vertex %d at pos=(%d,%d): "
                         "(n0=%ld n1=%ld n2=%ld, denom=%ld, g=%ld)",
-                        F.cell_id, vid, p.first, p.second,
+                        cell_id_for_diag, e.vid, e.a, e.b,
                         bw.n0, bw.n1, bw.n2, bw.denom, g);
-        pos3d[vid] = barycentric_combine(reduce_to_lowest_terms(bw), C0, C1, C2);
+        pos3d[e.vid] = barycentric_combine(reduce_to_lowest_terms(bw), C0, C1, C2);
     }
 }
 
-std::vector<coord3d> evaluate(const SurfaceParametrization& A,
-                              const std::vector<coord3d>& anchors,
-                              const Permutation& perm)
+void interpolate_cell(const ParamTablesView& V, int f,
+                      const std::vector<coord3d>& anchors,
+                      std::vector<coord3d>& pos3d)
+{
+    if (f < 0 || f >= V.nf || !V.cell_live(f))
+        paint_throw("eisenstein_paint::interpolate_cell: cell %d not charted", f);
+    const ChartView c = V.chart(f);
+    interpolate_cell(c.frame, CellCorners{c.corners[0], c.corners[1], c.corners[2]},
+                     c.entries, anchors, V.n_cones, pos3d, f);
+}
+
+std::vector<coord3d> evaluate_sorted(const SurfaceParametrization& A,
+                                     const std::vector<coord3d>& anchors)
 {
     // Cones are written directly; interpolate_cell skips them
     // ("pre-painted" contract).  Non-cone slots are written by
@@ -135,21 +149,28 @@ std::vector<coord3d> evaluate(const SurfaceParametrization& A,
     std::vector<coord3d> pos3d(Nv_sorted);
     for (int c = 0; c < A.n_cones; ++c) pos3d[c] = anchors[c];
     try {
-        for (size_t fi = 0; fi < A.cells.size(); ++fi)
-            if (A.cells[fi].ok)
-                interpolate_cell(A.cells[fi], A.lmaps[fi], anchors,
-                                 A.n_cones, pos3d);
+        const ParamTablesView V = A.view();
+        for (int f = 0; f < V.nf; ++f)
+            if (V.cell_live(f))
+                interpolate_cell(V, f, anchors, pos3d);
     } catch (const std::exception& e) {
         throw PaintError(Code::INTERPOLATE,
             std::string("interpolate_throw: ") + e.what());
     }
+    return pos3d;
+}
 
-    // perm[u_orig] = u_sorted, so the position written at sorted vertex
-    // perm[u_orig] is u_orig's 3D coordinate.
-    const int Nv_orig = (int)perm.size();
+std::vector<coord3d> evaluate(const SurfaceParametrization& A,
+                              const std::vector<coord3d>& anchors)
+{
+    const std::vector<coord3d> pos3d = evaluate_sorted(A, anchors);
+
+    // A.perm[u_orig] = u_sorted, so the position written at sorted
+    // vertex A.perm[u_orig] is u_orig's 3D coordinate.
+    const int Nv_orig = (int)A.perm.size();
     std::vector<coord3d> out(Nv_orig);
     for (int u = 0; u < Nv_orig; ++u)
-        out[u] = pos3d[perm[u]];
+        out[u] = pos3d[A.perm[u]];
     return out;
 }
 
@@ -196,61 +217,49 @@ CubicPolytope realize_cubic(const TriangulationView& T) {
 
 CubicRealization evaluate_tracked_complex(const CubicPolytope& C, int Nv)
 {
+    // Owning wrapper of the device-legal body (header): owned outputs and
+    // coverage record in, the named failure value converted to this
+    // function's documented throws after.
     const int Nc = 2 * Nv - 4;
     CubicRealization G;
     G.cubic_coords.assign(Nc, coord3d{0, 0, 0});
     G.dual_coords.assign(Nv, coord3d{0, 0, 0});
-    std::vector<char> have_cubic(Nc, 0), have_dual(Nv, 0);
+    std::vector<std::uint8_t> have_cubic(Nc, 0), have_dual(Nv, 0);
 
-    // Cones: exact solver positions.  Cone i is kis vertex Nv + U_i (its
-    // cubic vertex in T.triangles() order).
-    for (size_t i = 0; i < C.cone_pos.size(); ++i) {
-        const int U = C.cone_kis_vertex[i] - Nv;
-        if (U < 0 || U >= Nc)
-            paint_throw("eisenstein_paint::evaluate_tracked_complex: cone %zu "
-                        "has kis id %d (dual-vertex range; expected a cubic "
-                        "vertex)", i, C.cone_kis_vertex[i]);
-        G.cubic_coords[U] = C.cone_pos[i];
-        have_cubic[U] = 1;
-    }
+    const TrackedEvalResult r = evaluate_tracked_into<double>(
+        C.D, C.cone_pos, C.D.tracker.view, C.cone_kis_vertex, Nv, /*bond=*/1.0,
+        G.cubic_coords, G.dual_coords, have_cubic, have_dual);
 
-    // Tracked kis vertices: barycentric combination against their
-    // kappa=0 cell's cone positions -- exactly on the polytope surface
-    // (the cell is a flat piece of it).  face_vertices order == the slot
-    // anchoring.
-    for (const auto& p : C.D.tracker.points) {
-        const auto vs = C.D.face_vertices(p.face);
-        const coord3d x = barycentric_combine(p.b, C.cone_pos[vs[0]],
-                                              C.cone_pos[vs[1]],
-                                              C.cone_pos[vs[2]]);
-        if (p.label >= Nv) {
-            const int U = p.label - Nv;
-            if (U >= Nc || have_cubic[U])
-                paint_throw("eisenstein_paint::evaluate_tracked_complex: cubic "
-                            "vertex %d tracked twice or out of range", U);
-            G.cubic_coords[U] = x;
-            have_cubic[U] = 1;
-        } else {
-            if (p.label < 0 || have_dual[p.label])
-                paint_throw("eisenstein_paint::evaluate_tracked_complex: dual "
-                            "vertex %d tracked twice or out of range", p.label);
-            G.dual_coords[p.label] = x;
-            have_dual[p.label] = 1;
-        }
-    }
-
-    // Coverage: cones + tracked points partition the kis vertices, so
-    // every cubic vertex and every dual vertex must be written.
-    // @anchor cubic-coverage
-    int miss_cubic = 0, miss_dual = 0;
-    for (int U = 0; U < Nc; ++U) if (!have_cubic[U]) ++miss_cubic;
-    for (int u = 0; u < Nv; ++u) if (!have_dual[u]) ++miss_dual;
-    if (miss_cubic || miss_dual)
+    switch (r.code) {
+    case TrackedEval::OK:
+        return G;
+    case TrackedEval::CAPACITY:
+        paint_throw("eisenstein_paint::evaluate_tracked_complex: %zu cone "
+                    "positions / %zu kis ids for %d solved cones (Nv=%d)",
+                    C.cone_pos.size(), C.cone_kis_vertex.size(), C.D.nv, Nv);
+    case TrackedEval::CONE_NOT_CUBIC:
+        paint_throw("eisenstein_paint::evaluate_tracked_complex: cone %d has "
+                    "kis id %d (dual-vertex range; expected a cubic vertex)",
+                    r.witness, C.cone_kis_vertex[r.witness]);
+    case TrackedEval::DEAD_CELL:
+        paint_throw("eisenstein_paint::evaluate_tracked_complex: tracked point "
+                    "%d sits on cell %d, which is not live", r.witness,
+                    C.D.tracker.view.face[r.witness]);
+    case TrackedEval::TRACKED_TWICE:
+        paint_throw("eisenstein_paint::evaluate_tracked_complex: kis vertex %d "
+                    "tracked twice or out of range", r.witness);
+    case TrackedEval::COVERAGE: {
+        int miss_cubic = 0, miss_dual = 0;
+        for (int U = 0; U < Nc; ++U) if (!have_cubic[U]) ++miss_cubic;
+        for (int u = 0; u < Nv; ++u) if (!have_dual[u]) ++miss_dual;
         throw PaintError(Code::COVERAGE,
             "eisenstein_paint::evaluate_tracked_complex: coverage(missing_cubic=" +
             std::to_string(miss_cubic) + ",missing_dual=" +
             std::to_string(miss_dual) + ")");
-    return G;
+    }
+    }
+    paint_throw("eisenstein_paint::evaluate_tracked_complex: unnamed evaluation "
+                "status %d", (int)r.code);
 }
 
 // =====================================================================
@@ -321,7 +330,7 @@ DualGeometry dual_geometry(const TriangulationView& T) {
         const SortedDual   S = sorted_dual(T);
         const DualPolytope P = realize_dual(S);
         const SurfaceParametrization A = parametrize(P.D, S);
-        R.coords = evaluate(A, P.cone_pos, S.perm);
+        R.coords = evaluate(A, P.cone_pos);
     });
     if (!R.status.ok()) R.coords.clear();
     return R;

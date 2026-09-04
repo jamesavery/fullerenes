@@ -209,11 +209,42 @@ bool push_graph(const buckygen_queue& Q)
   return true;
 }
 
-bool next_fullerene(buckygen_queue& Q, Graph& G)
+// The worker's payload is the dual's adjacency in the library's storage
+// layout: rows of BUCKYGEN_DMAX with -1 padding, in cyclic planar order
+// (buckygen's e->next traversal preserves it).  A dual's stride is
+// BUCKYGEN_DMAX, so a matching destination takes each row wholesale and only
+// the degrees are counted; a wider one is padded.
+//
+// dst may view any memory the caller owns, device (shared-USM) slots included.
+static void fill_dual(const int* flat, node_t Nv, FullereneDualView dst)
+{
+  if(dst.N != Nv)
+    throw std::runtime_error("BuckyGen::next_fullerene: destination holds "
+                             + std::to_string((long)dst.N) + " vertices, the dual has "
+                             + std::to_string((long)Nv));
+  if(dst.dmax < BUCKYGEN_DMAX)
+    throw std::runtime_error("BuckyGen::next_fullerene: destination stride "
+                             + std::to_string(dst.dmax) + " cannot hold degree "
+                             + std::to_string(BUCKYGEN_DMAX));
+  if((long)dst.neighbours.size() < (long)Nv*dst.dmax || (long)dst.deg.size() < Nv)
+    throw std::runtime_error("BuckyGen::next_fullerene: destination spans are "
+                             "smaller than its own N x dmax");
+
+  for(node_t u=0; u<Nv; u++){
+    const int*  src = flat + (size_t)u*BUCKYGEN_DMAX;
+    node_t*     row = dst.neighbours.data() + (size_t)u*dst.dmax;
+    uint8_t     d   = 0;
+    while(d < BUCKYGEN_DMAX && src[d] != -1){ row[d] = src[d]; d++; }
+    for(int i=d; i<dst.dmax; i++) row[i] = -1;   // pad a wider destination
+    dst.deg[u] = d;
+  }
+}
+
+bool next_fullerene(buckygen_queue& Q, FullereneDualView dst)
 {
   // Single worker: a graph's chunks arrive contiguously and in seq order, so
   // we just append them until the graph is complete.
-  int flat[6*MAXN];
+  int flat[BUCKYGEN_DMAX*MAXN];
   int fill = 0, got = 0, nchunks = -1;
   BGMsg msg;
 
@@ -230,12 +261,7 @@ bool next_fullerene(buckygen_queue& Q, Graph& G)
       memcpy(flat+fill, msg.data, msg.ndata*sizeof(int));
       fill += msg.ndata;
       if(++got == nchunks){			// Completed graph
-        Graph adj(Q.Nvertices, GRAPH_DMAX);
-        for(int u=0;u<Q.Nvertices;u++)
-          for(int i=0; 6>i && (flat[u*6+i] != -1); i++)
-            adj.push_back(u, flat[u*6+i]);
-        // Buckygen's e->next traversal preserves cyclic planar order.
-        G = Graph(adj);
+        fill_dual(flat, Q.Nvertices, dst);
         return true;
       }
     } else throw std::runtime_error("BuckyGen::next_fullerene: unexpected IPC message type "
@@ -298,7 +324,7 @@ bool next_fullerene(buckygen_queue& Q, Graph& G)
   }
 
 
-  bool buckyherd_queue::next_fullerene(Graph& G)
+  bool buckyherd_queue::next_fullerene(FullereneDualView dst)
   {
     buckyherd_queue &H(*this);
     BGMsg msg;
@@ -315,13 +341,7 @@ bool next_fullerene(buckygen_queue& Q, Graph& G)
 	memcpy(H.reasm_buf[w].data()+H.reasm_fill[w], msg.data, msg.ndata*sizeof(int));
 	H.reasm_fill[w] += msg.ndata;
 	if(++H.reasm_got[w] == H.reasm_nchunks[w]){	// This worker completed a graph
-	  const int* flat = H.reasm_buf[w].data();
-	  Graph adj(H.Nvertices, GRAPH_DMAX);
-	  for(int u=0;u<H.Nvertices;u++)
-	    for(int i=0; 6>i && (flat[u*6+i] != -1); i++)
-	      adj.push_back(u, flat[u*6+i]);
-	  // Buckygen's e->next traversal preserves cyclic planar order.
-	  G = Graph(adj);
+	  fill_dual(H.reasm_buf[w].data(), (node_t)H.Nvertices, dst);
 	  H.reasm_fill[w] = 0; H.reasm_got[w] = 0; H.reasm_nchunks[w] = -1;
 	  return true;
 	}

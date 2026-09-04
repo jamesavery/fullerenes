@@ -222,139 +222,55 @@ vector<tri_t> PlanarGraphView::triangulation(int face_max) const
   return triangulation(faces);
 }
 
+// A face too small to cut into triangles.  Both triangulations below index f[2],
+// so this is the guard that keeps a corrupt face list from reading past its end
+// -- and the fan's loop bound j+1 < f.size() from underflowing on an empty one.
+static void require_polygon(const face_t& f, const char* operation)
+{
+  if(f.size() < 3)
+    throw std::logic_error(string(operation) + ": face with " + to_string(f.size())
+                           + " vertices cannot be triangulated (needs at least 3)");
+}
+
+// Split face i of more than 3 vertices at its centroid, the new vertex N+i.  The
+// documented contract, including why no orientation-repair pass follows, is at
+// the declaration in graphview.hh.
+//
+// Each triangle keeps its face's arc f[j] -> f[j+1] and adds the two spokes
+// f[j+1] -> c -> f[j]; the next triangle traverses that same spoke as
+// f[j+1] -> c, so every added arc appears once in each direction and the face
+// arcs are untouched.  Hence: oriented faces in, oriented surface out -- and a
+// triangle face, which is its own centroid triangulation, comes out unchanged,
+// so the two cases agree on the boundary arcs rather than winding oppositely
+// (which is what made a mixed triangle/polygon mesh come out inconsistent before
+// 2026-08-09).
 vector<tri_t> PlanarGraphView::centroid_triangulation(const vector<face_t>& faces) const
 {
-  // Test whether faces already form a triangulation
-  bool is_tri = true; for(int i=0;i<faces.size();i++) if(faces[i].size() != 3) is_tri = false;
-  if(is_tri){
-    //    cerr << "centroid_triangulation: Faces already form a triangulation.\n";
-    vector<tri_t> tris(faces.begin(),faces.end());
-    return orient_triangulation(tris);
-  } else {
-    //    cerr << "centroid_triangulation: Not a triangulation. Building centroid triangulation!\n";
-    // cerr << "Original faces:\n";
-    // cerr << "faces = {"; for(int i=0;i<faces.size();i++) cerr << faces[i] << (i+1<faces.size()?", ":"};\n");
-    // cerr << "layout = {"; for(int i=0;i<layout2d.size();i++) cerr << layout2d[i] << (i+1<layout2d.size()?", ":"};\n");
-    // cerr << "G = " << *this << ";\n";
-  }
-
-  // Triangulate by inserting extra vertex at face centroid and connecting
-  // each face vertex to this midpoint.
   vector<tri_t> tris;
-  for(int i=0;i<faces.size();i++){
-    const node_t v_new = N+i;
+  for(size_t i=0;i<faces.size();i++){
     const face_t& f(faces[i]);
+    require_polygon(f, "PlanarGraphView::centroid_triangulation");
+    const node_t c = N+int(i);            // face i's centroid vertex
 
-    if(f.size() > 3)
-      for(int j=0;j<f.size();j++)
-        tris.push_back({f[j],v_new,f[(j+1)%f.size()]});
-    else
-      tris.push_back({f[0],f[1],f[2]});
+    if(f.size() == 3) tris.push_back({f[0],f[1],f[2]});
+    else for(size_t j=0;j<f.size();j++)
+      tris.push_back({f[j],f[(j+1)%f.size()],c});
   }
-
-  return tris;                        // TODO: Make sure triangulation is oriented.
-  //return orient_triangulation(tris);
+  return tris;
 }
 
 
+// Fan from f[0].  Same contract, no new vertices: the interior diagonal f[0]-f[j]
+// is traversed f[j] -> f[0] by triangle j-1 and f[0] -> f[j] by triangle j, so
+// again every added arc appears once in each direction.  A triangle face is the
+// j == 1 term alone, so it too comes out unchanged and needs no special case.
 vector<tri_t> PlanarGraphView::triangulation(const vector<face_t>& faces) const
 {
-  // Test whether faces already form a triangulation
-  bool is_tri = true; for(int i=0;i<faces.size();i++) if(faces[i].size() != 3) is_tri = false;
-  if(is_tri){
-    //cerr << "PlanarGraph::triangulation: Faces already form a triangulation.\n";
-    vector<tri_t> tris(faces.begin(),faces.end());
-    return orient_triangulation(tris);
-  } else {
-    for(int i=0;i<faces.size();i++)
-      if(faces[i].size() != 3){
-        fprintf(stderr,"Face %d has %d sides: ",i,int(faces[i].size())); cerr << faces[i] << endl;
-      }
-  }
-
   vector<tri_t> tris;
-  // First, break up the faces into a non-consistent triangulation
-  for(size_t i=0;i<faces.size();i++){
-    face_t f(faces[i]);
-    assert(f.size() >= 3);
-    for(size_t j=1;j<f.size()-1;j++)
-      tris.push_back(tri_t(f[0],f[j],f[j+1]));
+  for(const face_t& f: faces){
+    require_polygon(f, "PlanarGraphView::triangulation");
+    for(size_t j=1;j+1<f.size();j++) tris.push_back(tri_t(f[0],f[j],f[j+1]));
   }
-
-  return orient_triangulation(tris);
-}
-
-
-vector<tri_t>& PlanarGraphView::orient_triangulation(vector<tri_t>& tris) const
-{
-  // Check that triangles are orientable: Every edge must appear in two faces
-  map<edge_t,int> edgecount;
-  for(int i=0;i<tris.size();i++)
-    for(int j=0;j<3;j++){
-      edgecount[edge_t(tris[i][j],tris[i][(j+1)%3])]++;
-      if(edgecount[edge_t(tris[i][j],tris[i][(j+1)%3])]>2)
-        cerr << tris[i] << " bad!\n";
-    }
-  for(map<edge_t,int>::const_iterator e(edgecount.begin()); e!=edgecount.end();e++)
-    if(e->second != 2){
-      cerr << "Triangulation not orientable: Edge "<< e->first << " appears in " << e->second <<" tris, not two.\n";
-      cerr << "tris = " << tris << "+1;\n";
-      cerr << "g    = " << *this << ";\n";
-      abort();
-    }
-
-  // Now, pick an orientation for triangle 0. We choose the one it
-  // already has. This determines the orientation of the remaining triangles!
-  map<arc_t,bool> done;
-  for(int i=0;i<3;i++){
-    done[arc_t(tris[0][i],tris[0][(i+1)%3])] = true;
-  }
-
-  queue<int> workset;
-  for(int i=1;i<tris.size();i++) workset.push(i);
-
-  while(!workset.empty()){
-    int i = workset.front(); workset.pop();
-    tri_t& t(tris[i]);
-
-
-    // Is this triangle connected to any already processed triangle?
-    bool seen = false, rev_seen = false;
-    for(int j=0;j<3;j++){  seen |= done[arc_t(t[j],t[(j+1)%3])]; rev_seen |= done[arc_t(t[(j+1)%3],t[j])]; }
-    if(!seen && !rev_seen) {
-      workset.push(i);
-      continue;
-    }
-
-    if(seen){
-      node_t u = t[2]; t[2] = t[1]; t[1] = u;
-    }
-
-    done[arc_t(t[0],t[1])] = true;
-    done[arc_t(t[1],t[2])] = true;
-    done[arc_t(t[2],t[0])] = true;
-  }
-  // Check consistency of orientation. It is consistent if and only if
-  // each edge has been used exactly once in each direction.
-  bool consistent = true;
-  vector<edge_t> edges = undirected_edges();
-
-  for(edge_t e: edges){
-    if(!done[arc_t(e.first,e.second)]){
-      fprintf(stderr,"A: Directed edge %d->%d is missing: triangulation is not consistently oriented.\n",e.first,e.second);
-      consistent = false;
-    }
-    if(!done[arc_t(e.second,e.first)]){
-      fprintf(stderr,"B: Directed edge %d->%d is missing: triangulation is not consistently oriented.\n",e.second,e.first);
-      consistent = false;
-    }
-  }
-
-  if(!consistent){
-    cerr << "(*** Inconsistent triangulation: ***)\n";
-    cerr << "tris = {"; for(int i=0;i<tris.size();i++) cerr << tris[i] << (i+1<tris.size()? ", ":"};\n");
-  }
-  assert(consistent == true);
   return tris;
 }
 
@@ -417,7 +333,7 @@ double lu_det(const vector<double> &A, int N)
 size_t PlanarGraphView::count_perfect_matchings() const
 {
   map<arc_t,int> faceEdge;
-  assert(is_consistently_oriented());
+  require_oriented_surface(*this, "PlanarGraphView::count_perfect_matchings");
   vector<face_t> faces(compute_faces());
   vector<bool> faceSum(faces.size()), visited(faces.size());
 
@@ -447,7 +363,7 @@ size_t PlanarGraphView::count_perfect_matchings() const
 }
 
 
-vector<coord3d> PlanarGraphView::zero_order_geometry(double scalerad) const
+vector<coord3d> PlanarGraphView::tutte_sphere_geometry(double scalerad) const
 {
   vector<coord2d> flat_layout = tutte_layout();
   vector<coord2d> angles(layout2d::spherical_projection(*this, flat_layout));

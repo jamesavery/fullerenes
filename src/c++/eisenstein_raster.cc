@@ -70,8 +70,7 @@ WalkResult walk_line_primitive(const TriangulationView& T,
     long cur_t_num = 0, cur_t_den = 1;
     int  entry_edge = -1;           // 0=(U,V), 1=(V,W), 2=(W,U)
 
-    const int MAX_STEPS = 4096;
-    for (int step = 0; step < MAX_STEPS; ++step) {
+    for (int step = 0; step < walk_max_steps; ++step) {
         struct Cand {
             int idx;
             int A, B;
@@ -181,13 +180,20 @@ NextFace find_next_face_at_hex(const TriangulationView& T,
     // Frame offset: T[V][0] is at lattice direction (d_X - j_X) mod 6.
     int k0 = ((d_X - j_X) % 6 + 6) % 6;
 
-    // Lattice direction of the line at V.  line_dir is an Eisenstein
-    // pointing in the line's direction (any positive-scale rep).
-    auto xy = line_dir.coord();
-    double theta = std::atan2(xy.second, xy.first);
-    if (theta < 0) theta += 2 * M_PI;
-    int j_line = (int)std::floor(theta / (M_PI / 3.0));
-    j_line = ((j_line % 6) + 6) % 6;
+    // Lattice direction of the line at V: the sextant [unit(j), unit(j+1))
+    // containing line_dir, decided by exact integer sector membership
+    // (Sector::contains_co is the [R, L) half-open test, i.e. floor-sextant
+    // semantics: a line along a unit direction belongs to the sector it
+    // OPENS).  line_dir is an Eisenstein pointing in the line's direction
+    // (any positive-scale rep).  This replaces floor(atan2/(pi/3)), whose
+    // result was 1-ULP-decided exactly on those boundary directions.
+    int j_line = -1;
+    for (int j = 0; j < 6; ++j)
+        if (Sector{unit_direction(j), unit_direction(j + 1)}.contains_co(line_dir)) {
+            j_line = j;
+            break;
+        }
+    if (j_line < 0) return out;    // unreachable: the six sectors cover the circle
 
     // Face index i such that T[V][i] is at direction j_line.
     int i = ((j_line - k0) % 6 + 6) % 6;
@@ -273,30 +279,19 @@ WalkResult walk_line(const TriangulationView& T, int u, int v, int w,
 // scan_triangle
 // =====================================================================
 
-namespace {
-
-// Floor-division for signed integers (rounds toward -inf).
-long floor_div(long n, long d) {
-    long q = n / d;
-    long r = n % d;
-    if (r != 0 && ((r < 0) != (d < 0))) --q;
-    return q;
-}
-
-// Ceiling-division for signed integers (rounds toward +inf).
-long ceil_div(long n, long d) {
-    long q = n / d;
-    long r = n % d;
-    if (r != 0 && ((r < 0) == (d < 0))) ++q;
-    return q;
-}
-
-}  // anonymous namespace
-
 ScanLines scan_triangle(Eisenstein P0, Eisenstein P1, Eisenstein P2)
 {
-    long w = wedge(P1 - P0, P2 - P0);
-    if (w <= 0) {
+    // Owner wrapper over the header-inline span body (scan_triangle_into,
+    // eisenstein_raster.hh -- the device batch pipelines run the same
+    // body): owning storage in, the body's refusal converted to the
+    // documented throw at this boundary.
+    ScanLines out;
+    const int b_min = std::min({P0.second, P1.second, P2.second});
+    const int b_max = std::max({P0.second, P1.second, P2.second});
+    out.lines.assign((size_t)(b_max - b_min + 1), {});
+    const long n = scan_triangle_into(P0, P1, P2, out.lines, out.b_min, out.b_max);
+    if (n < 0) {
+        const long w = wedge(P1 - P0, P2 - P0);
         char buf[256];
         std::snprintf(buf, sizeof buf,
             "scan_triangle: triangle ((%d,%d), (%d,%d), (%d,%d)) "
@@ -305,50 +300,5 @@ ScanLines scan_triangle(Eisenstein P0, Eisenstein P1, Eisenstein P2)
             w == 0 ? "degenerate (collinear)" : "CW");
         throw std::runtime_error(buf);
     }
-
-    int b_min = std::min({P0.second, P1.second, P2.second});
-    int b_max = std::max({P0.second, P1.second, P2.second});
-
-    ScanLines out;
-    out.b_min = b_min;
-    out.b_max = b_max;
-    out.lines.assign(b_max - b_min + 1, {});
-    for (auto& sl : out.lines) {
-        sl.a_left  = std::numeric_limits<int>::max();
-        sl.a_right = std::numeric_limits<int>::min();
-    }
-
-    // For a CCW triangle, each non-flat edge in the cycle P0->P1->P2->P0
-    // is on the LEFT chain iff its second endpoint has STRICTLY LOWER b
-    // than its first endpoint (b decreasing in CCW direction).  The
-    // other edges are on the RIGHT chain.
-    Eisenstein verts[3] = { P0, P1, P2 };
-    for (int i = 0; i < 3; ++i) {
-        Eisenstein A = verts[i];
-        Eisenstein B = verts[(i + 1) % 3];
-        if (A.second == B.second) continue;     // flat edge: skip
-        bool left_chain = (B.second < A.second);
-        long Aa = A.first,  Ab = A.second;
-        long Ba = B.first,  Bb = B.second;
-        long db = Bb - Ab;          // non-zero by the check above
-        long da = Ba - Aa;
-        int b_lo = (int)std::min(Ab, Bb);
-        int b_hi = (int)std::max(Ab, Bb);
-        for (int b = b_lo; b <= b_hi; ++b) {
-            // a_real = Aa + (b - Ab) * da / db
-            long num = (long)(b - Ab) * da;
-            long a_floor_off = floor_div(num, db);
-            long a_ceil_off  = ceil_div (num, db);
-            long a_floor     = Aa + a_floor_off;
-            long a_ceil      = Aa + a_ceil_off;
-            ScanLine& sl = out.lines[b - b_min];
-            if (left_chain) {
-                if ((int)a_ceil  < sl.a_left ) sl.a_left  = (int)a_ceil;
-            } else {
-                if ((int)a_floor > sl.a_right) sl.a_right = (int)a_floor;
-            }
-        }
-    }
-
     return out;
 }

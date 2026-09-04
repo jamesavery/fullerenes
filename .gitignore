@@ -22,3 +22,5 @@ play-*
 config.f
 config.hh
 claude-projects/
+# Python virtualenvs (the pybind + fviz/Mitsuba env; ~330 MB of wheels).
+**/.venv/
