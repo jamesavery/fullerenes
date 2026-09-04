@@ -220,7 +220,17 @@ endif()
 
 # C++ compiler flags
 
-set(CMAKE_CXX_FLAGS "-fPIC -O3 -m64 -pthread")
+# `-m64` means x86_64 to Clang's Darwin driver. It was harmless on native
+# Intel/Linux builds but silently produces x86_64 objects when a parent uses
+# osxcross for arm64. CMAKE_OSX_ARCHITECTURES already carries the target.
+if(CF_OSXCROSS_BUILD OR
+   (APPLE AND CMAKE_OSX_ARCHITECTURES MATCHES "(^|;)arm64(;|$)") OR
+   CMAKE_CXX_COMPILER_TARGET MATCHES "^arm64-apple-")
+  set(_FULLERENES_M64 "")
+else()
+  set(_FULLERENES_M64 "-m64")
+endif()
+set(CMAKE_CXX_FLAGS "-fPIC -O3 ${_FULLERENES_M64} -pthread")
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   # Clang (through at least 18.x) still reports __cpp_concepts=201907L (the
@@ -313,7 +323,5 @@ endif()
 if(ENABLE_PYTHON AND NOT FULLERENES_CORE_ONLY)
   add_subdirectory(src/pybind)
 endif()
-
-
 
 
