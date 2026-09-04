@@ -44,6 +44,9 @@ def test_generated_methods_are_callable():
 
 
 def test_dead_declaration_is_not_bound():
-    # GraphView::hamiltonian_count() is declared but not defined in the .so;
-    # the generator must drop it (else the module would fail to import).
-    assert not hasattr(fl.FullereneGraph.C20(), "hamiltonian_count")
+    # GraphView::hamiltonian_cycle_count() is declared but not defined in the
+    # .so (its definition is staged in claude-projects/unfortran until
+    # promotion); the generator must drop it, else the module would fail to
+    # import.  When the definition lands, this test inverts: the method must
+    # then BE bound.
+    assert not hasattr(fl.FullereneGraph.C20(), "hamiltonian_cycle_count")

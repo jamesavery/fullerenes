@@ -13,15 +13,25 @@ namespace BuckyGen {
   // the enumerator and the storage layout state the width once.
   inline constexpr int BUCKYGEN_DMAX = FullereneDualView::default_dmax;
 
+  // The STRONGEST view a destination can back: a FullereneDualView when the
+  // owner carries the pentagon list, else a TriangulationView -- the pentagon
+  // invariant is a type invariant of FullereneDualView and is never faked
+  // over storage that does not exist.
+  template<class G_t>
+  using dual_slot_t = std::conditional_t<pentagon_bearing<G_t>,
+                                         FullereneDualView, TriangulationView>;
+
   // Size an owning graph/dual type to hold one buckygen dual -- Nv vertices at
   // BUCKYGEN_DMAX, the payload's own width, whatever the destination type's
-  // default stride is -- and return the view the enumerator fills.
+  // default stride is -- and return the view the enumerator fills (the
+  // strongest one, see dual_slot_t; for a FullereneDual destination the fill
+  // establishes the pentagon list).
   //
   // Reuse is the normal case (one destination filled in a loop): storage is
   // reallocated only when the shape changes, and any twin table is dropped
   // because it describes the previous graph.
   template<class G_t> requires owning_graph<G_t>
-  FullereneDualView dual_slot(G_t& out, node_t Nv) {
+  dual_slot_t<G_t> dual_slot(G_t& out, node_t Nv) {
     if((node_t)out.N != Nv || out.dmax != BUCKYGEN_DMAX ||
        out.owned_neighbours.size() != (size_t)Nv*BUCKYGEN_DMAX){
       out.owned_neighbours.assign((size_t)Nv*BUCKYGEN_DMAX, node_t(-1));
@@ -31,7 +41,11 @@ namespace BuckyGen {
     }
     if constexpr (requires { out.owned_twin; }) out.owned_twin.clear();
     out.repoint();
-    return FullereneDualView(out.N, out.dmax, out.neighbours, out.deg);
+    TriangulationView base(out.N, out.dmax, out.neighbours, out.deg);
+    if constexpr (pentagon_bearing<G_t>)
+      return FullereneDualView(base, out.pentagons);
+    else
+      return base;
   }
 
   typedef struct {
@@ -63,6 +77,8 @@ namespace BuckyGen {
     buckygen_queue new_worker(int worker_index);
 
     // Fill a caller-provided dual view (see the free next_fullerene below).
+    // The FullereneDualView overload also establishes dst's pentagon list.
+    bool next_fullerene(TriangulationView dst);
     bool next_fullerene(FullereneDualView dst);
 
     // ... or any owning graph/dual type, sized here to the dual's own stride.
@@ -97,7 +113,10 @@ namespace BuckyGen {
   // Fill a caller-provided dual view -- the body every spelling reaches.  The
   // caller owns the memory; it may be anything addressable, a device
   // (shared-USM) slot included, so a batch can have each dual written straight
-  // into the arena its kernels read.
+  // into the arena its kernels read.  The FullereneDualView overload also
+  // establishes dst's pentagon list (the type's invariant); the
+  // TriangulationView overload fills adjacency only.
+  bool next_fullerene(buckygen_queue& Q, TriangulationView dst);
   bool next_fullerene(buckygen_queue& Q, FullereneDualView dst);
 
   // ... or an owning graph/dual type (Graph, Triangulation, FullereneDual,

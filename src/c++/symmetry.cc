@@ -44,6 +44,11 @@ PointGroup::PointGroup(const string& name_) : sym_type(UNKNOWN), n(0), sym_refle
 }
 
 
+bool PointGroup::is_fullerene_group() const {
+  for(const PointGroup& g: FullereneSymmetries) if(*this == g) return true;
+  return false;
+}
+
 string PointGroup::to_string() const {
   const char ts[7] = {'?','C','D','T','S','O','I'};
   const char rs[6] = {' ','v','h','d','i','s'};

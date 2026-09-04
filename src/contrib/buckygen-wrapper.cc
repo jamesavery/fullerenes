@@ -216,7 +216,9 @@ bool push_graph(const buckygen_queue& Q)
 // the degrees are counted; a wider one is padded.
 //
 // dst may view any memory the caller owns, device (shared-USM) slots included.
-static void fill_dual(const int* flat, node_t Nv, FullereneDualView dst)
+// Adjacency only: the FullereneDualView overloads of next_fullerene establish
+// the pentagon list on top of this fill.
+static void fill_dual(const int* flat, node_t Nv, TriangulationView dst)
 {
   if(dst.N != Nv)
     throw std::runtime_error("BuckyGen::next_fullerene: destination holds "
@@ -240,7 +242,7 @@ static void fill_dual(const int* flat, node_t Nv, FullereneDualView dst)
   }
 }
 
-bool next_fullerene(buckygen_queue& Q, FullereneDualView dst)
+bool next_fullerene(buckygen_queue& Q, TriangulationView dst)
 {
   // Single worker: a graph's chunks arrive contiguously and in seq order, so
   // we just append them until the graph is complete.
@@ -267,6 +269,21 @@ bool next_fullerene(buckygen_queue& Q, FullereneDualView dst)
     } else throw std::runtime_error("BuckyGen::next_fullerene: unexpected IPC message type "
                                     + std::to_string(msg.mtype));
   }
+}
+
+// A weak fill promoted to a strong one: adjacency landed, so the view
+// establishes its pentagon list (the type invariant) -- the one spelling
+// both strong next_fullerene overloads share.
+static bool establish(bool filled, FullereneDualView dst)
+{
+  if(!filled) return false;
+  dst.derive_pentagons();
+  return true;
+}
+
+bool next_fullerene(buckygen_queue& Q, FullereneDualView dst)
+{
+  return establish(next_fullerene(Q, TriangulationView(dst)), dst);
 }
 
 
@@ -325,6 +342,11 @@ bool next_fullerene(buckygen_queue& Q, FullereneDualView dst)
 
 
   bool buckyherd_queue::next_fullerene(FullereneDualView dst)
+  {
+    return establish(next_fullerene(TriangulationView(dst)), dst);
+  }
+
+  bool buckyherd_queue::next_fullerene(TriangulationView dst)
   {
     buckyherd_queue &H(*this);
     BGMsg msg;

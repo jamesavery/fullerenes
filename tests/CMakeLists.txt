@@ -9,6 +9,23 @@ target_link_libraries(extract-graph fullerenes)
 target_compile_definitions(extract-graph PRIVATE FULLERENE_ROOT="${CMAKE_SOURCE_DIR}")
 
 if(GTest_FOUND)
+  add_executable(edge-surgery-test edge-surgery-test.cc)
+  target_link_libraries(edge-surgery-test fullerenes GTest::GTest GTest::Main)
+  add_test(NAME edge-surgery-test COMMAND edge-surgery-test)
+
+  add_executable(arc-nav-test arc-nav-test.cc)
+  target_link_libraries(arc-nav-test fullerenes GTest::GTest GTest::Main)
+  add_test(NAME arc-nav-test COMMAND arc-nav-test)
+
+  add_executable(pentagon-test pentagon-test.cc)
+  # Uses batch::Batch, whose storage is SyclVector in a SYCL build (see view-test).
+  if(ENABLE_SYCL)
+    target_link_libraries(pentagon-test fullerenes sycl_fullerene_lib GTest::GTest GTest::Main)
+  else()
+    target_link_libraries(pentagon-test fullerenes GTest::GTest GTest::Main)
+  endif()
+  add_test(NAME pentagon-test COMMAND pentagon-test)
+
   add_executable(gc-transform-test gc-transform-test.cc)
   target_link_libraries(gc-transform-test fullerenes GTest::GTest GTest::Main)
   add_test(NAME gc-transform-test COMMAND gc-transform-test)

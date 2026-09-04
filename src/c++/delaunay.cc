@@ -196,19 +196,37 @@ int DelaunayTriangulation::track_point(int label, int face,
 
 // --- Delaunay operations: owner wrappers over the view machinery ---
 
+namespace {
+
+// The owner glue shared by the transport-hooked wrappers: run a view body
+// under the active transport policy, then convert a non-Ok status to the
+// documented throws.  (The removal drivers keep their own glue -- they
+// interpose reserve_for_removals and an observer; fold them in when a
+// prepare hook earns its keep.)
+template <class Body>
+auto with_transport(DelaunayTriangulation& D, const char* op, Body&& body)
+{
+  auto run = [&](auto&& tr) {
+    auto r = body(tr);
+    D.throw_on_status(op);
+    return r;
+  };
+  if (D.tracker.active) {
+    TrackerTransport tr{D, D.tracker.view, D.tracker.carry};
+    return run(tr);
+  }
+  return run(NoTransport{});
+}
+
+}  // namespace
+
 bool DelaunayTriangulation::flip_edge(int h)
 {
   // Owner wrappers serve the general (float-metric) API surface -- weighted
   // flips, post-reduction surgery -- so they instantiate the banded policy.
-  bool r;
-  if (tracker.active) {
-    TrackerTransport tr{*this, tracker.view, tracker.carry};
-    r = DelaunayView::flip_edge(h, BandedFloatMetric{}, tr);
-  } else {
-    r = DelaunayView::flip_edge(h);
-  }
-  throw_on_status("flip_edge");
-  return r;
+  return with_transport(*this, "flip_edge", [&](auto&& tr) {
+    return DelaunayView::flip_edge(h, BandedFloatMetric{}, tr);
+  });
 }
 
 int DelaunayTriangulation::lawson_sweep()
@@ -216,16 +234,10 @@ int DelaunayTriangulation::lawson_sweep()
   // Sweep-only workspace: k_max = 0 (no fan machinery), O(nh) bytes.
   HostDelaunayWorkspace ws({.nv0 = nv, .k_max = 0, .nh_explicit = nh});
   ws.sweep_in_stack.clear_all();
-  int flips;
-  if (tracker.active) {
-    TrackerTransport tr{*this, tracker.view, tracker.carry};
-    flips = DelaunayView::flip_to_delaunay(ws.lawson_stack, ws.sweep_in_stack,
-                                           BandedFloatMetric{}, tr);
-  } else {
-    flips = DelaunayView::flip_to_delaunay(ws.lawson_stack, ws.sweep_in_stack);
-  }
-  throw_on_status("lawson_sweep");
-  return flips;
+  return with_transport(*this, "lawson_sweep", [&](auto&& tr) {
+    return DelaunayView::flip_to_delaunay(ws.lawson_stack, ws.sweep_in_stack,
+                                          BandedFloatMetric{}, tr);
+  });
 }
 
 int DelaunayTriangulation::flip_to_delaunay()
@@ -330,47 +342,78 @@ void DelaunayTriangulation::remove_flat_vertices(double flat_tol,
   run_flat_removal(*this, BandedFloatMetric{flat_tol}, on_pop);
 }
 
-void DelaunayTriangulation::remove_flat_vertices_exact(const std::function<void(int)>& on_pop)
+// The exact-regime entry boundary (paper sec:exactness), shared by
+// remove_flat_vertices_exact and canonical_completion_exact.  The Lsq carry
+// is DERIVED from the current metric and VERIFIED -- entering the exact
+// regime on a metric it does not describe would be a silent wrong answer,
+// so both preconditions are loud:
+//   - every live he_length must square to a positive in-envelope integer
+//     within the integrality band (a from_intrinsic_metric complex, or
+//     the half-lengths bisect_multi_edges introduces, fail here);
+//   - the float curvature must agree with the integer cone excess at
+//     every live vertex (a complex with split_face / bisect-inserted
+//     vertices fails here: their v_orig_degree is not the equilateral
+//     labeling the exact flatness predicate reads).
+// The carry is transient (sized nh_cap: the machinery may allocate up to
+// capacity): the surviving he_length values are square roots of integers,
+// which the post-hoc utilities (canonical tesselation) recover exactly
+// through the same integrality boundary.
+static std::vector<long long>
+derive_exact_lsq_carry(const DelaunayTriangulation& D, const char* op)
 {
-  // The exact-regime driver (paper sec:exactness).  The Lsq carry is
-  // DERIVED from the current metric and VERIFIED -- entering the exact
-  // regime on a metric it does not describe would be a silent wrong answer,
-  // so both preconditions are loud:
-  //   - every live he_length must square to a positive in-envelope integer
-  //     within the integrality band (a from_intrinsic_metric complex, or
-  //     the half-lengths bisect_multi_edges introduces, fail here);
-  //   - the float curvature must agree with the integer cone excess at
-  //     every live vertex (a complex with split_face / bisect-inserted
-  //     vertices fails here: their v_orig_degree is not the equilateral
-  //     labeling the exact flatness predicate reads).
-  // The carry is transient (sized nh_cap: the machinery may allocate up to
-  // capacity): the surviving he_length values are square roots of integers,
-  // which the post-hoc utilities (canonical tesselation) recover exactly
-  // through the same integrality boundary.
   using delaunay_detail::lsq_integrality_band;
   const double pi_3 = std::numbers::pi_v<double> / 3.0;
-  std::vector<long long> Lsq((std::size_t)nh_cap, 0);
-  for (int h = 0; h < nh; h++) {
-    if (!alive(h)) continue;
-    const double sq = he_length[h] * he_length[h];
+  std::vector<long long> Lsq((std::size_t)D.nh_cap, 0);
+  for (int h = 0; h < D.nh; h++) {
+    if (!D.alive(h)) continue;
+    const double sq = D.he_length[h] * D.he_length[h];
     const long long n = std::llround(sq);
     if (n < 1 || n > exact_lsq_max ||
         std::abs(sq - (double)n) > lsq_integrality_band * std::max(1.0, sq))
       throw std::runtime_error(
-          "remove_flat_vertices_exact: he_length[" + std::to_string(h) +
+          std::string(op) + ": he_length[" + std::to_string(h) +
           "] does not square to a positive in-envelope integer (not an exact metric)");
     Lsq[h] = n;
   }
-  for (int v = 0; v < nv; v++) {
-    if (v_out[v] < 0) continue;
+  for (int v = 0; v < D.nv; v++) {
+    if (D.v_out[v] < 0) continue;
     // DelaunayView:: qualification: the owner's vector-returning curvature()
     // name-hides the view's per-vertex form.
-    if (std::abs(DelaunayView::curvature(v) - cone_excess(v) * pi_3) > 1e-6)
+    if (std::abs(D.DelaunayView::curvature(v) - D.cone_excess(v) * pi_3) > 1e-6)
       throw std::runtime_error(
-          "remove_flat_vertices_exact: curvature at v=" + std::to_string(v) +
+          std::string(op) + ": curvature at v=" + std::to_string(v) +
           " disagrees with its integer cone excess (not the equilateral labeling)");
   }
+  return Lsq;
+}
+
+void DelaunayTriangulation::remove_flat_vertices_exact(const std::function<void(int)>& on_pop)
+{
+  std::vector<long long> Lsq =
+      derive_exact_lsq_carry(*this, "remove_flat_vertices_exact");
   run_flat_removal(*this, ExactIntegerMetric{std::span<long long>(Lsq)}, on_pop);
+}
+
+std::vector<long long> DelaunayTriangulation::verified_exact_lsq_carry() const
+{
+  return derive_exact_lsq_carry(*this, "verified_exact_lsq_carry");
+}
+
+DelaunayView::CompletionStats DelaunayTriangulation::canonical_completion_exact()
+{
+  // The geometric precondition, checked here so a violation reads as what
+  // it is -- the view would otherwise report a refused flip on a
+  // non-inscribed tight component as a corrupt carry.
+  if (!is_delaunay())
+    throw std::runtime_error(
+        "canonical_completion_exact: complex is not Delaunay "
+        "(run lawson_sweep / the reduction first)");
+  std::vector<long long> Lsq =
+      derive_exact_lsq_carry(*this, "canonical_completion_exact");
+  const ExactIntegerMetric m{std::span<long long>(Lsq)};
+  return with_transport(*this, "canonical_completion_exact", [&](auto&& tr) {
+    return DelaunayView::canonical_completion(m, tr);
+  });
 }
 
 std::vector<int> DelaunayTriangulation::compact_vertices()
@@ -556,25 +599,23 @@ DelaunayTriangulation::canonical_tesselation(const vector<int>& vertex_labels,
       int u = he_origin[h];
       long long L = (long long)std::llround(he_length[h] * he_length[h]);
       poly.push_back({(u >= 0 && u < (int)vertex_labels.size()) ? vertex_labels[u] : u, L});
-      // Advance: walk the cell boundary CCW.  Within the cell, tight edges
-      // are interior, so step into the adjacent triangle until the next
+      // Advance via the named cell-boundary step (next_cell_boundary --
+      // the one body the canonical completion walks too).  Within the
+      // cell, tight edges are interior; the step crosses them to the next
       // boundary edge.
-      int h_next = he_next[h];
-      int safety = 0;
-      while (tight[h_next]) {
-        h_next = he_next[h_next ^ 1];
-        if (++safety > nh)
-          // Deep invariant failure: two silently-empty results would
-          // compare equal, so fail loud instead of returning a sentinel.
-          throw std::runtime_error(
-              "canonical_tesselation: cell-boundary walk from half-edge " +
-              std::to_string(h_start) + " failed to close after " +
-              std::to_string(nh) + " interior-edge (tight) steps, stuck at "
-              "half-edge " + std::to_string(h_next) + "; the tight mask "
-              "encloses a cell -- a well-formed iDT tesselation always closes. "
-              "(Thrown rather than returning an empty tesselation, which a "
-              "legitimately empty iDT also yields and so could not signal this.)");
-      }
+      const int h_next =
+          next_cell_boundary(h, [&](int g) { return (bool)tight[g]; });
+      if (h_next < 0)
+        // Deep invariant failure: two silently-empty results would
+        // compare equal, so fail loud instead of returning a sentinel.
+        throw std::runtime_error(
+            "canonical_tesselation: cell-boundary walk from half-edge " +
+            std::to_string(h_start) + " failed to close after " +
+            std::to_string(nh) + " interior-edge (tight) steps; the tight "
+            "mask encloses a cell -- a well-formed iDT tesselation always "
+            "closes. (Thrown rather than returning an empty tesselation, "
+            "which a legitimately empty iDT also yields and so could not "
+            "signal this.)");
       h = h_next;
     } while (h != h_start);
     T.cells.push_back(min_rotation(poly));

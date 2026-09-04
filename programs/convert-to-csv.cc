@@ -14,7 +14,7 @@ int main(int ac, char **av)
 
   printf("N = %d\n",DB.N);
 
-  if(DB.writeCSV(filename) != true) return -2;
+  if(DB.writeCSV(filename) != IsomerDB::WriteStatus::Ok) return -2;
     
   return 0;
 }

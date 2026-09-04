@@ -17,6 +17,11 @@
 // adds vector storage for any view type.
 
 #include <stdexcept>
+#include <array>
+#include <span>
+#include <cmath>
+#include <cfloat>
+#include <variant>   // std::monostate (pentagon_storage_t's non-bearing branch)
 
 #include "fullerenes/dense_graph.hh"
 #include "fullerenes/geometry.hh"
@@ -98,7 +103,49 @@ struct GraphView : Spanify::RSRAdjacencyView<node_t> {
     GraphView() = default;
 
     // --- Edge operations (mutate through spans) ---
+    // Ensure-edge, successor-ASSERTING: the new arc lands right before
+    // suc_uv in u's rotation (resp. suc_vu in v's); -1 appends at the end
+    // of the row.  The successor encodes the embedding -- it decides which
+    // face the edge splits -- so a named successor that is NOT a neighbour
+    // means the caller's picture of the rotation is wrong and throws
+    // (until 2026-08 this case silently appended, embedding the edge at an
+    // arbitrary cyclic position).
+    // @anchor graph-insert-edge
+    // @pre  vertices: size_t(e.first) < size_t(N) && size_t(e.second) < size_t(N)
+    // @pre  successors: (suc_uv < 0 || find(e.first, suc_uv) >= 0)
+    //               && (suc_vu < 0 || find(e.second, suc_vu) >= 0)
+    // @pre  (the slot core's @pre when the edge is absent -- rsr-insert-edge-slots)
+    // @post twin: twin_is_valid()
+    // @post returns was_present: true means the edge already existed and
+    //       NOTHING was changed; false means it was inserted
+    // @throws graph_surgery_error{VertexOutOfRange, SuccessorNotNeighbour}
+    //         and the slot core's codes
     bool insert_edge(const arc_t& e, const node_t suc_uv=-1, const node_t suc_vu=-1);
+
+    // Ensure-edge with HINT positioning: same as insert_edge except that a
+    // named-but-absent successor means APPEND rather than throw.  This is
+    // the incremental-construction idiom (the spiral windup names boundary
+    // nodes whose edges arrive later in the wind); a caller who KNOWS its
+    // successor is a neighbour should call insert_edge, which makes a
+    // wrong successor loud instead of silently repositioning the edge.
+    // @anchor graph-insert-edge-hint
+    // @pre  vertices: size_t(e.first) < size_t(N) && size_t(e.second) < size_t(N)
+    // @pre  (the slot core's @pre when the edge is absent -- rsr-insert-edge-slots)
+    // @post twin: twin_is_valid()
+    // @post returns was_present, as for insert_edge
+    // @throws graph_surgery_error{VertexOutOfRange} and the slot core's codes
+    bool insert_edge_hint(const arc_t& e, const node_t hint_uv=-1, const node_t hint_vu=-1);
+
+    // Remove the edge as a symmetric arc pair.  Presence in ONE direction
+    // only is corrupted adjacency and throws (until 2026-08 this case
+    // silently removed the surviving half-arc, hiding the corruption).
+    // @anchor graph-remove-edge
+    // @pre  vertices: size_t(e.first) < size_t(N) && size_t(e.second) < size_t(N)
+    // @pre  symmetric: (find(e.first, e.second) >= 0) == (find(e.second, e.first) >= 0)
+    // @post twin: twin_is_valid()
+    // @post returns was_present: true means the edge existed and was
+    //       removed; false means it was absent and nothing changed
+    // @throws graph_surgery_error{VertexOutOfRange, SelfLoop, NotMutualPair}
     bool remove_edge(const edge_t& e);
     bool edge_exists(const edge_t& e) const;
     void flip_all_orientations();
@@ -210,6 +257,15 @@ struct GraphView : Spanify::RSRAdjacencyView<node_t> {
     vector<OrientedSurface> component_surfaces(const vector<int>& genus = {}) const;
 
     bool adjacency_is_symmetric() const;
+
+    // How many of u's neighbours have u's own degree -- the quantity the
+    // pentagon/hexagon neighbour indices are the histogram of.
+    // @post result <= degree(u)
+    int same_degree_neighbours(node_t u) const {
+        int n = 0;
+        for (node_t v : nbrs(u)) n += (degree(v) == degree(u));
+        return n;
+    }
     bool has_separating_triangles() const;
 
     // --- Connectivity and shortest paths ---
@@ -224,9 +280,44 @@ struct GraphView : Spanify::RSRAdjacencyView<node_t> {
     vector<node_t> shortest_cycle(const vector<node_t>& prefix, const int max_depth) const;
     vector<int> multiple_source_shortest_paths(const vector<node_t>& sources, const unsigned int max_depth=INT_MAX) const;
 
-    // --- Hamiltonian paths ---
-    int hamiltonian_count() const;
-    int hamiltonian_count(node_t current_node, vector<bool>& used_edges, vector<bool>& used_nodes, vector<node_t>& path, const vector<int>& distances) const;
+    // --- Adjacency spectrum ---
+    // The eigenvalues of the adjacency matrix, DESCENDING (the order the pi
+    // system fills in: the Perron root first).  A[u][v] counts u-v arcs, so a
+    // multigraph gets its own spectrum.  Computed with the in-house BLAS-free
+    // cyclic Jacobi (LinAlg::jacobi_eig): the symmetry precondition is
+    // CHECKED here rather than inferred from the solver's guard, because an
+    // asymmetric matrix does not trip that guard -- it converges quietly to
+    // numbers that are not the spectrum.  The guard has never tripped on a
+    // symmetric input in this repo's sweeps (cubic C20-C100, cycles to
+    // N = 400, K_n to n = 100), and a trip is reported as what it is.
+    // @anchor adjacency-spectrum
+    // @pre  symmetric: adjacency_is_symmetric()
+    // @post size: result.size() == size_t(N)
+    // @post descending: is_sorted_descending(result)
+    // @post perron_regular: implies(all_of(indices(N), [&](node_t v){ return degree(v) == degree(0); }),
+    //                               fabs(result[0] - degree(0)) < 1e-9)
+    // @throws std::logic_error when the adjacency is not symmetric (a graph bug)
+    // @throws std::runtime_error when cyclic Jacobi exhausts its sweep budget
+    // @time O(sweeps*N^3) -- ~1 ms at N=60, ~5 ms at N=100  @space O(N^2)
+    vector<double> adjacency_spectrum() const;
+
+    // --- Hamiltonian cycles ---
+    // The number of Hamiltonian cycles of this graph, counted as UNDIRECTED
+    // cycles -- each once, not once per traversal direction.  That is the
+    // convention of IsomerDB's ncycham field and of the legacy Fortran
+    // HamiltonCyc (hamilton.f), whose backtracking (Babic's) this
+    // implements, generalised from cubic graphs to any degree.
+    //
+    // Connectivity is NOT required: a disconnected graph has no Hamiltonian
+    // cycle, and the search's distance bound returns 0 for it.
+    //
+    // @anchor hamiltonian-cycle-count
+    // @pre  simple: adjacency_is_symmetric() &&
+    //           none_of(indices(N), [&](node_t u){ return edge_exists({u,u}); })
+    // @post nonnegative: result >= 0
+    // @post small: implies(N < 3, result == 0)
+    // @time exponential in N: ~1 min per isomer at C110, ~20 ms at C60
+    int64_t hamiltonian_cycle_count() const;
 
     // --- Geometry helpers ---
     coord2d centre2d(const vector<coord2d>& layout) const;
@@ -634,13 +725,355 @@ struct TriangulationView : PlanarGraphView {
     Permutation sort_flat_last() const;
 };
 
+// --- Spectral graph invariants -------------------------------------------
+// Functions of a graph's adjacency spectrum alone (GraphView::adjacency_spectrum),
+// with no reference to any electron count -- the Hueckel module reports them,
+// but they belong to the graph.
+
+// The Estrada index EE(G) = sum_i exp(x_i) (Estrada 2000): the
+// subgraph-centrality trace tr e^A = sum_k tr A^k / k!.
+// @pre  nonempty: !spectrum.empty()
+double estrada_index(std::span<const double> spectrum);
+
+// The bipartivity beta(G) = sum_i cosh(x_i) / sum_i exp(x_i) (Estrada &
+// Rodriguez-Velazquez 2005): the even-walk share of EE(G).  In exact
+// arithmetic beta = (1 + EE(-A)/EE(A))/2, so beta > 1/2 always, and
+// 1 - beta = (sum_{k odd} tr A^k / k!)/EE(A), so beta == 1 IFF the graph has
+// no closed walk of odd length, i.e. iff it is bipartite.  Computed values
+// land within a few ulps of that, on either side -- hence the slack below,
+// and never test it with ==.
+// @pre  nonempty: !spectrum.empty()
+// @post half_to_one: result >= 0.5 && result <= 1 + 8*spectrum.size()*DBL_EPSILON
+double bipartivity(std::span<const double> spectrum);
+
+// The spectral moments M(k) = sum_i x_i^k = tr A^k, k = 0..15: the number of
+// closed k-walks.  For a SIMPLE LOOPLESS graph M(0) = N, M(1) = 0,
+// M(2) = 2|E| and M(3) = 6*#triangles -- exactly in the integers, to a few
+// eigensolver ulps here.  The 16 is the legacy report's width (hueckel.f
+// nspec = 15).
+// @pre  nonempty: !spectrum.empty()
+std::array<double, 16> spectral_moments(std::span<const double> spectrum);
+
 // ---------------------------------------------------------------------------
 // FullereneDualView: dual of a fullerene (triangulation with 12 degree-5
 // vertices, rest degree 6).
 // ---------------------------------------------------------------------------
+
+// The pentagon and hexagon neighbour indices of a fullerene (Raghavachari;
+// Fowler & Manolopoulos, An Atlas of Fullerenes; legacy spiral.f
+// DualAnalyze): P[k] = number of pentagons with k pentagon neighbours
+// (k = 0..5, sum 12), H[k] = number of hexagons with k hexagon neighbours
+// (k = 0..6, sum N/2 - 10).
+struct NeighbourIndices {
+    std::array<uint8_t,6> P{};
+    std::array<uint8_t,7> H{};
+};
+inline int pentagon_count(const NeighbourIndices& ni) { int n = 0; for (int k = 0; k < 6; k++) n += ni.P[k]; return n; }
+inline int hexagon_count (const NeighbourIndices& ni) { int n = 0; for (int k = 0; k < 7; k++) n += ni.H[k]; return n; }
+
+// Np = the number of pentagon-pentagon adjacencies = sum_k k P[k] / 2
+// (legacy util.f IPentInd).
+inline int pentagon_adjacencies(const NeighbourIndices& ni) {
+    int m = 0; for (int k = 0; k < 6; k++) m += k * ni.P[k]; return m / 2;
+}
+// sigma_h = the standard deviation of the hexagon-neighbour count over the
+// hexagons -- the strain parameter (legacy util.f HexInd).  0 when there are
+// no hexagons (C20).
+inline double hexagon_index(const NeighbourIndices& ni) {
+    const int n = hexagon_count(ni);
+    if (!n) return 0.0;
+    long hk = 0, hk2 = 0;
+    for (int k = 0; k < 7; k++) { hk += k * ni.H[k]; hk2 += k * k * ni.H[k]; }
+    return std::sqrt(std::fabs(double(hk2)/n - std::pow(double(hk)/n, 2)));
+}
+
+// ---------------------------------------------------------------------------
+// A view that carries the pentagon list, and the storage that backs it -- the
+// ONE spelling of both facts.  Generic owners stay ignorant of pentagons
+// (Owned<> is allocation only); the concrete owner or wrapper that mints a
+// pentagon-bearing view declares pentagon_storage_t<View> and points the
+// view's span at it.
+// ---------------------------------------------------------------------------
+template<class V>
+concept pentagon_bearing = requires(V v) { v.pentagons; };
+
+namespace graphview_detail {
+    // Two-phase (the owned.hh coord_type_of pattern): the false branch must
+    // not instantiate V::n_pentagons on views that have none.
+    template<class V, bool = pentagon_bearing<V>>
+    struct pentagon_storage { using type = std::monostate; };
+    template<class V>
+    struct pentagon_storage<V, true> {
+        using type = std::array<typename V::node_type, V::n_pentagons>;
+    };
+}
+template<class V>
+using pentagon_storage_t = typename graphview_detail::pentagon_storage<V>::type;
+
+// ---------------------------------------------------------------------------
+// A violated precondition of the pentagon-list operations below -- the
+// exception channel, not a modeled outcome (style-failures.md; the
+// graph_surgery_error / unoriented_surface_error precedent).  The list is a
+// type invariant of FullereneDualView (see @inv there), so every code names
+// one way a producer or a substitution tried to break it.  The channel is
+// closed over the whole operation set -- range violations included -- so one
+// operation throws ONE type.
+// ---------------------------------------------------------------------------
+struct pentagon_error : public std::logic_error {
+    enum class Code {
+        PentagonSpanWrongSize,     // the backing span does not hold exactly n_pentagons slots
+        PentagonsUnsorted,         // the list broke its strictly-ascending invariant (stale or
+                                   // tampered), caught by the substitution's O(1) conservation
+                                   // tripwire rather than by a per-call scan
+        NotFullereneDual,          // the graph's degree-5 vertex count is not n_pentagons
+        SubstitutionUnbalanced,    // |departures| != |arrivals|
+        SubstitutionTooLong,       // more substitutions than list slots
+        DeparturesNotDistinct,     // a departure is named twice
+        ArrivalsNotDistinct,       // an arrival is named twice
+        PentagonAbsent,            // a departure is not in the pentagon list
+        PentagonPresent,           // an arrival is already in the pentagon list
+        PentagonVertexOutOfRange,  // an arrival is not a vertex of the graph
+    };
+    Code      code;
+    long long u;      // the offending count (span/count/length codes) or vertex id
+    pentagon_error(Code code, const std::string& what, long long u = -1)
+        : std::logic_error(what), code(code), u(u) {}
+};
+
+// ---------------------------------------------------------------------------
+// @inv shape:  pentagons.size() == n_pentagons
+// @inv sorted: adjacent_find(pentagons, greater_equal) == end  [strictly ascending]
+// The invariants of an ESTABLISHED pentagon list, which every producer must
+// obey -- DOCUMENTED, not re-verified per call (the orientation discipline:
+// validation lives at boundaries, pentagons_valid() and the harness gates,
+// never in the hot path).  During construction, before the producer's
+// establishing call, the contents are stale and only pentagons_valid() may
+// be consulted.  Sortedness is what makes the binary searches and the
+// ordered set algebra below correct; the substitution's O(1) conservation
+// tripwire turns a violated invariant into a thrown diagnosis instead of a
+// memory error, at no scanning cost.
+// ---------------------------------------------------------------------------
 struct FullereneDualView : TriangulationView {
-    using TriangulationView::TriangulationView;
-    static constexpr uint8_t default_dmax = 6;
+    static constexpr uint8_t default_dmax  = 6;
+    static constexpr int     n_pentagons   = 12;
+
+    // The 12 pentagons (degree-5 vertices), ASCENDING -- a pure function of
+    // the graph, so maintained-equals-derived is checkable as array equality.
+    // Never optional: a batch-sliced span always exists over its slab memory,
+    // so emptiness cannot signal absence (the twin table's lesson); presence
+    // is a type invariant instead.  Producers establish the contents
+    // (derive_pentagons), surgery maintains them (substitute_pentagons), and
+    // boundary gates check maintained against derived (pentagons_valid).
+    // Relabelling or restructuring the graph stales the list; the producer
+    // that does so re-derives at its boundary.
+    std::span<node_t> pentagons;
+
+    FullereneDualView() = default;
+    // The one constructor: a triangulation plus the span backing the pentagon
+    // list.  @pre span: pentagons.size() == n_pentagons (checked by every
+    // operation below, so a misshapen span cannot survive its first use).
+    FullereneDualView(TriangulationView base, std::span<node_t> pentagons)
+        : TriangulationView(base), pentagons(pentagons) {}
+
+    // The degree-5 vertices of [0, N) in ascending vertex order, written into
+    // out (at most out.size() entries); returns how many the graph has.  THE
+    // reference definition that establishing and checking compose from.
+    int collect_degree5(std::span<node_t> out) const {
+        int k = 0;
+        for (node_t u = 0; u < N; u++)
+            if (deg[u] == 5) { if (k < (int)out.size()) out[k] = u; k++; }
+        return k;
+    }
+
+    // Establish the invariant from the graph.
+    // @anchor dual-derive-pentagons
+    // @pre  shape: pentagons.size() == n_pentagons
+    // @post derived: pentagons_valid()
+    // @post atomic: a throwing call writes nothing
+    // @throws pentagon_error{PentagonSpanWrongSize, NotFullereneDual}
+    void derive_pentagons() {
+        require_pentagon_span("derive_pentagons");
+        std::array<node_t, n_pentagons> d5;
+        const int n5 = collect_degree5(d5);
+        if (n5 != n_pentagons)
+            pentagon_fail("derive_pentagons",
+                          pentagon_error::Code::NotFullereneDual, n5);
+        std::copy(d5.begin(), d5.end(), pentagons.begin());
+    }
+
+    // The boundary gate: does the span hold exactly the ascending degree-5
+    // list of this graph?  False covers a misshapen span, stale construction
+    // contents, and a maintained list whose adjacency surgery has not caught
+    // up (substitute_pentagons is list-level only).
+    bool pentagons_valid() const {
+        std::array<node_t, n_pentagons> d5;
+        return (int)pentagons.size() == n_pentagons
+            && collect_degree5(d5) == n_pentagons
+            && std::equal(d5.begin(), d5.end(), pentagons.begin());
+    }
+
+    // Atomic pentagon substitution: the departures leave the list and the
+    // arrivals enter it in ONE operation.  (The sequential one-entry-at-a-time
+    // form is a known bug shape: an arrival aliasing a not-yet-removed
+    // departure corrupts the set.)  List-level only -- degrees are the
+    // adjacency surgery's concern; pentagons_valid() holds the two together
+    // at the boundary.  All preconditions are checked before the first write.
+    // @anchor dual-substitute-pentagons
+    // @pre  shape:     pentagons.size() == n_pentagons
+    // @pre  balanced:  departures.size() == arrivals.size() && departures.size() <= n_pentagons
+    // @pre  distinct:  adjacent_find(sorted(departures)) == end && adjacent_find(sorted(arrivals)) == end
+    // @pre  vertices:  all_of(arrivals, [&](node_t v){ return size_t(v) < size_t(N); })
+    // @pre  departing: includes(pentagons, sorted(departures))
+    // @pre  arriving:  none_of(arrivals, [&](node_t v){ return binary_search(pentagons, v); })
+    // @post substituted: pentagons == merge(set_difference(old, departures), sorted(arrivals))
+    // @post atomic: a throwing call leaves pentagons unchanged
+    // @throws pentagon_error
+    //
+    // The @pre list validates the ARGUMENTS; the list's own @inv (shape,
+    // sorted) is the producers' documented obligation and is not re-verified
+    // here -- only the conservation tripwire below stands on it.
+    void substitute_pentagons(std::span<const node_t> departures,
+                              std::span<const node_t> arrivals) {
+        const char* op = "substitute_pentagons";
+        require_pentagon_span(op);
+        if (departures.size() != arrivals.size())
+            pentagon_fail(op, pentagon_error::Code::SubstitutionUnbalanced,
+                          (long long)departures.size());
+        if (departures.size() > (size_t)n_pentagons)
+            pentagon_fail(op, pentagon_error::Code::SubstitutionTooLong,
+                          (long long)departures.size());
+        const int k = (int)departures.size();
+
+        std::array<node_t, n_pentagons> dep, arr;
+        std::copy(departures.begin(), departures.end(), dep.begin());
+        std::copy(arrivals.begin(),   arrivals.end(),   arr.begin());
+        std::sort(dep.begin(), dep.begin() + k);
+        std::sort(arr.begin(), arr.begin() + k);
+
+        const auto listed = [&](node_t v) {
+            return std::binary_search(pentagons.begin(), pentagons.end(), v);
+        };
+        const auto vertex = [&](node_t v) { return size_t(v) < size_t(N); };
+
+        if (auto d = std::adjacent_find(dep.begin(), dep.begin() + k); d != dep.begin() + k)
+            pentagon_fail(op, pentagon_error::Code::DeparturesNotDistinct, *d);
+        if (auto d = std::adjacent_find(arr.begin(), arr.begin() + k); d != arr.begin() + k)
+            pentagon_fail(op, pentagon_error::Code::ArrivalsNotDistinct, *d);
+        if (auto v = std::find_if_not(arr.begin(), arr.begin() + k, vertex); v != arr.begin() + k)
+            pentagon_fail(op, pentagon_error::Code::PentagonVertexOutOfRange, *v);
+        if (auto m = std::find_if_not(dep.begin(), dep.begin() + k, listed); m != dep.begin() + k)
+            pentagon_fail(op, pentagon_error::Code::PentagonAbsent, *m);
+        if (auto p = std::find_if(arr.begin(), arr.begin() + k, listed); p != arr.begin() + k)
+            pentagon_fail(op, pentagon_error::Code::PentagonPresent, *p);
+
+        // The write: ordered set algebra.  On a list obeying @inv sorted,
+        // the checked departures match exactly k list elements, so the
+        // difference holds n_pentagons - k survivors -- the conservation
+        // equality below is an O(1) tripwire (no scan) that turns a
+        // violated invariant into a diagnosis BEFORE the merge whose
+        // output bound stands on it.
+        std::array<node_t, n_pentagons> survivors, next;
+        auto survivors_end = std::set_difference(pentagons.begin(), pentagons.end(),
+                                                 dep.begin(), dep.begin() + k,
+                                                 survivors.begin());
+        if (survivors_end - survivors.begin() != n_pentagons - k)
+            pentagon_fail(op, pentagon_error::Code::PentagonsUnsorted,
+                          survivors_end - survivors.begin());
+        std::merge(survivors.begin(), survivors_end, arr.begin(), arr.begin() + k,
+                   next.begin());
+        std::copy(next.begin(), next.end(), pentagons.begin());
+    }
+
+    // --- Pentagon failure channel (the surgery_fail pattern) --------------
+
+    void require_pentagon_span(const char* op) const {
+        if ((int)pentagons.size() != n_pentagons)
+            pentagon_fail(op, pentagon_error::Code::PentagonSpanWrongSize,
+                          (long long)pentagons.size());
+    }
+
+    // The ONE builder for every pentagon diagnosis: code -> sentence, plus
+    // the list itself, so the message reads as a diagnosis rather than a
+    // shrug (the surgery_fail precedent).
+    [[noreturn]] void pentagon_fail(const char* op, pentagon_error::Code c,
+                                    long long u) const {
+        std::string reason;
+        switch (c) {
+        case pentagon_error::Code::PentagonSpanWrongSize:
+            reason = "the pentagon span holds " + std::to_string(u)
+                   + " slots, not " + std::to_string(n_pentagons); break;
+        case pentagon_error::Code::PentagonsUnsorted:
+            reason = "the pentagon list broke its ascending invariant ("
+                   + std::to_string(u) + " survivors where "
+                   + std::to_string(n_pentagons)
+                   + " minus the departures were conserved)"; break;
+        case pentagon_error::Code::NotFullereneDual:
+            reason = "the graph has " + std::to_string(u)
+                   + " degree-5 vertices, not " + std::to_string(n_pentagons); break;
+        case pentagon_error::Code::SubstitutionUnbalanced:
+            reason = std::to_string(u) + " departures do not balance "
+                   + "the arrivals"; break;
+        case pentagon_error::Code::SubstitutionTooLong:
+            reason = std::to_string(u) + " substitutions exceed the "
+                   + std::to_string(n_pentagons) + " list slots"; break;
+        case pentagon_error::Code::DeparturesNotDistinct:
+            reason = "departure " + std::to_string(u) + " is named twice"; break;
+        case pentagon_error::Code::ArrivalsNotDistinct:
+            reason = "arrival " + std::to_string(u) + " is named twice"; break;
+        case pentagon_error::Code::PentagonAbsent:
+            reason = "departure " + std::to_string(u)
+                   + " is not in the pentagon list"; break;
+        case pentagon_error::Code::PentagonPresent:
+            reason = "arrival " + std::to_string(u)
+                   + " is already in the pentagon list"; break;
+        case pentagon_error::Code::PentagonVertexOutOfRange:
+            reason = "arrival " + std::to_string(u)
+                   + " is not a vertex (N = " + std::to_string((long long)N) + ")"; break;
+        }
+        std::string list;
+        for (size_t i = 0; i < pentagons.size(); i++)
+            list += (i ? "," : "") + std::to_string(pentagons[i]);
+        throw pentagon_error(c, std::string("FullereneDualView::") + op + "(): "
+                             + reason + "; pentagons = [" + list + "]", u);
+    }
+
+    // -----------------------------------------------------------------------
+    // Batchability contract (extends graph fields with `pentagons`).
+    // Canonical tuple order: {neighbours, deg, twin, pentagons}.
+    //   pentagons : 12 per entry -- the contract's first constant-size field.
+    // -----------------------------------------------------------------------
+    static constexpr std::size_t n_fields = 4;
+
+    auto to_tuple() {
+        return std::forward_as_tuple(this->neighbours, this->deg, this->twin, pentagons);
+    }
+    auto to_tuple() const {
+        return std::forward_as_tuple(this->neighbours, this->deg, this->twin, pentagons);
+    }
+
+    static constexpr std::array<std::size_t, n_fields>
+    get_element_counts(int N, int dmax) {
+        return { (std::size_t)N * dmax, (std::size_t)N, (std::size_t)N * dmax,
+                 (std::size_t)n_pentagons };
+    }
+
+    // The pentagon/hexagon neighbour indices of this dual.
+    // @pre  fullerene_dual: all_of(indices(N), [&](node_t u){ return degree(u) == 5 || degree(u) == 6; })
+    // @post counts: pentagon_count(result) == n_pentagons && hexagon_count(result) == N - n_pentagons
+    NeighbourIndices neighbour_indices() const;
+
+    // The lexicographically smallest REGULAR (jump-free) ring spiral of this
+    // dual, over all starts: the 12 pentagon positions, 0-based, ascending --
+    // the isomer database's key (Fowler & Manolopoulos; legacy spiral.f).  A
+    // '5' beats a '6' lexicographically, so a pentagon start wins whenever
+    // one closes; the isomers whose only regular spirals start at a hexagon
+    // (one each of C100, C104, C110, C124, ...) fall back to the smallest
+    // hexagon start.  Empty = the isomer has no regular spiral at all (every
+    // start needs a jump), which is what the general spiral is for.
+    // @anchor fullerene-regular-rspi
+    // @post empty_or_ascending: result.empty() ||
+    //           (result.size() == 12 && is_sorted(result) && result[0] >= 0)
+    vector<int> regular_rspi() const;
 
     bool get_rspi(node_t f1, node_t f2, node_t f3,
                   vector<int>& r, jumplist_t& j, bool general=true) const;
@@ -805,8 +1238,8 @@ struct PolyhedronView : PlanarGraphView {
     }
 
     static constexpr std::array<std::size_t, n_fields>
-    get_size_factors(int /*N*/, int dmax) {
-        return { (std::size_t)dmax, (std::size_t)1, (std::size_t)dmax, (std::size_t)1 };
+    get_element_counts(int N, int dmax) {
+        return { (std::size_t)N * dmax, (std::size_t)N, (std::size_t)N * dmax, (std::size_t)N };
     }
 
     // --- Geometry queries ---
@@ -1094,8 +1527,8 @@ struct DeltahedronView : TriangulationView {
     }
 
     static constexpr std::array<std::size_t, n_fields>
-    get_size_factors(int /*N*/, int dmax) {
-        return { (std::size_t)dmax, (std::size_t)1, (std::size_t)dmax, (std::size_t)1 };
+    get_element_counts(int N, int dmax) {
+        return { (std::size_t)N * dmax, (std::size_t)N, (std::size_t)N * dmax, (std::size_t)N };
     }
 
     // --- Quality metrics ---

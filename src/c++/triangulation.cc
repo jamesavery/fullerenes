@@ -325,7 +325,9 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
   // calling insert_edge through the derived pointer produces
   // incorrect neighbour ordering in the planar embedding.
   GraphView& g = *this;
-  auto ins = [&g](const arc_t& e, node_t su, node_t sv){ g.insert_edge(e, su, sv); };
+  // Hint form: the windup names boundary nodes whose edges arrive later in
+  // the wind, so the successor may legitimately not be a neighbour yet.
+  auto ins = [&g](const arc_t& e, node_t su, node_t sv){ g.insert_edge_hint(e, su, sv); };
 
   // ── Initialize: place first two nodes ────────────────────────────────
   B.push_back({0, spiral_string[0] - 1});
@@ -1557,6 +1559,31 @@ spiral_nomenclature FullereneDualView::name(bool rarest_start) const
   return spiral_nomenclature(dual_graph(), spiral_nomenclature::FULLERENE,
 			     spiral_nomenclature::CUBIC,
 			     rarest_start);  
+}
+
+// The two-bin histogram of same_degree_neighbours over the pentagons (degree
+// 5) and hexagons (degree 6) of the dual.  The @pre is what bounds the bin
+// index: a degree-d vertex has at most d same-degree neighbours, and P/H hold
+// 6/7 bins.
+NeighbourIndices FullereneDualView::neighbour_indices() const
+{
+  NeighbourIndices ni;
+  for(node_t u=0;u<N;u++){
+    const int du = degree(u);
+    if(du != 5 && du != 6)
+      throw std::invalid_argument("FullereneDualView::neighbour_indices: vertex " + to_string(u) +
+                                  " has degree " + to_string(du) + ", not 5 or 6: not a fullerene dual");
+    if(du == 5) ni.P[same_degree_neighbours(u)]++; else ni.H[same_degree_neighbours(u)]++;
+  }
+  return ni;
+}
+
+vector<int> FullereneDualView::regular_rspi() const
+{
+  vector<int> rspi; jumplist_t jumps;
+  if(get_rspi(rspi, jumps, /*general=*/false, /*pentagon_start=*/true) ||
+     get_rspi(rspi, jumps, /*general=*/false, /*pentagon_start=*/false)) return rspi;
+  return {};
 }
 
 // call for one general spiral and extract the pentagon indices
