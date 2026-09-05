@@ -271,3 +271,46 @@ TYPED_TEST(ArcNav, FindArcOnAbsentEdgeCarriesNoSlot) {
     using V = typename TestFixture::View;
     EXPECT_EQ(V::slot(G.find_arc(TypeParam(1), TypeParam(3))), V::no_slot);
 }
+
+// @ref rsr-find-reverse, rsr-compute-twin, rsr-twin-mismatch (dense_graph.hh)
+TYPED_TEST(ArcNav, ComputeTwinMatchesTheRotationDerivedTwin) {
+    // Differential: the fixture's twin was derived from the rotation
+    // lists; the view's compute_twin derives from the arrays through its
+    // own find, INTO the same storage (no allocation).  Zero the table and
+    // let the view rebuild it in place.
+    using V = typename TestFixture::View;
+    for (const auto& f : this->fixtures()) {
+        SCOPED_TRACE(f.name);
+        auto G = this->build(f.rot);
+        const std::vector<uint8_t> expect = this->twin;
+        std::fill(this->twin.begin(), this->twin.end(), 0);
+        G.compute_twin();
+        for (auto a : this->arcs(G)) {
+            EXPECT_EQ(this->twin[G.arcid(a)], expect[G.arcid(a)]);
+            EXPECT_EQ(G.find_reverse(a), G.reverse_arc(a));   // the locator IS alpha
+        }
+        // Padding slots hold the named dead value.
+        for (int u = 0; u < this->N; u++)
+            for (int i = G.degree(TypeParam(u)); i < this->dmax; i++)
+                EXPECT_EQ(this->twin[(size_t)u * this->dmax + i], V::no_slot);
+        EXPECT_EQ(G.twin_mismatch(), TypeParam(-1));
+        EXPECT_TRUE(G.twin_is_valid());
+    }
+}
+
+TYPED_TEST(ArcNav, TwinMismatchNamesTheFirstDisagreeingVertex) {
+    // On the 5-wheel, vertex 3's slot-0 arc goes to 4 (row 4 = {5, 0, 3},
+    // so the locator's slot is 2).  Point the cached entry one slot on --
+    // a live slot of row 4 that does not hold 3 -- and the first vertex
+    // the validator names is 3; the per-row repair clears it.
+    auto G = this->build(this->fixtures()[1].rot);
+    const auto a = G.arc_at(TypeParam(3), 0);
+    const uint8_t good = this->twin[G.arcid(a)];
+    this->twin[G.arcid(a)] = uint8_t((good + 1) % G.degree(G.target(a)));
+    EXPECT_EQ(G.twin_mismatch(), TypeParam(3));
+    EXPECT_FALSE(G.twin_is_valid());
+    G.compute_twin_row(TypeParam(3));
+    EXPECT_EQ(this->twin[G.arcid(a)], good);
+    EXPECT_EQ(G.twin_mismatch(), TypeParam(-1));
+    EXPECT_TRUE(G.twin_is_valid());
+}

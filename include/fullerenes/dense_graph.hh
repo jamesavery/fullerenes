@@ -299,13 +299,114 @@ struct RSRAdjacencyView {
     }
 
     // =======================================================================
+    // The twin table: derivation and validity, both from the LOCATOR
+    //
+    // alpha has ONE reference definition, the locator: the reverse of the
+    // arc u -> v is the arc at the slot of v's row that holds u, which is
+    // find(v, u).  The twin table is a CACHE of that answer, one byte per
+    // arc, so that reverse_arc is O(1).  Everything below is stated against
+    // the locator: compute_twin writes it into the view's own span (no
+    // allocation -- the storage is the owner's, and a view over caller
+    // arrays derives its table in place), twin_mismatch names the first
+    // vertex whose cached answer differs from it, and twin_is_valid IS
+    // "there is no such vertex".  One definition; the validator, the
+    // derivation and the surgery's maintenance all answer to it.
+    //
+    // SIMPLE GRAPHS.  find resolves the FIRST occurrence of u in v's row,
+    // so on a graph with parallel arcs u -> v the locator names one slot
+    // for both and the derived table is not an involution; the library's
+    // face tracing makes the same assumption (graphview.hh's
+    // is_consistently_oriented note, and the open question it cites), and
+    // the surgery below refuses to create parallel arcs.  Validity here
+    // means agreement with the locator, and on a simple graph that agreement
+    // implies the involution.
+    // =======================================================================
+
+    // The reverse arc BY THE LOCATOR -- alpha's reference definition, read
+    // off the adjacency alone.  An absent reverse comes back carrying
+    // no_slot (find_arc's convention).
+    // @anchor rsr-find-reverse
+    // @pre  live: is_live_arc(a)
+    // @pre  target_in_range: size_t(target(a)) < size_t(N)
+    // @post result == find_arc(target(a), source(a))
+    arcix_t find_reverse(arcix_t a) const {
+        return find_arc(target(a), source(a));
+    }
+
+    // Derive the twin table INTO the view's own span from the adjacency:
+    // every live arc's entry becomes the locator's slot (no_slot where the
+    // reverse is absent -- the caller decides whether that is a contract
+    // violation, as Owned::compute_twin does), every padding slot becomes
+    // no_slot, the named dead value.  Total: reads only rows of vertices in
+    // range; an out-of-range target leaves no_slot like an absent reverse.
+    // O(sum of degree^2).
+    // @anchor rsr-compute-twin
+    // @pre  present: has_twin() && twin.size() >= size_t(N) * dmax
+    // @post agrees:  twin_mismatch() == K(-1) whenever every arc has a
+    //                reverse and every target is in range
+    void compute_twin() {
+        for (K u = 0; u < N; ++u) {
+            const int d = deg[u];
+            for (int i = 0; i < dmax; ++i) {
+                uint8_t s = no_slot;
+                if (i < d) {
+                    const K v = neighbours[arcid(u, i)];
+                    if (size_t(v) < size_t(N)) s = slot(find_reverse(arc_at(u, i)));
+                }
+                twin[arcid(u, i)] = s;
+            }
+        }
+    }
+
+    // The same for ONE row -- the per-row repair after a construction-phase
+    // edit of that row alone.  Entries of OTHER rows that point into this
+    // one are not touched (they name slots, and only this row's slots may
+    // have moved).
+    // @pre  present: has_twin()
+    // @pre  vertex:  size_t(u) < size_t(N)
+    void compute_twin_row(K u) {
+        const int d = deg[u];
+        for (int i = 0; i < dmax; ++i) {
+            uint8_t s = no_slot;
+            if (i < d) {
+                const K v = neighbours[arcid(u, i)];
+                if (size_t(v) < size_t(N)) s = slot(find_reverse(arc_at(u, i)));
+            }
+            twin[arcid(u, i)] = s;
+        }
+    }
+
+    // The first vertex with a live arc whose cached entry is not the
+    // locator's answer, or K(-1) when the table agrees everywhere.  A live
+    // arc WITHOUT a reverse is a mismatch too: the table caches alpha, and
+    // an arc the graph does not close has no alpha to cache (so an
+    // asymmetric graph is never valid, whatever its table says).  Total:
+    // an out-of-range target is a mismatch, never a read through it.
+    // O(sum of degree^2) -- a validator, not a hot-path check.
+    // @anchor rsr-twin-mismatch
+    // @pre  present: has_twin()
+    // @post result == K(-1) || (some live arc of result has no reverse or
+    //       disagrees with find_reverse)
+    K twin_mismatch() const {
+        for (K u = 0; u < N; ++u)
+            for (int i = 0; i < deg[u]; ++i) {
+                const K v = neighbours[arcid(u, i)];
+                if (size_t(v) >= size_t(N)) return u;
+                const uint8_t s = slot(find_reverse(arc_at(u, i)));
+                if (s == no_slot || twin[arcid(u, i)] != s) return u;
+            }
+        return K(-1);
+    }
+
+    // =======================================================================
     // Embedded-edge surgery
     //
     // The operations in this section edit the rotation system as a SYMMETRIC
     // pair -- both directed arcs of an edge in one call -- and are the only
     // mutators that maintain the twin table.  What "valid twin" means is
-    // defined ONCE, executably, by twin_is_valid() below; every contract in
-    // this section cites it by name.
+    // defined ONCE, executably, by twin_is_valid() below -- agreement with
+    // the locator (the section above); every contract in this section cites
+    // it by name.
     //
     // Positions are corners: insert_edge_at(a_u, a_v) lands the new edge in
     // the corner AFTER arc a_u in u's rotation and after a_v in v's.  The
@@ -333,24 +434,17 @@ struct RSRAdjacencyView {
     using Code = graph_surgery_error::Code;
 
     // THE twin-validity predicate -- the definition every @pre/@post twin
-    // clause in this header cites.  Empty twin is vacuously valid; else
-    // every live arc's entry names a live slot of a valid target row that
-    // points back at it (its reverse), both ways (involution).  The RSR
-    // sibling of validate(PlanarCSR) in planar_csr.hh.  Total: survives
-    // arbitrary garbage (out-of-range targets are reported false, never
-    // read through).  O(N*dmax) -- a validator, not a hot-path check.
+    // clause in this header cites: an empty twin is vacuously valid, and a
+    // present one is valid iff NO vertex disagrees with the locator
+    // (twin_mismatch above).  On a simple graph that is exactly "every live
+    // arc's entry names the live slot of the target row that points back at
+    // it, both ways": the entry equals find(v, u), so slot j holds u, and
+    // the reverse arc's own entry equals find(u, v) == i.  The RSR sibling
+    // of validate(PlanarCSR) in planar_csr.hh.  Total: survives arbitrary
+    // garbage (an out-of-range target is a mismatch, never read through).
+    // O(sum of degree^2) -- a validator, not a hot-path check.
     bool twin_is_valid() const {
-        if (!has_twin()) return true;
-        for (K u = 0; u < N; ++u)
-            for (int i = 0; i < deg[u]; ++i) {
-                const K v = neighbours[arcid(u, i)];
-                const int j = twin[arcid(u, i)];
-                if (size_t(v) >= size_t(N))     return false;
-                if (j >= deg[v])                return false;
-                if (neighbours[arcid(v, j)] != u) return false;
-                if (twin[arcid(v, j)] != i)     return false;
-            }
-        return true;
+        return !has_twin() || twin_mismatch() == K(-1);
     }
 
     // The linear slot at which an arc inserted into the corner after a

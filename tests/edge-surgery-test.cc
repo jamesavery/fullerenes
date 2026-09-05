@@ -130,6 +130,48 @@ TYPED_TEST(SurgeryWidth, ComputeAndValidate) {
     EXPECT_TRUE(F.G.twin_is_valid());          // vacuous without twin
 }
 
+// The VIEW's own derivation -- RSRAdjacencyView::compute_twin, writing
+// into the caller's span -- against the test-local recompute, and its
+// check twin_mismatch against a planted fault.  Nothing allocates: the
+// table's storage is TestRSR's, sized at construction.
+// @ref rsr-compute-twin, rsr-twin-mismatch (dense_graph.hh)
+TYPED_TEST(SurgeryWidth, ViewComputeTwinIsTheLocator) {
+    using V = Spanify::RSRAdjacencyView<TypeParam>;
+    TestRSR<TypeParam> T(6, 4, true);
+    T.cycle();
+    T.G.compute_twin();                        // into T.tw, through the span
+    EXPECT_TRUE(T.G.twin_is_valid());
+    EXPECT_TRUE(T.twin_matches_fresh());
+    EXPECT_EQ(T.G.twin_mismatch(), TypeParam(-1));
+    // Padding slots carry the named dead value.
+    for (int u = 0; u < 6; ++u)
+        for (int i = T.G.degree(TypeParam(u)); i < T.dmax; ++i)
+            EXPECT_EQ(T.tw[size_t(u) * T.dmax + i], V::no_slot);
+    // A fault planted at vertex 2 -- its slot-0 arc goes to 3; a dead
+    // slot of row 3 -- is named as vertex 2, and the per-row repair
+    // clears it.
+    T.tw[2 * T.dmax + 0] = uint8_t(T.G.degree(TypeParam(3)));
+    EXPECT_EQ(T.G.twin_mismatch(), TypeParam(2));
+    EXPECT_FALSE(T.G.twin_is_valid());
+    T.G.compute_twin_row(TypeParam(2));
+    EXPECT_EQ(T.G.twin_mismatch(), TypeParam(-1));
+    EXPECT_TRUE(T.G.twin_is_valid());
+}
+
+// The view's derivation is TOTAL: an arc without a reverse is left at
+// no_slot and reported as a mismatch (an alpha the graph does not have
+// cannot be cached), where the OWNER's compute_twin refuses by name
+// (ComputeTwinThrowsOnAsymmetry below).
+TYPED_TEST(SurgeryWidth, ViewComputeTwinIsTotalOnAsymmetry) {
+    using V = Spanify::RSRAdjacencyView<TypeParam>;
+    TestRSR<TypeParam> T(2, 2, true);
+    T.G.push_back(TypeParam(0), TypeParam(1));   // no reverse
+    T.G.compute_twin();
+    EXPECT_EQ(T.tw[0], V::no_slot);
+    EXPECT_EQ(T.G.twin_mismatch(), TypeParam(0));
+    EXPECT_FALSE(T.G.twin_is_valid());
+}
+
 TYPED_TEST(SurgeryWidth, InsertRemoveRoundTrip) {
     TestRSR<TypeParam> T(6, 4, true);
     T.cycle();
@@ -312,9 +354,12 @@ TEST(EdgeSurgery, ValidatorBitesOnWrongReverse) {
     EXPECT_FALSE(G.twin_is_valid());
 }
 
-// Clause 3 in isolation needs a state where every entry points back at the
-// right vertex but the pairing is not an involution -- possible only with
-// parallel arcs, built through the construction primitives.
+// A state where every entry points back at the right vertex but the
+// pairing is not an involution -- possible only with parallel arcs, built
+// through the construction primitives.  The validator is the LOCATOR
+// (dense_graph.hh's twin section): with parallel arcs 0->1 it names slot 0
+// of row 1 for both arcs of row 0, so the crossed pairing disagrees with
+// it at (0, slot 1) and is refused there.
 TEST(EdgeSurgery, ValidatorBitesOnBrokenInvolution) {
     G_t G(2, 4);
     G.push_back(0, 1); G.push_back(0, 1);      // two parallel arcs 0->1
@@ -323,8 +368,8 @@ TEST(EdgeSurgery, ValidatorBitesOnBrokenInvolution) {
     // Cross the pairing: 0/0 <-> 1/0 and 0/1 <-> 1/1 become a 4-cycle.
     G.twin[0 * G.dmax + 0] = 0;  G.twin[1 * G.dmax + 0] = 1;
     G.twin[0 * G.dmax + 1] = 1;  G.twin[1 * G.dmax + 1] = 0;
-    // Clauses 1-2 hold at every arc (both slots of the other row name the
-    // right vertex); only the involution clause can refuse this.
+    // Both slots of the other row name the right vertex; the locator's
+    // first-occurrence answer is what refuses the crossing.
     EXPECT_FALSE(G.twin_is_valid());
 }
 

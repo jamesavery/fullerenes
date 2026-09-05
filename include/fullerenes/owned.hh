@@ -215,6 +215,12 @@ struct Owned : View {
     }
 
     // --- Twin computation (allocates owned_twin) ---
+    // The OWNER's half is the storage: size the table and point the view's
+    // span at it.  The derivation is the view's own compute_twin (the
+    // locator, dense_graph.hh), so a view over caller arrays and an owner
+    // derive the same table from one body.  The owner then refuses an
+    // asymmetric graph by name -- a live arc whose reverse the locator did
+    // not find is left carrying no_slot -- naming the arc's two endpoints.
     // @pre  symmetric: every arc has a reverse -- violation throws
     //       graph_surgery_error{AsymmetricAdjacency} (this function is the
     //       from-scratch oracle the surgery tests compare against, so its
@@ -223,16 +229,13 @@ struct Owned : View {
     void compute_twin() {
         owned_twin.resize(this->N * this->dmax, 0);
         this->twin = std::span<uint8_t>(owned_twin);
-        for (node u = 0; u < this->N; ++u) {
-            for (int i = 0; i < this->deg[u]; ++i) {
-                node v = this->neighbours[u * this->dmax + i];
-                int j = this->find(v, u);
-                if (j < 0)
+        this->GraphView::compute_twin();
+        for (node u = 0; u < this->N; ++u)
+            for (int i = 0; i < this->deg[u]; ++i)
+                if (this->twin[this->arcid(u, i)] == GraphView::no_slot)
                     this->surgery_fail("compute_twin",
-                                       GraphView::Code::AsymmetricAdjacency, u, v);
-                owned_twin[u * this->dmax + i] = uint8_t(j);
-            }
-        }
+                                       GraphView::Code::AsymmetricAdjacency, u,
+                                       this->neighbours[this->arcid(u, i)]);
     }
 
     // --- Restride (owned only -- reallocates) ---
