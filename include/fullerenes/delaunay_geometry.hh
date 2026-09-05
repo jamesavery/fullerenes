@@ -51,14 +51,21 @@ inline constexpr double lsq_integrality_band = 1e-9; // |len^2 - round| relative
 inline constexpr double curvature_agreement_band = 1e-6; // |float curvature - exact
                                                      // cone excess| for entering it
 
+// The three scalar helpers and the Diamond below are templates on the
+// floating-point scalar T (double everywhere in the library; float exists
+// so a single-precision evaluation of the SAME formulas can be measured
+// against the double and exact ones).  The bands are stored as doubles
+// and cast to T at use.
+
 // Heron product: H(a,b,c) = (a+b+c)(-a+b+c)(a-b+c)(a+b-c) = 16*Area^2.
 // Returns 0 if the triangle inequality is violated.
 // (The squared-length form heron_product_sq lives ring-generically in
 // metric_forms.hh; eisenstein.hh pins its exact-integer instantiation.)
-inline double heron_product(double a, double b, double c) {
-  double s1 = -a + b + c;
-  double s2 =  a - b + c;
-  double s3 =  a + b - c;
+template <class T = double>
+inline T heron_product(T a, T b, T c) {
+  T s1 = -a + b + c;
+  T s2 =  a - b + c;
+  T s3 =  a + b - c;
   if (s1 < 0 || s2 < 0 || s3 < 0) return 0;
   return (a + b + c) * s1 * s2 * s3;
 }
@@ -68,19 +75,21 @@ inline double heron_product(double a, double b, double c) {
 // Returns +/-cot_degenerate on a degenerate triangle (H <= 0) -- a value no
 // sane tolerance ever brackets, so degenerate diamonds classify as
 // non-tight rather than tripping the tight test.
-inline double cot_opposite(double opp, double b, double c) {
-  double H = heron_product(opp, b, c);
-  double num = b*b + c*c - opp*opp;
-  if (H <= 0) return (num >= 0) ? cot_degenerate : -cot_degenerate;
+template <class T = double>
+inline T cot_opposite(T opp, T b, T c) {
+  T H = heron_product(opp, b, c);
+  T num = b*b + c*c - opp*opp;
+  if (H <= 0) return (num >= 0) ? T(cot_degenerate) : T(-cot_degenerate);
   return num / std::sqrt(H);
 }
 
 // Angle of the corner adjacent to sides `adj1`, `adj2` in a triangle whose
 // opposite side is `opp`.  Law of cosines, clamped for floating-point safety
 // at triangle-inequality boundaries.
-inline double triangle_angle(double adj1, double adj2, double opp) {
-  double c = (adj1*adj1 + adj2*adj2 - opp*opp) / (2 * adj1 * adj2);
-  return std::acos(std::clamp(c, -1.0, 1.0));
+template <class T = double>
+inline T triangle_angle(T adj1, T adj2, T opp) {
+  T c = (adj1*adj1 + adj2*adj2 - opp*opp) / (2 * adj1 * adj2);
+  return std::acos(std::clamp(c, T(-1), T(1)));
 }
 
 }  // namespace delaunay_detail
@@ -232,13 +241,15 @@ struct DiamondSq : DiamondForms<long long> {
 // All geometric predicates (Delaunay, convexity, flipped length) depend only
 // on these five edge lengths.  No vertex IDs or topology needed.
 // ============================================================================
-struct Diamond {
-  double e, a, b, c, d;
+template <class T>
+struct DiamondT {
+  T e, a, b, c, d;
 
-  // cot(angle_B) + cot(angle_D) >= 0, within delaunay_band.
-  bool is_delaunay() const {
+  // cot(angle_B) + cot(angle_D) >= 0, within the band (delaunay_band by
+  // default; a measurement may supply its own).
+  bool is_delaunay(T band = T(delaunay_detail::delaunay_band)) const {
     using namespace delaunay_detail;
-    return cot_opposite(e, a, b) + cot_opposite(e, c, d) >= delaunay_band;
+    return cot_opposite(e, a, b) + cot_opposite(e, c, d) >= band;
   }
 
   // Angle sum < pi at both u and v, strictly (convexity_band margin).
@@ -250,30 +261,30 @@ struct Diamond {
   // sibling spells this as the sigma-involution pair -- DiamondSq -- where
   // recomputation is free of FP order effects; here the shared-root spelling
   // is deliberate, per the R-B decision.)
-  bool is_convex() const {
+  bool is_convex(T band = T(delaunay_detail::convexity_band)) const {
     using namespace delaunay_detail;
-    double e2 = e*e;
-    double Ha = heron_product(e, a, b), Hd = heron_product(e, c, d);
-    double sHa = (Ha > 0) ? std::sqrt(Ha) : 0;
-    double sHd = (Hd > 0) ? std::sqrt(Hd) : 0;
-    auto convex_at = [&](double P, double Q) {
-      return sHa * Q + P * sHd > convexity_band;
+    T e2 = e*e;
+    T Ha = heron_product(e, a, b), Hd = heron_product(e, c, d);
+    T sHa = (Ha > 0) ? std::sqrt(Ha) : T(0);
+    T sHd = (Hd > 0) ? std::sqrt(Hd) : T(0);
+    auto convex_at = [&](T P, T Q) {
+      return sHa * Q + P * sHd > band;
     };
     return convex_at(e2 + a*a - b*b, e2 + c*c - d*d)      // at u
         && convex_at(e2 + b*b - a*a, e2 + d*d - c*c);     // at v
   }
 
   // Length of BD, the other diagonal.
-  double flipped_length() const {
+  T flipped_length() const {
     using delaunay_detail::heron_product;
     // f^2 = a^2 + c^2 - (PQ - sqrt(Ha*Hd)) / (2e^2)
-    double e2 = e*e, a2 = a*a, b2 = b*b, c2 = c*c, d2 = d*d;
-    double P = e2 + a2 - b2;
-    double Q = e2 + c2 - d2;
-    double Ha = heron_product(e, a, b), Hd = heron_product(e, c, d);
-    double sqrtHH = (Ha > 0 && Hd > 0) ? std::sqrt(Ha * Hd) : 0;
-    double f2 = a2 + c2 - (P * Q - sqrtHH) / (2 * e2);
-    return (f2 > 0) ? std::sqrt(f2) : 0;
+    T e2 = e*e, a2 = a*a, b2 = b*b, c2 = c*c, d2 = d*d;
+    T P = e2 + a2 - b2;
+    T Q = e2 + c2 - d2;
+    T Ha = heron_product(e, a, b), Hd = heron_product(e, c, d);
+    T sqrtHH = (Ha > 0 && Hd > 0) ? std::sqrt(Ha * Hd) : T(0);
+    T f2 = a2 + c2 - (P * Q - sqrtHH) / (2 * e2);
+    return (f2 > 0) ? std::sqrt(f2) : T(0);
   }
 
   // The squared-length diamond, entered through the integrality trust
@@ -283,7 +294,7 @@ struct Diamond {
   // integer squared lengths and never rounds.
   std::optional<DiamondSq> squared() const {
     using delaunay_detail::lsq_integrality_band;
-    long long L[5]; const double v[5] = {e, a, b, c, d};
+    long long L[5]; const double v[5] = {(double)e, (double)a, (double)b, (double)c, (double)d};
     for (int i = 0; i < 5; i++) {
       const double sq = v[i] * v[i];
       L[i] = (long long)std::llround(sq);
@@ -311,13 +322,14 @@ struct Diamond {
   // (cotangents are dimensionless), so tol is a pure angle threshold.
   // cot_opposite returns +/-1e15 on a degenerate triangle, which never lands
   // within a sane tol, so degenerate diamonds are correctly reported non-tight.
-  bool is_cocircular(double tol) const {
+  bool is_cocircular(T tol) const {
     using delaunay_detail::cot_opposite;
-    double cotB = cot_opposite(e, a, b);
-    double cotD = cot_opposite(e, c, d);
+    T cotB = cot_opposite(e, a, b);
+    T cotD = cot_opposite(e, c, d);
     return std::abs(cotB + cotD) < tol;
   }
 };
+using Diamond = DiamondT<double>;
 
 // ============================================================================
 // Fan polygon: isometric 2D development of a flat vertex's star.
