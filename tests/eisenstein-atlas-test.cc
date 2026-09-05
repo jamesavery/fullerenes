@@ -14,6 +14,11 @@
 //                   force genuine cross-cell traces (slot 0 alone is a
 //                   near-no-op on some fixtures), so a single corrupted
 //                   half-edge transition fails here.
+//   Rebuild      -- the T-free atlas (build_intrinsic_atlas) charts the
+//                   same complex WITHOUT its dual triangulation, and
+//                   intrinsic_dual rebuilds that dual from the charts
+//                   alone: the reconstruction carries the input's own
+//                   canonical spiral name.
 //
 // Fixtures: C60-IPR#0 / C80-IPR#0 / C28#0 have depth-0 routing (every
 // face edge directly anchored); C60 general #0 (C1 symmetry) and
@@ -29,6 +34,7 @@
 #include "fullerenes/eisenstein_paint.hh"
 #include "fullerenes/eisenstein_paint_geometry.hh"   // realize_dual, DualPolytope
 #include "fullerenes/buckygen-wrapper.hh"
+#include "fullerenes/spiral.hh"            // the reconstruction verdict
 
 #include <cstring>
 
@@ -37,6 +43,7 @@ using namespace eisenstein_paint;
 namespace {
 
 struct Charted {
+    Triangulation T;         // the input dual, for the reconstruction verdict
     SortedDual   S;
     DualPolytope P;
     SurfaceParametrization param;
@@ -57,6 +64,7 @@ Triangulation nth_dual(int N, bool IPR, int idx) {
 Charted chart(int N, int idx, bool ipr) {
     Charted c;
     Triangulation T = nth_dual(N, ipr, idx);
+    c.T = T;
     c.S = sorted_dual(T);
     c.P = realize_dual(c.S);
     c.param = parametrize(c.P.D, c.S);
@@ -112,6 +120,42 @@ void expect_resolves_and_locates(const SurfaceParametrization& P, const char* ta
     }
 }
 
+// The canonical (labelling-invariant) name of a fullerene dual: the
+// reconstruction invents its own vertex numbering, so only a canonical
+// name compares the two SURFACES rather than two labellings.
+std::string canonical_name(const Triangulation& T) {
+    return spiral_nomenclature(T, spiral_nomenclature::FULLERENE,
+                               spiral_nomenclature::TRIANGULATION,
+                               /*rarest_special_start=*/true).to_string();
+}
+
+void expect_reconstructs_dual(const Charted& c, const char* tag) {
+    IntrinsicAtlas A = build_intrinsic_atlas(c.P.D);
+
+    // The selection must be TOTAL: an unplaced cell contributes no
+    // lattice points, which would silently shrink the surface the
+    // reconstruction walks instead of failing it.
+    for (int f = 0; f < A.D.nf; f++)
+        if (A.D.f_he[f] >= 0)
+            ASSERT_TRUE(A.placed(f)) << tag << ": cell " << f << " unplaced";
+
+    const Triangulation R = intrinsic_dual(A);
+    ASSERT_EQ(R.N, c.T.N) << tag;
+
+    // Degrees are READ OFF the neighbour rings, never assumed, so this
+    // gates the ring closure itself -- and names a failure mode that a
+    // spiral-name mismatch alone would leave unexplained.
+    int pentagons = 0;
+    for (node_t v = 0; v < R.N; v++) {
+        const int d = R.degree(v);
+        ASSERT_TRUE(d == 5 || d == 6) << tag << ": vertex " << v << " has degree " << d;
+        pentagons += (d == 5);
+    }
+    EXPECT_EQ(pentagons, 12) << tag;
+
+    EXPECT_EQ(canonical_name(R), canonical_name(c.T)) << tag;
+}
+
 }  // namespace
 
 TEST(EisensteinAtlas, DeterministicBuild) {
@@ -138,4 +182,16 @@ TEST(EisensteinAtlas, ResolveAllAndLocateCorners) {
     expect_resolves_and_locates(c.param, "C28#0");
     expect_resolves_and_locates(d.param, "C60#0");
     expect_resolves_and_locates(e.param, "C100#30");
+}
+
+// The T-free path stands on the charts alone: no T (the atlas selects
+// among the exact cell developments by cross-edge transition
+// consistency, where build_atlas would walk T) and no 3D (the flat cone
+// metric is all it reads).
+TEST(EisensteinAtlas, IntrinsicDualReconstruction) {
+    expect_reconstructs_dual(chart(60, 0, true),    "C60-IPR#0");
+    expect_reconstructs_dual(chart(80, 0, true),    "C80-IPR#0");
+    expect_reconstructs_dual(chart(28, 0, false),   "C28#0");
+    expect_reconstructs_dual(chart(60, 0, false),   "C60#0");
+    expect_reconstructs_dual(chart(100, 30, false), "C100#30");
 }

@@ -207,6 +207,97 @@ struct CellAtlas {
 //           (non-edge lattice adjacency), an uncovered edge graph.
 CellAtlas build_atlas(const SurfaceParametrization& P);
 
+// =====================================================================
+// The T-free (intrinsic) atlas -- charts and transitions over a pure
+// flat cone metric, where no dual triangulation T is known.
+// =====================================================================
+
+// Every admissible development of every cell (CellDevelopments: corners,
+// frames, lattice scans) plus THE SELECTION: accepted[f] names the
+// development that develops consistently with its neighbours, and
+// he_trans the transitions that selection makes exact.  Owning, unlike
+// CellAtlas: there is no SurfaceParametrization to alias -- these charts
+// ARE the parametrization the intrinsic path has.
+//
+// The lattice points of the accepted charts are numbered globally by
+// node_first (the exclusive prefix over their entry counts), so
+// node_at(f, p) is exactly the union-find node intrinsic_dual glues on.
+// The claimed VERTEX IDS are absent by construction: deriving them is
+// intrinsic_dual's whole job.
+struct IntrinsicAtlas {
+  DelaunayView         D;           // the charted cone iDT
+  CellDevelopments     dev;         // every admissible development, per cell
+  std::vector<int32_t> accepted;    // [D.nf] chosen development, -1 unplaced
+  std::vector<int32_t> node_first;  // [D.nf+1] exclusive prefix of chart entries
+  std::vector<LatticeIsometry> he_trans;  // [D.nh] face(h) -> face(twin h)
+
+  bool placed(int f) const {
+    return f >= 0 && f < (int)accepted.size() && accepted[f] >= 0;
+  }
+  // @pre placed(f).
+  DevelopmentView chart(int f) const { return dev.development(f, accepted[f]); }
+  std::array<Eisenstein, 3> frame_points(int f) const { return chart(f).frame_points(); }
+  std::array<int, 3> corner_ids(int f) const {
+    const CellCorners c = dev.corners(f);
+    return { c.c0, c.c1, c.c2 };
+  }
+  int n_nodes() const { return node_first.empty() ? 0 : node_first.back(); }
+
+  // The global node id of lattice point p in cell f's chart, or -1 when
+  // f does not claim p (dead, unplaced, or p outside the scan).  Pure
+  // row arithmetic -- ChartView::claim's index, with no vertex id to
+  // read.
+  int node_at(int f, Eisenstein p) const {
+    if (!placed(f)) return -1;
+    const DevelopmentView c = chart(f);
+    if (p.second < c.scan.b_min || p.second > c.scan.b_max) return -1;
+    const ScanRow r = c.rows[p.second - c.scan.b_min];
+    if (p.first < r.a_left || p.first > r.a_right) return -1;
+    return node_first[f] + r.entry_off + (p.first - r.a_left);
+  }
+};
+
+// Build the atlas over D WITHOUT a known dual triangulation T (pure flat cone
+// metric): the cell developments are the SAME exact enumeration build_atlas
+// charts through (cell_developments), but the choice among them is made
+// INTRINSICALLY -- by demanding a unit-rotation transition to an already-placed
+// neighbour across their shared iDT edge -- where the parametrization would use
+// T's frame walkers.  No claims, no T: only the accepted charts and their
+// transitions, which is all the intrinsic dual reconstruction (no T, no 3D)
+// consumes.  Curvature-sign-agnostic like build_atlas.
+//
+// Seed a cell with one of its developments (a global reflection/rotation gauge
+// the canonical spiral name is invariant under), then BFS: each new cell takes
+// the development whose shared-edge transition to its placed neighbour is a unit
+// rotation.  A cell reachable through several edges is placed by the first
+// neighbour that resolves it; one with no consistent development (a folded cell
+// on a noisy metric) is left unplaced rather than aborting.
+//
+//   @pre    D a post-flip simplicial iDT with integer edge length-squares.
+//   @post   consistently reachable cells have accepted >= 0; he_trans holds the
+//           transition across every half-edge between two placed cells.
+//   @throws PaintError(EMBED) when a live cell's metric leaves the integrality
+//           band or admits no lattice development at all (cell_developments'
+//           float-to-exact boundary); std::logic_error if D has no placeable
+//           cell, or if two placed cells' shared edge does not develop by a
+//           lattice isometry (deep invariants).
+IntrinsicAtlas build_intrinsic_atlas(const DelaunayView& D);
+
+// Reconstruct the ORIENTED dual triangulation from an intrinsic atlas: take each
+// placed cell's lattice points, unite the copies shared across every edge (via
+// the chart transitions), and read off the CCW unit-triangle faces as an
+// oriented graph.  The cones become its degree-5 (pentagon) vertices and the
+// interior lattice points its degree-6 (hexagon) vertices -- the fullerene dual
+// -- ready for spiral_nomenclature.  Curvature-sign-agnostic: vertex degrees are
+// read off, not assumed, so fulleroid duals reconstruct unchanged.  This is the
+// intrinsic, combinatorial-only (no T, no 3D) analogue of run()'s dual.
+//
+//   @pre    A from build_intrinsic_atlas with every cell placed (a clean iDT).
+//   @post   an oriented Triangulation isomorphic to the dual of A.D's surface.
+//   @throws std::logic_error on an orientation inconsistency or a shared lattice
+//           point absent from a cell scan (deep invariants).
+Triangulation intrinsic_dual(const IntrinsicAtlas& A);
+
 // Trace the straight segment a -> b (both in `cell`'s frame; a inside the
 // CLOSED cell) through the cell complex.  Returns b's host cell, b
 // re-expressed in that cell's frame, and the carried frame isometry.

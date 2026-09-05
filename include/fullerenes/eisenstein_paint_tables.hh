@@ -701,4 +701,13 @@ struct SortedDual;   // eisenstein_paint.hh
 CellDevelopments cell_developments(const ::DelaunayView& D,
                                    const SortedDual& S);
 
+// The T-free form -- THE body, which the SortedDual overload forwards
+// to.  N_sorted / n_cones are carried on the product and enter only the
+// scratch-capacity formulas, never the developments themselves, so a
+// pure flat cone metric (where every D vertex IS a cone, and no dual
+// triangulation is known) passes its own vertex count for both.  Same
+// failure contract.
+CellDevelopments cell_developments(const ::DelaunayView& D,
+                                   int32_t N_sorted, int32_t n_cones);
+
 }  // namespace eisenstein_paint
