@@ -21,7 +21,8 @@ cmake ..
 cmake --build build
 
 # Build with SYCL GPU support (requires Intel DPC++ compiler)
-# CMake auto-detects sycl-ls and sets SYCL_TARGETS to NVIDIA, AMD, or X86
+# SYCL_TARGETS defaults to the GPU the machine reports (nvidia-smi -> NVIDIA,
+# rocminfo -> AMD, neither -> X86), and the *_ARCH knobs to its architecture
 cmake -DENABLE_SYCL=ON -DSYCL_TARGETS=NVIDIA ..
 
 # Run all tests (CTest)
@@ -42,9 +43,9 @@ is on), or use clang.
 
 ## Key Build Options
 
-- `ENABLE_SYCL` — Build GPU code (auto-detected from `sycl-ls`)
-- `SYCL_TARGETS` — GPU backend: `NVIDIA`, `AMD`, or `X86` (single target per build)
-- `CMAKE_CUDA_ARCHITECTURES` — NVIDIA SM architecture (e.g. 86 for RTX 3090)
+- `ENABLE_SYCL` — Build GPU code (defaults ON when an AdaptiveCpp compiler is found)
+- `SYCL_TARGETS` — GPU backend: `NVIDIA`, `AMD`, `X86`, or `GENERIC` (single target per build; default: the GPU `nvidia-smi`/`rocminfo` report, else `X86`)
+- `SYCL_CUDA_ARCH` / `SYCL_HIP_ARCH` / `CMAKE_CUDA_ARCHITECTURES` — GPU architecture (default: what the vendor tool reports, e.g. 89 for an RTX 4090; 86 / gfx90a when none is)
 - `FULLERENES_LEGACY_FORTRAN` — Build the legacy Fortran program and its C ABI (default OFF; the only thing that needs a Fortran compiler)
 - `FORTRAN_NMAX` — Max vertices for Fortran static allocation (default 5000; only with the option above)
 - `GPU_MAXREGCOUNT` — GPU register pressure limit (default 80)
