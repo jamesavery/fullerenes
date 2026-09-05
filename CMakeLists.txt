@@ -15,8 +15,19 @@ option(FULLERENES_CORE_ONLY
   "Build only libfullerenes + buckygen (skip Fortran, playground, programs, benchmarks, tests, SYCL, pybind)"
   OFF)
 
-if(NOT FULLERENES_CORE_ONLY)
+# The legacy Fortran program (src/fortran: the Schwerdtfeger-Wirz-Avery
+# "Fullerene" v4.5) and graph_fortran.cc, the C++ side of its ABI.  Nothing
+# else in the tree links or calls Fortran -- every algorithm it carried that
+# the library needs has a C++ home (claude-projects/unfortran) -- so it is
+# opt-in: the default build, tests included, needs no Fortran compiler.  Off
+# means enable_language(Fortran) never runs.  Forced off under core-only.
+cmake_dependent_option(FULLERENES_LEGACY_FORTRAN
+  "Build the legacy Fortran program and its C ABI (needs a Fortran compiler)"
+  OFF "NOT FULLERENES_CORE_ONLY" OFF)
+
+if(FULLERENES_LEGACY_FORTRAN)
   enable_language(Fortran)
+  set(FORTRAN_NMAX 5000 CACHE STRING "Maximum vertex count for Fortran routines using statically allocated memory")
 endif()
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
   # Only when this repo is the top-level project: never rewrite a parent
@@ -26,7 +37,6 @@ endif()
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(FULLERENE_DATABASE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/database/ CACHE PATH "Path to fullerene database root")
-set(FORTRAN_NMAX 5000 CACHE STRING "Maximum vertex count for Fortran routines using statically allocated memory")
 
 find_package(GSL)
 find_package(GTest)
@@ -209,7 +219,7 @@ include_directories(AFTER SYSTEM include)
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/include/)
 
 # Fortran compiler flags
-if(NOT FULLERENES_CORE_ONLY)
+if(FULLERENES_LEGACY_FORTRAN)
   if(DEFINED ENV{CRAYPE_VERSION})
     message("Cray compiler environment detected")
     set(CMAKE_Fortran_FLAGS "-fPIC -O3")
@@ -239,9 +249,9 @@ configure_file(
   ${CMAKE_CURRENT_BINARY_DIR}/include/fullerenes/config.hh
   )
 
-if(NOT FULLERENES_CORE_ONLY)
+if(FULLERENES_LEGACY_FORTRAN)
   # Fortran configure file.  NOTE: writes into the SOURCE tree -- gated so a
-  # pristine submodule checkout stays clean in core-only mode.
+  # checkout that never builds the Fortran stays clean.
   configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/include/fullerenes/config.f.in
     ${CMAKE_CURRENT_SOURCE_DIR}/src/fortran/config.f
@@ -249,7 +259,7 @@ if(NOT FULLERENES_CORE_ONLY)
 endif()
 
 
-if(NOT FULLERENES_CORE_ONLY)
+if(FULLERENES_LEGACY_FORTRAN)
   add_subdirectory(src/fortran)
 endif()
 add_subdirectory(src/contrib)
@@ -269,6 +279,16 @@ if(ENABLE_SYCL)
   set(PREVIOUS_CXX_FLAGS ${CMAKE_CXX_FLAGS})
   set(PREVIOUS_CXX_STANDARD ${CMAKE_CXX_STANDARD})
   if(SYCL_TARGETS STREQUAL "NVIDIA" AND SYCL_CUDA_BACKEND STREQUAL "cuda-nvcxx")
+    # This backend drives NVIDIA's nvc++ (not clang) for the SYCL translation
+    # units, but CMAKE_CXX_FLAGS was computed against the HOST compiler.  When
+    # the host compiler is clang -- or acpp, which CMake identifies as Clang --
+    # the block above appended clang-only switches that nvc++ rejects outright
+    # ("nvc++-Error-Unknown switch: -Wno-builtin-macro-redefined"), failing
+    # every SYCL TU.  Strip them: the __cpp_concepts override exists solely to
+    # unhide libstdc++'s <expected> under clang, and nvc++ neither needs nor
+    # understands it.
+    string(REPLACE "-Wno-builtin-macro-redefined" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+    string(REPLACE "-D__cpp_concepts=202002L" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
     string(REPLACE "-fopenmp" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
     string(REGEX REPLACE " +" " " CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
   else()
