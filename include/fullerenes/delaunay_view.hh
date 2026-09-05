@@ -1341,6 +1341,7 @@ struct DelaunayView {
   // no interior edge, are already canonical, and are not counted.
   struct CompletionStats {
     int fanned = 0, ambiguous = 0, nondisk = 0, flips = 0;
+    bool operator==(const CompletionStats&) const = default;
     CompletionStats& operator+=(const CompletionStats& o) {
       fanned += o.fanned; ambiguous += o.ambiguous;
       nondisk += o.nondisk; flips += o.flips;
@@ -1939,6 +1940,11 @@ struct DelaunayView {
   // the surviving old labels; new_of_old is scratch.  Device-legal,
   // allocation-free; the owner's compact_vertices() wraps this with owned
   // scratch.
+  // @post monotone: new_to_old[0..nlive) is strictly increasing -- the
+  //       relabelling old -> new is order-preserving on live vertices, so
+  //       every order on vertex ids (the canonical completion's corner key,
+  //       CanonicalTesselation's cell words under identity labels) is
+  //       unchanged by compaction.
   int compact_vertices(std::span<int> new_to_old, std::span<int> new_of_old) {
     if (status != Status::Ok) return nv;
     if ((int)new_to_old.size() < nv || (int)new_of_old.size() < nv) {

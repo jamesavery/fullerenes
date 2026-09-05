@@ -565,7 +565,8 @@ struct DelaunayTriangulation : DelaunayView, DelaunayStorage {
   // removal that leaves live vertices scattered (the metric-based path, which
   // unlike compute(T) does not sort flats last), because AlexandrovSolver
   // sizes its system by nv and assumes every index 0..nv-1 is a live cone.
-  // Returns new_to_old: the original index of each surviving vertex.
+  // Returns new_to_old: the original index of each surviving vertex, in
+  // increasing order (the view body's @post monotone).
   std::vector<int> compact_vertices();
 
   // --- Edge/face allocation ---
