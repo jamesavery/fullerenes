@@ -9,6 +9,7 @@
 // Build: cmake --build build --target patch_diag
 // Run:   ./build/benchmarks/patch_diag 60 1217
 
+#include "fullerenes/nanotube.hh"
 #include "fullerenes/buckygen-wrapper.hh"
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/deltahedron.hh"
@@ -25,62 +26,9 @@
 using namespace std;
 using namespace buckinverse;
 
-// =====================================================================
-// (5,0) nanotube dual graph builder
-// =====================================================================
-static Graph makeNanotubeDual(int n_rings) {
-    assert(n_rings >= 1);
-    int N = 12 + 5 * n_rings;
-
-    // Vertex ID helpers (all indices mod 5)
-    auto mod5 = [](int i) -> int { return ((i % 5) + 5) % 5; };
-    auto cn  = [&](int i) -> int { return 1 + mod5(i); };             // cap_N[i]
-    auto rng = [&](int j, int i) -> int { return 6 + 5*j + mod5(i); }; // ring_j[i]
-    auto cs  = [&](int i) -> int { return 6 + 5*n_rings + mod5(i); };  // cap_S[i]
-    int pole_N = 0;
-    int pole_S = 11 + 5*n_rings;
-    int last = n_rings - 1;
-
-    // Build oriented adjacency lists directly (CCW as seen from outside).
-    Graph adj(N, GRAPH_DMAX);
-
-    // pole_N: CCW from outside = cn(0), cn(1), ..., cn(4)
-    for (int i = 0; i < 5; i++) adj.push_back(pole_N, cn(i));
-
-    // cn(i) (deg 5): CCW neighbors
-    for (int i = 0; i < 5; i++)
-        adj.assign_row(cn(i), {pole_N, cn(i+1), rng(0, i+1), rng(0, i), cn(i-1)});
-
-    // rng(0, i): connects up to cn(i-1), cn(i) and down to next layer
-    if (n_rings == 1) {
-        for (int i = 0; i < 5; i++)
-            adj.assign_row(rng(0, i), {cn(i-1), cn(i), rng(0, i+1), cs(i+1), cs(i), rng(0, i-1)});
-    } else {
-        for (int i = 0; i < 5; i++)
-            adj.assign_row(rng(0, i), {cn(i-1), cn(i), rng(0, i+1), rng(1, i+1), rng(1, i), rng(0, i-1)});
-    }
-
-    // Interior rings: rng(j, i) for 1 <= j <= last-1
-    for (int j = 1; j < last; j++)
-        for (int i = 0; i < 5; i++)
-            adj.assign_row(rng(j, i), {rng(j-1, i-1), rng(j-1, i), rng(j, i+1), rng(j+1, i+1), rng(j+1, i), rng(j, i-1)});
-
-    // rng(last, i): connects down to cs
-    if (n_rings >= 2)
-        for (int i = 0; i < 5; i++)
-            adj.assign_row(rng(last, i), {rng(last-1, i-1), rng(last-1, i), rng(last, i+1), cs(i+1), cs(i), rng(last, i-1)});
-
-    // cs(i) (deg 5): connected up to rng(last,i-1) and rng(last,i)
-    for (int i = 0; i < 5; i++)
-        adj.assign_row(cs(i), {pole_S, cs(i-1), rng(last, i-1), rng(last, i), cs(i+1)});
-
-    // pole_S (deg 5): CCW from outside (below) = cs(4), cs(3), ..., cs(0)
-    for (int i = 4; i >= 0; i--) adj.push_back(pole_S, cs(i));
-
-    Graph G(adj);
-    assert(G.is_consistently_oriented());
-    return G;
-}
+// The (5,0) nanotube dual builder is the library's nanotube_50_dual
+// (fullerenes/nanotube.hh).
+static Graph makeNanotubeDual(int n_rings) { return nanotube_50_dual(n_rings); }
 
 // =====================================================================
 // Quality statistics for a Deltahedron

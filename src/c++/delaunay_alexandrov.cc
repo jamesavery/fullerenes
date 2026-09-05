@@ -1662,7 +1662,7 @@ void AlexandrovIDTCubic::set_cones(ConeLabels L)
   cone_kis_vertex = std::move(L.kis_vertex);
 }
 
-void AlexandrovIDTCubic::build(const TriangulationView& T)
+void AlexandrovIDTCubic::build_banded(const TriangulationView& T)
 {
   KisMetric M = kis_metric(T);
   vector<int> new_to_old;
@@ -1674,7 +1674,7 @@ void AlexandrovIDTCubic::build(const TriangulationView& T)
   solver.D = std::move(D);
 }
 
-DelaunayView::CompletionStats AlexandrovIDTCubic::build_exact(const TriangulationView& T)
+DelaunayView::CompletionStats AlexandrovIDTCubic::build(const TriangulationView& T)
 {
   KisMetric M = kis_metric(T);
   DelaunayTriangulation D =
