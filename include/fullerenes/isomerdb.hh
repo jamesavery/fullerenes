@@ -86,10 +86,9 @@ public:
     // The record of the isomer whose dual is D: the fields in `producers` are
     // computed (RSPI always -- it is the key), the others left zero.  The
     // canonical RSPI is FullereneDualView::regular_rspi, the database's key.
-    // Definition staged in claude-projects/unfortran (src/isomerdb_record.cc)
-    // -- the one record producer not yet in the library; the fields it
-    // computes come from hueckel::analyze and hamiltonian_cycle_count, which
-    // are.
+    // Defined in isomerdb_record.cc, which composes the producers
+    // (regular_rspi, neighbour_indices, Symmetry, hueckel::analyze,
+    // hamiltonian_cycle_count); isomerdb.cc itself stays a reader/writer.
     // @anchor isomer-record-from-dual
     static EntryResult from_dual(const FullereneDualView& D, Field producers);
     // A filled HOMO level: the Fortran's closed/open distinction, and the

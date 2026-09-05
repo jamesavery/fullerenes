@@ -147,6 +147,10 @@ if(GTest_FOUND)
   target_link_libraries(isomerdb-test fullerenes GTest::GTest GTest::Main)
   add_test(NAME isomerdb-test COMMAND isomerdb-test)
 
+  add_executable(isomerdb-record-test isomerdb-record-test.cc)
+  target_link_libraries(isomerdb-record-test fullerenes GTest::GTest)
+  add_test(NAME isomerdb-record-test COMMAND isomerdb-record-test)
+
   add_executable(alexandrov-cubic-test alexandrov-cubic-test.cc)
   target_link_libraries(alexandrov-cubic-test fullerenes buckygen GTest::GTest GTest::Main)
   add_test(NAME alexandrov-cubic-test COMMAND alexandrov-cubic-test)
