@@ -58,6 +58,41 @@ void orient_neighbours(GraphView& G, const vector<coord2d>& layout)
   }
 }
 
+// BOUNDARY 2 -- contract at the declaration.  The rows built from the matrix
+// are in ascending index order, an ordering with no geometric meaning, which
+// for anything bigger than a triangle is a rotation system of the wrong genus:
+// nothing to preserve, only an embedding to establish.
+PlanarGraph planargraph_from_adjacency_matrix(int N, std::span<const int> A, int stride)
+{
+  Graph nb(N, GRAPH_DMAX);
+  for(int i=0;i<N;i++)
+    for(int j=i+1;j<N;j++)
+      if(A[size_t(i)*stride+j]) {
+        nb.push_back(i, j);
+        nb.push_back(j, i);
+      }
+  Graph G(nb);
+  planar_orient(G);
+  require_oriented_surface(G, "planargraph_from_adjacency_matrix");
+  return PlanarGraph(G);
+}
+
+// BOUNDARY 4 -- contract at the declaration.  orient_neighbours is faithful to
+// whatever drawing it is given, so a drawing with crossings yields a consistent
+// orientation of a higher-genus surface; the rows G arrived with are saved
+// first and put back unless the re-sorted ones are still a genus-0 embedding.
+OrientedSurface set_layout2d_verified(GraphView& G, const vector<coord2d>& drawing)
+{
+  vector<vector<node_t>> arrived(G.N);
+  for(node_t u=0;u<G.N;u++) arrived[u].assign(G[u].begin(), G[u].end());
+
+  orient_neighbours(G, drawing);
+  const OrientedSurface S = G.oriented_surface();
+  if(S.code != OrientedSurface::Code::Ok)
+    for(node_t u=0;u<G.N;u++) std::copy(arrived[u].begin(), arrived[u].end(), G[u].begin());
+  return S;
+}
+
 bool layout_is_crossingfree(const PlanarGraphView& G, const vector<coord2d>& layout)
 {
   assert(layout.size() == G.N);

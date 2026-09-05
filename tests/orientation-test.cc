@@ -23,14 +23,9 @@
 
 using namespace std;
 
-// The Fortran C ABI, whose C++ side is src/c++/graph_fortran.cc.  Boundaries 2
-// and 4 have no other entry point -- oriented_graph_from_adjacency is
-// file-static and set_layout2d_ is only ever called from Fortran.
-extern "C" {
-  FullereneGraph* new_fullerene_graph_(const int *nmax, const int *N, const int *adjacency);
-  void            delete_fullerene_graph_(FullereneGraph**);
-  void            set_layout2d_(PlanarGraph **g, const double *layout2d);
-}
+// Boundaries 2 and 4 are layout2d::planargraph_from_adjacency_matrix and
+// layout2d::set_layout2d_verified; the legacy Fortran ABI (graph_fortran.cc)
+// wraps them, and the tests below reach them directly.
 
 // Build an unoriented graph by extracting undirected edges and rebuilding neighbour lists.
 static Graph to_unoriented(const Graph& G) {
@@ -242,14 +237,9 @@ TEST_F(OrientationTest, SetLayout2dFromGoodLayout) {
     vector<coord2d> layout = oriented.tutte_layout();
     ASSERT_TRUE(layout2d::layout_is_crossingfree(oriented, layout));
 
-    vector<double> layout_data(2*G.N);
-    for(node_t u = 0; u < G.N; u++){
-      layout_data[2*u]   = layout[u].first;
-      layout_data[2*u+1] = layout[u].second;
-    }
-
-    PlanarGraph PG(to_unoriented(G)), *p = &PG;
-    set_layout2d_(&p, layout_data.data());
+    PlanarGraph PG(to_unoriented(G));
+    const OrientedSurface S = layout2d::set_layout2d_verified(PG, layout);
+    EXPECT_EQ(S.code, OrientedSurface::Code::Ok) << "the verdict must report the adoption";
 
     EXPECT_TRUE(PG.is_consistently_oriented())
       << "a crossing-free drawing must re-import as an orientation";
@@ -265,13 +255,8 @@ TEST_F(OrientationTest, SetLayout2dFromGoodLayout) {
 TEST_F(OrientationTest, SetLayout2dRefusesACorruptingDrawing) {
   const FullereneGraph& G = test_graphs[0].second;          // C20
 
-  vector<double> layout_data(2*G.N);
   vector<coord2d> collinear(G.N);
-  for(node_t u = 0; u < G.N; u++){
-    collinear[u]       = coord2d(u, 0);
-    layout_data[2*u]   = u;
-    layout_data[2*u+1] = 0;
-  }
+  for(node_t u = 0; u < G.N; u++) collinear[u] = coord2d(u, 0);
 
   {  // the fixture is supposed to corrupt: check that it does, at the raw sort
     PlanarGraph probe(G);
@@ -280,9 +265,10 @@ TEST_F(OrientationTest, SetLayout2dRefusesACorruptingDrawing) {
       << "the collinear drawing was expected to destroy the orientation";
   }
 
-  PlanarGraph PG(G), *p = &PG;
+  PlanarGraph PG(G);
   ASSERT_TRUE(PG.is_consistently_oriented());
-  set_layout2d_(&p, layout_data.data());
+  const OrientedSurface S = layout2d::set_layout2d_verified(PG, collinear);
+  EXPECT_NE(S.code, OrientedSurface::Code::Ok) << "the verdict must report the refusal";
 
   EXPECT_TRUE(PG.is_consistently_oriented())
     << "the boundary must not install a drawing that breaks the invariant";
@@ -314,10 +300,9 @@ TEST_F(OrientationTest, FacesPreservedThroughMol2) {
 }
 
 // -------------------------------------------------------------------------
-// BOUNDARY 2: oriented_graph_from_adjacency -- an adjacency MATRIX, which fixes
-// the edge set and nothing else.  Was test 8, which open-coded the boundary's
-// body; it now goes through the Fortran ABI entry point that is the only way to
-// reach it.
+// BOUNDARY 2: planargraph_from_adjacency_matrix -- an adjacency MATRIX, which
+// fixes the edge set and nothing else.  Was test 8, which open-coded the
+// boundary's body.
 // -------------------------------------------------------------------------
 TEST_F(OrientationTest, AdjacencyMatrixBoundary) {
   for(const auto& [name, G] : test_graphs) {
@@ -329,21 +314,19 @@ TEST_F(OrientationTest, AdjacencyMatrixBoundary) {
       for(node_t v : G.nbrs(u))
         adj[size_t(u)*N + v] = 1;
 
-    FullereneGraph *H = new_fullerene_graph_(&N, &N, adj.data());
-    ASSERT_NE(H, nullptr) << name << ": the boundary refused a planar adjacency matrix";
+    const FullereneGraph H(layout2d::planargraph_from_adjacency_matrix(N, adj, N));
 
-    EXPECT_TRUE(H->is_consistently_oriented());
-    EXPECT_TRUE(same_edges(G, *H));
-    EXPECT_EQ(face_sizes(*H, 6), face_sizes(PlanarGraph(G), 6))
+    EXPECT_TRUE(H.is_consistently_oriented());
+    EXPECT_TRUE(same_edges(G, H));
+    EXPECT_EQ(face_sizes(H, 6), face_sizes(PlanarGraph(G), 6))
       << name << ": 12 pentagons and the rest hexagons";
-
-    delete_fullerene_graph_(&H);
   }
 }
 
 // NOT TESTED, and not for want of trying: the boundary's REFUSAL path, i.e. an
-// adjacency matrix that is not planar (K5) reaching new_fullerene_graph_ and
-// coming back NULL.  It cannot be exercised from a test binary, because
+// adjacency matrix that is not planar (K5) reaching
+// planargraph_from_adjacency_matrix and throwing unoriented_surface_error.  It
+// cannot be exercised from a test binary, because
 // PlanarGraph::tutte_layout abort()s -- src/c++/layout.cc:244 and :253 -- before
 // planar_orient can return false, taking the process with it.  That is one entry
 // in the library-wide assert/abort inventory

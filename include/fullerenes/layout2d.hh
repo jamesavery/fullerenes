@@ -2,6 +2,8 @@
 
 #include "fullerenes/planargraph.hh"
 
+#include <span>
+
 // Free functions for 2D layout operations on planar graphs.
 // These were previously member functions of PlanarGraph that depended on a stored layout2d member.
 // Now they take the layout as an explicit parameter, separating combinatorial graph structure from 2D embedding.
@@ -23,14 +25,15 @@ namespace layout2d {
   // by nature, each documented as a boundary at its definition:
   //
   //   1. Polyhedron::from_mol2            (polyhedron-io.cc)  -- bare edge list
-  //   2. oriented_graph_from_adjacency    (graph_fortran.cc)  -- adjacency matrix
+  //   2. planargraph_from_adjacency_matrix (below)  -- adjacency matrix; the
+  //      legacy Fortran ABI's new_graph_/new_fullerene_graph_ wrap it
   //   3. orient_polyhedron_neighbours     (polyhedron.cc, file-static) -- the
   //      Polyhedron-from-coordinates construction, whose only callers are the
   //      Polyhedron(graph, points) constructors
-  //   4. set_layout2d_                    (graph_fortran.cc)  -- the Fortran C ABI
-  //      re-import of an externally computed embedding (VERIFIED and rolled back
-  //      on failure; see the note there -- it is the one caller whose input may
-  //      already be oriented)
+  //   4. set_layout2d_verified            (below)  -- re-import of an externally
+  //      computed drawing, VERIFIED and rolled back on failure: the one caller
+  //      whose input may already be oriented.  The legacy Fortran ABI's
+  //      set_layout2d_ wraps it.
   //
   // Regression coverage for all four is tests/orientation-test.cc.
   // ---------------------------------------------------------------------------
@@ -60,6 +63,34 @@ namespace layout2d {
   // @pre    laid_out: layout.size() == G.N
   // @pre    planar_drawing: `layout` draws G without edge crossings
   void orient_neighbours(GraphView& G, const vector<coord2d>& layout);
+
+  // An oriented planar graph from an adjacency MATRIX: a symmetric bit table
+  // that fixes the edge set and nothing else, so there is no orientation to
+  // preserve, only one to establish.  A sanctioned caller of planar_orient
+  // (boundary 2 above), and CHECKED twice -- planar_orient's own verdict, then
+  // the graph's, because a false verdict leaves the rows rewritten and still
+  // not an embedding.  A is row-major with row stride `stride`; only the upper
+  // triangle is read, and a nonzero entry is an edge.
+  // @anchor planargraph-from-adjacency-matrix
+  // @pre  sized: stride >= N && A.size() >= size_t(N) * size_t(stride)
+  // @pre  symmetric: all_of(indices(N), [&](int i){ return all_of(indices(N),
+  //           [&](int j){ return (A[i*stride+j] != 0) == (A[j*stride+i] != 0); }); })
+  // @post oriented: result.is_consistently_oriented()
+  // @throws unoriented_surface_error when the matrix is not a planar graph
+  PlanarGraph planargraph_from_adjacency_matrix(int N, std::span<const int> A, int stride);
+
+  // Adopt `drawing` as G's rotation system iff it is a crossing-free drawing
+  // of G: sort every row CCW in it (orient_neighbours), keep the result if it
+  // is a genus-0 embedding, else put back exactly the rows G arrived with.
+  // Boundary 4 above -- the one whose input may already be oriented, hence the
+  // one that can be asked to make things worse, hence the only one that rolls
+  // back.  The result is the verdict on the re-sorted rows (faces, genus), so
+  // a refusal can say why; on a refusal G is unchanged.
+  // @anchor set-layout2d-verified
+  // @pre  laid_out: drawing.size() == size_t(G.N)
+  // @post adopted: implies(result.code == OrientedSurface::Code::Ok, G.is_consistently_oriented())
+  OrientedSurface set_layout2d_verified(GraphView& G, const vector<coord2d>& drawing);
+
   face_t find_outer_face(const PlanarGraphView& G, const vector<coord2d>& layout);
   bool layout_is_crossingfree(const PlanarGraphView& G, const vector<coord2d>& layout);
 
