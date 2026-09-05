@@ -257,6 +257,12 @@ struct GraphView : Spanify::RSRAdjacencyView<node_t> {
     vector<OrientedSurface> component_surfaces(const vector<int>& genus = {}) const;
 
     bool adjacency_is_symmetric() const;
+    // No self-loops and no parallel arcs: each neighbour list is a set of
+    // vertices other than its own.  Symmetry is the separate predicate above;
+    // a simple undirected graph satisfies both.
+    // @anchor graphview-is-simple
+    // @time O(sum_u degree(u)^2)
+    bool is_simple() const;
 
     // How many of u's neighbours have u's own degree -- the quantity the
     // pentagon/hexagon neighbour indices are the histogram of.
@@ -305,18 +311,21 @@ struct GraphView : Spanify::RSRAdjacencyView<node_t> {
     // The number of Hamiltonian cycles of this graph, counted as UNDIRECTED
     // cycles -- each once, not once per traversal direction.  That is the
     // convention of IsomerDB's ncycham field and of the legacy Fortran
-    // HamiltonCyc (hamilton.f), whose backtracking (Babic's) this
-    // implements, generalised from cubic graphs to any degree.
+    // HamiltonCyc, whose backtracking this implements, generalised from
+    // cubic graphs to any degree.
+    // @ref D. Babic, hamilton.f:1-183 (HamiltonCyc)
     //
     // Connectivity is NOT required: a disconnected graph has no Hamiltonian
-    // cycle, and the search's distance bound returns 0 for it.
+    // cycle, and the search's distance bound returns 0 for it.  Simplicity
+    // IS: on a multigraph the count is not even label-independent (the
+    // multiplicity of the closing edge is collapsed, that of the first edge
+    // is not), and a self-loop at vertex 0 corrupts the search state.
     //
     // @anchor hamiltonian-cycle-count
-    // @pre  simple: adjacency_is_symmetric() &&
-    //           none_of(indices(N), [&](node_t u){ return edge_exists({u,u}); })
+    // @pre  simple: adjacency_is_symmetric() && is_simple()
     // @post nonnegative: result >= 0
     // @post small: implies(N < 3, result == 0)
-    // @time exponential in N: ~1 min per isomer at C110, ~20 ms at C60
+    // @time exponential in N: ~20 ms per isomer at C60, ~0.6 s at C80, ~2 min at C110
     int64_t hamiltonian_cycle_count() const;
 
     // --- Geometry helpers ---

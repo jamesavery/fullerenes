@@ -5,7 +5,7 @@
 // full-set agreement validates the port end to end. Spectral-moment
 // identities pin the eigensolver wiring independently of the database.
 
-#include <gtest/gtest.h>
+#include "fullerene-test-main.hh"
 
 #include "fullerenes/hueckel.hh"
 #include "fullerenes/isomerdb.hh"
@@ -15,27 +15,13 @@
 #include <array>
 #include <cmath>
 #include <cstdio>
-#include <fstream>
 #include <span>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
-namespace {
-
-// The sizes the database sweep runs over.  CTest runs with no arguments, so
-// the default must be a complete, quick sweep; --sizes N,N,... overrides it.
-std::vector<int>& sizes() { static std::vector<int> s{20, 24, 26, 28, 30, 32, 34, 36, 38, 40}; return s; }
-
-bool database_present() {
-  std::ifstream f(IsomerDB::database_path + "/All/c060all.database");
-  return f.good();
-}
-
-}  // namespace
-
 TEST(Hueckel, CubicSpectralInvariants) {
-  if (!database_present()) GTEST_SKIP() << "fullerene database not installed";
+  if (!IsomerDB::is_installed(20)) GTEST_SKIP() << "C20 database not installed";
   IsomerDB db = IsomerDB::readPDB(20, false);
   FullereneGraph g = IsomerDB::makeIsomer(20, db.entries[0]);
   hueckel::Analysis H = hueckel::analyze(g);
@@ -51,10 +37,15 @@ TEST(Hueckel, CubicSpectralInvariants) {
 }
 
 TEST(Hueckel, MatchesIsomerDatabase) {
-  if (!database_present()) GTEST_SKIP() << "fullerene database not installed";
-  ASSERT_FALSE(sizes().empty()) << "--sizes= would make this sweep assert nothing";
+  ASSERT_FALSE(fullerene_test::sizes().empty()) << "--sizes= would make this sweep assert nothing";
+  // A partial install narrows the sweep rather than failing it; a corpus that
+  // holds none of the requested sizes skips.  The n_compared guard below is
+  // what refuses a sweep that compared nothing.
+  std::vector<int> installed;
+  for (int N : fullerene_test::sizes()) if (IsomerDB::is_installed(N)) installed.push_back(N);
+  if (installed.empty()) GTEST_SKIP() << "none of the requested sizes is installed";
   size_t n_compared = 0;
-  for (int N : sizes()) {
+  for (int N : installed) {
     IsomerDB db = IsomerDB::readPDB(N, false);
     ASSERT_GT(db.entries.size(), 0u) << "empty database for N=" << N;
 
@@ -102,8 +93,7 @@ TEST(Hueckel, MatchesIsomerDatabase) {
 // The spectrum constructor is public and reusable, so its edges are part of
 // the contract: the electron count must fit, and a completely filled set of
 // levels has no LUMO to classify or measure a gap against.
-// Build a simple undirected graph from an edge list (shared with
-// test_hamiltonian.cc's cases; these need no database).
+// A simple undirected graph from an edge list; these cases need no database.
 static Graph graph_of(int N, const std::vector<std::pair<int,int>>& edges) {
   Graph g(size_t(N), GRAPH_DMAX);
   for (auto [u, v] : edges) g.insert_edge({u, v});
@@ -220,6 +210,7 @@ TEST(Hueckel, BipartivityDetectsBipartite) {
   const std::array<double,16> M = spectral_moments(symmetric);
   for (size_t k = 1; k < M.size(); k += 2) EXPECT_NEAR(M[k], 0.0, 1e-9) << "odd moment " << k;
   // A fullerene has pentagons, hence odd cycles, hence bipartivity < 1.
+  if (!IsomerDB::is_installed(60, true)) GTEST_SKIP() << "IPR C60 database not installed";
   IsomerDB db = IsomerDB::readPDB(60, true);
   const hueckel::Analysis H = hueckel::analyze(IsomerDB::makeIsomer(60, db.entries[0]));
   EXPECT_GT(bipartivity(H.x), 0.5);
@@ -227,7 +218,7 @@ TEST(Hueckel, BipartivityDetectsBipartite) {
 }
 
 TEST(Hueckel, C60IhReference) {
-  if (!database_present()) GTEST_SKIP() << "fullerene database not installed";
+  if (!IsomerDB::is_installed(60, true)) GTEST_SKIP() << "IPR C60 database not installed";
   IsomerDB db = IsomerDB::readPDB(60, true);  // the single IPR C60 isomer = Ih
   ASSERT_EQ(db.entries.size(), 1u);
   FullereneGraph g = IsomerDB::makeIsomer(60, db.entries[0]);
@@ -257,27 +248,7 @@ TEST(Hueckel, C60IhReference) {
   EXPECT_LT(bipartivity(H.x), 1.0);
 }
 
-// --sizes N,N,... overrides the sweep; everything else goes to GoogleTest.
+// The default sweep is quick and complete; --sizes N,N,... widens it.
 int main(int argc, char** argv) {
-  std::vector<char*> rest{argv[0]};
-  auto parse = [](const std::string& csv) {
-    std::vector<int> out;
-    for (size_t i = 0; i < csv.size();) {
-      size_t j = csv.find(',', i);
-      if (j == std::string::npos) j = csv.size();
-      if (j > i) out.push_back(std::atoi(csv.substr(i, j - i).c_str()));
-      i = j + 1;
-    }
-    return out;
-  };
-  for (int i = 1; i < argc; i++) {
-    const std::string a = argv[i];
-    if (a == "--sizes" && i + 1 < argc) { sizes() = parse(argv[++i]); continue; }
-    if (a.rfind("--sizes=", 0) == 0)    { sizes() = parse(a.substr(8)); continue; }
-    rest.push_back(argv[i]);
-  }
-  rest.push_back(nullptr);   // GoogleTest reads argv[argc]
-  int rc = int(rest.size()) - 1;
-  ::testing::InitGoogleTest(&rc, rest.data());
-  return RUN_ALL_TESTS();
+  return fullerene_test::run(argc, argv, {20, 24, 26, 28, 30, 32, 34, 36, 38, 40}, "hueckel");
 }

@@ -146,7 +146,7 @@ void Graph::apply_permutation(const Permutation& pi)
 // such a walk enters a cycle not containing a0 and never returns.
 //
 // @pre  symmetric: G.adjacency_is_symmetric()   (else phi is not total)
-// @pre  simple:    no parallel arcs, no self-loops  (else phi is not injective)
+// @pre  simple:    G.is_simple()                 (else phi is not injective)
 // @throws std::logic_error when either @pre is violated
 // @time O(E_dmax)
 template<typename Visit>
@@ -287,6 +287,18 @@ bool GraphView::has_separating_triangles() const
   return false;
 }
 
+
+bool GraphView::is_simple() const
+{
+  for(node_t u=0;u<N;u++){
+    auto nu = (*this)[u];
+    for(int i=0;i<nu.size();i++){
+      if(nu[i] == u) return false;
+      for(int j=0;j<i;j++) if(nu[j] == nu[i]) return false;
+    }
+  }
+  return true;
+}
 
 bool GraphView::adjacency_is_symmetric() const
 {

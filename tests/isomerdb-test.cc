@@ -9,12 +9,15 @@
 // machines without the database installed.
 
 #include <gtest/gtest.h>
-#include <fstream>
+
 #include "fullerenes/isomerdb.hh"
 
 namespace {
 
-// RAII redirect of the static database root.
+// RAII redirect of the static database root, so a case that points IsomerDB at
+// a nonexistent corpus cannot leak that setting into the cases after it.  Only
+// this suite needs it -- the tests that merely read the corpus ask
+// IsomerDB::is_installed and skip.
 struct DatabasePathGuard {
   std::string saved;
   explicit DatabasePathGuard(const std::string& path) : saved(IsomerDB::database_path) {
@@ -22,11 +25,6 @@ struct DatabasePathGuard {
   }
   ~DatabasePathGuard() { IsomerDB::database_path = saved; }
 };
-
-bool database_present() {
-  std::ifstream f(IsomerDB::database_path + "/All/c060all.database");
-  return f.good();
-}
 
 }  // namespace
 
@@ -61,7 +59,7 @@ TEST(IsomerDBErrors, NumberIsomersOutOfRangeIsZero) {
 }
 
 TEST(IsomerDBReads, ReadPDB_C60) {
-  if (!database_present()) GTEST_SKIP() << "fullerene database not installed";
+  if (!IsomerDB::is_installed(60)) GTEST_SKIP() << "fullerene database not installed";
   IsomerDB db = IsomerDB::readPDB(60, false);
   EXPECT_EQ(db.N, 60);
   EXPECT_EQ(db.Nisomers, 1812);
@@ -69,7 +67,7 @@ TEST(IsomerDBReads, ReadPDB_C60) {
 }
 
 TEST(IsomerDBReads, MakeIsomerFromEntry) {
-  if (!database_present()) GTEST_SKIP() << "fullerene database not installed";
+  if (!IsomerDB::is_installed(60)) GTEST_SKIP() << "fullerene database not installed";
   IsomerDB db = IsomerDB::readPDB(60, false);
   FullereneGraph g = IsomerDB::makeIsomer(60, db.entries[0]);
   EXPECT_EQ(g.N, 60);

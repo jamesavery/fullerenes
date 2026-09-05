@@ -583,13 +583,18 @@ string IsomerDB::PDBfilename(int N, Corpus corpus, string extension)
   return database_path + dir + pad_string(to_string(N),3,'0') + tag + extension + ".database";
 }
 
+bool IsomerDB::is_installed(int N, Corpus corpus)
+{
+  return bool(ifstream(PDBfilename(N, corpus).c_str()));
+}
+
 vector<int> IsomerDB::available_sizes(Corpus corpus)
 {
   vector<int> sizes;
   const bool IPR = corpus == Corpus::IPR;
   const int N_last = (IPR? 60 : 20) + 2*int(Nisomers_data[IPR].size() - 1);
   for(int N = IPR? 60 : 20; N <= N_last; N += 2)
-    if(is_fullerene_size(N) && ifstream(PDBfilename(N, corpus).c_str())) sizes.push_back(N);
+    if(is_fullerene_size(N) && is_installed(N, corpus)) sizes.push_back(N);
   return sizes;
 }
 

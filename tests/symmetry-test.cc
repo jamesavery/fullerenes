@@ -25,11 +25,7 @@ static int get_nmax(const char* env_var, int default_val, int hard_max) {
 }
 
 // Check if the database file exists for a given N.
-static bool database_exists(int N) {
-  string filename = IsomerDB::database_path + "/All/c"
-    + pad_string(to_string(N), 3, '0') + "all.database";
-  return ifstream(filename).good();
-}
+static bool database_exists(int N) { return IsomerDB::is_installed(N); }
 
 // Build RSPI->group map from the All database for a given N.
 // Returns only nontrivial entries (group != "C1").
