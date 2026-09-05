@@ -1,4 +1,4 @@
-// Correctness tests for GraphView::hamiltonian_cycle_count (src/c++/hamiltonian.cc).
+// Correctness tests for GraphView::hamilton_cycle_count (src/c++/hamilton_cycle.cc).
 //
 // Three independent oracles:
 //
@@ -143,7 +143,7 @@ TEST(HamiltonianCount, KnownCounts) {
   };
   for (const auto& c : cases) {
     SCOPED_TRACE(c.name);
-    EXPECT_EQ(c.g.hamiltonian_cycle_count(), c.expected);
+    EXPECT_EQ(c.g.hamilton_cycle_count(), c.expected);
   }
 }
 
@@ -162,7 +162,7 @@ TEST(HamiltonianCount, MatchesBruteForceOnRandomGraphs) {
         if (std::uniform_real_distribution<double>(0, 1)(rng) < p) e.push_back({u, v});
       std::shuffle(e.begin(), e.end(), rng);
       Graph g = graph_of(N, e);
-      ASSERT_EQ(g.hamiltonian_cycle_count(), brute_force_count(g)) << "N=" << N << " trial " << trial;
+      ASSERT_EQ(g.hamilton_cycle_count(), brute_force_count(g)) << "N=" << N << " trial " << trial;
       n_graphs++;
     }
   printf("[          ] %d random graphs agree with brute force\n", n_graphs);
@@ -172,7 +172,7 @@ TEST(HamiltonianCount, MatchesBruteForceOnRandomGraphs) {
 TEST(HamiltonianCount, C20DodecahedronHas30) {
   FullereneGraph dodecahedron(20, {0,1,2,3,4,5,6,7,8,9,10,11});
   ASSERT_EQ(dodecahedron.N, 20);
-  EXPECT_EQ(dodecahedron.hamiltonian_cycle_count(), 30);
+  EXPECT_EQ(dodecahedron.hamilton_cycle_count(), 30);
 }
 
 // Every isomer of every requested size, in both corpora that carry ground
@@ -196,7 +196,7 @@ TEST(HamiltonianCount, MatchesEnumeratedTablesAndDatabase) {
 
       int64_t mn = INT64_MAX, mx = 0;
       for (size_t i = 0; i < db.entries.size(); i++) {
-        const int64_t c = IsomerDB::makeIsomer(N, db.entries[i]).hamiltonian_cycle_count();
+        const int64_t c = IsomerDB::makeIsomer(N, db.entries[i]).hamilton_cycle_count();
         mn = std::min(mn, c);
         mx = std::max(mx, c);
         if (db.with_ncycham) {

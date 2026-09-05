@@ -1,6 +1,6 @@
 #include "fullerenes/graphview.hh"
 
-// GraphView::hamiltonian_cycle_count -- the number of undirected Hamiltonian
+// GraphView::hamilton_cycle_count -- the number of undirected Hamiltonian
 // cycles (contract on the declaration in graphview.hh).
 //
 // Darko Babic's backtracking, as implemented in the legacy Fortran
@@ -39,7 +39,7 @@ namespace {
 
 // One count; constructed, run once, discarded.
 //
-// @anchor hamiltonian-cycle-search
+// @anchor hamilton-cycle-search
 // @inv closing: closing_ends_left == count_if(g.nbrs(s), [&](node_t v){ return closing_end[v] && !on_path[v]; })
 // @inv budget:  all_of(indices(g.N), [&](node_t w){ return in_range(usable_degree[w], 0, g.degree(w)); })
 //
@@ -49,7 +49,7 @@ namespace {
 // decremented only for edges no such cycle can use -- the edges a step leaves
 // behind (their endpoint's two cycle edges are already fixed) and the earlier
 // phases' s-edges.  A bound below two therefore proves the branch dead.
-struct HamiltonianCycleSearch {
+struct HamiltonCycleSearch {
   const GraphView& g;
   const node_t s = 0;            // every Hamiltonian cycle passes through it
   vector<char> on_path;
@@ -58,7 +58,7 @@ struct HamiltonianCycleSearch {
   vector<int>  dist;             // BFS distance from s on the full graph
   int closing_ends_left = 0;     // closing ends not yet on the path
 
-  HamiltonianCycleSearch(const GraphView& g)
+  HamiltonCycleSearch(const GraphView& g)
     : g(g), on_path(g.N, 0), usable_degree(g.N), closing_end(g.N, 0), dist(g.N) {
     for (node_t v = 0; v < g.N; v++) usable_degree[v] = g.degree(v);
     g.single_source_shortest_paths(s, dist.data());
@@ -72,11 +72,11 @@ struct HamiltonianCycleSearch {
   // and restoration cannot come apart; on_path is the same at both ends
   // because the only vertex placed inside the scope is `taken`.
   struct Exclusion {
-    HamiltonianCycleSearch& S;
+    HamiltonCycleSearch& S;
     span<const node_t> ws;
     node_t taken;
     bool viable = true;
-    Exclusion(HamiltonianCycleSearch& S, span<const node_t> ws, node_t taken) : S(S), ws(ws), taken(taken) {
+    Exclusion(HamiltonCycleSearch& S, span<const node_t> ws, node_t taken) : S(S), ws(ws), taken(taken) {
       for (node_t w : ws) if (w != taken && !S.on_path[w] && --S.usable_degree[w] < 2) viable = false;
     }
     ~Exclusion() { for (node_t w : ws) if (w != taken && !S.on_path[w]) S.usable_degree[w]++; }
@@ -139,8 +139,8 @@ struct HamiltonianCycleSearch {
 
 }  // namespace
 
-int64_t GraphView::hamiltonian_cycle_count() const
+int64_t GraphView::hamilton_cycle_count() const
 {
   if (N < 3) return 0;   // before the search state (and its BFS) is built
-  return HamiltonianCycleSearch(*this).count_cycles();
+  return HamiltonCycleSearch(*this).count_cycles();
 }

@@ -88,7 +88,7 @@ public:
     // canonical RSPI is FullereneDualView::regular_rspi, the database's key.
     // Defined in isomerdb_record.cc, which composes the producers
     // (regular_rspi, neighbour_indices, Symmetry, hueckel::analyze,
-    // hamiltonian_cycle_count); isomerdb.cc itself stays a reader/writer.
+    // hamilton_cycle_count); isomerdb.cc itself stays a reader/writer.
     // @anchor isomer-record-from-dual
     static EntryResult from_dual(const FullereneDualView& D, Field producers);
     // A filled HOMO level: the Fortran's closed/open distinction, and the

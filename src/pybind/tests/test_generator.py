@@ -44,8 +44,8 @@ def test_generated_methods_are_callable():
 
 
 def test_promoted_definition_is_bound():
-    # GraphView::hamiltonian_cycle_count() spent August declared in graphview.hh
+    # GraphView::hamilton_cycle_count() spent August declared in graphview.hh
     # with no definition in the .so, and this test pinned the generator's
     # dead-declaration gate on it.  The definition landed 2026-09-05, so the
     # gate must now let it through: the method is bound, and it counts.
-    assert fl.FullereneGraph.C20().hamiltonian_cycle_count() == 30
+    assert fl.FullereneGraph.C20().hamilton_cycle_count() == 30

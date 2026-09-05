@@ -11,7 +11,7 @@
 //   group, NMR              Symmetry::point_group / NMR_pattern
 //   NeHOMO, NedgeHOMO,      hueckel::analyze (hueckel.f HueckelAnalyze +
 //   HLgap                     the gap-zeroing convention of spiral.f's writer)
-//   ncycham                 GraphView::hamiltonian_cycle_count (hamilton.f HamiltonCyc)
+//   ncycham                 GraphView::hamilton_cycle_count (hamilton.f HamiltonCyc)
 //
 // Every way the record can fail to exist is a named EntryResult code returned
 // at the point it is discovered; representability is checked here, before the
@@ -83,7 +83,7 @@ EntryResult Entry::from_dual(const FullereneDualView& D, Field producers)
       e.HLgap     = float(H.gap);
     }
     if (!!(producers & Field::Ncycham)) {
-      const int64_t h = G.hamiltonian_cycle_count();
+      const int64_t h = G.hamilton_cycle_count();
       if (h < 1 || h > Entry::ncycham_max) return not_representable("the Hamilton-cycle count", h, "I7");
       e.ncycham = int(h);
     }

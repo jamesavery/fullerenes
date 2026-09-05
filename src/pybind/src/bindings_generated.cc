@@ -28,7 +28,7 @@ void register_generated_FullereneGraph(py::class_<pyf::PyGraph<FullereneGraph, F
     cls.def("adjacency_is_symmetric", [](W& w) { return w.view().adjacency_is_symmetric(); });
     cls.def("is_simple", [](W& w) { return w.view().is_simple(); });
     cls.def("has_separating_triangles", [](W& w) { return w.view().has_separating_triangles(); });
-    cls.def("hamiltonian_cycle_count", [](W& w) { return w.view().hamiltonian_cycle_count(); });
+    cls.def("hamilton_cycle_count", [](W& w) { return w.view().hamilton_cycle_count(); });
     cls.def("max_degree", [](W& w) { return w.view().max_degree(); });
     cls.def("count_edges", [](W& w) { return w.view().count_edges(); });
 }
@@ -48,7 +48,7 @@ void register_generated_FullereneDual(py::class_<pyf::PyGraph<FullereneDual, Ful
     cls.def("adjacency_is_symmetric", [](W& w) { return w.view().adjacency_is_symmetric(); });
     cls.def("is_simple", [](W& w) { return w.view().is_simple(); });
     cls.def("has_separating_triangles", [](W& w) { return w.view().has_separating_triangles(); });
-    cls.def("hamiltonian_cycle_count", [](W& w) { return w.view().hamiltonian_cycle_count(); });
+    cls.def("hamilton_cycle_count", [](W& w) { return w.view().hamilton_cycle_count(); });
     cls.def("count_edges", [](W& w) { return w.view().count_edges(); });
 }
 
@@ -68,7 +68,7 @@ void register_generated_Polyhedron(py::class_<pyf::PyGeom<Polyhedron, Polyhedron
     cls.def("adjacency_is_symmetric", [](W& w) { return w.view().adjacency_is_symmetric(); });
     cls.def("is_simple", [](W& w) { return w.view().is_simple(); });
     cls.def("has_separating_triangles", [](W& w) { return w.view().has_separating_triangles(); });
-    cls.def("hamiltonian_cycle_count", [](W& w) { return w.view().hamiltonian_cycle_count(); });
+    cls.def("hamilton_cycle_count", [](W& w) { return w.view().hamilton_cycle_count(); });
     cls.def("max_degree", [](W& w) { return w.view().max_degree(); });
     cls.def("count_edges", [](W& w) { return w.view().count_edges(); });
 }
@@ -91,6 +91,6 @@ void register_generated_Deltahedron(py::class_<pyf::PyGeom<Deltahedron, Deltahed
     cls.def("adjacency_is_symmetric", [](W& w) { return w.view().adjacency_is_symmetric(); });
     cls.def("is_simple", [](W& w) { return w.view().is_simple(); });
     cls.def("has_separating_triangles", [](W& w) { return w.view().has_separating_triangles(); });
-    cls.def("hamiltonian_cycle_count", [](W& w) { return w.view().hamiltonian_cycle_count(); });
+    cls.def("hamilton_cycle_count", [](W& w) { return w.view().hamilton_cycle_count(); });
     cls.def("count_edges", [](W& w) { return w.view().count_edges(); });
 }

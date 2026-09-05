@@ -139,9 +139,9 @@ if(GTest_FOUND)
   add_test(NAME hueckel-test COMMAND hueckel-test)
 
   # Own main (--sizes), hence GTest::GTest without GTest::Main.
-  add_executable(hamiltonian-test hamiltonian-test.cc)
-  target_link_libraries(hamiltonian-test fullerenes GTest::GTest)
-  add_test(NAME hamiltonian-test COMMAND hamiltonian-test)
+  add_executable(hamilton-cycle-test hamilton-cycle-test.cc)
+  target_link_libraries(hamilton-cycle-test fullerenes GTest::GTest)
+  add_test(NAME hamilton-cycle-test COMMAND hamilton-cycle-test)
 
   add_executable(isomerdb-test isomerdb-test.cc)
   target_link_libraries(isomerdb-test fullerenes GTest::GTest GTest::Main)

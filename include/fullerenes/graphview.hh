@@ -321,12 +321,12 @@ struct GraphView : Spanify::RSRAdjacencyView<node_t> {
     // multiplicity of the closing edge is collapsed, that of the first edge
     // is not), and a self-loop at vertex 0 corrupts the search state.
     //
-    // @anchor hamiltonian-cycle-count
+    // @anchor hamilton-cycle-count
     // @pre  simple: adjacency_is_symmetric() && is_simple()
     // @post nonnegative: result >= 0
     // @post small: implies(N < 3, result == 0)
     // @time exponential in N: ~20 ms per isomer at C60, ~0.6 s at C80, ~2 min at C110
-    int64_t hamiltonian_cycle_count() const;
+    int64_t hamilton_cycle_count() const;
 
     // --- Geometry helpers ---
     coord2d centre2d(const vector<coord2d>& layout) const;
