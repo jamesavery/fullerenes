@@ -1,5 +1,5 @@
 #include "fullerenes/delaunay.hh"
-#include "fullerenes/delaunay_cyclotomic.hh"
+#include "fullerenes/delaunay_cyclotomic_wide.hh"
 
 #include <cmath>
 #include <algorithm>
@@ -404,14 +404,16 @@ void DelaunayTriangulation::remove_flat_vertices_exact(const std::function<void(
 // returned is the only exact description of the reduced complex: the
 // exact lengths and wedges are not recoverable from the float shadows, and
 // the entry boundary's fresh-kis premise no longer holds.
-static cyclotomic::CyclotomicKisCarry
+// The owner runs the 64/128 tier (delaunay_cyclotomic_wide.hh): one
+// isomer at a time, any size the 64-bit storage holds.
+static cyclotomic::CyclotomicKisCarry64
 reduced_cyclotomic_kis_carry(DelaunayTriangulation& D, int n_centres,
                              std::span<const int> centre_size, const char* op,
                              const std::function<void(int)>& on_pop)
 {
-  cyclotomic::CyclotomicKisCarry carry =
-      cyclotomic::derive_cyclotomic_kis_carry(D, n_centres, centre_size, op);
-  cyclotomic::CyclotomicMetric m = carry.metric();
+  cyclotomic::CyclotomicKisCarry64 carry =
+      cyclotomic::derive_cyclotomic_kis_carry_wide(D, n_centres, centre_size, op);
+  cyclotomic::CyclotomicMetric64 m = carry.metric();
   run_flat_removal(D, op, m, on_pop);
   return carry;
 }
@@ -443,10 +445,10 @@ DelaunayTriangulation::remove_and_complete_cyclotomic_kis(
   // Removal, then completion, on ONE carry.  The removal's post-condition
   // (Delaunay under the metric) is the completion's precondition, so no
   // separate Delaunay check stands between them.
-  cyclotomic::CyclotomicKisCarry carry = reduced_cyclotomic_kis_carry(
+  cyclotomic::CyclotomicKisCarry64 carry = reduced_cyclotomic_kis_carry(
       *this, n_centres, centre_size, "remove_and_complete_cyclotomic_kis",
       on_pop);
-  cyclotomic::CyclotomicMetric m = carry.metric();
+  cyclotomic::CyclotomicMetric64 m = carry.metric();
   return complete_under(*this, "remove_and_complete_cyclotomic_kis", m);
 }
 

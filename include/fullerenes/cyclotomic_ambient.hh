@@ -65,10 +65,9 @@ inline constexpr auto kPow60 = make_pow_table60();
 
 // ---------------------------------------------------------------------------
 // The ring Z[zeta_60] (its rank-16 product folds through kPow60 with
-// per-coordinate amplification <= 58 B^2, the guard's constant; the
-// accumulation is 128-bit -- this is host-tier scaffolding).
+// per-coordinate amplification <= 58 B^2, the guard's constant).
 // ---------------------------------------------------------------------------
-struct Zeta60 : CheckedCoeffRing<Zeta60, 16, __int128> {
+struct Zeta60 : CheckedCoeffRing<Zeta60, 16, long long> {
   static constexpr int kAmplification = 58;
   static const std::array<long long, 16>& pow_row(int k) {
     return detail::kPow60[k];

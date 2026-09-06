@@ -1,6 +1,6 @@
 #pragma once
 // ============================================================================
-// delaunay_cyclotomic.hh -- CyclotomicMetric: the exact metric policy of
+// delaunay_cyclotomic.hh -- CyclotomicMetricT: the exact metric policy of
 // the FLATTENED KIS SURFACE, the third regime of the iDT machinery
 // (BandedFloatMetric / ExactIntegerMetric, delaunay_view.hh; layer 2 of
 // the cyclotomic-algebra-and-idt-extension debt entry,
@@ -20,18 +20,23 @@
 //                pentagon-incidence count of a cubic corner; 0 at every
 //                face centre).  Purely combinatorial and flip-invariant:
 //                the flatness word costs no arithmetic at all.
-// Every predicate consults the constructor-validated cyclotomic::Diamond,
+// Every predicate consults the constructor-validated cyclotomic::DiamondT,
 // so a corrupt carry REFUSES (InvariantViolated through the view's latch)
 // instead of mis-classifying; flips transport (lsq, both face wedges)
-// through Diamond::flipped's exact divisions.
+// through DiamondT::flipped's exact divisions.
 //
-// THE STORAGE WIDTH.  The policy is templated on the storage type S of a
-// carried number: Real30 itself (64-bit coordinates, the host default) or
-// Stored30<int32_t> (32-bit coordinates, the device tier -- half the
-// arena, and every fullerene through C1000 fits by a wide margin,
-// cyclotomic.hh's storage section).  Arithmetic is always in Real30;
-// every read widens, every write narrows, and a value the width cannot
-// hold trips by name (CapacityExceeded) -- the storage-width refusal.
+// THE TWO WIDTHS.  The policy is templated on the STORAGE type S of a
+// carried number and the RING R of the arithmetic (cyclotomic.hh's
+// WIDTHS paragraph); every read widens S to R, every write narrows R to
+// S, and a value the storage cannot hold trips CapacityExceeded by name.
+// Two instantiations are used:
+//   CyclotomicMetric32  = <Stored30<int32_t>, Real30>      the batch tier
+//                         (device and host sweeps; through ~C15,000);
+//   CyclotomicMetric64  = <Real30, Real30Wide>              single huge
+//                         isomers (delaunay_cyclotomic_wide.hh, host).
+// The unqualified names (CyclotomicMetric, CarryStore, CyclotomicKisCarry)
+// are the 64-bit ring over its own storage, kept for the parallel port's
+// arena until it moves to the batch tier; they are not a supported tier.
 //
 // THE Q-FRAME DEVELOPMENT (prepare_star / ear / commit_star /
 // first_tie_side).  Flat-star removal develops the star's rim into the
@@ -61,7 +66,7 @@
 // derive_exact_lsq_carry's discipline: entering the exact regime on a
 // metric it does not describe would be a silent wrong answer.
 //
-// ONE tier: the policy is the same code on the host and in a GPU
+// ONE tier of code: the policy is the same code on the host and in a GPU
 // work-item (cyclotomic.hh's banner) -- the cubic chain's device
 // reduction runs it over a per-isomer carry arena (claude-projects/
 // parallel-primitives, IdtBatch::launch_kis_reduce_exact).
@@ -83,30 +88,37 @@ namespace cyclotomic {
 // cubic corner's pentagon count k; 0 at face centres).
 inline constexpr double kCurvatureQuantum = std::numbers::pi_v<double> / 15;
 
-// The storage of a development point at storage width S: Zeta30 itself
-// when S is Real30, a pair of narrow coordinates otherwise; widen / narrow
-// as for the reals.
+// The storage of a development point at storage type S: a pair of
+// coordinates at that width.  For a ring used as its own storage the pair
+// IS the point ring (the parallel port's arena holds Zeta30 values).
 template <class S>
 struct StoredZeta {
   S x, y;
 };
 template <class S>
-using zeta_store_t = std::conditional_t<std::is_same_v<S, Real30>, Zeta30, StoredZeta<S>>;
-
+struct zeta_store {
+  using type = StoredZeta<S>;
+};
+template <class Coef>
+struct zeta_store<Real30T<Coef>> {
+  using type = Zeta30T<Real30T<Coef>>;
+};
 template <class S>
-inline Zeta30 widen(const StoredZeta<S>& z) { return {widen(z.x), widen(z.y)}; }
-inline const Zeta30& widen(const Zeta30& z) { return z; }
+using zeta_store_t = typename zeta_store<S>::type;
 
-template <class Z>
-inline std::optional<Z> narrow_point(const Zeta30& z) {
-  if constexpr (std::is_same_v<Z, Zeta30>) {
-    if (!z.ok()) return std::nullopt;
-    return z;
-  } else {
-    const auto x = narrow<decltype(Z::x)>(z.x), y = narrow<decltype(Z::y)>(z.y);
-    if (!x || !y) return std::nullopt;
-    return Z{*x, *y};
-  }
+template <class R, class S>
+inline Zeta30T<R> widen_point(const StoredZeta<S>& z) {
+  return {widen<R>(z.x), widen<R>(z.y)};
+}
+template <class R, class Coef>
+inline Zeta30T<R> widen_point(const Zeta30T<Real30T<Coef>>& z) {
+  return {widen<R>(z.x), widen<R>(z.y)};
+}
+template <class Z, class R>
+inline std::optional<Z> narrow_point(const Zeta30T<R>& z) {
+  const auto x = narrow<decltype(Z::x)>(z.x), y = narrow<decltype(Z::y)>(z.y);
+  if (!x || !y) return std::nullopt;
+  return Z{*x, *y};
 }
 
 // Does the CCW sector from direction `from` to direction `to` subtend at
@@ -116,7 +128,8 @@ inline std::optional<Z> narrow_point(const Zeta30& z) {
 // accepted tie); wedge == 0 with positive dot would be a 0 / 2pi sector,
 // excluded by the fan premise (defensive reject).  A refused sign leaves
 // its name in `tr` (caller trips).
-inline bool sector_at_most_pi(const Zeta30& from, const Zeta30& to,
+template <class R>
+inline bool sector_at_most_pi(const Zeta30T<R>& from, const Zeta30T<R>& to,
                               SignTrace& tr) {
   const SignOr sw = sign_real(wedge(from, to), &tr);
   if (!sw) return false;
@@ -129,15 +142,15 @@ inline bool sector_at_most_pi(const Zeta30& from, const Zeta30& to,
 }
 
 // ---------------------------------------------------------------------------
-// The policy.  Spans are caller-owned (CyclotomicKisCarry below); the
+// The policy.  Spans are caller-owned (CyclotomicKisCarryT below); the
 // pending-transport members make the policy STATEFUL -- one instance must
 // live across a whole reduction run (the drivers pass the metric by
 // reference throughout).
 // ---------------------------------------------------------------------------
 // The carry as the policy sees it: the three exact arrays (file banner) and
 // the two development scratch arrays, as caller-owned views at storage
-// width S.
-template <class S = Real30>
+// type S.
+template <class S>
 struct CarryViewsT {
   std::span<S> lsq;                      // [nh_cap] per half-edge, twin-paired
   std::span<S> f_wedge;                  // [nf_cap] per face slot
@@ -146,7 +159,7 @@ struct CarryViewsT {
   std::span<S> diag_pend;                // [k_max] accepted-ear diagonal lsq
 };
 
-template <class S = Real30>
+template <class S, class R>
 struct CyclotomicMetricT : CarryViewsT<S> {
   using Views = CarryViewsT<S>;
   using Views::lsq;
@@ -154,7 +167,10 @@ struct CyclotomicMetricT : CarryViewsT<S> {
   using Views::curv_k;
   using Views::dev;
   using Views::diag_pend;
+  using ring = R;
+  using storage = S;
   using Zs = zeta_store_t<S>;
+  using Zr = Zeta30T<R>;
 
   // Flip transport, armed by flipped() and applied by the set_edge_length
   // the SAME flip issues (flip_edge calls them back to back on one h; a
@@ -162,24 +178,24 @@ struct CyclotomicMetricT : CarryViewsT<S> {
   // re-arms).
   struct PendingFlip {
     int h = -1;
-    Real30 f2, w_origin, w_far;
+    R f2, w_origin, w_far;
   } pend{};
   // Ear-diagonal FIFO: ear() pushes each ACCEPTED diagonal's exact lsq in
   // acceptance order; splice_fan's set_edge_length calls consume them in
   // the same order (ear_clip_fan records diagonals 1:1 with acceptances).
   int n_diag = 0, i_diag = 0;
-  Real30 dev_scale{};                    // Ls(0) of the current development
+  R dev_scale{};                         // Ls(0) of the current development
   int dev_k = 0;
 
   // The carry read at arithmetic width: squared length of h, wedge of face
   // f, development point i.
-  Real30 L(int h) const { return widen(lsq[h]); }
-  Real30 W(int f) const { return widen(f_wedge[f]); }
-  Zeta30 Qd(int i) const { return widen(dev[i]); }
+  R L(int h) const { return widen<R>(lsq[h]); }
+  R W(int f) const { return widen<R>(f_wedge[f]); }
+  Zr Qd(int i) const { return widen_point<R>(dev[i]); }
 
   // The carry written at storage width: a value the width cannot hold
   // trips by name (the storage-width refusal) and is not written.
-  static bool put(DelaunayView& V, std::span<S> arr, int i, const Real30& v,
+  static bool put(DelaunayView& V, std::span<S> arr, int i, const R& v,
                   const char* what) {
     const auto n = narrow<S>(v);
     if (!n) {
@@ -189,7 +205,7 @@ struct CyclotomicMetricT : CarryViewsT<S> {
     arr[i] = *n;
     return true;
   }
-  static bool put_point(DelaunayView& V, std::span<Zs> arr, int i, const Zeta30& z,
+  static bool put_point(DelaunayView& V, std::span<Zs> arr, int i, const Zr& z,
                         const char* what) {
     const auto n = narrow_point<Zs>(z);
     if (!n) {
@@ -202,8 +218,8 @@ struct CyclotomicMetricT : CarryViewsT<S> {
 
   // The float shadows of an exact squared length: the x kLsqScale
   // convention cleared, and its root.
-  static double shadow_lsq(const Real30& q) { return q.value() / (double)kLsqScale; }
-  static double shadow_len(const Real30& q) { return std::sqrt(shadow_lsq(q)); }
+  static double shadow_lsq(const R& q) { return q.value() / (double)kLsqScale; }
+  static double shadow_len(const R& q) { return std::sqrt(shadow_lsq(q)); }
 
   // Does h's float shadow agree with its exact lsq, at the integrality
   // band?  The one spelling of the exact<->float length bridge: the entry
@@ -222,7 +238,7 @@ struct CyclotomicMetricT : CarryViewsT<S> {
 
   // A refusal of the ring, tripped by name.  A POISONED value is a
   // coefficient overflow: the carry has left the ring's guaranteed
-  // envelope (kCarryCoeffMax), a CAPACITY refusal, the same kind as a
+  // envelope (carry_coeff_max), a CAPACITY refusal, the same kind as a
   // storage width exceeded.  Every other refusal (a non-divisible
   // quotient, a non-positive wedge, an inconsistent carry, an undecided
   // sign) falsifies the carry: InvariantViolated.
@@ -243,11 +259,11 @@ struct CyclotomicMetricT : CarryViewsT<S> {
   // The wedge-carrying diamond of h; a carry the validated constructor
   // refuses is corrupt (or, poisoned, outside the envelope) -- trip, never
   // guess.
-  std::optional<Diamond> diamond_of(DelaunayView& V, int h) const {
+  std::optional<DiamondT<R>> diamond_of(DelaunayView& V, int h) const {
     const auto A = V.diamond_arcs(h);
     Refusal why = Refusal::None;
-    auto D = Diamond::make(L(A.e), L(A.a), L(A.b), L(A.c), L(A.d),
-                           W(V.he_face[h]), W(V.he_face[V.twin(h)]), &why);
+    auto D = DiamondT<R>::make(L(A.e), L(A.a), L(A.b), L(A.c), L(A.d),
+                               W(V.he_face[h]), W(V.he_face[V.twin(h)]), &why);
     if (!D) refuse(V, why, "cyclotomic: diamond carry refused (lsq/wedge)", h);
     return D;
   }
@@ -348,27 +364,27 @@ struct CyclotomicMetricT : CarryViewsT<S> {
     }
     dev_k = k;
     dev_scale = L(fan.spoke_he[0]);
-    if (!put_point(V, dev, 0, Zeta30{dev_scale, Real30{}},
+    if (!put_point(V, dev, 0, Zr{dev_scale, R{}},
                    "cyclotomic prepare_star: development point exceeds the storage width"))
       return;
-    Zeta30 q_i = Qd(0);
+    Zr q_i = Qd(0);
     for (int i = 0; i < k; i++) {
-      const Real30 Ls_i = L(fan.spoke_he[i]);
-      const Real30 Ls_n = L(fan.spoke_he[(i + 1) % k]);
-      const Real30 Lr_i = L(fan.inner_rim[i]);
-      const Real30 w_i = W(V.he_face[fan.spoke_he[i]]);
-      const Real30 d_i = Ls_i + Ls_n - Lr_i;
-      const Zeta30 rot{d_i - Real30::gamma() * w_i, 2 * w_i};
-      const Zeta30 num = q_i * rot;
-      const Real30 den = 2 * Ls_i;
+      const R Ls_i = L(fan.spoke_he[i]);
+      const R Ls_n = L(fan.spoke_he[(i + 1) % k]);
+      const R Lr_i = L(fan.inner_rim[i]);
+      const R w_i = W(V.he_face[fan.spoke_he[i]]);
+      const R d_i = Ls_i + Ls_n - Lr_i;
+      const Zr rot{d_i - R::gamma() * w_i, 2 * w_i};
+      const Zr num = q_i * rot;
+      const R den = 2 * Ls_i;
       DivTrace dt;
       const auto qx = exact_div(num.x, den, &dt);
-      const auto qy = qx ? exact_div(num.y, den, &dt) : std::optional<Real30>{};
+      const auto qy = qx ? exact_div(num.y, den, &dt) : std::optional<R>{};
       if (!qx || !qy) {
         refuse(V, dt.refusal, "cyclotomic prepare_star: development division refused", v);
         return;
       }
-      const Zeta30 q{*qx, *qy};
+      const Zr q{*qx, *qy};
       if (i + 1 < k) {
         if (!put_point(V, dev, i + 1, q,
                        "cyclotomic prepare_star: development point exceeds the storage width"))
@@ -387,7 +403,7 @@ struct CyclotomicMetricT : CarryViewsT<S> {
   // delaunay_detail::ear_diag_sq_if_acceptable); on acceptance the exact
   // diagonal lsq is queued for splice_fan's paired write.
   Length ear(DelaunayView& V, const FanPolygon&, int pp, int pi, int pn) {
-    const Zeta30 qp = Qd(pp), qi = Qd(pi), qn = Qd(pn);
+    const Zr qp = Qd(pp), qi = Qd(pi), qn = Qd(pn);
     SignTrace tr;
     const SignOr s = decided(V, sign_real(wedge(qi - qp, qn - qp), &tr), tr,
                              "cyclotomic ear: CCW sign refused", pi);
@@ -436,7 +452,7 @@ struct CyclotomicMetricT : CarryViewsT<S> {
     }
     for (int ti = 0; ti < ws.tri.n_triangles; ti++) {
       const auto& t = ws.tri.triangles[ti];
-      const Zeta30 q0 = Qd(t.v0);
+      const Zr q0 = Qd(t.v0);
       DivTrace dt;
       const auto w = exact_div(wedge(Qd(t.v1) - q0, Qd(t.v2) - q0), dev_scale, &dt);
       if (!w) {
@@ -473,26 +489,26 @@ struct CyclotomicMetricT : CarryViewsT<S> {
       ws.poly[n++] = g;
       if (g == V.twin(h_loop)) break;
     }
-    const Zeta30 q0{L(ws.poly[0]), Real30{}};
-    Zeta30 qt = q0;
+    const Zr q0{L(ws.poly[0]), R{}};
+    Zr qt = q0;
     for (int t = 0; t + 1 < n; t++) {
-      const Real30 Ls_t = L(ws.poly[t]);
-      const Real30 Ls_n = L(ws.poly[t + 1]);
-      const Real30 Lr_t = L(V.he_next[ws.poly[t]]);
-      const Real30 w_t = W(V.he_face[ws.poly[t]]);
-      const Real30 d_t = Ls_t + Ls_n - Lr_t;
-      const Zeta30 rot{d_t - Real30::gamma() * w_t, 2 * w_t};
-      const Zeta30 num = qt * rot;
-      const Real30 den = 2 * Ls_t;
+      const R Ls_t = L(ws.poly[t]);
+      const R Ls_n = L(ws.poly[t + 1]);
+      const R Lr_t = L(V.he_next[ws.poly[t]]);
+      const R w_t = W(V.he_face[ws.poly[t]]);
+      const R d_t = Ls_t + Ls_n - Lr_t;
+      const Zr rot{d_t - R::gamma() * w_t, 2 * w_t};
+      const Zr num = qt * rot;
+      const R den = 2 * Ls_t;
       DivTrace dt;
       const auto qx = exact_div(num.x, den, &dt);
-      const auto qy = qx ? exact_div(num.y, den, &dt) : std::optional<Real30>{};
+      const auto qy = qx ? exact_div(num.y, den, &dt) : std::optional<R>{};
       if (!qx || !qy) {
         refuse(V, dt.refusal, "cyclotomic first_tie_side: development division refused",
                h_loop);
         return 0;
       }
-      qt = Zeta30{*qx, *qy};
+      qt = Zr{*qx, *qy};
     }
     SignTrace ts;
     const bool le = sector_at_most_pi(q0, qt, ts);
@@ -504,12 +520,6 @@ struct CyclotomicMetricT : CarryViewsT<S> {
   }
 };
 
-using CarryViews = CarryViewsT<Real30>;
-using CyclotomicMetric = CyclotomicMetricT<Real30>;
-// The 32-bit storage tier (cyclotomic.hh's storage section).
-using Stored30Narrow = Stored30<int32_t>;
-using CyclotomicMetricNarrow = CyclotomicMetricT<Stored30Narrow>;
-
 // ---------------------------------------------------------------------------
 // The carry's storage as caller-owned WRITABLE views (the derivation's
 // output), the owned carry, and the verified entry boundary in two layers:
@@ -520,7 +530,7 @@ using CyclotomicMetricNarrow = CyclotomicMetricT<Stored30Narrow>;
 // half-edge capacity, f_wedge at the face capacity, curv_k at the vertex
 // capacity, dev at the half-edge capacity + 1.
 // ---------------------------------------------------------------------------
-template <class S = Real30>
+template <class S, class R>
 struct CarryStoreT {
   std::span<S> lsq, f_wedge, diag_pend;
   std::span<signed char> curv_k;
@@ -529,9 +539,8 @@ struct CarryStoreT {
   CarryViewsT<S> views() const { return {lsq, f_wedge, curv_k, dev, diag_pend}; }
   // A fresh policy over this store: the views, and the transport state at
   // its defaults (pend disarmed, the ear FIFO empty).
-  CyclotomicMetricT<S> metric() const { return {views()}; }
+  CyclotomicMetricT<S, R> metric() const { return {views()}; }
 };
-using CarryStore = CarryStoreT<Real30>;
 
 // A refused derivation: what failed and the id it failed on; ok() when the
 // carry was derived and verified.
@@ -547,9 +556,9 @@ struct CarryRefusal {
 // 5 or 6 (any integer element type).  The first mismatch is returned by
 // name; the store is then partially written and must not be used.
 // @pre  every store span holds its capacity above; V is a fresh kis DCEL
-template <class Size, class S>
+template <class Size, class S, class R>
 inline CarryRefusal derive_cyclotomic_kis_carry_into(
-    CarryStoreT<S> c, const DelaunayView& V, int n_centres,
+    CarryStoreT<S, R> c, const DelaunayView& V, int n_centres,
     std::span<const Size> centre_size) {
   if (n_centres <= 0 || n_centres >= V.nv ||
       (long)centre_size.size() < n_centres)
@@ -565,13 +574,13 @@ inline CarryRefusal derive_cyclotomic_kis_carry_into(
   for (auto& q : c.diag_pend) q = S{};
   // The verifying reads go through the policy's own bridge words, on the
   // views of the store (nothing below resizes them).
-  const CyclotomicMetricT<S> m = c.metric();
+  const CyclotomicMetricT<S, R> m = c.metric();
 
   // The constants table at storage width (|c| <= 100: every width holds it).
-  const auto U = narrow<S>(Real30::lsq_cubic_edge());
-  const auto Sp = narrow<S>(Real30::lsq_pentagon_spoke());
-  const auto WH = narrow<S>(Real30::wedge_hexagon_kis());
-  const auto WP = narrow<S>(Real30::wedge_pentagon_kis());
+  const auto U = narrow<S>(R::lsq_cubic_edge());
+  const auto Sp = narrow<S>(R::lsq_pentagon_spoke());
+  const auto WH = narrow<S>(R::wedge_hexagon_kis());
+  const auto WP = narrow<S>(R::wedge_pentagon_kis());
   if (!U || !Sp || !WH || !WP)
     return {"the constants table exceeds the storage width", 0};
 
@@ -629,39 +638,51 @@ inline CarryRefusal derive_cyclotomic_kis_carry_into(
   return {};
 }
 
-template <class S = Real30>
+template <class S, class R>
 struct CyclotomicKisCarryT {
   std::vector<S> lsq, f_wedge, diag_pend;
   std::vector<signed char> curv_k;
   std::vector<zeta_store_t<S>> dev;
 
-  CarryStoreT<S> store() { return {lsq, f_wedge, diag_pend, curv_k, dev}; }
+  CarryStoreT<S, R> store() { return {lsq, f_wedge, diag_pend, curv_k, dev}; }
   // A fresh policy over this carry: the views, and the transport state at
   // its defaults (pend disarmed, the ear FIFO empty).
-  CyclotomicMetricT<S> metric() { return store().metric(); }
+  CyclotomicMetricT<S, R> metric() { return store().metric(); }
 };
-using CyclotomicKisCarry = CyclotomicKisCarryT<Real30>;
 
 // The owning entry boundary: allocate the carry at the DCEL's capacities,
 // derive and verify it (derive_cyclotomic_kis_carry_into), and convert a
 // refusal to the documented throw.  Every mismatch throws: this boundary
 // is loud by design.
-template <class S = Real30>
-inline CyclotomicKisCarryT<S> derive_cyclotomic_kis_carry(
+template <class S = Real30, class R = Real30>
+inline CyclotomicKisCarryT<S, R> derive_cyclotomic_kis_carry(
     const DelaunayView& V, int n_centres, std::span<const int> centre_size,
     const char* op = "derive_cyclotomic_kis_carry") {
-  CyclotomicKisCarryT<S> c;
+  CyclotomicKisCarryT<S, R> c;
   c.lsq.assign(V.he_length.size(), S{});
   c.f_wedge.assign(V.f_he.size(), S{});
   c.curv_k.assign((std::size_t)V.nv, 0);
   c.dev.assign(V.he_length.size() + 1, zeta_store_t<S>{});
   c.diag_pend.assign(V.he_length.size(), S{});
   const CarryRefusal r =
-      derive_cyclotomic_kis_carry_into<int, S>(c.store(), V, n_centres, centre_size);
+      derive_cyclotomic_kis_carry_into<int, S, R>(c.store(), V, n_centres, centre_size);
   if (!r.ok())
     throw std::runtime_error(std::string(op) + ": " + r.what + " (id " +
                              std::to_string(r.id) + ")");
   return c;
 }
+
+// ---- The batch tier, 32/64 (file banner) ----
+using Stored30Narrow = Stored30<int32_t>;
+using CyclotomicMetric32 = CyclotomicMetricT<Stored30Narrow, Real30>;
+using CarryStore32 = CarryStoreT<Stored30Narrow, Real30>;
+using CyclotomicKisCarry32 = CyclotomicKisCarryT<Stored30Narrow, Real30>;
+
+// ---- The 64-bit ring over its own storage: the parallel port's arena
+// until it moves to the batch tier (not a supported tier, see banner) ----
+using CarryViews = CarryViewsT<Real30>;
+using CyclotomicMetric = CyclotomicMetricT<Real30, Real30>;
+using CarryStore = CarryStoreT<Real30, Real30>;
+using CyclotomicKisCarry = CyclotomicKisCarryT<Real30, Real30>;
 
 }  // namespace cyclotomic
