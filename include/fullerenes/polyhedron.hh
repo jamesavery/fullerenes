@@ -42,16 +42,20 @@ struct Polyhedron : public Owned<PolyhedronView<double>> {
   // Owning: copies points into owned storage
   Polyhedron(const PlanarGraphView& G, const vector<coord3d>& points_ = vector<coord3d>(), const int face_max = INT_MAX);
 
-  // View: uses external coordinate memory (caller manages lifetime)
+  // Owning as well: the coordinates are copied in from the span (an owner never borrows)
   Polyhedron(const PlanarGraphView& G, std::span<coord3d> points_, const int face_max = INT_MAX);
 
   // Create polyhedron from point collection, assuming shortest distance is approximate bond length
   Polyhedron(const vector<coord3d>& xs, double tolerance = 1.2);
 
-  // Replace owned coordinate storage and repoint the span.
-  void set_points(std::vector<coord3d> pts) {
-    owned_points = std::move(pts);
-    repoint();
+  // Write the coordinates: one per vertex, copied into the owner's storage.
+  // @pre  size: pts.size() == size_t(N)
+  // @throws std::invalid_argument on a size mismatch
+  void set_points(std::span<const coord3d> pts) {
+    if (pts.size() != size_t(N))
+      throw std::invalid_argument("Polyhedron::set_points: " + std::to_string(pts.size())
+                                  + " coordinates for " + std::to_string(N) + " vertices");
+    std::copy(pts.begin(), pts.end(), points.begin());
   }
 
   Polyhedron convex_hull() const { return incremental_convex_hull(); }

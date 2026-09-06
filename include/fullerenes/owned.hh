@@ -1,362 +1,461 @@
 #pragma once
 
-// Owned<View>: universal ownership template for the view hierarchy.
+// Owned<View>: the storage behind a view, and nothing else.
 //
-// Adds vector storage for any view type (GraphView, PolyhedronView, etc.).
-// Points the base view's spans into its own vectors.
+// A view (graphview.hh) is a bundle of spans over fields it does not own.
+// This owner holds ONE std::vector per field of the view's batchability
+// contract -- to_tuple / n_fields / get_element_counts, the contract
+// Batch<V> slices (batch/batchable.hh) -- sized for a vertex CAPACITY that
+// may exceed the live vertex count N, and keeps the view's spans pointing at
+// exactly N vertices' worth of each buffer.  So:
 //
-// Detects at compile time whether the view carries geometry (a `points`
-// span) and conditionally owns coordinate storage. One template, one
-// Rule-of-5, handles all owned types.
+//   - every field of every view rides one law: adjacency, degrees, twin,
+//     coordinates, the 12-entry pentagon list -- no per-field members and no
+//     "does this view carry geometry" branches; a view that adds a field to
+//     its tuple is owned without a line here changing;
+//   - within capacity, a resize is a repoint and allocates nothing: a graph
+//     edited in place for a whole run (an enumerator's working graph)
+//     reserves its bound once and grows nothing afterwards;
+//   - the owner IS the view (it derives from it), so a reader takes
+//     `const View&` and an algorithm is written once against the view.
 //
-// STORAGE BACKEND (Phase 1): owned_* buffers use std::vector on host.
-// Batch<View> (Phase 4) will use BatchAlloc<T> from batch/storage-policy.hh
-// which aliases to SyclVector<T> in SYCL builds. Owned<View> will converge
-// on BatchAlloc<T> once SyclVector gains iterator-range construction and
-// assign(); until then Owned<View> stays host-vector to keep SYCL TUs
-// that include owned.hh compiling unchanged.
+// What lives here: allocation and capacity, repointing, the deep copies and
+// the row-count changes those imply, and the owner's half of the twin table
+// (its storage; the derivation is the view's compute_twin).  The whole-graph
+// relayouts -- restride, relabel, compaction -- are the view's words
+// (dense_graph.hh: pad_rows, restride_into, relabel_into) composed here
+// with one allocation each.
+//
+// THE TWIN IS OPTIONAL and its buffer is not: the table is allocated with
+// the other fields but the view's span is switched on only by
+// compute_twin(), so has_twin() means "computed" exactly as it does for a
+// view over caller arrays, and a graph that never asks for a table never
+// pays its maintenance.
+//
+// STORAGE BACKEND: std::vector on host.  (Batch<View> uses BatchAlloc<T>,
+// which aliases to SyclVector<T> in SYCL builds; the owner stays host-vector
+// so the SYCL translation units that include it compile unchanged.)
 
 #include "fullerenes/graphview.hh"
-#include "fullerenes/batch/storage-policy.hh"
-#include <variant>
-#include <type_traits>
+#include "fullerenes/batch/batchable.hh"
 
-// An owning adjacency type: it holds the storage its view spans point into,
-// and can repoint them after that storage moves or is resized.  Owned<View>
-// and Graph both satisfy it, so a filler can be written once against any
-// owner rather than once per concrete graph class.
+#include <algorithm>
+#include <set>
+#include <string>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+// An owning graph as a filler sees it (BuckyGen::dual_slot): storage its
+// view spans point into, reshaped on request to an empty N-by-dmax graph
+// with any twin table dropped, exposing the view's fields the fill writes.
+// Owned<View> and the legacy Graph both satisfy it, so a filler is written
+// once against any owner rather than once per concrete graph class.
 template<typename G>
-concept owning_graph = requires(G& g) {
-    g.owned_neighbours;
-    g.owned_deg;
+concept owning_graph = requires(G& g, typename G::node_type n, int d) {
+    g.reshape(n, d);
     g.repoint();
     g.N;
     g.dmax;
+    g.neighbours;
+    g.deg;
 };
 
 namespace owned_detail {
-    // Fallback: no geometry member → use coord3d as a dummy (never actually stored).
-    template<typename V, bool HasGeom>
-    struct coord_type_of { using type = coord3d; };
-
-    // When has_geometry is true, extract the element type of View::points.
-    template<typename V>
-    struct coord_type_of<V, true> {
-        using type = typename std::remove_reference_t<
-            decltype(std::declval<V>().points)>::value_type;
-    };
+    // tuple<vector<T0>, vector<T1>, ...>: one host buffer per field of V.
+    template<class V, std::size_t... Is>
+    auto make_buffer_tuple(std::index_sequence<Is...>)
+        -> std::tuple<std::vector<std::remove_const_t<batch::field_element_t<V, Is>>>...>;
+    template<class V>
+    using buffer_tuple_t =
+        decltype(make_buffer_tuple<V>(std::make_index_sequence<V::n_fields>{}));
 }
 
 template<typename View>
 struct Owned : View {
-    using node = typename View::node_type;
+    using node      = typename View::node_type;
+    using buffers_t = owned_detail::buffer_tuple_t<View>;
 
-    // Compile-time detection: does View have a `points` member?
-    static constexpr bool has_geometry = requires(View v) { v.points; };
+    // The graph triple {neighbours, deg, twin} is the base adjacency
+    // contract's field set, in its canonical order (batchable.hh); the twin
+    // is its last field, and the one whose span is switched on by
+    // computation rather than by allocation.  Fields past the triple are the
+    // view's own (coordinates, the pentagon list).
+    static constexpr std::size_t n_graph_fields = Spanify::RSRAdjacencyView<node>::n_fields;
+    static constexpr std::size_t twin_field     = n_graph_fields - 1;
+    static_assert(std::is_same_v<batch::field_element_t<View, twin_field>, uint8_t>,
+                  "the last field of the graph triple must be the twin table");
 
-    // Deduce coordinate element type from View::points (only when has_geometry).
-    using coord_type = typename owned_detail::coord_type_of<View, has_geometry>::type;
+    buffers_t buffers;            // one vector per field, holding `capacity` vertices' worth
+    int       capacity = 0;       // the vertex count the buffers are sized for (>= N)
+    bool      twin_computed = false;
 
-    // --- Storage ---
-    std::vector<node>    owned_neighbours;
-    std::vector<uint8_t> owned_deg;
-    std::vector<uint8_t> owned_twin;
+    // The k-th field's buffer -- what a deep copy or a test reads; the view's
+    // span is the first N vertices' worth of it.
+    template<std::size_t k> auto&       buffer()       { return std::get<k>(buffers); }
+    template<std::size_t k> const auto& buffer() const { return std::get<k>(buffers); }
 
-    // For geometry views: vector<coord_type>.  For non-geometry: monostate (zero overhead).
-    std::conditional_t<has_geometry, std::vector<coord_type>,
-                       std::monostate> owned_points{};
+    bool owns_memory() const { return capacity > 0; }
 
-    // --- Repoint all spans to owned storage ---
+    // --- Repoint: every span at the first N vertices' worth of its buffer,
+    //     the twin span at nothing until computed.  Never past a buffer's
+    //     end: that clamp is what makes an owner without storage total (a
+    //     moved-from one, or a default-constructed one before reserve) --
+    //     its spans are empty.  N is always raised through resize, which
+    //     reserves first, so the clamp never truncates a live graph. ---
     void repoint() {
-        this->neighbours = std::span<node>(owned_neighbours);
-        this->deg = std::span<uint8_t>(owned_deg);
-        this->twin = owned_twin.empty()
-            ? std::span<uint8_t>()
-            : std::span<uint8_t>(owned_twin);
-        if constexpr (has_geometry)
-            this->points = std::span<coord_type>(owned_points);
+        const auto counts = View::get_element_counts(this->N, this->dmax);
+        auto spans = this->to_tuple();
+        batch::for_each_field<View>([&](auto Ic) {
+            constexpr std::size_t k = Ic;
+            using span_t = batch::field_span_t<View, k>;
+            auto& buf = std::get<k>(buffers);
+            const bool on = (k != twin_field) || twin_computed;
+            std::get<k>(spans) = on ? span_t(buf.data(), std::min(counts[k], buf.size())) : span_t{};
+        });
     }
 
-    bool owns_memory() const { return !owned_neighbours.empty(); }
+    // --- Capacity: size every buffer for at least `cap` vertices at the
+    //     current stride, keeping contents.  Buffers only ever grow. ---
+    // @anchor owned-reserve
+    // @post capacity >= cap
+    // @post sized: every buffer holds at least get_element_counts(capacity, dmax) elements
+    // @post kept:  the first N vertices' worth of every field is unchanged
+    void reserve(int cap) {
+        capacity = std::max(capacity, cap);
+        const auto counts = View::get_element_counts(capacity, this->dmax);
+        batch::for_each_field<View>([&](auto Ic) {
+            constexpr std::size_t k = Ic;
+            auto& buf = std::get<k>(buffers);
+            if (buf.size() < counts[k]) buf.resize(counts[k]);
+        });
+        repoint();
+    }
 
-    // --- Allocating constructor ---
-    // default_dmax comes from the View type:
-    //   Owned<GraphView>(60)          -> dmax=10
-    //   Owned<CubicGraphView>(60)     -> dmax=3
-    //   Owned<TriangulationView>(32)  -> dmax=6
-    //   Owned<PolyhedronView>(60)     -> dmax=10, points[60]
-    explicit Owned(int N, uint8_t dmax = View::default_dmax)
-        : owned_neighbours(N * dmax, node(-1)), owned_deg(N, 0) {
-        this->N = node(N);
+    // --- Live vertex count.  Within capacity nothing is allocated and no
+    //     buffer moves.  Rows exposed by growth are padded (the view's
+    //     pad_rows), so they are empty and a computed twin stays valid (an
+    //     empty row has no arcs); the view's own fields are value-initialised
+    //     over the exposed slice.  Shrinking abandons rows; they are padded
+    //     again if ever re-exposed. ---
+    // @anchor owned-resize
+    // @post N == new_N && capacity >= new_N
+    // @post empty:   all_of(indices(old_N, new_N), [&](node u){ return degree(u) == 0; })
+    // @post twin:    implies(has_twin(), twin_is_valid() == twin_is_valid_before)
+    // @post storage: implies(new_N <= capacity_before, every buffer's data() is unchanged)
+    void resize(int new_N) {
+        const int old_N = this->N;
+        reserve(new_N);
+        this->N = node(new_N);
+        repoint();
+        if (new_N > old_N) {
+            const auto was = View::get_element_counts(old_N, this->dmax);
+            const auto now = View::get_element_counts(new_N, this->dmax);
+            batch::for_each_field<View>([&](auto Ic) {
+                constexpr std::size_t k = Ic;
+                if constexpr (k >= n_graph_fields) {
+                    auto& buf = std::get<k>(buffers);
+                    using elem_t = typename std::remove_reference_t<decltype(buf)>::value_type;
+                    std::fill(buf.begin() + was[k], buf.begin() + now[k], elem_t{});
+                }
+            });
+            this->pad_rows(node(old_N), node(new_N));
+        }
+    }
+
+    // --- An EMPTY N-by-dmax graph in this storage: the shape a filler wants
+    //     (BuckyGen::dual_slot), reusing the buffers when they are large
+    //     enough and dropping any twin table (it described the previous
+    //     graph).  Every row is padded on every call -- a filler that skips
+    //     a row can no longer inherit the previous graph's. ---
+    // @anchor owned-reshape
+    // @post N == N_ && dmax == dmax_ && !has_twin()
+    // @post empty:   all_of(indices(N), [&](node u){ return degree(u) == 0; })
+    // @post storage: implies(N_ <= capacity_before && dmax_ <= dmax_before,
+    //                        every buffer's data() is unchanged)
+    void reshape(node N_, int dmax_) {
+        this->N = 0;
+        this->dmax = dmax_;
+        twin_computed = false;
+        resize(int(N_));
+    }
+
+    // --- Construction ---
+
+    // No storage and no vertices -- except that the constant-size fields (a
+    // dual's pentagon list) get theirs at once, so a view invariant such as
+    // "the pentagon span has 12 slots" holds from the first moment.
+    Owned() { reserve(0); }
+
+    // An empty graph: N vertices with dmax slots each, sized for
+    // max(N, cap) vertices (an enumerator's working graph reserves its
+    // run's bound here).  Every row empty, every slot padding.
+    explicit Owned(int N, uint8_t dmax = View::default_dmax, int cap = 0) {
         this->dmax = dmax;
-        if constexpr (has_geometry) owned_points.resize(N);
-        repoint();
+        reserve(std::max(N, cap));
+        resize(N);
     }
 
-    // --- Deep copy from any compatible view (adjacency only) ---
-    // For geometry types, allocates default-initialized coordinates.
-    explicit Owned(const GraphView& src)
-        : owned_neighbours(src.neighbours.begin(), src.neighbours.end()),
-          owned_deg(src.deg.begin(), src.deg.end()),
-          owned_twin(src.twin.begin(), src.twin.end()) {
-        this->N = src.N;
-        this->dmax = src.dmax;
-        if constexpr (has_geometry) owned_points.resize(src.N);
-        repoint();
-    }
+    // Deep copy from any view of the hierarchy: the fields the two contracts
+    // share are copied (the source's twin comes along iff it has one), the
+    // rest value-initialised -- a FullereneDual derives its pentagon list at
+    // its boundary, a Polyhedron sets its points.  The buffers are sized for
+    // src.N; a larger existing capacity is kept (copy-assignment from
+    // another owner, below, takes that owner's capacity instead).
+    template<class Src> requires std::is_base_of_v<GraphView, Src>
+    explicit Owned(const Src& src) { assign(src); }
 
-    // --- Deep copy adjacency + move coordinates (geometry types only) ---
-    Owned(const GraphView& src, std::vector<coord_type> pts) requires has_geometry
-        : owned_neighbours(src.neighbours.begin(), src.neighbours.end()),
-          owned_deg(src.deg.begin(), src.deg.end()),
-          owned_twin(src.twin.begin(), src.twin.end()),
-          owned_points(std::move(pts)) {
-        this->N = src.N;
-        this->dmax = src.dmax;
-        repoint();
-    }
+    template<class Src> requires std::is_base_of_v<GraphView, Src>
+    Owned& operator=(const Src& src) { assign(src); return *this; }
 
-    // --- Deep copy from geometry view (adjacency + coordinates) ---
-    explicit Owned(const View& src) requires has_geometry
-        : owned_neighbours(src.neighbours.begin(), src.neighbours.end()),
-          owned_deg(src.deg.begin(), src.deg.end()),
-          owned_twin(src.twin.begin(), src.twin.end()),
-          owned_points(src.points.begin(), src.points.end()) {
-        this->N = src.N;
-        this->dmax = src.dmax;
-        repoint();
-    }
-
-    // --- Default + Rule-of-5 ---
-    Owned() = default;
+    // --- Rule of 5: the buffers move or copy, the spans follow. ---
 
     Owned(const Owned& o)
-        : View(o),
-          owned_neighbours(o.owned_neighbours),
-          owned_deg(o.owned_deg),
-          owned_twin(o.owned_twin),
-          owned_points(o.owned_points) {
-        if (!owned_neighbours.empty()) repoint();
+        : View(o), buffers(o.buffers), capacity(o.capacity), twin_computed(o.twin_computed) {
+        repoint();
     }
-
     Owned(Owned&& o) noexcept
-        : View(o),
-          owned_neighbours(std::move(o.owned_neighbours)),
-          owned_deg(std::move(o.owned_deg)),
-          owned_twin(std::move(o.owned_twin)),
-          owned_points(std::move(o.owned_points)) {
-        if (!owned_neighbours.empty()) repoint();
-        o.neighbours = {}; o.deg = {}; o.N = 0;
-        if constexpr (has_geometry) o.points = {};
+        : View(o), buffers(std::move(o.buffers)), capacity(o.capacity),
+          twin_computed(o.twin_computed) {
+        repoint();
+        o.release();
     }
-
     Owned& operator=(const Owned& o) {
         if (this != &o) {
             View::operator=(o);
-            owned_neighbours = o.owned_neighbours;
-            owned_deg = o.owned_deg;
-            owned_twin = o.owned_twin;
-            owned_points = o.owned_points;
-            if (!owned_neighbours.empty()) repoint();
-            else {
-                this->neighbours = o.neighbours;
-                this->deg = o.deg;
-                this->twin = o.twin;
-                if constexpr (has_geometry) this->points = o.points;
-            }
+            buffers = o.buffers;
+            capacity = o.capacity;
+            twin_computed = o.twin_computed;
+            repoint();
         }
         return *this;
     }
-
     Owned& operator=(Owned&& o) noexcept {
         if (this != &o) {
             View::operator=(o);
-            owned_neighbours = std::move(o.owned_neighbours);
-            owned_deg = std::move(o.owned_deg);
-            owned_twin = std::move(o.owned_twin);
-            owned_points = std::move(o.owned_points);
-            if (!owned_neighbours.empty()) repoint();
-            else {
-                this->neighbours = o.neighbours;
-                this->deg = o.deg;
-                this->twin = o.twin;
-                if constexpr (has_geometry) this->points = o.points;
-            }
-            o.neighbours = {}; o.deg = {}; o.N = 0;
-            if constexpr (has_geometry) o.points = {};
+            buffers = std::move(o.buffers);
+            capacity = o.capacity;
+            twin_computed = o.twin_computed;
+            repoint();
+            o.release();
         }
         return *this;
     }
 
-    // --- Assignment from geometry view (deep copy adjacency + coordinates) ---
-    Owned& operator=(const View& src) requires has_geometry {
-        if (src.neighbours.data() == owned_neighbours.data()) return *this;
-        this->N = src.N;
-        this->dmax = src.dmax;
-        owned_neighbours.assign(src.neighbours.begin(), src.neighbours.end());
-        owned_deg.assign(src.deg.begin(), src.deg.end());
-        owned_twin.assign(src.twin.begin(), src.twin.end());
-        owned_points.assign(src.points.begin(), src.points.end());
-        repoint();
-        return *this;
-    }
-
-    // --- Assignment from any view (deep copy adjacency only) ---
-    Owned& operator=(const GraphView& src) {
-        if (src.neighbours.data() == owned_neighbours.data()) return *this;
-        this->N = src.N;
-        this->dmax = src.dmax;
-        owned_neighbours.assign(src.neighbours.begin(), src.neighbours.end());
-        owned_deg.assign(src.deg.begin(), src.deg.end());
-        owned_twin.assign(src.twin.begin(), src.twin.end());
-        if constexpr (has_geometry) owned_points.resize(src.N);
-        repoint();
-        return *this;
-    }
-
-    // --- Twin computation (allocates owned_twin) ---
-    // The OWNER's half is the storage: size the table and point the view's
-    // span at it.  The derivation is the view's own compute_twin (the
-    // locator, dense_graph.hh), so a view over caller arrays and an owner
-    // derive the same table from one body.  The owner then refuses an
-    // asymmetric graph by name -- a live arc whose reverse the locator did
-    // not find is left carrying no_slot -- naming the arc's two endpoints.
-    // @pre  symmetric: every arc has a reverse -- violation throws
-    //       graph_surgery_error{AsymmetricAdjacency} (this function is the
-    //       from-scratch oracle the surgery tests compare against, so its
-    //       guard must hold in every build configuration, not only -O0).
-    // @post twin: twin_is_valid()
+    // --- Twin: the owner's half is the storage.  Switch the span on and
+    //     derive through the view's compute_twin (the locator, one body for
+    //     owner and view alike); an arc the locator could not reverse
+    //     (first_twinless_arc) means an asymmetric graph, refused by name
+    //     with the table switched off again. ---
+    // @anchor owned-compute-twin
+    // @pre  symmetric: adjacency_is_symmetric() -- violation throws
+    //       graph_surgery_error{AsymmetricAdjacency} naming the arc's
+    //       endpoints (this is the from-scratch oracle the surgery tests
+    //       compare against, so the guard holds in every build configuration)
+    // @post twin:   has_twin() && twin_is_valid()
+    // @post atomic: a throwing call leaves !has_twin()
     void compute_twin() {
-        owned_twin.resize(this->N * this->dmax, 0);
-        this->twin = std::span<uint8_t>(owned_twin);
-        this->GraphView::compute_twin();
-        for (node u = 0; u < this->N; ++u)
-            for (int i = 0; i < this->deg[u]; ++i)
-                if (this->twin[this->arcid(u, i)] == GraphView::no_slot)
-                    this->surgery_fail("compute_twin",
-                                       GraphView::Code::AsymmetricAdjacency, u,
-                                       this->neighbours[this->arcid(u, i)]);
-    }
-
-    // --- Restride (owned only -- reallocates) ---
-    void restride_inplace(uint8_t new_dmax) {
-        std::vector<node> new_neighbours(this->N * new_dmax, node(-1));
-        std::vector<uint8_t> new_deg(this->N);
-        for (int u = 0; u < this->N; ++u) {
-            int d = std::min((int)this->degree(u), (int)new_dmax);
-            new_deg[u] = d;
-            for (int j = 0; j < d; ++j)
-                new_neighbours[u * new_dmax + j] = (*this)[u][j];
+        twin_computed = true;
+        repoint();
+        this->View::compute_twin();
+        const auto a = this->first_twinless_arc();
+        if (View::source(a) != node(-1)) {
+            const node u = View::source(a);
+            const node v = this->neighbours[this->arcid(u, View::slot(a))];
+            twin_computed = false;
+            repoint();
+            this->surgery_fail("compute_twin", View::Code::AsymmetricAdjacency, u, v);
         }
-        owned_neighbours = std::move(new_neighbours);
-        owned_deg = std::move(new_deg);
-        owned_twin.clear();
-        this->dmax = new_dmax;
-        repoint();
     }
 
-    // --- Resize (owned only -- reallocates) ---
-    // A computed twin stays the right SHAPE (new rows have no live arcs, so
-    // validity is untouched); has_twin() must never outlive the size it
-    // promises.
-    void resize(int new_N) {
-        owned_neighbours.resize(new_N * this->dmax, node(-1));
-        owned_deg.resize(new_N, 0);
-        if (!owned_twin.empty()) owned_twin.resize(new_N * this->dmax, 0);
-        this->N = node(new_N);
-        if constexpr (has_geometry) owned_points.resize(new_N);
-        repoint();
-    }
+    // --- Row-count changes: resize plus a row write. ---
 
-    // --- Push/pop vertex rows (owned only) ---
-    // @post twin (if present) keeps its shape; a pushed row's arcs have no
-    //       reverses yet, so its twin entries are STALE until recomputed
-    //       (construction-phase, as for the per-row primitives).
+    // @anchor owned-push-back
+    // @pre  fits: row.size() <= size_t(dmax) -- violation throws
+    //       graph_surgery_error{RowFull}, naming the new row's index
+    // @post N == N_before + 1 && equal(row, nbrs(N - 1)); a computed twin is
+    //       stale on the new row until recomputed (its arcs have no reverses)
     void push_back(const std::vector<node>& row) {
-        assert(int(row.size()) <= this->dmax);
-        owned_neighbours.resize((this->N + 1) * this->dmax, node(-1));
-        owned_deg.push_back(uint8_t(row.size()));
-        if (!owned_twin.empty()) owned_twin.resize((this->N + 1) * this->dmax, 0);
-        repoint();
-        for (int i = 0; i < int(row.size()); ++i)
-            this->neighbours[this->N * this->dmax + i] = row[i];
-        this->N++;
-        if constexpr (has_geometry) {
-            owned_points.push_back(coord_type());
-            this->points = std::span<coord_type>(owned_points);
-        }
+        if (row.size() > size_t(this->dmax))
+            this->surgery_fail("push_back", View::Code::RowFull, this->N, node(-1),
+                               " (" + std::to_string(row.size()) + " entries for a stride of "
+                               + std::to_string(this->dmax) + ")");
+        resize(this->N + 1);
+        const node u = this->N - 1;
+        this->deg[u] = uint8_t(row.size());
+        std::copy(row.begin(), row.end(), this->neighbours.begin() + u * this->dmax);
     }
 
+    // @anchor owned-pop-back
+    // @pre  nonempty: N > 0 -- violation throws graph_surgery_error{VertexOutOfRange}
+    // @post N == N_before - 1
     void pop_back() {
-        assert(this->N > 0);
-        this->N--;
-        owned_neighbours.resize(this->N * this->dmax);
-        owned_deg.resize(this->N);
-        if (!owned_twin.empty()) owned_twin.resize(this->N * this->dmax);
-        if constexpr (has_geometry) {
-            owned_points.resize(this->N);
-        }
-        repoint();
+        if (this->N == 0)
+            this->surgery_fail("pop_back", View::Code::VertexOutOfRange, node(-1), node(-1));
+        resize(this->N - 1);
     }
 
-    // Bring base push_back(node, node) into scope
     using View::push_back;
 
-    // --- Remove isolated vertices (compacts graph) ---
-    void remove_isolated_vertices() {
-        std::vector<int> new_id(this->N);
-        int u_new = 0;
-        for (int u = 0; u < this->N; u++)
-            if (!(*this)[u].empty())
-                new_id[u] = u_new++;
+    // --- Whole-graph relayouts: a view word into a fresh owner of the same
+    //     capacity, whose storage this one then takes. ---
 
-        Owned g(u_new, this->dmax);
-        for (int u = 0; u < this->N; u++)
-            for (node v : (*this)[u])
-                g.push_back(node(new_id[u]), node(new_id[v]));
-
+    // The same rotation system at another stride (restride_into); the
+    // fields past the graph triple ride along unchanged; the twin is
+    // dropped (stale at the new stride).
+    // @anchor owned-restride
+    // @pre  fits: all_of(indices(N), [&](node u){ return degree(u) <= new_dmax; })
+    //       -- violation throws graph_surgery_error{RowFull} and leaves this owner unchanged
+    // @post dmax == new_dmax && !has_twin() && capacity == capacity_before
+    // @post rows: all_of(indices(N), [&](node u){ return equal(nbrs(u), nbrs_before(u)); })
+    void restride_inplace(uint8_t new_dmax) {
+        Owned g(this->N, new_dmax, capacity);
+        this->restride_into(g);
+        g.take_tail_fields(*this, {});
         *this = std::move(g);
     }
 
-    // --- Relabel vertices according to pi (pi[u_old] = u_new) ---
-    // Vertex u_old's adjacency row (and coordinates, for geometry views) moves
-    // to slot u_new, and every arc target t is relabelled to pi[t].
+    // Relabel by pi (pi[u_old] = u_new): row u_old lands in row pi[u_old]
+    // with every target relabelled (relabel_into); a per-vertex field
+    // follows its vertex; a computed twin travels with its rows and stays
+    // valid.  A constant-size field is copied as it stands: a pentagon
+    // LIST names vertices, so it is STALE afterwards and its producer
+    // re-derives it at the boundary (graphview.hh's pentagon contract).
+    // @anchor owned-apply-permutation
+    // @pre  permutation: pi.size() == size_t(N) && is_permutation(pi, identity(N))
+    //       -- violation throws graph_surgery_error{BadPermutation}, this owner unchanged
+    // @post rows: relabel_into's @post rows, over all of [0, N)
+    // @post twin: implies(has_twin_before, has_twin() && twin_is_valid() == twin_is_valid_before)
+    // @post per_vertex_fields: field[pi[u]] == field_before[u]
+    // @post constant_fields: unchanged (stale)
+    // @post capacity == capacity_before
     void apply_permutation(const Permutation& pi) {
-        assert(owns_memory());
-        assert((int)pi.size() == this->N);
-        std::vector<node> new_neighbours(this->N * this->dmax, node(-1));
-        std::vector<uint8_t> new_deg(this->N, 0);
-        for (int u_old = 0; u_old < this->N; ++u_old) {
-            const int u_new = pi[u_old];
-            new_deg[u_new] = owned_deg[u_old];
-            for (int i = 0; i < owned_deg[u_old]; ++i) {
-                const node t_old = owned_neighbours[u_old * this->dmax + i];
-                new_neighbours[u_new * this->dmax + i] = pi[t_old];
-            }
-        }
-        owned_neighbours = std::move(new_neighbours);
-        owned_deg        = std::move(new_deg);
-        if constexpr (has_geometry) {
-            std::vector<coord_type> new_points(this->N);
-            for (int u_old = 0; u_old < this->N; ++u_old)
-                new_points[pi[u_old]] = owned_points[u_old];
-            owned_points = std::move(new_points);
-        }
+        require_permutation("apply_permutation", pi);
+        Owned g(this->N, uint8_t(this->dmax), capacity);
+        g.twin_computed = twin_computed;
+        g.repoint();
+        this->relabel_into(pi, g);
+        g.take_tail_fields(*this, pi);
+        *this = std::move(g);
+    }
+
+    // Drop every vertex of degree 0, relabelling the survivors in order --
+    // relabel_into's partial relabelling, with per-vertex fields and a
+    // computed twin following their vertices.
+    // @anchor owned-remove-isolated
+    // @pre  symmetric: adjacency_is_symmetric() (so no kept row points at a dropped vertex)
+    // @post N == count_if(indices(N_before), [&](node u){ return degree_before(u) > 0; })
+    // @post order: survivors keep their relative order
+    // @post capacity == capacity_before
+    void remove_isolated_vertices() {
+        std::vector<int> pi(this->N, -1);
+        int kept = 0;
+        for (node u = 0; u < this->N; ++u)
+            if (this->deg[u] > 0) pi[u] = kept++;
+        Owned g(kept, uint8_t(this->dmax), capacity);
+        g.twin_computed = twin_computed;
+        g.repoint();
+        this->relabel_into(pi, g);
+        g.take_tail_fields(*this, pi);
+        *this = std::move(g);
+    }
+
+    // Remove the named vertices: every edge at each of them (the view's
+    // surgery), then the compaction above -- which also drops any vertex
+    // that was ALREADY isolated.  Connectivity is not preserved in general.
+    // @anchor owned-remove-vertices
+    // @pre  vertices: all_of(sv, [&](int u){ return size_t(u) < size_t(N); })
+    //       -- violation throws graph_surgery_error{VertexOutOfRange} before any write
+    // @post absent: no vertex of sv survives; every other vertex of positive
+    //       degree survives, relabelled in order
+    void remove_vertices(const std::set<int>& sv) {
+        for (int u : sv) this->require_vertices("remove_vertices", node(u), node(u));
+        for (int u : sv)
+            while (!(*this)[u].empty())
+                this->remove_edge({node(u), (*this)[u][0]});
+        remove_isolated_vertices();
+    }
+
+  private:
+    // A moved-from owner: no storage, no live vertices, every span empty.
+    void release() {
+        capacity = 0;
+        twin_computed = false;
+        this->N = 0;
         repoint();
     }
 
-    // --- Remove specific vertices and compact ---
-    void remove_vertices(std::set<int>& sv) {
-        const int N_naught = this->N;
-        for (int u : sv) {
-            while (!(*this)[u].empty()) {
-                node v = (*this)[u][0];
-                this->remove_edge({node(u), v});
-            }
+    void require_permutation(const char* op, std::span<const int> pi) const {
+        std::vector<bool> hit(this->N, false);
+        bool ok = pi.size() == size_t(this->N);
+        for (std::size_t u = 0; ok && u < pi.size(); ++u) {
+            ok = size_t(pi[u]) < size_t(this->N) && !hit[pi[u]];
+            if (ok) hit[pi[u]] = true;
         }
-        remove_isolated_vertices();
-        if (N_naught != int(sv.size()) + this->N)
-            std::cerr << "removed more vertices than intended" << std::endl;
-        assert(this->is_connected());
+        if (!ok)
+            this->surgery_fail(op, View::Code::BadPermutation, node(-1), node(-1),
+                               " (" + std::to_string(pi.size()) + " entries for "
+                               + std::to_string(this->N) + " vertices)");
+    }
+
+    // The deep copy behind the converting constructor and assignment.
+    // Assigning a view of this owner's own storage is the identity (the
+    // aliasing rule the legacy Graph::operator= keeps as well).
+    template<class Src>
+    void assign(const Src& src) {
+        if (capacity > 0 && static_cast<const void*>(src.neighbours.data())
+                            == static_cast<const void*>(std::get<0>(buffers).data()))
+            return;
+        this->N = 0;
+        this->dmax = src.dmax;
+        twin_computed = src.has_twin();
+        reserve(src.N);
+        this->N = node(src.N);
+        repoint();
+        const auto counts = View::get_element_counts(this->N, this->dmax);
+        auto dst = this->to_tuple();
+        const auto s = src.to_tuple();
+        constexpr std::size_t shared = std::min(std::remove_cvref_t<Src>::n_fields, View::n_fields);
+        batch::for_each_field<View>([&](auto Ic) {
+            constexpr std::size_t k = Ic;
+            auto& d = std::get<k>(dst);
+            using elem_t = typename std::remove_reference_t<decltype(d)>::element_type;
+            if constexpr (k < shared) {
+                static_assert(std::is_same_v<batch::field_element_t<std::remove_cvref_t<Src>, k>, elem_t>,
+                              "a shared field must have one element type in both contracts");
+                const auto& sk = std::get<k>(s);
+                if (!sk.empty()) std::copy_n(sk.data(), std::min(counts[k], sk.size()), d.data());
+            } else {
+                std::fill_n(d.data(), counts[k], elem_t{});
+            }
+        });
+    }
+
+    // The fields past the graph triple, taken from `o` into this (freshly
+    // sized) owner: a PER-VERTEX field -- one element per vertex, read off
+    // the contract (batch::elements_per_vertex) -- follows its vertex through
+    // pi, a dropped vertex (pi[u] < 0) taking its element with it; with pi
+    // empty, and for a constant-size field, the contents are copied as they
+    // stand.
+    void take_tail_fields(const Owned& o, std::span<const int> pi) {
+        const auto ours   = View::get_element_counts(this->N, this->dmax);
+        const auto theirs = View::get_element_counts(o.N, o.dmax);
+        const auto per_vertex = batch::elements_per_vertex<View>(o.dmax);
+        auto dst = this->to_tuple();
+        const auto src = o.to_tuple();
+        batch::for_each_field<View>([&](auto Ic) {
+            constexpr std::size_t k = Ic;
+            if constexpr (k >= n_graph_fields) {
+                auto& d = std::get<k>(dst);
+                const auto& s = std::get<k>(src);
+                if (per_vertex[k] == 1 && !pi.empty()) {
+                    for (node u = 0; u < o.N; ++u)
+                        if (pi[u] >= 0) d[pi[u]] = s[u];
+                } else {
+                    std::copy_n(s.data(), std::min(ours[k], theirs[k]), d.data());
+                }
+            }
+        });
     }
 };

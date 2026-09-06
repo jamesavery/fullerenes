@@ -174,6 +174,22 @@ struct Graph : GraphView {
     repoint();
   }
 
+  // An EMPTY N-by-dmax graph in this storage -- the owning_graph word a
+  // filler needs (BuckyGen::dual_slot): reallocated only when the shape
+  // changes, every row empty, any twin span dropped.
+  void reshape(node_t N_, int dmax_) {
+    if (N != N_ || dmax != dmax_ || owned_neighbours.size() != size_t(N_) * dmax_) {
+      owned_neighbours.assign(size_t(N_) * dmax_, node_t(-1));
+      owned_deg.assign(size_t(N_), 0);
+      N = N_; dmax = dmax_;
+    } else {
+      std::fill(owned_neighbours.begin(), owned_neighbours.end(), node_t(-1));
+      std::fill(owned_deg.begin(), owned_deg.end(), 0);
+    }
+    twin = {};
+    repoint();
+  }
+
   void push_back(const std::vector<node_t>& row) {
     assert(int(row.size()) <= dmax);
     owned_neighbours.resize((N + 1) * dmax, node_t(-1));

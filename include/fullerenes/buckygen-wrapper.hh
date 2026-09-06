@@ -21,26 +21,18 @@ namespace BuckyGen {
   using dual_slot_t = std::conditional_t<pentagon_bearing<G_t>,
                                          FullereneDualView, TriangulationView>;
 
-  // Size an owning graph/dual type to hold one buckygen dual -- Nv vertices at
+  // Shape an owning graph/dual type to hold one buckygen dual -- Nv vertices at
   // BUCKYGEN_DMAX, the payload's own width, whatever the destination type's
   // default stride is -- and return the view the enumerator fills (the
   // strongest one, see dual_slot_t; for a FullereneDual destination the fill
   // establishes the pentagon list).
   //
-  // Reuse is the normal case (one destination filled in a loop): storage is
-  // reallocated only when the shape changes, and any twin table is dropped
-  // because it describes the previous graph.
+  // Reuse is the normal case (one destination filled in a loop): the owner's
+  // reshape keeps its storage when it is large enough and drops any twin
+  // table, which described the previous graph.
   template<class G_t> requires owning_graph<G_t>
   dual_slot_t<G_t> dual_slot(G_t& out, node_t Nv) {
-    if((node_t)out.N != Nv || out.dmax != BUCKYGEN_DMAX ||
-       out.owned_neighbours.size() != (size_t)Nv*BUCKYGEN_DMAX){
-      out.owned_neighbours.assign((size_t)Nv*BUCKYGEN_DMAX, node_t(-1));
-      out.owned_deg.assign((size_t)Nv, 0);
-      out.N    = Nv;
-      out.dmax = BUCKYGEN_DMAX;
-    }
-    if constexpr (requires { out.owned_twin; }) out.owned_twin.clear();
-    out.repoint();
+    out.reshape(Nv, BUCKYGEN_DMAX);
     TriangulationView base(out.N, out.dmax, out.neighbours, out.deg);
     if constexpr (pentagon_bearing<G_t>)
       return FullereneDualView(base, out.pentagons);

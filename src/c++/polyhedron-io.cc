@@ -489,7 +489,10 @@ Polyhedron Polyhedron::from_mol2(FILE *file)
     //    cerr << i << " of " << N << ": Read line "<< line;
     //    cerr << "Point " << x << endl;
   }
-  assert(points.size() == N);         // TODO: Fail gracefully if file format error.
+  if(points.size() != size_t(N))
+    throw mesh_io_error(mesh_io_error::Code::MalformedFile,
+                        "from_mol2: " + std::to_string(points.size()) + " atoms read for a header count of "
+                        + std::to_string(N));
 
 
   // Fast forward to edge section
@@ -511,8 +514,7 @@ Polyhedron Polyhedron::from_mol2(FILE *file)
 
   Polyhedron P;
   static_cast<Owned<PolyhedronView<double>>&>(P) = static_cast<const GraphView&>(G);
-  P.owned_points = std::move(points);
-  P.repoint();
+  P.set_points(points);
   {
     // The boundary act: bonds in, rotation system out, then the verdict.  A
     // Tutte layout is crossing-free only for a planar 3-connected graph, so on

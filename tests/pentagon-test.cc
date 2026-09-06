@@ -265,7 +265,7 @@ TEST(Pentagons, OwnedCopyEstablishesOverOwnStorage) {
     FullereneDual b(a);                          // FullereneDual copy
     EXPECT_TRUE(b.pentagons_valid());
     EXPECT_NE(a.pentagons.data(), b.pentagons.data());
-    EXPECT_EQ(b.pentagons.data(), b.owned_pentagons.data());
+    EXPECT_EQ(b.pentagons.data(), b.buffer<3>().data());
 
     FullereneDual c(static_cast<const GraphView&>(a));   // foreign-view copy
     EXPECT_TRUE(c.pentagons_valid());
@@ -275,13 +275,13 @@ TEST(Pentagons, MoveCarriesListAndClearsSource) {
     FullereneDual a = C20_dual();
     FullereneDual b(std::move(a));
     EXPECT_TRUE(b.pentagons_valid());
-    EXPECT_EQ(b.pentagons.data(), b.owned_pentagons.data());
+    EXPECT_EQ(b.pentagons.data(), b.buffer<3>().data());
     EXPECT_TRUE(a.pentagons.empty());
 
     FullereneDual c;
     c = std::move(b);
     EXPECT_TRUE(c.pentagons_valid());
-    EXPECT_EQ(c.pentagons.data(), c.owned_pentagons.data());
+    EXPECT_EQ(c.pentagons.data(), c.buffer<3>().data());
     EXPECT_TRUE(b.pentagons.empty());
 }
 

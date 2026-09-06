@@ -221,7 +221,7 @@ TEST(PolyhedronView, ViewCoordinates) {
     Polyhedron owned = Polyhedron::C20();
 
     // Create a view that shares the coordinate memory
-    std::span<coord3d> pts_span(owned.owned_points.data(), owned.owned_points.size());
+    std::span<coord3d> pts_span = owned.points;
     Polyhedron view(static_cast<const PlanarGraphView&>(owned), pts_span, 6);
 
     // Polyhedron always deep-copies now (both adjacency and points)
@@ -245,7 +245,7 @@ TEST(PolyhedronView, ViewMutatesCoordinates) {
     // With Owned<PolyhedronView>, points is always owned (deep copy).
     // Test that writing through the span modifies the owned storage.
     owned.points[0] = coord3d(99.0, 99.0, 99.0);
-    EXPECT_DOUBLE_EQ(owned.owned_points[0][0], 99.0);
+    EXPECT_DOUBLE_EQ(owned.buffer<3>()[0][0], 99.0);   // the points field's own storage
 }
 
 // ---------------------------------------------------------------------------
@@ -354,7 +354,7 @@ TEST(BatchSlicing, MutationThroughViewWritesBack) {
     std::vector<coord3d> pts(P0.points.begin(), P0.points.end());
 
     // Polyhedron now always deep-copies, so writes go to owned storage.
-    // Verify that writing through the points span updates owned_points.
+    // Verify that writing through the points span updates the owner's storage.
     Graph g_view(N, dmax,
                  std::span<node_t>(values),
                  std::span<uint8_t>(deg));
@@ -363,9 +363,9 @@ TEST(BatchSlicing, MutationThroughViewWritesBack) {
 
     poly.points[0] = coord3d(1.0, 2.0, 3.0);
 
-    EXPECT_DOUBLE_EQ(poly.owned_points[0][0], 1.0);
-    EXPECT_DOUBLE_EQ(poly.owned_points[0][1], 2.0);
-    EXPECT_DOUBLE_EQ(poly.owned_points[0][2], 3.0);
+    EXPECT_DOUBLE_EQ(poly.buffer<3>()[0][0], 1.0);
+    EXPECT_DOUBLE_EQ(poly.buffer<3>()[0][1], 2.0);
+    EXPECT_DOUBLE_EQ(poly.buffer<3>()[0][2], 3.0);
 }
 
 // ---------------------------------------------------------------------------
@@ -377,9 +377,7 @@ TEST(TriangulationView, FromGraphView) {
     Triangulation T_owned(fg.dual_graph());
 
     // Create a Graph view of the triangulation's adjacency
-    Graph view(T_owned.N, T_owned.dmax,
-               std::span<node_t>(T_owned.owned_neighbours),
-               std::span<uint8_t>(T_owned.owned_deg));
+    Graph view(T_owned.N, T_owned.dmax, T_owned.neighbours, T_owned.deg);
 
     Triangulation T_view(view);
     EXPECT_TRUE(T_view.owns_memory());  // deep-copies from view
@@ -425,6 +423,191 @@ TEST(GraphView, EmptyView) {
                std::span<uint8_t>(deg));
     EXPECT_EQ(view.N, 0);
     EXPECT_FALSE(view.owns_memory());
+}
+
+// ---------------------------------------------------------------------------
+// Owned<View>: one buffer per field of the view's contract, with capacity
+// ---------------------------------------------------------------------------
+
+TEST(Owned, ResizeWithinCapacityKeepsTheBuffers) {
+    Owned<TriangulationView> g(0, 6, 64);           // empty, sized for 64 vertices
+    EXPECT_EQ(g.N, 0);
+    EXPECT_EQ(g.capacity, 64);
+    EXPECT_TRUE(g.owns_memory());
+    const node_t*  nb = g.buffer<0>().data();
+    const uint8_t* dg = g.buffer<1>().data();
+    g.resize(10);
+    EXPECT_EQ(g.N, 10);
+    EXPECT_EQ(g.neighbours.size(), size_t(10 * 6));   // the span is the live graph
+    for (node_t u = 0; u < 10; u++) {
+        EXPECT_EQ(g.degree(u), 0);
+        for (int i = 0; i < 6; i++) EXPECT_EQ(g.neighbours[u * 6 + i], node_t(-1));
+    }
+    g.resize(64);
+    EXPECT_EQ(g.buffer<0>().data(), nb);            // no reallocation within capacity
+    EXPECT_EQ(g.buffer<1>().data(), dg);
+    EXPECT_EQ(g.capacity, 64);
+    g.resize(65);                                   // past capacity: grows
+    EXPECT_EQ(g.N, 65);
+    EXPECT_GE(g.capacity, 65);
+    EXPECT_EQ(g.degree(64), 0);
+}
+
+TEST(Owned, TwinIsOptionalUntilComputedAndSurvivesGrowth) {
+    Triangulation T(FullereneGraph::C20().dual_graph());
+    EXPECT_FALSE(T.has_twin());                     // allocated, not switched on
+    T.compute_twin();
+    EXPECT_TRUE(T.has_twin());
+    EXPECT_TRUE(T.twin_is_valid());
+    T.resize(T.N + 2);                              // two empty rows: still valid
+    EXPECT_TRUE(T.twin_is_valid());
+    for (int i = 0; i < 6; i++)
+        EXPECT_EQ(T.twin[(T.N - 1) * 6 + i], TriangulationView::no_slot);
+    Triangulation C(T);                             // the copy has its own valid table
+    EXPECT_TRUE(C.has_twin());
+    EXPECT_TRUE(C.twin_is_valid());
+    EXPECT_NE(C.twin.data(), T.twin.data());
+    Triangulation U(FullereneGraph::C20().dual_graph());
+    static_cast<Owned<TriangulationView>&>(C) = static_cast<const GraphView&>(U);
+    EXPECT_FALSE(C.has_twin());                     // a twin-less source: no table
+    EXPECT_EQ(C.N, U.N);
+}
+
+TEST(Owned, FullereneDualOwnsItsPentagonListInTheTuple) {
+    FullereneDual D(FullereneGraph::C20().dual_graph());
+    ASSERT_EQ(D.N, 12);
+    EXPECT_TRUE(D.pentagons_valid());
+    EXPECT_EQ(D.pentagons.data(), D.buffer<3>().data());   // the contract's fourth field
+    FullereneDual E(D);
+    EXPECT_TRUE(E.pentagons_valid());
+    EXPECT_NE(E.pentagons.data(), D.pentagons.data());    // its own storage
+    FullereneDual M(std::move(E));
+    EXPECT_TRUE(M.pentagons_valid());
+    EXPECT_EQ(M.pentagons.size(), size_t(FullereneDualView::n_pentagons));
+    // Buckminsterfullerene's ring spiral (0-based pentagon positions).
+    FullereneDual S(60, std::vector<int>{0, 6, 8, 10, 12, 14, 17, 19, 21, 23, 25, 31});
+    EXPECT_EQ(S.N, 32);
+    EXPECT_TRUE(S.pentagons_valid());               // established after the spiral build
+}
+
+TEST(Owned, ApplyPermutationCarriesTwinAndCoordinates) {
+    Triangulation T(FullereneGraph::C20().dual_graph());
+    T.compute_twin();
+    Permutation pi(T.N);
+    for (int u = 0; u < T.N; u++) pi[u] = T.N - 1 - u;    // reverse the labels
+    Triangulation R(T);
+    R.apply_permutation(pi);
+    EXPECT_TRUE(R.has_twin());
+    EXPECT_TRUE(R.twin_is_valid());
+    for (node_t u = 0; u < T.N; u++) {
+        EXPECT_EQ(R.degree(pi[u]), T.degree(u));
+        for (int i = 0; i < T.degree(u); i++) EXPECT_EQ(R[pi[u]][i], pi[T[u][i]]);
+    }
+    Polyhedron P = Polyhedron::C20();
+    const coord3d p0 = P.points[0];
+    Permutation q(P.N);
+    for (int u = 0; u < P.N; u++) q[u] = P.N - 1 - u;
+    P.apply_permutation(q);
+    for (int c = 0; c < 3; c++) EXPECT_DOUBLE_EQ(P.points[P.N - 1][c], p0[c]);
+    EXPECT_TRUE(P.is_consistently_oriented());
+}
+
+TEST(Owned, RemoveIsolatedVerticesCompacts) {
+    Owned<GraphView> g(5, 3);
+    g.insert_edge(arc_t(0, 1));
+    g.insert_edge(arc_t(1, 3));
+    g.insert_edge(arc_t(3, 4));                     // vertex 2 stays isolated
+    g.remove_isolated_vertices();
+    EXPECT_EQ(g.N, 4);
+    EXPECT_EQ(g.degree(2), 2);                      // old vertex 3
+    EXPECT_GE(g.find(0, 1), 0);
+    EXPECT_GE(g.find(1, 2), 0);                     // old edge 1-3
+    EXPECT_GE(g.find(2, 3), 0);                     // old edge 3-4
+}
+
+TEST(Owned, RestrideKeepsRowsAndCoordinates) {
+    Polyhedron P = Polyhedron::C20();
+    ASSERT_EQ(P.dmax, 3);
+    const coord3d p5 = P.points[5];
+    P.restride_inplace(6);
+    EXPECT_EQ(P.dmax, 6);
+    for (node_t u = 0; u < P.N; u++) EXPECT_EQ(P.degree(u), 3);
+    for (int c = 0; c < 3; c++) EXPECT_DOUBLE_EQ(P.points[5][c], p5[c]);
+    EXPECT_TRUE(P.is_consistently_oriented());
+}
+
+TEST(Owned, ReshapeMakesAnEmptyGraphReusingStorage) {
+    Owned<TriangulationView> g(12, 6);
+    g.compute_twin();                               // an empty graph's table: trivially valid
+    EXPECT_TRUE(g.has_twin());
+    const node_t* nb = g.buffer<0>().data();
+    g.reshape(12, 6);
+    EXPECT_FALSE(g.has_twin());                     // dropped: it described the previous graph
+    EXPECT_EQ(g.buffer<0>().data(), nb);            // storage reused
+    for (node_t u = 0; u < 12; u++) EXPECT_EQ(g.degree(u), 0);
+    g.reshape(20, 6);
+    EXPECT_EQ(g.N, 20);
+    EXPECT_EQ(g.degree(19), 0);
+}
+
+TEST(Owned, RowCountChangesRefuseByName) {
+    Owned<GraphView> g(2, 3);
+    EXPECT_THROW(g.push_back(std::vector<node_t>{0, 1, 0, 1}), Spanify::graph_surgery_error);
+    EXPECT_EQ(g.N, 2);                              // a refused push changes nothing
+    g.push_back(std::vector<node_t>{0, 1});
+    EXPECT_EQ(g.N, 3);
+    EXPECT_EQ(g.degree(2), 2);
+    g.pop_back(); g.pop_back(); g.pop_back();
+    EXPECT_EQ(g.N, 0);
+    EXPECT_THROW(g.pop_back(), Spanify::graph_surgery_error);
+}
+
+TEST(Owned, RestrideRefusesARowWiderThanTheNewStride) {
+    Owned<GraphView> g(5, 4);
+    for (node_t v = 1; v < 5; v++) g.insert_edge(arc_t(0, v));   // degree 4 at vertex 0
+    EXPECT_THROW(g.restride_inplace(3), Spanify::graph_surgery_error);
+    EXPECT_EQ(g.dmax, 4);                           // unchanged on refusal
+    EXPECT_EQ(g.degree(0), 4);
+    g.restride_inplace(6);                          // widening is always fine
+    EXPECT_EQ(g.dmax, 6);
+    EXPECT_EQ(g.degree(0), 4);
+    EXPECT_TRUE(g.adjacency_is_symmetric());
+}
+
+TEST(Owned, ShrinkThenGrowPadsTheReexposedRows) {
+    Owned<GraphView> g(3, 3);
+    g.insert_edge(arc_t(1, 2));
+    g.resize(1);                                    // rows 1 and 2 abandoned with their arcs
+    g.resize(3);                                    // re-exposed: empty again
+    EXPECT_EQ(g.degree(1), 0);
+    EXPECT_EQ(g.degree(2), 0);
+    for (int i = 0; i < 3; i++) EXPECT_EQ(g.neighbours[1 * 3 + i], node_t(-1));
+}
+
+TEST(Owned, DefaultDualHasItsPentagonSpanAndAMovedFromOwnerHasNone) {
+    FullereneDual d;
+    EXPECT_EQ(d.N, 0);
+    EXPECT_FALSE(d.owns_memory());
+    EXPECT_EQ(d.pentagons.size(), size_t(FullereneDualView::n_pentagons));   // the type invariant, from the first moment
+    EXPECT_THROW(d.derive_pentagons(), pentagon_error);   // no pentagons, not a misshapen span
+    FullereneDual e(FullereneGraph::C20().dual_graph());
+    FullereneDual f(std::move(e));
+    EXPECT_FALSE(e.owns_memory());
+    EXPECT_EQ(e.capacity, 0);
+    EXPECT_EQ(e.N, 0);
+    EXPECT_TRUE(e.neighbours.empty());
+    EXPECT_TRUE(f.pentagons_valid());
+}
+
+TEST(Owned, ApplyPermutationRefusesANonPermutation) {
+    Triangulation T(FullereneGraph::C20().dual_graph());
+    Permutation short_pi(T.N - 1);
+    EXPECT_THROW(T.apply_permutation(short_pi), Spanify::graph_surgery_error);
+    Permutation twice(T.N);
+    for (int u = 0; u < T.N; u++) twice[u] = 0;
+    EXPECT_THROW(T.apply_permutation(twice), Spanify::graph_surgery_error);
+    EXPECT_EQ(T.N, 12);                             // untouched
+    EXPECT_TRUE(T.is_consistently_oriented());
 }
 
 // ---------------------------------------------------------------------------

@@ -35,6 +35,7 @@
 #include <cstddef>
 #include <tuple>
 #include <type_traits>
+#include <utility>
 
 namespace batch {
 
@@ -51,6 +52,34 @@ concept batchable_view =
             -> std::same_as<std::array<std::size_t, V::n_fields>>;
     };
 
+// -- Derived types of the contract -----------------------------------------
+//
+// The field tuple as V::to_tuple() returns it, each field's span type and
+// element type, and the compile-time loop over the field indices.  Whatever
+// STORES or SLICES a batchable view's fields -- Batch<V> and BatchView<V>
+// (batch.hh), Owned<V> (owned.hh) -- derives its per-field storage from
+// these, so the fields are named in one place: the view's to_tuple().
+
+// tuple<span<T0>&, span<T1>&, ...> with cvref stripped.
+template<class V>
+using field_tuple_t = std::remove_cvref_t<decltype(std::declval<V&>().to_tuple())>;
+
+// span<Ti> (a value, not a reference) for field I.
+template<class V, std::size_t I>
+using field_span_t = std::remove_reference_t<std::tuple_element_t<I, field_tuple_t<V>>>;
+
+// The element type of that span (int32_t, uint8_t, coord3<double>, ...).
+template<class V, std::size_t I>
+using field_element_t = typename field_span_t<V, I>::element_type;
+
+// Apply f(std::integral_constant<std::size_t, k>) for k = 0 .. V::n_fields-1.
+template<class V, class F>
+constexpr void for_each_field(F&& f) {
+    [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        (f(std::integral_constant<std::size_t, Is>{}), ...);
+    }(std::make_index_sequence<V::n_fields>{});
+}
+
 // -- Layout compatibility --------------------------------------------------
 
 // Two batchable views share a layout iff their element counts agree
@@ -66,6 +95,23 @@ constexpr bool layout_compatible(int N, int dmax) {
     for (std::size_t k = 0; k < K; ++k)
         if (a[k] != b[k]) return false;
     return true;
+}
+
+// -- Field shape -----------------------------------------------------------
+
+// How each field scales with the vertex count, read off the contract
+// itself: its element count at N = 2 minus at N = 1 -- 0 for a
+// constant-size field (a dual's pentagon list), 1 for one element per
+// vertex (degrees, coordinates), dmax for one per arc (adjacency, twin).
+// What a relabelling needs to move a field with its vertex (Owned<V>), and
+// what a batch will need the first time it permutes or compacts.
+template<class V>
+constexpr std::array<std::size_t, V::n_fields> elements_per_vertex(int dmax) {
+    const auto one = V::get_element_counts(1, dmax);
+    const auto two = V::get_element_counts(2, dmax);
+    std::array<std::size_t, V::n_fields> per{};
+    for (std::size_t k = 0; k < V::n_fields; ++k) per[k] = two[k] - one[k];
+    return per;
 }
 
 } // namespace batch
