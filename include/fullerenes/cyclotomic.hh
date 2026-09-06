@@ -44,20 +44,24 @@
 // Representation: Real30 = int64 coordinates over the power basis
 // 1, gamma, gamma^2, gamma^3, reduced by
 // psi(y) = y^4 + y^3 - 4 y^2 - 4 y + 1 (the minimal polynomial; conjugates
-// 2 cos(k pi/15), k in {1,7,11,13}).
+// 2 cos(k pi/15), k in {1,7,11,13}).  A CARRY may be STORED narrower:
+// Stored30<int32_t> holds the same coordinates in 32 bits (widen / narrow
+// below), and the policy trips by name when a value does not fit.
 //
 // OVERFLOW DISCIPLINE -- checked-and-poisoned, never silent: EVERY ring
-// operation checks its own coefficient arithmetic (int64 overflow on
-// add/sub/scale, the int64 store-back and the unsigned-magnitude operand
-// guard on the __int128 product accumulation) and POISONS the value
+// operation checks its own coefficient arithmetic and POISONS the value
 // (ok = false) instead of wrapping; poison is sticky, and every consumer
 // refuses a poisoned value with a NAMED reason (Refusal, carried by
 // SignTrace / DivTrace / the Diamond factory) -- a wrong sign from
 // overflow is therefore structurally impossible; large inputs refuse
-// loudly.  The guaranteed-unpoisoned input envelopes are the NAMED
-// constants kPredicateCoeffMax / kFlipCoeffMax below, each pinned by a
-// static_assert spelling its binding term.  Today's kis constants have
-// |c| <= 100.
+// loudly.  Add, subtract and scale are builtin-checked.  A PRODUCT is
+// guarded on its operands' magnitudes: a coordinate of x*y is at most
+// kAmplification * max|x| * max|y| (the fold rows' worst case, derived at
+// compile time), so the product is accumulated in int64 exactly whenever
+// that bound fits -- no 128-bit arithmetic anywhere on the run path.  The
+// guaranteed-unpoisoned input envelope is the NAMED constant
+// kCarryCoeffMax below, pinned by static_asserts spelling the binding
+// terms.  Today's kis constants have |c| <= 100.
 //
 // EXACT DIVISION (the flip divides by 2e, twice): the quotient is
 // computed in F_p[y]/(psi) for a fixed prime p (extended Euclid),
@@ -92,7 +96,6 @@
 // ambient verification ring (cyclotomic_ambient.hh).
 // ============================================================================
 
-#include "bigint_fixed.hh"
 #include "diamond_forms.hh"
 #include "metric_forms.hh"
 
@@ -101,6 +104,7 @@
 #include <cstdint>
 #include <limits>
 #include <optional>
+#include <type_traits>
 
 namespace cyclotomic {
 
@@ -205,14 +209,45 @@ static_assert(kTwoCos15[2] == std::array<long long, 4>{-2, 0, 1, 0});
 static_assert(kTwoCos15[3] == std::array<long long, 4>{0, -3, 0, 1});
 static_assert(kTwoCos15[4] == std::array<long long, 4>{1, 4, 0, -1});
 
-// Operand bound under which a product's __int128 accumulation cannot
-// overflow: the convolution slots fold into per-coordinate amplification
-// <= 45 * B^2 for the rank-4 ring (exactly (11,45,30,22) per coordinate)
-// and <= 58 * B^2 for the ambient rank-16 ring, and 58 * (2^60)^2 < 2^126
-// < 2^127.  Compared UNSIGNED against the unsigned magnitude (an INT64_MIN
-// coordinate is 2^63 and must trip; the 2026-08-25 review exhibited the
-// signed comparison letting it through into undefined behaviour).
-inline constexpr unsigned long long kMulOperandMax = 1ULL << 60;
+// The per-coordinate AMPLIFICATION of a product, from the fold rows:
+// |(x*y)_i| <= A_i max|x| max|y| with A_i the sum, over the convolution
+// slots s = j + k, of (the number of pairs (j,k) landing in s) times (the
+// magnitude with which slot s folds into coordinate i: 1 for s = i, the
+// row kGamPow[s][i] for s >= Rank).  For a FIXED left factor c the pair
+// count becomes sum_{j+k=s} |c_j|.  Both are compile-time integers.
+constexpr int amplification_of_product() {
+  int worst = 0;
+  for (int i = 0; i < 4; i++) {
+    long long tot = 0;
+    for (int s = 0; s < 7; s++) {
+      const int pairs = (s < 4 ? s : 6 - s) + 1;
+      const long long fold = s < 4 ? (s == i ? 1 : 0) : (kGamPow[s][i] < 0 ? -kGamPow[s][i] : kGamPow[s][i]);
+      tot += pairs * fold;
+    }
+    if (tot > worst) worst = (int)tot;
+  }
+  return worst;
+}
+constexpr int amplification_of_factor(const std::array<long long, 4>& c) {
+  int worst = 0;
+  for (int i = 0; i < 4; i++) {
+    long long tot = 0;
+    for (int s = 0; s < 7; s++) {
+      long long pairs = 0;
+      for (int j = 0; j < 4; j++)
+        if (s - j >= 0 && s - j < 4) pairs += c[j] < 0 ? -c[j] : c[j];
+      const long long fold = s < 4 ? (s == i ? 1 : 0) : (kGamPow[s][i] < 0 ? -kGamPow[s][i] : kGamPow[s][i]);
+      tot += pairs * fold;
+    }
+    if (tot > worst) worst = (int)tot;
+  }
+  return worst;
+}
+inline constexpr int kProductAmplification = amplification_of_product();
+inline constexpr int kHeronUnitAmplification = amplification_of_factor({4, 0, -1, 0});
+inline constexpr int kGammaAmplification = amplification_of_factor({0, 1, 0, 0});
+static_assert(kProductAmplification == 45, "per-coordinate amplification (11,45,30,22)");
+static_assert(kHeronUnitAmplification == 13 && kGammaAmplification == 5);
 
 // gamma as a correctly rounded double (verified against an exact rational
 // Newton iteration on psi and by the test suite's long-double cross-check).
@@ -228,11 +263,16 @@ inline constexpr double kGammaDouble = 0x1.f4cfc327a0080p+0;
 // marks a value whose coefficients overflowed somewhere in its history;
 // every consumer refuses it by name.  The derived ring supplies its
 // reduced-power table via pow_row(k) (indices Rank .. 2 Rank - 2 fold a
-// product; the ambient conjugation reads the full table).
+// product; the ambient conjugation reads the full table) and its
+// per-coordinate product amplification kAmplification (the fold rows'
+// worst case); Acc is the product's accumulator, int64 for the working
+// ring (nothing wider exists on the run path), __int128 for the ambient
+// scaffolding.
 // ---------------------------------------------------------------------------
-template <class D, int Rank>
+template <class D, int Rank, class Acc = __int128>
 struct CheckedCoeffRing {
   static constexpr int kRank = Rank;
+  using UAcc = std::conditional_t<(sizeof(Acc) > 8), unsigned __int128, unsigned long long>;
 
   std::array<long long, Rank> a{};
   bool ok = true;
@@ -296,7 +336,9 @@ struct CheckedCoeffRing {
   }
 
   // The coefficient magnitude, UNSIGNED: 2^63 (an INT64_MIN coordinate)
-  // must compare above kMulOperandMax, so no signed cast may intervene.
+  // must enter the product guard as 2^63, so no signed cast may intervene
+  // (the 2026-08-25 review exhibited a signed comparison letting it
+  // through into undefined behaviour).
   unsigned long long max_abs_coord() const {
     unsigned long long m = 0;
     for (long long c : a) {
@@ -307,25 +349,36 @@ struct CheckedCoeffRing {
     return m;
   }
 
-  // Product with the ring's polynomial reduction.  Accumulation in
-  // __int128 behind the kMulOperandMax guard; the int64 store-back is
-  // checked -- either way out of range poisons, never wraps.
+  // The product guard: every coordinate of x*y is bounded by
+  // kAmplification * max|x| * max|y|, so the accumulation below is exact
+  // in Acc iff that bound fits it -- decided on the magnitudes BEFORE any
+  // arithmetic.  (For the int64 accumulator the magnitude product is
+  // itself overflow-checked; for the 128-bit one it is exact.)
+  static bool product_fits(unsigned long long mx, unsigned long long my) {
+    constexpr UAcc kCap = (((UAcc)1 << (8 * sizeof(Acc) - 1)) - 1) / (UAcc)D::kAmplification;
+    if constexpr (sizeof(Acc) > 8) {
+      return (UAcc)mx * my <= kCap;
+    } else {
+      unsigned long long p;
+      return !__builtin_mul_overflow(mx, my, &p) && p <= kCap;
+    }
+  }
+
+  // Product with the ring's polynomial reduction, accumulated in Acc
+  // behind the guard; the store-back is checked as well (a tautology for
+  // the int64 accumulator, the guarantee for the wider one) -- either way
+  // out of range poisons, never wraps.
   friend D operator*(const D& x, const D& y) {
     D r;
-    r.ok = x.ok && y.ok;
+    r.ok = x.ok && y.ok && product_fits(x.max_abs_coord(), y.max_abs_coord());
     if (!r.ok) return r;
-    if (x.max_abs_coord() > detail::kMulOperandMax ||
-        y.max_abs_coord() > detail::kMulOperandMax) {
-      r.ok = false;
-      return r;
-    }
-    __int128 conv[2 * Rank - 1] = {};
+    Acc conv[2 * Rank - 1] = {};
     for (int i = 0; i < Rank; i++) {
       if (!x.a[i]) continue;
       for (int j = 0; j < Rank; j++)
-        conv[i + j] += (__int128)x.a[i] * y.a[j];
+        conv[i + j] += (Acc)x.a[i] * y.a[j];
     }
-    __int128 red[Rank] = {};
+    Acc red[Rank] = {};
     for (int i = 0; i < Rank; i++) red[i] = conv[i];
     for (int k = Rank; k < 2 * Rank - 1; k++) {
       if (!conv[k]) continue;
@@ -334,7 +387,7 @@ struct CheckedCoeffRing {
     }
     for (int i = 0; i < Rank; i++) {
       r.a[i] = (long long)red[i];
-      r.ok &= ((__int128)r.a[i] == red[i]);
+      r.ok &= ((Acc)r.a[i] == red[i]);
     }
     return r;
   }
@@ -344,7 +397,8 @@ struct CheckedCoeffRing {
 // The working ring Z[gamma].  Every element is real by construction --
 // there is no non-real refusal here.
 // ---------------------------------------------------------------------------
-struct Real30 : CheckedCoeffRing<Real30, 4> {
+struct Real30 : CheckedCoeffRing<Real30, 4, long long> {
+  static constexpr int kAmplification = detail::kProductAmplification;
   static const std::array<long long, 4>& pow_row(int k) {
     return detail::kGamPow[k];
   }
@@ -400,31 +454,84 @@ struct Real30 : CheckedCoeffRing<Real30, 4> {
 };
 
 // ---------------------------------------------------------------------------
-// The guaranteed-unpoisoned input envelopes, derived by exact worst-case
-// per-coordinate bound composition through the reduction rows (the
-// amplification vector of one product is (11,45,30,22); the 2026-08-25
-// review re-derived both bounds to the digit and located the binding
-// terms).  Inputs within the envelope NEVER poison; larger inputs refuse
-// by name, never lie.
-//   - kPredicateCoeffMax binds one whole predicate chain (the validity
-//     gate + delaunay/convexity); the binding term is the store-back of
-//     heron_unit * w^2, per-coordinate <= 410 * C^2.
-//   - kFlipCoeffMax binds the flip numerators (the division itself is
-//     mod-p, growth-free; its verification product runs under the operand
-//     guard); the binding term is P*Q - heron_unit * wu * wl,
-//     per-coordinate <= 815 * C^2.
+// STORAGE at a chosen coefficient width.  The arithmetic ring is Real30;
+// a carry may be STORED narrower -- Stored30<int32_t> holds the same
+// power-basis coordinates in 32 bits, which every fullerene kis surface
+// through C1000 fits by a wide margin (whitepaper sec. 6: the largest
+// coordinate is bounded by the (5,0) nanotube's, 536 575 at C1000; the
+// arithmetic envelope kCarryCoeffMax below binds first).  widen() is
+// exact; narrow() refuses (nullopt) a coordinate the width cannot hold
+// and a poisoned value, and the policy turns that refusal into a named
+// trip: an overflow of the storage width refuses, never wraps.  Real30
+// is its own storage (widen / narrow are the identity on an unpoisoned
+// value), so every consumer is written once, over the storage type S.
 // ---------------------------------------------------------------------------
-inline constexpr long long kPredicateCoeffMax = 149'986'763;
-inline constexpr long long kFlipCoeffMax = 106'381'487;
-static_assert((__int128)410 * kPredicateCoeffMax * kPredicateCoeffMax <=
-                  std::numeric_limits<long long>::max(),
-              "predicate binding term (heron_unit * w^2 store-back)");
-static_assert((__int128)815 * kFlipCoeffMax * kFlipCoeffMax <=
-                  std::numeric_limits<long long>::max(),
-              "flip binding term (PQ - unit*wu*wl store-back)");
-static_assert((__int128)45 * kPredicateCoeffMax * kPredicateCoeffMax <=
-                  (__int128)detail::kMulOperandMax,
-              "second-level operands (w*w) must clear the product guard");
+template <class Coef>
+struct Stored30 {
+  std::array<Coef, 4> a{};
+  friend bool operator==(const Stored30& x, const Stored30& y) {
+    bool eq = true;
+    for (int i = 0; i < 4; i++) eq &= (x.a[i] == y.a[i]);
+    return eq;
+  }
+};
+
+template <class Coef>
+inline Real30 widen(const Stored30<Coef>& s) {
+  Real30 r;
+  for (int i = 0; i < 4; i++) r.a[i] = (long long)s.a[i];
+  return r;
+}
+inline const Real30& widen(const Real30& r) { return r; }
+
+template <class S>
+inline std::optional<S> narrow(const Real30& v) {
+  if (!v.ok) return std::nullopt;
+  if constexpr (std::is_same_v<S, Real30>) {
+    return v;
+  } else {
+    using Coef = typename decltype(S::a)::value_type;
+    S s;
+    for (int i = 0; i < 4; i++) {
+      if (v.a[i] < (long long)std::numeric_limits<Coef>::min() ||
+          v.a[i] > (long long)std::numeric_limits<Coef>::max())
+        return std::nullopt;
+      s.a[i] = (Coef)v.a[i];
+    }
+    return s;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// The guaranteed-unpoisoned input envelope: inputs -- squared lengths and
+// wedges -- of coordinate magnitude <= kCarryCoeffMax pass every product
+// guard and every store of the predicate chain (the validity gate,
+// delaunay / convexity) and of the flip.  Along the chain the operands
+// are C-sized (sides, wedges), 3C-sized (the law-of-cosines forms) or
+// kHeronUnitAmplification*C-sized (the Heron unit times ONE wedge: the
+// consistency check and the flip's cross term are associated as
+// (unit * w) * w on purpose, so that no operand grows quadratically), and
+// the largest stored sum is the Heron form, nine products.  Binding:
+//   the guard of (heron_unit * w) * w,   45 * 13 * C^2 <= 2^63 - 1,
+// i.e. C <= 125 564 516 (2^26.9); the Heron store and the guard of P * Q
+// both allow 405 C^2.  Inputs within the envelope NEVER poison; larger
+// inputs refuse by name, never lie.  (Exact division is mod-p, growth-
+// free; its verification product is guarded like any product, so a
+// wrong lift refuses instead of verifying.)
+// ---------------------------------------------------------------------------
+inline constexpr long long kCarryCoeffMax = 125'564'516;
+namespace detail {
+inline constexpr __int128 kInt64Max = std::numeric_limits<long long>::max();
+}
+static_assert((__int128)detail::kProductAmplification * detail::kHeronUnitAmplification *
+                      kCarryCoeffMax * kCarryCoeffMax <= detail::kInt64Max,
+              "binding term: the guard of (heron_unit * w) * w");
+static_assert((__int128)detail::kProductAmplification * detail::kHeronUnitAmplification *
+                      (kCarryCoeffMax + 1) * (kCarryCoeffMax + 1) > detail::kInt64Max,
+              "kCarryCoeffMax is the largest envelope the binding term admits");
+static_assert((__int128)9 * detail::kProductAmplification * kCarryCoeffMax * kCarryCoeffMax <=
+                  detail::kInt64Max,
+              "the Heron form's nine-product store, and the guard of P * Q at 3C");
 
 // ---------------------------------------------------------------------------
 // The exact sign oracle of the working ring: ONE fixed-point evaluation.
@@ -582,8 +689,8 @@ static_assert(psi_sign_at(gamma_fixed<kVerifyLimbs>()) < 0,
 static_assert(psi_sign_at(gamma_fixed<kVerifyLimbs>() + FixedU<kVerifyLimbs>::one()) > 0,
               "gamma constant: psi((m + 1) / 2^p) must be positive");
 // p sufficient for every representable coefficient: 2^p > 2 * 17 * 15^3 * H^4
-// with H < 2^63, i.e. p >= 4 * 63 + 16.
-static_assert(kSignBits >= 4 * 63 + 16, "sign oracle: precision below the Liouville requirement");
+// = 114 750 H^4 < 2^16.81 H^4 with H <= 2^63, i.e. p > 268.81, p >= 269.
+static_assert(kSignBits >= 4 * 63 + 17, "sign oracle: precision below the Liouville requirement");
 static_assert(kSignConstLimbs * 64 >= 3 * kSignBits + 3, "sign oracle: constant limbs");
 static_assert(kSignAccLimbs * 64 >= 3 * kSignBits + 3 + 63 + 2, "sign oracle: accumulator limbs");
 static_assert(kVerifyLimbs * 64 >= 4 * kSignBits + 5, "sign oracle: verification limbs");
@@ -616,103 +723,6 @@ inline constexpr std::array<FixedU<kSignConstLimbs>, 4> kSignPowers = make_sign_
     neg.mul_add(kSignPowers[k], mag & neg_mask);
   }
   return sign_from_int(FixedU<kSignAccLimbs>::cmp(pos, neg));
-}
-
-// ---- The AMBIENT verification ring's bisection driver (host tier) ----
-// Kept for cyclotomic_ambient.hh's conductor-60 oracle and its cross-checks;
-// nothing on the working ring's run path calls it.  Capacities: the
-// binding intermediate is lhs = Bmid << smid at the deepest iteration,
-// ~ (deg+1)*smid + 63 bits.
-inline constexpr int kMaxDyadicBits = 384;
-inline constexpr int kLimbs = (4 * kMaxDyadicBits) / 64 + 4;
-using Big = FixedBigInt<kLimbs>;
-
-// Exact integer 2^(s*deg) * poly(m/2^s), coefficients B, by Horner.
-template <class B>
-inline B eval_scaled(const B* coeff, int deg, const B& m, int s) {
-  B r = coeff[deg];
-  for (int k = deg - 1; k >= 0; k--)
-    r = r * m + (coeff[k] << (s * (deg - k)));
-  return r;
-}
-
-// The shared rung-2 driver: the sign of B(alpha) for alpha the root of
-// the monic Psi isolated in [m0, m0+1]/2^s0 -- ONE body for the rank-4
-// and the ambient conductor-60 oracles (each supplies coefficients, its
-// isolating seed, and its capacities).  In its own frame (the FixedBigInt
-// arrays are multi-KB; the fast path must not pay them).  Host tier.
-// @pre B not identically zero; Psi(lo) and Psi(hi) of opposite signs with
-// exactly one root of Psi inside.  @variant max_bits - s.
-template <class B>
-[[gnu::noinline]] inline SignOr sign_at_isolated_root(
-    const B* Bc, int deg, const B* Psi, int psi_deg, long long m0, int s0,
-    int max_bits, SignTrace* tr) {
-  const int hdeg = deg > 0 ? deg : 1;   // constant B still Horners at deg 1
-
-  // |B'(x)| on [0,2] is bounded by M = sum k |b_k| 2^{k-1}: magnitudes
-  // only, so each term enters with sgn forced positive (no cancellation).
-  B M = B{};
-  for (int k = 1; k <= deg; k++) {
-    B t = Bc[k];
-    t.sgn = t.n ? 1 : 0;
-    for (int rep = 0; rep < k; rep++) M = M + (t << (k - 1));
-  }
-
-  B m = B::from_i128(m0);
-  int s = s0;
-  auto psi_sign_at = [&](const B& mm, int ss) -> std::optional<int> {
-    const B val = eval_scaled(Psi, psi_deg, mm, ss);
-    if (val.overflowed()) return std::nullopt;
-    return val.sgn;
-  };
-  const auto lo0 = psi_sign_at(m, s);
-  if (!lo0) {
-    if (tr) tr->refusal = Refusal::BigWidth;
-    return std::nullopt;
-  }
-  const int lo_sign = *lo0;
-
-  while (s < max_bits) {
-    if (tr) tr->bisections++;
-    // Conclusive when |B(mid)| > M * width (mid is the parent interval's
-    // midpoint, so |alpha - mid| <= 2^-smid): |Bmid|*2^{smid} vs
-    // M*2^{smid*hdeg}, both exactly scaled.
-    const B mid = (m << 1) + B::from_i128(1);
-    const int smid = s + 1;
-    const B Bmid = eval_scaled(Bc, hdeg, mid, smid);
-    const B lhs = Bmid << smid;
-    const B rhs = M << (smid * hdeg);
-    if (Bmid.overflowed() || lhs.overflowed() || rhs.overflowed()) {
-      if (tr) tr->refusal = Refusal::BigWidth;
-      return std::nullopt;
-    }
-    if (B::cmp_mag(lhs, rhs) > 0) return sign_from_int(Bmid.sgn);
-
-    const auto ms = psi_sign_at(mid, smid);
-    if (!ms || *ms == 0) {   // *ms == 0: alpha rational -- corrupt input
-      if (tr) tr->refusal = Refusal::BigWidth;
-      return std::nullopt;
-    }
-    m = (*ms == lo_sign) ? mid : (m << 1);
-    s = smid;
-  }
-  if (tr) tr->refusal = Refusal::DyadicCap;
-  return std::nullopt;   // fail-loud backstop (see the oracle banner)
-}
-
-// Rung 1, the shared sentence: conclusive iff |val| clears the bound.
-inline std::optional<Sign> rung1(double val, double abs_sum, double relerr,
-                                 SignTrace* tr) {
-  const double err = abs_sum * relerr;
-  if (val > err) {
-    if (tr) tr->rung = 1;
-    return Sign::Positive;
-  }
-  if (val < -err) {
-    if (tr) tr->rung = 1;
-    return Sign::Negative;
-  }
-  return std::nullopt;
 }
 
 }  // namespace detail
@@ -974,16 +984,18 @@ struct Zeta30 {
   friend Zeta30 operator*(long long n, const Zeta30& u) {
     return {n * u.x, n * u.y};
   }
-  // (x + y zeta)(x' + y' zeta) with zeta^2 = gamma zeta - 1.
+  // (x + y zeta)(x' + y' zeta) with zeta^2 = gamma zeta - 1.  The gamma
+  // term is associated (gamma * y) * y' so that both operands of every
+  // product stay input-sized (the envelope's discipline, cyclotomic.hh).
   friend Zeta30 operator*(const Zeta30& u, const Zeta30& v) {
     return {u.x * v.x - u.y * v.y,
-            u.x * v.y + u.y * v.x + Real30::gamma() * (u.y * v.y)};
+            u.x * v.y + u.y * v.x + (Real30::gamma() * u.y) * v.y};
   }
   // Complex conjugation: zeta -> gamma - zeta.
   Zeta30 conj() const { return {x + Real30::gamma() * y, -y}; }
 
   // |u|^2, a Real30 (the identity (conj(u) u).y == 0 holds by algebra).
-  Real30 lsq() const { return x * x + Real30::gamma() * (x * y) + y * y; }
+  Real30 lsq() const { return x * x + (Real30::gamma() * x) * y + y * y; }
 };
 
 // The delta-normalized wedge of two vectors: Im(conj(u) v)/sin(pi/15).
@@ -1037,8 +1049,10 @@ struct Diamond {
       if (why) *why = Refusal::NonPositiveWedge;
       return std::nullopt;
     }
+    // (unit * w) * w, not unit * (w * w): both operands of each product
+    // stay input-sized (the envelope's binding term, see kCarryCoeffMax).
     const Real30 u = Real30::heron_unit();
-    if (!(D.H_upper() == u * (wu * wu) && D.H_lower() == u * (wl * wl))) {
+    if (!(D.H_upper() == (u * wu) * wu && D.H_lower() == (u * wl) * wl)) {
       if (why) *why = Refusal::InconsistentCarry;
       return std::nullopt;
     }
@@ -1121,7 +1135,7 @@ struct Diamond {
   std::optional<Flipped> flipped(DivTrace* tr = nullptr) const {
     const Real30 two_e = 2 * f_.e;
     const auto q1 = exact_div(
-        P() * Q() - Real30::heron_unit() * (wu_ * wl_), two_e, tr);
+        P() * Q() - (Real30::heron_unit() * wu_) * wl_, two_e, tr);
     if (!q1) return std::nullopt;
     const auto wo = exact_div(Q() * wu_ + P() * wl_, two_e, tr);
     if (!wo) return std::nullopt;
