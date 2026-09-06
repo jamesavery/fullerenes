@@ -29,8 +29,11 @@ template <ForcefieldType FFT, typename T, typename K>
 struct ForceField
 {
     TEMPLATE_TYPEDEFS(T, K);
-    typedef Constants<T, K> Constants;
-    typedef mat3<T> mat3;
+    // Qualified on purpose: a class may not use a name and then redeclare it
+    // to mean something else ([basic.scope.class]); g++ enforces this, nvc++
+    // does not, and the omp backend builds with g++.
+    typedef ::Constants<T, K> Constants;
+    typedef ::mat3<T> mat3;
 
     const NodeNeighbours<K> node_graph; // Contains face-information and neighbour-information. Both of which are constant in the lifespan of this struct.
     const Constants constants;          // Contains force-constants and equillibrium-parameters. Constant in the lifespan of this struct.

@@ -133,7 +133,7 @@ endif()
 option(ENABLE_SYCL "Build SYCL GPU code (requires AdaptiveCpp)" ${ENABLE_SYCL_DEFAULT})
 if(FULLERENES_CORE_ONLY)
   # Core-only must not let an auto-detected acpp flip the library ABI via
-  # add_compile_definitions(FULLERENES_ENABLE_SYCL=1) below.
+  # FULLERENES_ENABLE_SYCL in config.hh below.
   set(ENABLE_SYCL OFF)
 endif()
 
@@ -158,10 +158,13 @@ if(ENABLE_SYCL)
   if(NOT SYCL_COMPILER)
     message(FATAL_ERROR "ENABLE_SYCL=ON requires AdaptiveCpp compiler (acpp or syclcc)")
   endif()
-  # Force batch::Batch storage to use SyclVector (USM) even in translation
-  # units compiled by the host C++ compiler (programs/, benchmarks/), so
-  # host-populated batch buffers are accessible to SYCL kernels.
-  add_compile_definitions(FULLERENES_ENABLE_SYCL=1)
+  # batch::Batch storage is SyclVector (USM) in every translation unit of a
+  # SYCL build -- host-compiled ones (programs/, benchmarks/) included, so
+  # host-populated batch buffers are accessible to SYCL kernels.  The switch
+  # is FULLERENES_ENABLE_SYCL in the generated config.hh (configure_file
+  # below), which out-of-tree consumers see too; it used to be a compile
+  # definition here, invisible to them.
+  set(FULLERENES_ENABLE_SYCL ON)
 
   # The default target is the GPU the machine reports (above); a CUDA
   # toolchain with no GPU listed still means NVIDIA (it compiles); and with
