@@ -107,6 +107,10 @@ struct CarryViews {
   std::span<Real30> diag_pend;           // [k_max] accepted-ear diagonal lsq
 };
 
+// ONE tier: the policy is the same code on the host and in a GPU work-item
+// (cyclotomic.hh's banner) -- since 2026-09-06 the cubic chain's device
+// reduction runs it over a per-isomer carry arena (claude-projects/
+// parallel-primitives, IdtBatch::launch_kis_reduce_exact).
 struct CyclotomicMetric : CarryViews {
   // Flip transport, armed by flipped() and applied by the set_edge_length
   // the SAME flip issues (flip_edge calls them back to back on one h; a
@@ -288,17 +292,12 @@ struct CyclotomicMetric : CarryViews {
   // diagonal lsq is queued for splice_fan's paired write.
   Length ear(DelaunayView& V, const FanPolygon&, int pp, int pi, int pn) {
     bool ok = true;
-    const SignOr s = sign_real(wedge(dev[pi] - dev[pp], dev[pn] - dev[pp]));
-    if (!s) {
-      V.trip(DelaunayView::Status::InvariantViolated,
-             "cyclotomic ear: CCW sign refused", pi);
-      return {0, 0};
-    }
+    const SignOr s = decided(V, sign_real(wedge(dev[pi] - dev[pp], dev[pn] - dev[pp])),
+                             "cyclotomic ear: CCW sign refused", pi);
+    if (!s) return {0, 0};
     if (*s != Sign::Positive) return {0, 0};
     if (!sector_at_most_pi(dev[pp], dev[pn], ok)) {
-      if (!ok)
-        V.trip(DelaunayView::Status::InvariantViolated,
-               "cyclotomic ear: sector sign refused", pi);
+      if (!ok) decided(V, SignOr{}, "cyclotomic ear: sector sign refused", pi);
       return {0, 0};
     }
     const auto dsq = exact_div((dev[pn] - dev[pp]).lsq(), dev_scale);
@@ -342,8 +341,10 @@ struct CyclotomicMetric : CarryViews {
                "cyclotomic commit_star: wedge descale refused", v);
         return;
       }
-      const SignOr s = sign_real(*w);
-      if (!s || *s != Sign::Positive) {
+      const SignOr s = decided(V, sign_real(*w),
+                               "cyclotomic commit_star: ear-face wedge sign refused", v);
+      if (!s) return;
+      if (*s != Sign::Positive) {
         V.trip(DelaunayView::Status::InvariantViolated,
                "cyclotomic commit_star: non-positive ear-face wedge", v);
         return;
@@ -391,8 +392,7 @@ struct CyclotomicMetric : CarryViews {
     bool ok = true;
     const bool le = sector_at_most_pi(q0, qt, ok);
     if (!ok) {
-      V.trip(DelaunayView::Status::InvariantViolated,
-             "cyclotomic first_tie_side: sector sign refused", h_loop);
+      decided(V, SignOr{}, "cyclotomic first_tie_side: sector sign refused", h_loop);
       return 0;
     }
     return le ? 0 : 1;
@@ -400,43 +400,58 @@ struct CyclotomicMetric : CarryViews {
 };
 
 // ---------------------------------------------------------------------------
-// The owned carry + the verified entry boundary.
+// The carry's storage as caller-owned WRITABLE views (the derivation's
+// output), the owned carry, and the verified entry boundary in two layers:
+// a view body that fills a store and reports a refusal by name (no
+// allocation, no exceptions -- callable from a GPU work-item over a
+// per-isomer arena), and the owner that allocates, calls it, and converts
+// a refusal to the documented throw.  Sizes: lsq / diag_pend at the
+// half-edge capacity, f_wedge at the face capacity, curv_k at the vertex
+// capacity, dev at the half-edge capacity + 1.
 // ---------------------------------------------------------------------------
-struct CyclotomicKisCarry {
-  std::vector<Real30> lsq, f_wedge, diag_pend;
-  std::vector<signed char> curv_k;
-  std::vector<Zeta30> dev;
+struct CarryStore {
+  std::span<Real30> lsq, f_wedge, diag_pend;
+  std::span<signed char> curv_k;
+  std::span<Zeta30> dev;
 
-  // A fresh policy over this carry: the views, and the transport state at
+  CarryViews views() const { return {lsq, f_wedge, curv_k, dev, diag_pend}; }
+  // A fresh policy over this store: the views, and the transport state at
   // its defaults (pend disarmed, the ear FIFO empty).
-  CyclotomicMetric metric() {
-    return {CarryViews{lsq, f_wedge, curv_k, dev, diag_pend}};
-  }
+  CyclotomicMetric metric() const { return {views()}; }
 };
 
-// Derive + VERIFY the cyclotomic carry from a FRESH kis DCEL (see the
-// file banner's entry boundary).  n_centres = the face-centre vertex
-// count (kis ids < n_centres); centre_size[c] = that face's size, 5 or 6.
-// Every mismatch throws: this boundary is loud by design.
-inline CyclotomicKisCarry derive_cyclotomic_kis_carry(
-    const DelaunayView& V, int n_centres, std::span<const int> centre_size,
-    const char* op = "derive_cyclotomic_kis_carry") {
-  auto fail = [&](const std::string& what, long id) {
-    throw std::runtime_error(std::string(op) + ": " + what + " (id " +
-                             std::to_string(id) + ")");
-  };
-  if (n_centres <= 0 || n_centres >= V.nv ||
-      (int)centre_size.size() < n_centres)
-    fail("centre bookkeeping does not match the DCEL", n_centres);
+// A refused derivation: what failed and the id it failed on; ok() when the
+// carry was derived and verified.
+struct CarryRefusal {
+  const char* what = nullptr;
+  long id = 0;
+  bool ok() const { return what == nullptr; }
+};
 
-  CyclotomicKisCarry c;
-  c.lsq.assign(V.he_length.size(), Real30{});
-  c.f_wedge.assign(V.f_he.size(), Real30{});
-  c.curv_k.assign((std::size_t)V.nv, 0);
-  c.dev.assign(V.he_length.size() + 1, Zeta30{});
-  c.diag_pend.assign(V.he_length.size(), Real30{});
-  // The verifying reads go through the policy's own bridge words, on views
-  // of the arrays just sized (nothing below resizes them).
+// Derive + VERIFY the cyclotomic carry from a FRESH kis DCEL into a store
+// (see the file banner's entry boundary).  n_centres = the face-centre
+// vertex count (kis ids < n_centres); centre_size[c] = that face's size,
+// 5 or 6 (any integer element type).  The first mismatch is returned by
+// name; the store is then partially written and must not be used.
+// @pre  every store span holds its capacity above; V is a fresh kis DCEL
+template <class Size>
+inline CarryRefusal derive_cyclotomic_kis_carry_into(
+    CarryStore c, const DelaunayView& V, int n_centres,
+    std::span<const Size> centre_size) {
+  if (n_centres <= 0 || n_centres >= V.nv ||
+      (long)centre_size.size() < n_centres)
+    return {"centre bookkeeping does not match the DCEL", n_centres};
+  if ((long)c.lsq.size() < V.nh || (long)c.f_wedge.size() < V.nf ||
+      (long)c.curv_k.size() < V.nv || (long)c.dev.size() < V.nh + 1 ||
+      (long)c.diag_pend.size() < V.nh)
+    return {"carry store smaller than the DCEL", V.nh};
+  for (auto& q : c.lsq) q = Real30{};
+  for (auto& q : c.f_wedge) q = Real30{};
+  for (auto& k : c.curv_k) k = 0;
+  for (auto& z : c.dev) z = Zeta30{};
+  for (auto& q : c.diag_pend) q = Real30{};
+  // The verifying reads go through the policy's own bridge words, on the
+  // views of the store (nothing below resizes them).
   const CyclotomicMetric m = c.metric();
 
   const Real30 U = Real30::lsq_cubic_edge();
@@ -449,17 +464,17 @@ inline CyclotomicKisCarry derive_cyclotomic_kis_carry(
     if (!V.alive(h)) continue;
     const int u = V.he_origin[h], w = V.dest(h);
     const bool cu = u < n_centres, cw = w < n_centres;
-    if (cu && cw) fail("centre-centre edge (not a kis complex)", h);
+    if (cu && cw) return {"centre-centre edge (not a kis complex)", h};
     Real30 L = U;
     if (cu || cw) {
       const int centre = cu ? u : w;
-      const int sz = centre_size[centre];
-      if (sz != 5 && sz != 6) fail("centre face size not 5 or 6", centre);
+      const int sz = (int)centre_size[centre];
+      if (sz != 5 && sz != 6) return {"centre face size not 5 or 6", centre};
       L = (sz == 5) ? S : U;
     }
     c.lsq[h] = L;
     if (!m.shadow_agrees(V, h))
-      fail("he_length disagrees with the kis edge class", h);
+      return {"he_length disagrees with the kis edge class", h};
   }
 
   // Face classes: exactly one centre corner each; the wedge by its size.
@@ -471,8 +486,8 @@ inline CyclotomicKisCarry derive_cyclotomic_kis_carry(
       const int vtx = V.he_origin[hs[j]];
       if (vtx < n_centres) { centre = vtx; n_c++; }
     }
-    if (n_c != 1) fail("kis face without exactly one centre corner", f);
-    c.f_wedge[f] = (centre_size[centre] == 5) ? WP : WH;
+    if (n_c != 1) return {"kis face without exactly one centre corner", f};
+    c.f_wedge[f] = ((int)centre_size[centre] == 5) ? WP : WH;
   }
 
   // Curvature indices: centres flat; cubic corners count their deg-5
@@ -485,16 +500,48 @@ inline CyclotomicKisCarry derive_cyclotomic_kis_carry(
     if (v >= n_centres) {
       for (int h : V.incident(v)) {
         const int d = V.dest(h);
-        if (d < n_centres && centre_size[d] == 5) k++;
+        if (d < n_centres && (int)centre_size[d] == 5) k++;
       }
-      if (k > 3) fail("cubic corner with more than 3 pentagons", v);
+      if (k > 3) return {"cubic corner with more than 3 pentagons", v};
     }
     c.curv_k[v] = (signed char)k;
     k_total += k;
     if (!m.cone_agrees(V, v))
-      fail("cone angle disagrees with the curvature index", v);
+      return {"cone angle disagrees with the curvature index", v};
   }
-  if (k_total != 60) fail("total curvature is not 4 pi (sum k != 60)", k_total);
+  if (k_total != 60) return {"total curvature is not 4 pi (sum k != 60)", k_total};
+  return {};
+}
+
+struct CyclotomicKisCarry {
+  std::vector<Real30> lsq, f_wedge, diag_pend;
+  std::vector<signed char> curv_k;
+  std::vector<Zeta30> dev;
+
+  CarryStore store() { return {lsq, f_wedge, diag_pend, curv_k, dev}; }
+  // A fresh policy over this carry: the views, and the transport state at
+  // its defaults (pend disarmed, the ear FIFO empty).
+  CyclotomicMetric metric() { return store().metric(); }
+};
+
+// The owning entry boundary: allocate the carry at the DCEL's capacities,
+// derive and verify it (derive_cyclotomic_kis_carry_into), and convert a
+// refusal to the documented throw.  Every mismatch throws: this boundary
+// is loud by design.
+inline CyclotomicKisCarry derive_cyclotomic_kis_carry(
+    const DelaunayView& V, int n_centres, std::span<const int> centre_size,
+    const char* op = "derive_cyclotomic_kis_carry") {
+  CyclotomicKisCarry c;
+  c.lsq.assign(V.he_length.size(), Real30{});
+  c.f_wedge.assign(V.f_he.size(), Real30{});
+  c.curv_k.assign((std::size_t)V.nv, 0);
+  c.dev.assign(V.he_length.size() + 1, Zeta30{});
+  c.diag_pend.assign(V.he_length.size(), Real30{});
+  const CarryRefusal r =
+      derive_cyclotomic_kis_carry_into<int>(c.store(), V, n_centres, centre_size);
+  if (!r.ok())
+    throw std::runtime_error(std::string(op) + ": " + r.what + " (id " +
+                             std::to_string(r.id) + ")");
   return c;
 }
 

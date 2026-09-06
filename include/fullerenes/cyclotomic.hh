@@ -79,14 +79,17 @@
 // (whitepaper @ref sec:flip); a refusal on module inputs falsifies the
 // caller's premise and must trip loudly upstream.
 //
-// TIER NOTE: add/sub/mul and rungs (0)-(1) of sign_real are allocation-free
-// fixed-array code with NO transcendental call anywhere -- gamma enters
-// rung (1) as a correctly rounded stored constant (kGammaDouble), so the
-// double rung is bit-identical across hosts and devices up to FMA
-// contraction, which the error bound covers.  The exact dyadic fallback
-// (rung 2) is a SEPARATE, host-tier function with a fixed multi-KB frame
-// (FixedBigInt arrays); the fast path never pays it.  Nothing here is
-// device-TESTED yet -- the device story is layer-2 work.
+// ONE TIER: everything on the run path -- add/sub/mul, the sign oracle
+// (sign_real: exact zero by coordinates, else ONE fixed-point evaluation
+// at a precision derived from the Liouville bound; its banner below), and
+// the exact division (modular products reduced by shifts and adds) -- is
+// integer arithmetic over fixed-size arrays with no loop of data-dependent
+// length, no allocation, no exception and no floating point (the double
+// value() is a SHADOW for the mesh's edge lengths, never a decision).  The
+// same code runs in a GPU work-item and on the host; since 2026-09-06 it
+// is the cubic chain's device reduction (claude-projects/parallel-primitives).
+// The bisection driver at the end of the oracle section serves only the
+// ambient verification ring (cyclotomic_ambient.hh).
 // ============================================================================
 
 #include "bigint_fixed.hh"
@@ -124,8 +127,12 @@ enum class Refusal : int {
   None = 0,
   Poisoned,           // a coefficient overflowed somewhere in the history
   NotReal,            // ambient tier: sign of a non-real element requested
-  DyadicCap,          // rung 2 hit kMaxDyadicBits (fail-loud backstop)
-  BigWidth,           // rung 2 overflowed a FixedBigInt capacity
+  DyadicCap,          // ambient tier: the bisection hit its dyadic cap
+  BigWidth,           // ambient tier: the bisection overflowed a limb capacity
+  Undecided,          // working ring: the fixed-point evaluation of a NONZERO
+                      // element returned zero -- impossible by the Liouville
+                      // bound the precision is derived from; the constants
+                      // are corrupt (a fail-loud backstop, never a tolerance)
   DivisorZero,        // exact_div by zero
   NotDivisible,       // exact_div: no quotient verified (either prime)
   NonPositiveWedge,   // Diamond: a face wedge not strictly positive
@@ -249,9 +256,14 @@ struct CheckedCoeffRing {
     return true;
   }
   // Coordinate equality (poison compared too: a poisoned value equals
-  // nothing, itself included, on the safe side).
+  // nothing, itself included, on the safe side).  Spelled as a fold without
+  // an early exit: an element-wise compare loop with early exit is a memory
+  // comparison idiom the optimizer replaces by a library call (bcmp), which
+  // a GPU kernel has no library to resolve.
   friend bool operator==(const D& x, const D& y) {
-    return x.ok && y.ok && x.a == y.a;
+    bool eq = x.ok && y.ok;
+    for (int i = 0; i < Rank; i++) eq &= (x.a[i] == y.a[i]);
+    return eq;
   }
 
   friend D operator+(const D& x, const D& y) {
@@ -376,19 +388,14 @@ struct Real30 : CheckedCoeffRing<Real30, 4> {
   static Real30 heron_unit() { return from_coords({4, 0, -1, 0}); }
   static Real30 heron_unit_inv() { return from_coords({0, 1, 1, 0}); }
 
-  // Numeric value (diagnostics and the sign oracle's double rung): Horner
-  // at the correctly rounded stored constant -- no cos call.
+  // Numeric value (the float SHADOW of an exact quantity -- the mesh's
+  // double edge lengths -- and diagnostics): Horner at the correctly
+  // rounded stored constant, no cos call.  Never a decision: every sign is
+  // the exact oracle's (sign_real).
   double value() const {
-    double v, abs_sum;
-    value_with_abs(v, abs_sum);
-    return v;
-  }
-  void value_with_abs(double& value, double& abs_sum) const {
     const double g = detail::kGammaDouble;
-    value = (((double)a[3] * g + (double)a[2]) * g + (double)a[1]) * g +
-            (double)a[0];
-    abs_sum = 0;
-    for (long long c : a) abs_sum += std::fabs((double)c);
+    return (((double)a[3] * g + (double)a[2]) * g + (double)a[1]) * g +
+           (double)a[0];
   }
 };
 
@@ -419,51 +426,203 @@ static_assert((__int128)45 * kPredicateCoeffMax * kPredicateCoeffMax <=
                   (__int128)detail::kMulOperandMax,
               "second-level operands (w*w) must clear the product guard");
 
-// The double rung's relative error bound, derived: 4 int->double
-// conversions and the 3+3 Horner operations contribute <= 7u per term path
-// (u = 2^-53), against term magnitudes |a_k| gamma^k <= 8 |a_k|, so
-// <= 56u * sum|a_k|; the argument error |kGammaDouble - gamma| <= u
-// (correctly rounded, gamma in [1,2)) enters through |B'| <= 12 sum|a_k|
-// as <= 12u * sum|a_k|.  Total <= 68u ~ 7.6e-15 * sum|a_k| under
-// round-to-nearest; FMA contraction only removes rounding steps, and even
-// a 4-ulp-perturbed constant stays under ~1.7e-14 (the review measured a
-// 4.6M-vector worst of 3.95e-15, incl. LLL near-cancelling families).
-// kRung1RelErr = 1e-13 keeps >= 5x margin over the worst reading;
-// -ffast-math reassociation would void the analysis (do not build this
-// file with it).
-inline constexpr double kRung1RelErr = 1e-13;
-static_assert(kRung1RelErr >= 5.1e-14,
-              "must keep >= 3x margin over the 4-ulp worst reading 1.7e-14");
-
 // ---------------------------------------------------------------------------
-// The exact sign oracle.
+// The exact sign oracle of the working ring: ONE fixed-point evaluation.
 //
-// Ladder: (0) exact zero by coordinates (the power basis is a Z-basis, so
-// zero has one representation); (1) double Horner against kRung1RelErr;
-// (2) sign_at_isolated_root -- bisect the isolating interval [15/8, 2] of
-// gamma (exactly: 2^12 psi(15/8) = -6599 < 0 < psi(2) = 1, and the
-// nearest conjugate is 2 cos(7 pi/15) = 0.20905..) with EXACT integer
-// arithmetic until |B(mid)| exceeds the derivative bound times the
-// interval width.  No transcendental constant enters rung (2).
-//
-// Termination of rung (2), honestly bounded for FULL int64 coordinates
-// (the poison discipline guarantees stored coordinates, nothing smaller):
-// B is a nonzero integer polynomial in gamma of degree <= 3 and height
-// H <= 2^63; its integer norm is >= 1 and the three conjugate values are
-// bounded by (1+2+4+8) H = 15 H, so |B(gamma)| >= (15 H)^-3 > 2^-201.
-// The derivative bound is M <= (1+4+12) H < 2^68, so the bisection
-// concludes by s ~ 201 + 68 + 1 = 270 bits -- inside kMaxDyadicBits = 384.
-// Refused-at-cap is a fail-loud backstop, never a tolerance.
+// Every verdict is the sign of B(gamma) for an integer polynomial B of
+// degree <= 3 in gamma = 2 cos(pi/15) with coefficients b_k (|b_k| < 2^63
+// by the storage type; the poison discipline guarantees nothing smaller).
+// Step (0): exact zero by coordinates (the power basis is a Z-basis, so
+// zero has one representation).  Step (1), for B != 0: with m the integer
+// floor(gamma 2^p) the sign of the EXACT integer
+//     S = 2^{3p} B(m / 2^p) = sum_k b_k * m^k * 2^{p (3 - k)}
+// is the sign of B(gamma), because the two are closer than any nonzero
+// value can be to zero:
+//   * |B(gamma) - B(m/2^p)| <= max |B'| on [0, 2] * |gamma - m/2^p|
+//                            <= (1 + 4 + 12) H * 2^-p = 17 H 2^-p,
+//     H = max |b_k| (a coefficient-wise bound, no cancellation assumed);
+//   * a nonzero B has integer norm >= 1 and three conjugate values each
+//     bounded by (1 + 2 + 4 + 8) H = 15 H, so |B(gamma)| >= (15 H)^-3
+//     (Liouville);
+//   * hence sign S = sign B(gamma) whenever 2^p > 2 * 17 * 15^3 * H^4,
+//     i.e. p > 4 log2 H + 15.9; with H < 2^63 this is p > 268 (the
+//     static_assert below holds the inequality).
+// The constants m^k 2^{p(3-k)} are compile-time integers; m itself is
+// derived by tools/derive_cyclotomic_constant.py (exact bisection of psi)
+// and VERIFIED here at compile time by psi(m/2^p) < 0 < psi((m+1)/2^p),
+// evaluated exactly.  The evaluation is four multiply-accumulates of a
+// 64-bit coefficient into a fixed-width integer -- no loop with a
+// data-dependent trip count, no branch on the data beyond the final
+// compare, no floating point, no allocation: the same code on a GPU
+// work-item and on the host.  (The bisection driver below the constants
+// serves the AMBIENT verification ring only.)
 // ---------------------------------------------------------------------------
 
 namespace detail {
 
-// Rung-2 capacities.  The binding intermediate is lhs = Bmid << smid at
-// the deepest iteration, ~ (deg+1)*smid + 63 bits: provably 27 of the 28
-// limbs here (the ambient tier runs 99 of 100) -- one limb of margin,
-// checked at every operation, refusing (BigWidth) rather than wrapping.
-// Review-measured extremes (2026-08-25 record, LLL-adversarial inputs at
-// |B(gamma)| = 2^-190.3): 252 bisections, 16-limb high water.
+// Fixed-width unsigned integers, little-endian 64-bit limbs, for the
+// evaluation and its compile-time verification.  Sizes are chosen so that
+// no operation below can overflow (each is stated at its use).
+template <int N>
+struct FixedU {
+  uint64_t l[N] = {};
+
+  constexpr bool is_zero() const {
+    bool z = true;
+    for (int i = 0; i < N; i++) z &= (l[i] == 0);
+    return z;
+  }
+  static constexpr FixedU one() { FixedU r; r.l[0] = 1; return r; }
+  // Three-way order of magnitudes: -1, 0, +1.
+  static constexpr int cmp(const FixedU& x, const FixedU& y) {
+    for (int i = N - 1; i >= 0; i--)
+      if (x.l[i] != y.l[i]) return x.l[i] < y.l[i] ? -1 : 1;
+    return 0;
+  }
+  friend constexpr FixedU operator+(const FixedU& x, const FixedU& y) {
+    FixedU r;
+    unsigned __int128 c = 0;
+    for (int i = 0; i < N; i++) {
+      c += (unsigned __int128)x.l[i] + y.l[i];
+      r.l[i] = (uint64_t)c;
+      c >>= 64;
+    }
+    return r;
+  }
+  // x << bits, bits a multiple of 64 or not; limbs shifted out are lost
+  // (callers size N so none are).
+  constexpr FixedU shl(int bits) const {
+    FixedU r;
+    const int w = bits / 64, s = bits % 64;
+    for (int i = N - 1; i >= 0; i--) {
+      const int j = i - w;
+      if (j < 0) break;
+      uint64_t v = l[j] << s;
+      if (s && j > 0) v |= l[j - 1] >> (64 - s);
+      r.l[i] = v;
+    }
+    return r;
+  }
+  // Schoolbook product truncated at N limbs (callers size N so the true
+  // product fits).
+  friend constexpr FixedU operator*(const FixedU& x, const FixedU& y) {
+    FixedU r;
+    for (int i = 0; i < N; i++) {
+      if (!x.l[i]) continue;
+      unsigned __int128 c = 0;
+      for (int j = 0; i + j < N; j++) {
+        c += (unsigned __int128)x.l[i] * y.l[j] + r.l[i + j];
+        r.l[i + j] = (uint64_t)c;
+        c >>= 64;
+      }
+    }
+    return r;
+  }
+  constexpr FixedU times_small(uint64_t k) const {
+    FixedU r;
+    unsigned __int128 c = 0;
+    for (int i = 0; i < N; i++) {
+      c += (unsigned __int128)l[i] * k;
+      r.l[i] = (uint64_t)c;
+      c >>= 64;
+    }
+    return r;
+  }
+  // this += v * k, for a constant v of M <= N - 1 limbs and a 64-bit k:
+  // the RUN-PATH operation of the oracle (one fixed pass per coefficient).
+  template <int M>
+  constexpr void mul_add(const FixedU<M>& v, uint64_t k) {
+    static_assert(M < N, "the accumulator needs one limb above the constant");
+    unsigned __int128 c = 0;
+    for (int i = 0; i < M; i++) {
+      c += (unsigned __int128)v.l[i] * k + l[i];
+      l[i] = (uint64_t)c;
+      c >>= 64;
+    }
+    for (int i = M; i < N && c; i++) {
+      c += l[i];
+      l[i] = (uint64_t)c;
+      c >>= 64;
+    }
+  }
+};
+
+// The precision p and the limb counts it implies (the inequality that
+// makes p sufficient is the static_assert after the constants).
+inline constexpr int kSignBits = 320;              // p
+inline constexpr int kSignConstLimbs = 16;         // m^k 2^{p(3-k)} < 2^{3p+3} = 2^963
+inline constexpr int kSignAccLimbs = 17;           // |b_k| < 2^63, four terms: < 2^1028
+inline constexpr int kVerifyLimbs = 24;            // psi at scale 2^{4p}: < 2^1285
+
+// m = floor(gamma 2^p), little-endian 64-bit limbs (tools/derive_cyclotomic_constant.py 320).
+inline constexpr std::array<uint64_t, 6> kGammaFixedLimbs = {
+    0x45effbeef3b55e15ULL, 0x10c1517b2ab04fe0ULL, 0x5af6b5d8ea29e11eULL,
+    0xf5be43c6e4340270ULL, 0xf4cfc327a007f8a9ULL, 0x0000000000000001ULL};
+
+template <int N>
+constexpr FixedU<N> gamma_fixed() {
+  FixedU<N> m;
+  for (int i = 0; i < 6; i++) m.l[i] = kGammaFixedLimbs[i];
+  return m;
+}
+
+// sign of psi(M / 2^p) at scale 2^{4p}, exactly: psi(y) = y^4 + y^3 - 4y^2
+// - 4y + 1 (kPsi30), so 2^{4p} psi(M/2^p) = M^4 + M^3 2^p + 2^{4p}
+// - 4 M^2 2^{2p} - 4 M 2^{3p}; compared as positive part vs negative part.
+constexpr int psi_sign_at(const FixedU<kVerifyLimbs>& M) {
+  using F = FixedU<kVerifyLimbs>;
+  const F M2 = M * M, M3 = M2 * M, M4 = M3 * M;
+  const F pos = M4 + M3.shl(kSignBits) + F::one().shl(4 * kSignBits);
+  const F neg = M2.shl(2 * kSignBits).times_small(4) + M.shl(3 * kSignBits).times_small(4);
+  return F::cmp(pos, neg);
+}
+// The isolating property of m, verified at compile time (exact).
+static_assert(psi_sign_at(gamma_fixed<kVerifyLimbs>()) < 0,
+              "gamma constant: psi(m / 2^p) must be negative");
+static_assert(psi_sign_at(gamma_fixed<kVerifyLimbs>() + FixedU<kVerifyLimbs>::one()) > 0,
+              "gamma constant: psi((m + 1) / 2^p) must be positive");
+// p sufficient for every representable coefficient: 2^p > 2 * 17 * 15^3 * H^4
+// with H < 2^63, i.e. p >= 4 * 63 + 16.
+static_assert(kSignBits >= 4 * 63 + 16, "sign oracle: precision below the Liouville requirement");
+static_assert(kSignConstLimbs * 64 >= 3 * kSignBits + 3, "sign oracle: constant limbs");
+static_assert(kSignAccLimbs * 64 >= 3 * kSignBits + 3 + 63 + 2, "sign oracle: accumulator limbs");
+static_assert(kVerifyLimbs * 64 >= 4 * kSignBits + 5, "sign oracle: verification limbs");
+
+// The evaluation constants m^k 2^{p(3-k)}, k = 0..3.
+constexpr std::array<FixedU<kSignConstLimbs>, 4> make_sign_powers() {
+  using F = FixedU<kSignConstLimbs>;
+  const F m = gamma_fixed<kSignConstLimbs>();
+  std::array<F, 4> P{};
+  P[0] = F::one().shl(3 * kSignBits);
+  P[1] = m.shl(2 * kSignBits);
+  P[2] = (m * m).shl(kSignBits);
+  P[3] = m * m * m;
+  return P;
+}
+inline constexpr std::array<FixedU<kSignConstLimbs>, 4> kSignPowers = make_sign_powers();
+
+// sign of S = sum_k b_k m^k 2^{p(3-k)}: the positive and the negative terms
+// accumulated apart (magnitudes masked by the coefficient's sign, so both
+// passes run on every lane), then compared.  ONE out-of-line body: every
+// predicate calls it, and inlining its 128 fixed multiply-accumulates at
+// each of the ~30 call sites of a reduction kernel multiplied the device
+// compile time, not the run time.
+[[gnu::noinline]] inline Sign sign_of_fixed_eval(const std::array<long long, 4>& b) {
+  FixedU<kSignAccLimbs> pos, neg;
+  for (int k = 0; k < 4; k++) {
+    const uint64_t neg_mask = (uint64_t)0 - (uint64_t)(b[k] < 0);
+    const uint64_t mag = b[k] < 0 ? (uint64_t)0 - (uint64_t)b[k] : (uint64_t)b[k];
+    pos.mul_add(kSignPowers[k], mag & ~neg_mask);
+    neg.mul_add(kSignPowers[k], mag & neg_mask);
+  }
+  return sign_from_int(FixedU<kSignAccLimbs>::cmp(pos, neg));
+}
+
+// ---- The AMBIENT verification ring's bisection driver (host tier) ----
+// Kept for cyclotomic_ambient.hh's conductor-60 oracle and its cross-checks;
+// nothing on the working ring's run path calls it.  Capacities: the
+// binding intermediate is lhs = Bmid << smid at the deepest iteration,
+// ~ (deg+1)*smid + 63 bits.
 inline constexpr int kMaxDyadicBits = 384;
 inline constexpr int kLimbs = (4 * kMaxDyadicBits) / 64 + 4;
 using Big = FixedBigInt<kLimbs>;
@@ -556,25 +715,11 @@ inline std::optional<Sign> rung1(double val, double abs_sum, double relerr,
   return std::nullopt;
 }
 
-// Rung 2 for the working ring: the element IS an integer polynomial in
-// gamma -- no rewrite step.
-[[gnu::noinline]] inline SignOr sign_real_exact(const Real30& v,
-                                                SignTrace* tr) {
-  Big B[4], Psi[5];
-  int deg = 0;
-  for (int i = 0; i < 4; i++) {
-    B[i] = Big::from_i128(v.a[i]);
-    if (B[i].sgn) deg = i;
-  }
-  for (int i = 0; i <= 4; i++) Psi[i] = Big::from_i128(kPsi30[i]);
-  return sign_at_isolated_root(B, deg, Psi, 4, /*m0=*/15, /*s0=*/3,
-                               kMaxDyadicBits, tr);
-}
-
 }  // namespace detail
 
 // Exact sign of a ring element; nullopt = refused by name (see Refusal;
-// the trace carries which).  @anchor cyclotomic-sign-real
+// the trace carries which, and the step that decided: 0 = zero by
+// coordinates, 1 = the fixed-point evaluation).  @anchor cyclotomic-sign-real
 inline SignOr sign_real(const Real30& v, SignTrace* tr = nullptr) {
   if (!v.ok) {
     if (tr) tr->refusal = Refusal::Poisoned;
@@ -584,11 +729,13 @@ inline SignOr sign_real(const Real30& v, SignTrace* tr = nullptr) {
     if (tr) tr->rung = 0;
     return Sign::Zero;
   }
-  double val, abs_sum;
-  v.value_with_abs(val, abs_sum);
-  if (const auto s = detail::rung1(val, abs_sum, kRung1RelErr, tr)) return *s;
-  if (tr) tr->rung = 2;
-  return detail::sign_real_exact(v, tr);
+  const Sign s = detail::sign_of_fixed_eval(v.a);
+  if (tr) tr->rung = 1;
+  if (s == Sign::Zero) {   // impossible for a nonzero element (oracle banner)
+    if (tr) tr->refusal = Refusal::Undecided;
+    return std::nullopt;
+  }
+  return s;
 }
 
 // The ring's order, three-way: sign(a - b).  Z[gamma] is a subring of R,
@@ -616,9 +763,36 @@ inline constexpr unsigned long long kDivPrimes[2] = {
                                // for a divisor nonzero mod it)
 };
 
+// Reduction modulo the two primes by shifts and adds -- no 128-bit
+// division anywhere (a GPU emulates one in hundreds of instructions).
+//   2^61 - 1:  x = hi 2^61 + lo == hi + lo, folded twice;
+//   2^63 - 25: x = hi 2^63 + lo == 25 hi + lo, folded twice (hi < 2^63 for
+//              a product of residues, so 25 hi + lo < 2^68; the second
+//              fold leaves < 2^63 + 800, one conditional subtraction).
+inline unsigned long long reduce_p61(unsigned __int128 x) {
+  const unsigned long long M = (1ULL << 61) - 1;
+  unsigned long long r = (unsigned long long)(x & M) + (unsigned long long)(x >> 61);
+  r = (r & M) + (r >> 61);
+  return r >= M ? r - M : r;
+}
+inline unsigned long long reduce_p63(unsigned __int128 x) {
+  const unsigned long long P = (1ULL << 63) - 25, L = (1ULL << 63) - 1;
+  unsigned __int128 y = (x & L) + (x >> 63) * 25;
+  unsigned long long r = (unsigned long long)(y & L) + (unsigned long long)(y >> 63) * 25;
+  return r >= P ? r - P : r;
+}
+inline unsigned long long reduce_mod(unsigned __int128 x, unsigned long long p) {
+  return p == kDivPrimes[0] ? reduce_p61(x) : reduce_p63(x);
+}
 inline unsigned long long mulmod(unsigned long long x, unsigned long long y,
                                  unsigned long long p) {
-  return (unsigned long long)((unsigned __int128)x * y % p);
+  return reduce_mod((unsigned __int128)x * y, p);
+}
+// (a + b) mod p for residues a, b < p < 2^63.
+inline unsigned long long addmod(unsigned long long a, unsigned long long b,
+                                 unsigned long long p) {
+  const unsigned long long s = a + b;
+  return s >= p ? s - p : s;
 }
 inline unsigned long long powmod(unsigned long long x, unsigned long long e,
                                  unsigned long long p) {
@@ -630,9 +804,12 @@ inline unsigned long long powmod(unsigned long long x, unsigned long long e,
   }
   return r;
 }
+// The residue of a signed 64-bit integer.
 inline unsigned long long tomod(long long v, unsigned long long p) {
-  const long long m = v % (long long)p;
-  return (unsigned long long)(m < 0 ? m + (long long)p : m);
+  const unsigned long long mag = v < 0 ? (unsigned long long)0 - (unsigned long long)v
+                                       : (unsigned long long)v;
+  const unsigned long long r = reduce_mod(mag, p);
+  return v < 0 && r ? p - r : r;
 }
 
 // Inverse of d in F_p[y]/(psi) by extended Euclid on (psi, d); nullopt if
@@ -662,9 +839,9 @@ inline std::optional<std::array<unsigned long long, 4>> ring_inverse_mod(
       const unsigned long long f = mulmod(r0[d0], inv_lead, p);
       const int shift = d0 - d1;
       for (int i = 0; i <= d1; i++)
-        r0[i + shift] = (r0[i + shift] + p - mulmod(f, r1[i], p)) % p;
+        r0[i + shift] = addmod(r0[i + shift], p - mulmod(f, r1[i], p), p);
       for (int i = 0; i <= 4 - shift; i++)
-        t0[i + shift] = (t0[i + shift] + p - mulmod(f, t1[i], p)) % p;
+        t0[i + shift] = addmod(t0[i + shift], p - mulmod(f, t1[i], p), p);
       const int nd0 = degree(r0);
       if (nd0 == d0) return std::nullopt;   // dead guard: cancellation exact
       d0 = nd0;
@@ -696,14 +873,14 @@ inline std::array<unsigned long long, 4> mulmod_ring(
   unsigned long long conv[7] = {};
   for (int i = 0; i < 4; i++)
     for (int j = 0; j < 4; j++)
-      conv[i + j] = (conv[i + j] + mulmod(x[i], y[j], p)) % p;
+      conv[i + j] = addmod(conv[i + j], mulmod(x[i], y[j], p), p);
   std::array<unsigned long long, 4> r{};
   for (int i = 0; i < 4; i++) r[i] = conv[i];
   for (int k = 4; k < 7; k++) {
     if (!conv[k]) continue;
     const auto& row = kGamPow[k];
     for (int i = 0; i < 4; i++)
-      r[i] = (r[i] + mulmod(conv[k], tomod(row[i], p), p)) % p;
+      r[i] = addmod(r[i], mulmod(conv[k], tomod(row[i], p), p), p);
   }
   return r;
 }
@@ -785,7 +962,7 @@ struct Zeta30 {
 
   bool is_zero() const { return x.is_zero() && y.is_zero(); }
   friend bool operator==(const Zeta30& u, const Zeta30& v) {
-    return u.x == v.x && u.y == v.y;
+    return (u.x == v.x) & (u.y == v.y);   // no early exit (see Real30's operator==)
   }
   friend Zeta30 operator+(const Zeta30& u, const Zeta30& v) {
     return {u.x + v.x, u.y + v.y};
