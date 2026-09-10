@@ -825,10 +825,16 @@ VertexOccurrence locate_vertex(const SurfaceParametrization& P, int v) {
 CellDevelopments cell_developments(const ::DelaunayView& D,
                                    const SortedDual& S)
 {
+    return cell_developments(D, (int32_t)S.T.N, S.n_cones);
+}
+
+CellDevelopments cell_developments(const ::DelaunayView& D,
+                                   int32_t N_sorted, int32_t n_cones)
+{
     CellDevelopments cd;
     cd.nf       = D.nf;
-    cd.N_sorted = (int32_t)S.T.N;
-    cd.n_cones  = S.n_cones;
+    cd.N_sorted = N_sorted;
+    cd.n_cones  = n_cones;
     cd.cells.resize(cd.nf);
     cd.dev_first.resize(cd.nf + 1);
     cd.entry_capacity_first.resize(cd.nf + 1);

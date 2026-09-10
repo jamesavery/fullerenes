@@ -8,8 +8,10 @@
 // integers -- no floating point enters any predicate or position.
 
 #include "fullerenes/eisenstein_atlas.hh"
+#include "fullerenes/union_find.hh"   // UnionFind (intrinsic_dual's point gluing)
 
 #include <algorithm>
+#include <cstdlib>
 #include <cstdint>
 #include <limits>
 #include <numeric>
@@ -102,27 +104,35 @@ void check_charts_match_cycles(const DelaunayView& D, const ParamTablesView& V) 
   }
 }
 
-// Per-half-edge chart transitions: he_trans[h] maps face(h)'s frame onto
-// face(twin h)'s, matched on the crossed edge's corner SLOTS in each face
-// cycle (Lemma: transitions are exact).  Slot matching -- not cone-id
-// matching -- so a repeated-corner cell cannot confuse the pairing; the
-// twin cycles the same edge in the opposite direction, hence the reversed
-// slot pair on the g side.  Keyed by the crossing half-edge, so a cell
-// pair sharing several edges (legal on a delta-complex) is unambiguous by
-// construction.  Dead slots stay identity and are unreachable (@inv:
-// every half-edge on a live face cycle is alive).
+// THE transition body: the chart isometry across half-edge h, from the
+// frame Pf of face(h) onto the frame Pg of face(twin h), matched on the
+// crossed edge's corner SLOTS in each face cycle (Lemma: transitions are
+// exact).  Slot matching -- not cone-id matching -- so a repeated-corner
+// cell cannot confuse the pairing; the twin cycles the same edge in the
+// opposite direction, hence the reversed slot pair on the g side.
+//   @throws std::logic_error (from isometry_from_segments) when the two
+//           frames do not develop the shared edge into one another --
+//           the falsifier the intrinsic selection tests candidates by.
+inline LatticeIsometry edge_transition(const DelaunayView& D, int h,
+                                       const std::array<Eisenstein, 3>& Pf,
+                                       const std::array<Eisenstein, 3>& Pg) {
+  const int k  = D.cycle_slot(h);           // = the chart corner slot the
+  const int k2 = D.cycle_slot(D.twin(h));   //   edge leaves from (gated)
+  return isometry_from_segments(Pf[k], Pf[(k + 1) % 3], Pg[(k2 + 1) % 3], Pg[k2]);
+}
+
+// Per-half-edge chart transitions over a parametrization's charts.
+// Keyed by the crossing half-edge, so a cell pair sharing several edges
+// (legal on a delta-complex) is unambiguous by construction.  Dead slots
+// stay identity and are unreachable (@inv: every half-edge on a live
+// face cycle is alive).
 std::vector<LatticeIsometry> half_edge_transitions(const DelaunayView& D,
                                                    const ParamTablesView& V) {
   std::vector<LatticeIsometry> trans(D.nh);
   for (int h = 0; h < D.nh; h++) {
     if (!D.alive(h)) continue;
-    const int ht = D.twin(h);
-    const auto Pf = V.frame_points(D.he_face[h]);
-    const auto Pg = V.frame_points(D.he_face[ht]);
-    const int k  = D.cycle_slot(h);       // = the chart corner slot the
-    const int k2 = D.cycle_slot(ht);      //   edge leaves from (gated above)
-    trans[h] = isometry_from_segments(Pf[k], Pf[(k + 1) % 3],
-                                      Pg[(k2 + 1) % 3], Pg[k2]);
+    trans[h] = edge_transition(D, h, V.frame_points(D.he_face[h]),
+                               V.frame_points(D.he_face[D.twin(h)]));
   }
   return trans;
 }
@@ -442,6 +452,228 @@ CellPoint locate_sample(CellAtlas& A, int fi, long a, long b, long c, long den) 
   const EisensteinRational q(num, den);
   CellTrace out = trace_segment(A, R.cell, R.anchor, q);
   return { out.cell, out.pos };
+}
+
+// =====================================================================
+// The T-free (intrinsic) atlas: development selection by cross-edge
+// consistency, and the dual reconstruction that selection carries.
+// =====================================================================
+
+namespace {
+
+// Do the two charts currently accepted on the faces of h develop their
+// shared edge into one another?  edge_transition throws exactly for the
+// mirror (wrong-orbit) development, so a clean return IS the verdict --
+// the falsifier that replaces T's frame walkers.
+bool transition_consistent(const IntrinsicAtlas& A, int h) {
+  const DelaunayView& D = A.D;
+  try {
+    (void)edge_transition(D, h, A.frame_points(D.he_face[h]),
+                          A.frame_points(D.he_face[D.twin(h)]));
+    return true;
+  } catch (const std::logic_error&) {
+    return false;
+  }
+}
+
+}  // namespace
+
+IntrinsicAtlas build_intrinsic_atlas(const DelaunayView& D) {
+  IntrinsicAtlas A;
+  A.D = D;
+  // A pure flat cone metric: every D vertex IS a cone, and the two counts
+  // enter only the scratch-capacity formulas the intrinsic path never reads.
+  A.dev = cell_developments(D, D.nv, D.nv);
+  A.accepted.assign(D.nf, -1);
+
+  int nlive = 0;
+  for (int f = 0; f < D.nf; f++) if (A.dev.n_developments(f) > 0) nlive++;
+
+  // Choose the seed's development so the whole atlas propagates.  A cell with
+  // several developments has only ONE that is globally consistent, and an
+  // arbitrary pick can wedge the entire BFS.  So prefer an unambiguous
+  // (single-development) seed, and otherwise try each of the seed's
+  // developments until one places every live cell; the BFS then resolves every
+  // remaining ambiguous cell by transition consistency.
+  int seed = -1;
+  for (int f = 0; f < D.nf; f++) if (A.dev.n_developments(f) == 1) { seed = f; break; }
+  if (seed < 0)
+    for (int f = 0; f < D.nf; f++) if (A.dev.n_developments(f) > 0) { seed = f; break; }
+  if (seed < 0) fail("build_intrinsic_atlas: no placeable cell in iDT");
+
+  for (int k0 = 0; k0 < A.dev.n_developments(seed); k0++) {
+    A.accepted.assign(D.nf, -1);
+    A.accepted[seed] = k0;
+    std::vector<int> order{ seed };
+    for (size_t qi = 0; qi < order.size(); qi++) {
+      const int f = order[qi];
+      for (const int h : D.face_halfedges(f)) {
+        const int g = D.he_face[D.twin(h)];
+        if (A.placed(g)) continue;
+        for (int k = 0; k < A.dev.n_developments(g); k++) {
+          A.accepted[g] = k;
+          if (transition_consistent(A, h)) { order.push_back(g); break; }
+          A.accepted[g] = -1;   // wrong-orbit development; try the next
+        }
+      }
+    }
+    if ((int)order.size() == nlive) break;   // consistent development found
+  }
+
+  // The transitions the selection makes exact.  Edges touching an unplaced
+  // cell (a folded cell on a noisy metric) simply have none; between two
+  // placed cells the transition must exist, so a refusal here is loud.
+  A.he_trans.assign(D.nh, LatticeIsometry{});
+  for (int h = 0; h < D.nh; h++) {
+    if (!D.alive(h)) continue;
+    const int f = D.he_face[h], g = D.he_face[D.twin(h)];
+    if (!A.placed(f) || !A.placed(g)) continue;
+    A.he_trans[h] = edge_transition(D, h, A.frame_points(f), A.frame_points(g));
+  }
+
+  // Global numbering of the accepted charts' lattice points (the union-find
+  // node ids intrinsic_dual glues on).
+  A.node_first.assign(D.nf + 1, 0);
+  for (int f = 0; f < D.nf; f++)
+    A.node_first[f + 1] =
+        A.node_first[f] + (A.placed(f) ? A.chart(f).scan.n_entries : 0);
+  return A;
+}
+
+Triangulation intrinsic_dual(const IntrinsicAtlas& A) {
+  const DelaunayView& D = A.D;
+
+  // Unite the copies of each shared lattice point: along every edge, walk its
+  // integer points (gcd of the edge vector's components + 1 of them) and map
+  // each from one cell's frame into the other's by the chart transition.
+  UnionFind uf(A.n_nodes());
+  auto node_at = [&](int cell, Eisenstein p) {
+    const int n = A.node_at(cell, p);
+    if (n < 0) fail("intrinsic_dual: shared lattice point absent from cell scan");
+    return n;
+  };
+  for (int h = 0; h < D.nh; h += 2) {
+    if (!D.alive(h)) continue;
+    const int f = D.he_face[h], g = D.he_face[D.twin(h)];
+    if (!A.placed(f) || !A.placed(g)) continue;
+    const std::array<Eisenstein, 3> Pf = A.frame_points(f);
+    const int k = D.cycle_slot(h);       // the crossed edge's corner slot in f
+    const Eisenstein Pa = Pf[k], Pb = Pf[(k + 1) % 3];
+    const Eisenstein e = Pb - Pa;
+    const int segs = std::gcd(std::abs(e.first), std::abs(e.second));
+    const Eisenstein step = e / segs;
+    const LatticeIsometry Tfg = A.he_trans[h];
+    for (int i = 0; i <= segs; i++) {
+      const Eisenstein pf = Pa + step * i;
+      uf.unite(node_at(f, pf), node_at(g, Tfg.apply(pf)));
+    }
+  }
+
+  // Dense vertex id per union-find class.
+  const std::vector<std::vector<int>> comps = uf.components();
+  std::vector<int> vid(A.n_nodes());
+  for (int c = 0; c < (int)comps.size(); c++)
+    for (const int u : comps[c]) vid[u] = c;
+  const int V = (int)comps.size();
+  auto gid = [&](int cell, Eisenstein p) { return vid[node_at(cell, p)]; };
+
+  // Locate the apex of the unit triangle (v, w, apex): it is unit_apex(pv, pw)
+  // in cell c's frame, but that triangle may straddle one or more cone-iDT
+  // edges.  Walk the straight segment v -> apex through the cells: while the
+  // apex is outside the current cell, cross the edge the segment truly exits --
+  // the apex strictly exterior to it AND the crossing WITHIN that edge's
+  // segment (s in [0,1]), not merely on its infinite line -- re-expressing v
+  // and the apex by the chart transition, until the apex lands in a cell that
+  // claims it.  The oriented multi-sheet fold, boundary by boundary.  The exit
+  // arc IS the best-th half-edge of the face cycle (corner k = origin of cycle
+  // half-edge k -- true by construction here: cell_developments takes each
+  // cell's corners straight off its face cycle).
+  struct ApexLoc { int cell; Eisenstein pv, apex; };
+  const int cap = max_cell_crossings(D.nf);
+  auto locate_apex = [&](int c, Eisenstein pv, Eisenstein apex) -> ApexLoc {
+    for (int step = 0; step < cap; step++) {
+      if (A.node_at(c, apex) >= 0) return { c, pv, apex };
+      const std::array<Eisenstein, 3> P = A.frame_points(c);
+      int best = -1;
+      for (int k = 0; k < 3; k++) {
+        const Eisenstein Pi = P[k], Pj = P[(k + 1) % 3], d = Pj - Pi;
+        if (wedge(d, apex - Pi) >= 0) continue;     // apex not strictly exterior to edge k
+        const long sden = wedge(apex - pv, d);      // crossing s = snum/sden along [Pi, Pj]
+        const long snum = wedge(apex - pv, pv - Pi);
+        const bool in_edge = sden > 0 ? (snum >= 0 && snum <= sden)
+                                      : sden < 0 && (snum <= 0 && snum >= sden);
+        if (in_edge) { best = k; break; }
+      }
+      if (best < 0) fail("intrinsic_dual: no exit edge toward apex");
+      const int h_exit = D.face_halfedges(c)[best];
+      const int g = D.he_face[D.twin(h_exit)];
+      if (!A.placed(g)) fail("intrinsic_dual: no placed neighbour across exit edge");
+      const LatticeIsometry T = A.he_trans[h_exit];
+      pv = T.apply(pv);  apex = T.apply(apex);  c = g;
+    }
+    fail("intrinsic_dual: apex walk exceeded " + std::to_string(cap) + " cell crossings");
+  };
+
+  // Seed each vertex with one incident dual edge (v at pv in cell c, neighbour
+  // at pw).  The fast path is an in-cell unit neighbour; a cone in a coarse
+  // cell can have ALL its neighbours across boundaries, so fall back to
+  // stepping a unit in each lattice direction and locating where it lands
+  // (skipping the direction into the cone's angle deficit, which reaches no
+  // neighbour).
+  struct Seed { int cell = -1; Eisenstein pv, pw; };
+  std::vector<Seed> seed(V);
+  std::vector<std::pair<int, Eisenstein>> occ(V, { -1, Eisenstein{} });
+  for (int f = 0; f < D.nf; f++) {
+    if (!A.placed(f)) continue;
+    const DevelopmentView ch = A.chart(f);
+    for (int b = ch.scan.b_min; b <= ch.scan.b_max; b++) {
+      const ScanRow row = ch.rows[b - ch.scan.b_min];
+      for (int a = row.a_left; a <= row.a_right; a++) {
+        const Eisenstein p(a, b);
+        const int v = gid(f, p);
+        if (occ[v].first < 0) occ[v] = { f, p };
+        if (seed[v].cell >= 0) continue;
+        for (int d = 0; d < 6; d++)
+          if (A.node_at(f, p + unit_direction(d)) >= 0) {
+            seed[v] = { f, p, p + unit_direction(d) };
+            break;
+          }
+      }
+    }
+  }
+  for (int v = 0; v < V; v++) {
+    const auto [c, pv] = occ[v];
+    for (int d = 0; d < 6 && seed[v].cell < 0; d++)
+      try {
+        const ApexLoc nb = locate_apex(c, pv, pv + unit_direction(d));
+        if (gid(nb.cell, nb.apex) != v) seed[v] = { nb.cell, nb.pv, nb.apex };
+      } catch (const std::logic_error&) { /* direction into the deficit; try the next */ }
+    if (seed[v].cell < 0)
+      fail("intrinsic_dual: vertex " + std::to_string(v) + " has no incident edge");
+  }
+
+  // Read each vertex's CCW neighbour ring by rotating around it: after
+  // neighbour w, the next one CCW is the apex of the unit triangle (v, w, apex)
+  // on the CCW side.  The ring closes when the rotation returns to the start
+  // neighbour -- after 5 steps at a cone, 6 at a hex: the degree is read off,
+  // never assumed.
+  std::vector<std::vector<node_t>> nbr(V);
+  for (int v = 0; v < V; v++) {
+    int c = seed[v].cell;
+    Eisenstein pv = seed[v].pv, pw = seed[v].pw;
+    const int w0 = gid(c, pw);
+    for (;;) {
+      nbr[v].push_back(gid(c, pw));
+      if ((int)nbr[v].size() > V)
+        fail("intrinsic_dual: neighbour ring failed to close at vertex "
+             + std::to_string(v));
+      const ApexLoc nx = locate_apex(c, pv, unit_apex(pv, pw));
+      c = nx.cell;  pv = nx.pv;  pw = nx.apex;
+      if (gid(c, pw) == w0) break;
+    }
+  }
+
+  return Triangulation(Graph(Spanify::OwnedDenseGraph<node_t>(nbr)));
 }
 
 }  // namespace eisenstein_paint
