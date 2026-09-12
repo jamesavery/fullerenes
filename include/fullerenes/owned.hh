@@ -117,19 +117,14 @@ struct Owned : View {
     }
 
     // --- Capacity: size every buffer for at least `cap` vertices at the
-    //     current stride, keeping contents.  Buffers only ever grow. ---
+    //     current stride, keeping contents, and repoint.  Buffers only ever
+    //     grow. ---
     // @anchor owned-reserve
     // @post capacity >= cap
     // @post sized: every buffer holds at least get_element_counts(capacity, dmax) elements
     // @post kept:  the first N vertices' worth of every field is unchanged
     void reserve(int cap) {
-        capacity = std::max(capacity, cap);
-        const auto counts = View::get_element_counts(capacity, this->dmax);
-        batch::for_each_field<View>([&](auto Ic) {
-            constexpr std::size_t k = Ic;
-            auto& buf = std::get<k>(buffers);
-            if (buf.size() < counts[k]) buf.resize(counts[k]);
-        });
+        grow_buffers(cap);
         repoint();
     }
 
@@ -146,7 +141,7 @@ struct Owned : View {
     // @post storage: implies(new_N <= capacity_before, every buffer's data() is unchanged)
     void resize(int new_N) {
         const int old_N = this->N;
-        reserve(new_N);
+        grow_buffers(new_N);
         this->N = node(new_N);
         repoint();
         if (new_N > old_N) {
@@ -193,7 +188,7 @@ struct Owned : View {
     // run's bound here).  Every row empty, every slot padding.
     explicit Owned(int N, uint8_t dmax = View::default_dmax, int cap = 0) {
         this->dmax = dmax;
-        reserve(std::max(N, cap));
+        grow_buffers(std::max(N, cap));
         resize(N);
     }
 
@@ -378,6 +373,20 @@ struct Owned : View {
     }
 
   private:
+    // The buffers alone, sized for at least `cap` vertices at the current
+    // stride, keeping contents; the spans are NOT repointed.  Every caller
+    // sets N and repoints once afterwards, so a growth is followed by
+    // exactly one repoint (reserve's public form is this plus the repoint).
+    void grow_buffers(int cap) {
+        capacity = std::max(capacity, cap);
+        const auto counts = View::get_element_counts(capacity, this->dmax);
+        batch::for_each_field<View>([&](auto Ic) {
+            constexpr std::size_t k = Ic;
+            auto& buf = std::get<k>(buffers);
+            if (buf.size() < counts[k]) buf.resize(counts[k]);
+        });
+    }
+
     // A moved-from owner: no storage, no live vertices, every span empty.
     void release() {
         capacity = 0;
@@ -410,7 +419,7 @@ struct Owned : View {
         this->N = 0;
         this->dmax = src.dmax;
         twin_computed = src.has_twin();
-        reserve(src.N);
+        grow_buffers(src.N);
         this->N = node(src.N);
         repoint();
         const auto counts = View::get_element_counts(this->N, this->dmax);

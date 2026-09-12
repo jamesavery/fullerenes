@@ -584,6 +584,21 @@ TEST(Owned, ShrinkThenGrowPadsTheReexposedRows) {
     for (int i = 0; i < 3; i++) EXPECT_EQ(g.neighbours[1 * 3 + i], node_t(-1));
 }
 
+TEST(Owned, FirstUnpaddedRowChecksWhatPadRowsEstablishes) {
+    Owned<TriangulationView> g(3, 6);               // three empty rows, padded
+    g.compute_twin();                               // the table too: every entry absent
+    EXPECT_EQ(g.first_unpadded_row(), node_t(-1));
+    g.neighbours[1 * 6 + 2] = 0;                    // a slot past row 1's degree
+    EXPECT_EQ(g.first_unpadded_row(), 1);
+    g.neighbours[1 * 6 + 2] = node_t(-1);
+    g.twin[2 * 6 + 5] = 0;                          // a twin entry past row 2's degree
+    EXPECT_EQ(g.first_unpadded_row(), 2);
+    g.pad_rows(2, 3);
+    EXPECT_EQ(g.first_unpadded_row(), node_t(-1));
+    g.insert_edge(arc_t(0, 1));                     // live slots are not padding
+    EXPECT_EQ(g.first_unpadded_row(), node_t(-1));
+}
+
 TEST(Owned, DefaultDualHasItsPentagonSpanAndAMovedFromOwnerHasNone) {
     FullereneDual d;
     EXPECT_EQ(d.N, 0);

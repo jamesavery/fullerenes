@@ -149,6 +149,24 @@ struct RSRAdjacencyView {
         }
     }
 
+    // The first row of [0, N) whose slots past its degree are not padding
+    // -- a neighbour slot other than K(-1), or, when the table is present,
+    // a twin entry other than no_slot -- or K(-1) when every row is padded.
+    // The check of what pad_rows establishes and every row write keeps
+    // (a row written whole writes its padding too).  O(N * dmax): a
+    // validator, not a hot-path check.
+    // @anchor rsr-first-unpadded-row
+    // @post result == K(-1) || (size_t(result) < size_t(N) && some slot of
+    //       row result at or past deg[result] is not padding)
+    K first_unpadded_row() const {
+        const bool tw = has_twin();
+        for (K u = 0; u < N; ++u)
+            for (int i = deg[u]; i < dmax; ++i)
+                if (neighbours[arcid(u, i)] != K(-1) || (tw && twin[arcid(u, i)] != no_slot))
+                    return u;
+        return K(-1);
+    }
+
     // The same rotation system at dst's stride: row u's entries land in
     // dst's row u, the remaining slots padding.  A row wider than dst's
     // stride is REFUSED by name -- truncating it would leave an asymmetric
