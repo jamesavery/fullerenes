@@ -22,6 +22,10 @@
 #include <span>
 #include <type_traits>
 
+#if defined(__ACPP__)
+#include <sycl/sycl.hpp>
+#endif
+
 #include "fullerenes/diamond_forms.hh"
 #include "fullerenes/eisenstein.hh"
 
@@ -31,6 +35,21 @@
 namespace delaunay_detail {
 
 inline constexpr double two_pi = 2 * std::numbers::pi_v<double>;
+
+// The transcendentals this header's bodies use, spelled so the same bodies
+// compile as device code: under AdaptiveCpp the sycl:: functions (the host
+// library's on the host, the vendor's device library on the device), else
+// std::.  A std::acos or std::sin reached from device code compiled ahead
+// of time lowers to an LLVM intrinsic the NVPTX backend cannot implement.
+#if defined(__ACPP__)
+template <class T> inline T dev_acos(T x) { return sycl::acos(x); }
+template <class T> inline T dev_sin(T x)  { return sycl::sin(x); }
+template <class T> inline T dev_cos(T x)  { return sycl::cos(x); }
+#else
+template <class T> inline T dev_acos(T x) { return std::acos(x); }
+template <class T> inline T dev_sin(T x)  { return std::sin(x); }
+template <class T> inline T dev_cos(T x)  { return std::cos(x); }
+#endif
 
 // Tolerance bands of the floating-point predicates (the general-metric
 // regime).  These absorb FP noise in the cotangent/Heron/development
@@ -89,7 +108,7 @@ inline T cot_opposite(T opp, T b, T c) {
 template <class T = double>
 inline T triangle_angle(T adj1, T adj2, T opp) {
   T c = (adj1*adj1 + adj2*adj2 - opp*opp) / (2 * adj1 * adj2);
-  return std::acos(std::clamp(c, T(-1), T(1)));
+  return dev_acos(std::clamp(c, T(-1), T(1)));
 }
 
 }  // namespace delaunay_detail
@@ -365,8 +384,8 @@ struct FanPolygon {
                               //         regime only, else untouched)
 
   // 2D fan coordinates of boundary vertex i.
-  double x(int i) const { return spokes[i] * std::cos(cum[i]); }
-  double y(int i) const { return spokes[i] * std::sin(cum[i]); }
+  double x(int i) const { return spokes[i] * delaunay_detail::dev_cos(cum[i]); }
+  double y(int i) const { return spokes[i] * delaunay_detail::dev_sin(cum[i]); }
 
   // Diagonal length between fan boundary vertices, as Euclidean distance in
   // the isometric development.
@@ -374,7 +393,7 @@ struct FanPolygon {
     double angle = (to > from) ? cum[to] - cum[from]
                                : (cum[k] - cum[from]) + cum[to];
     double sf = spokes[from], st = spokes[to];
-    double len2 = sf*sf + st*st - 2*sf*st*std::cos(angle);
+    double len2 = sf*sf + st*st - 2*sf*st*delaunay_detail::dev_cos(angle);
     return (len2 > 0) ? std::sqrt(len2) : 0;
   }
 
@@ -383,7 +402,8 @@ struct FanPolygon {
   double ear_area(int pp, int pi, int pn) const {
     double rp = spokes[pp], ri = spokes[pi], rn = spokes[pn];
     double tp = cum[pp], ti = cum[pi], tn = cum[pn];
-    return rp*ri*std::sin(ti - tp) + ri*rn*std::sin(tn - ti) + rn*rp*std::sin(tp - tn);
+    return rp*ri*delaunay_detail::dev_sin(ti - tp) + ri*rn*delaunay_detail::dev_sin(tn - ti)
+         + rn*rp*delaunay_detail::dev_sin(tp - tn);
   }
 };
 

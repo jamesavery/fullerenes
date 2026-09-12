@@ -33,6 +33,9 @@ struct CountingExactMetric {
   void prepare_star(DelaunayView& V, DelaunayWorkspace& ws, int v) const {
     inner.prepare_star(V, ws, v);
   }
+  void commit_star(DelaunayView& V, DelaunayWorkspace& ws, int v) const {
+    inner.commit_star(V, ws, v);
+  }
   Length ear(DelaunayView& V, const FanPolygon& fan, int pp, int pi, int pn) const {
     return inner.ear(V, fan, pp, pi, pn);
   }

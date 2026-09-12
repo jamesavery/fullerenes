@@ -3,7 +3,12 @@
 #include <fullerenes/sycl-headers/sycl-span.hh>
 #include <fullerenes/sycl-headers/sycl-vector.hh>
 #include <fullerenes/sycl-headers/sycl-mdspan.hh>
-#include <../../src/sycl/deigen-batch.cc>
+// Quoted, not <angled>: a bracket include is resolved against the -I search
+// path, so <../../src/sycl/...> only found this file by the accident that the
+// build directory sat at <repo>/build (making <build>/include/../../ the repo
+// root).  Any other build location -- out-of-tree, or a second config dir --
+// failed to compile.  Quoted includes resolve relative to THIS file first.
+#include "../../src/sycl/deigen-batch.cc"
 
 TEST(MDSPan, Constructor)
 {

@@ -78,7 +78,7 @@ struct symMat3
     real_t detBxp3 = -c*c*(d-q) + 2*b*c*e - (a-q)*e*e - b*b*(f-q) + (a-q)*(d-q)*(f-q);
     real_t r = detBxp3/(2*p*p*p);
 
-    real_t phi = r <= -1? real_t(M_PI)/real_t(3.) : (r >= 1? real_t(0.) : acos(r)/real_t(3.));
+    real_t phi = r <= -1? real_t(M_PI)/real_t(3.) : (r >= 1? real_t(0.) : sycl::acos(r)/real_t(3.));
     real_t lam1 = q + real_t(2.)*p*sycl::cos(phi);
     real_t lam3 = q + real_t(2.)*p*sycl::cos(phi +  ( real_t(2.)/real_t(3.))*M_PI);
     real_t lam2 = real_t(3.)*q - lam1 - lam3;
