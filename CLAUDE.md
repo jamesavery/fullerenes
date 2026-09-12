@@ -131,7 +131,7 @@ The GPU pipeline processes batches of fullerene isomers through stages: graph du
 
 ### Library Structure
 
-- `fullerenes` (shared lib, `src/c++/`) — Core C++ graph/geometry/spiral library
+- `fullerenes` (shared lib, `src/c++/`; `FULLERENES_SHARED=OFF` builds it static) — Core C++ graph/geometry/spiral library
 - `sycl_fullerene_lib` + component libs (`src/sycl/`) — GPU kernels, each compiled separately with per-module register constraints
 - `fortran_opt`, `fortran_lib`, `fullerene_program` (`src/fortran/`) — the legacy Fortran program, built only under `FULLERENES_LEGACY_FORTRAN`
 - `programs/` — 20+ CLI tools for conversion, generation, and analysis

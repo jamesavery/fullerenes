@@ -1,4 +1,9 @@
-add_library(fullerenes SHARED
+if(FULLERENES_SHARED)
+  set(_fullerenes_lib_type SHARED)
+else()
+  set(_fullerenes_lib_type STATIC)
+endif()
+add_library(fullerenes ${_fullerenes_lib_type}
   graph.cc cubicgraph.cc planargraph.cc fullerenegraph.cc triangulation.cc polyhedron.cc
   spiralc.cc planargraph-io.cc polyhedron-io.cc debug.cc fold.cc  unfold.cc  seam_step.cc geometryc.cc
   delaunay.cc  delaunay_alexandrov.cc  dense_linalg.cc  isomerdb.cc fortran_format.cc graph_spectrum.cc hueckel.cc hamilton_cycle.cc isomerdb_record.cc layout.cc layout2d.cc argparser.cc
