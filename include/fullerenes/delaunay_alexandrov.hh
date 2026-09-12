@@ -580,11 +580,13 @@ struct AlexandrovIDTCubic {
   //                       - cone_npent[i]*M_PI/15) <= KAPPA_TOL; })
   // @post gauss_bonnet: |sum_i (2*M_PI - v_cone_angle[i]) - 4*M_PI|
   //           <= TOTAL_KAPPA_TOL
-  // @post every cocircular cell is the fan from its least-rotation corner,
-  //       except cells the completion refuses by name -- a periodic boundary
-  //       word or a failed disk gate -- which result.ambiguous /
-  //       result.nondisk count (both zero on every fullerene kis surface
-  //       measured through C100)
+  // @post every cocircular cell is triangulated canonically: the fan from
+  //       its unique least-rotation corner, or, when exactly two corners tie,
+  //       the symmetric split about the diameter joining them (result.fanned
+  //       and result.periodic_completed count the two).  Only a word with
+  //       three or four least corners, or a failed disk gate, is refused --
+  //       result.ambiguous / result.nondisk, neither of which can occur on a
+  //       cone surface
   // @throws std::logic_error when a cone guard trips (a flat vertex
   //         survived removal, kappa != k*pi/15, or total curvature != 4pi
   //         -- all "can't happen" on a correct kis metric);

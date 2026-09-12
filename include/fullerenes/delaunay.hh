@@ -524,18 +524,24 @@ struct DelaunayTriangulation : DelaunayView, DelaunayStorage {
 
   // Canonical completion of the Delaunay tesselation (the view body's doc,
   // delaunay_view.hh, carries the algorithm and the full contract):
-  // retriangulate every cocircular cell as the fan from its canonical
-  // corner, so the triangulation handed downstream is a function of the
-  // labeled input complex alone -- independent of the flip order that
-  // produced it.  Exact regime (derives and verifies the Lsq carry exactly
-  // as remove_flat_vertices_exact; same loud preconditions), and checks
-  // the is_delaunay() precondition itself.  Tesselation-invariant,
-  // Delaunay-preserving, idempotent.  Refusal classes, counted per cell
-  // and left untouched, never guessed at: .ambiguous (periodic boundary
-  // rotation word: no label-determined apex) and .nondisk (a component
-  // failing the disk Euler count -- on a Delaunay complex with embedded
-  // cells the class is provably empty by the empty-circumdisk property;
-  // the gate is the fail-loud backstop beyond that scope).
+  // retriangulate every cocircular cell canonically, so the triangulation
+  // handed downstream is a function of the labeled input complex alone --
+  // independent of the flip order that produced it.  A cell whose boundary
+  // rotation word has one minimum becomes the fan from that corner
+  // (.fanned); one with two becomes the symmetric split about the chord
+  // joining them (.periodic_completed), which needs no apex and gives the
+  // same chords from either minimum.  Those are the only cases on a convex
+  // polyhedral metric, so every fullerene completes.  Exact regime (derives and verifies the
+  // Lsq carry exactly as remove_flat_vertices_exact; same loud
+  // preconditions), and checks the is_delaunay() precondition itself.
+  // Tesselation-invariant, Delaunay-preserving, idempotent.  Refusal
+  // classes, counted per cell and left untouched, never guessed at:
+  // .ambiguous (three or four minima -- impossible on a convex polyhedral
+  // metric, reachable only on a one-cell flat torus) and .nondisk (a
+  // component failing the
+  // disk Euler count -- on a Delaunay complex with embedded cells the class
+  // is provably empty by the empty-circumdisk property; the gate is the
+  // fail-loud backstop beyond that scope).
   // Transport-hooked: with tracking active, tracked points ride the flips.
   // NOT transactional: a throw can leave the complex part-completed with
   // the status latched.
