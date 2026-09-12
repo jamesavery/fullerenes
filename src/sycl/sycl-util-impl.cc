@@ -21,14 +21,19 @@
 
 using namespace sycl;
 
+// Not constexpr: std::ostream is not a literal type, so a stream inserter can
+// never be constant-evaluated and the marker was inert.  It was not harmless --
+// clang's CUDA mode makes a constexpr function implicitly __host__ __device__,
+// so these got compiled for the device, where std::ostream::operator<< is
+// unavailable.  Printing is a host activity; saying so keeps them off the GPU.
 template <typename U>
-constexpr std::ostream& operator<<(std::ostream& os, const ReferenceWrapper<U>& ref) {
+inline std::ostream& operator<<(std::ostream& os, const ReferenceWrapper<U>& ref) {
     os << ref.get();
     return os;
 }
 
 template <typename U, size_t N>
-constexpr std::ostream& operator<<(std::ostream& os, const std::array<U,N>& arr) {
+std::ostream& operator<<(std::ostream& os, const std::array<U,N>& arr) {
     os << "[";
     for (size_t i = 0; i < N; i++) {
         os << arr[i];

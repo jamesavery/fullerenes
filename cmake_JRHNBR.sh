@@ -3,6 +3,7 @@
 # Configure the fullerenes build on this machine (Ubuntu 22.04, 2x RTX 4090).
 #
 #   ./cmake_JRHNBR.sh [build-dir] [extra -D args...]   # default: ./build
+#   SYCL_MODE=aot-clang ./cmake_JRHNBR.sh              # AOT via clang, not nvc++
 #   SYCL_MODE=generic ./cmake_JRHNBR.sh                # JIT instead of AOT
 #
 # then:
@@ -53,8 +54,9 @@ BUILD_DIR="${1:-$SRC_DIR/build}"
 ACPP=/opt/adaptivecpp/bin/acpp
 CLANG_C=/usr/lib/llvm-20/bin/clang
 NVCXX=/opt/nvidia/hpc_sdk/Linux_x86_64/2026/compilers/bin/nvc++
+CUDA_TOOLKIT=/usr/local/cuda-12.8  # clang-20 supports CUDA only up to 12.8
 CUDA_ARCH=89                       # RTX 4090.  3090 = 86, A100 = 80, H100 = 90.
-SYCL_MODE="${SYCL_MODE:-aot}"      # aot | generic
+SYCL_MODE="${SYCL_MODE:-aot}"      # aot | aot-clang | generic
 
 if [ ! -x "$ACPP" ]; then
     echo "error: no AdaptiveCpp compiler at $ACPP" >&2
@@ -82,13 +84,35 @@ case "$SYCL_MODE" in
                    -DSYCL_CUDA_BACKEND=cuda-nvcxx
                    -DSYCL_CUDA_ARCH="$CUDA_ARCH")
         ;;
+    aot-clang)
+        # AOT with clang's own CUDA backend instead of nvc++: same precompiled
+        # sm_89 device code, but the kernels go through clang-20, so nothing
+        # ever includes the HPC SDK's bundled stdexec (whose sequence_senders
+        # headers stopped compiling against libstdc++-12 in SDK 26.5).
+        #
+        # It needs a CUDA toolkit clang understands: clang-20 supports CUDA only
+        # up to 12.8, while every HPC SDK toolkit here is 13.x.  CMakeLists
+        # derives --acpp-cuda-path from CMAKE_CUDA_COMPILER in this branch, so
+        # pointing that at 12.8's nvcc is what selects the right headers and
+        # libdevice.
+        if [ ! -x "$CUDA_TOOLKIT/bin/nvcc" ]; then
+            echo "error: aot-clang mode needs a CUDA toolkit <= 12.8, not found at" >&2
+            echo "       $CUDA_TOOLKIT" >&2
+            echo "       Install one, or re-run with:  SYCL_MODE=generic $0" >&2
+            exit 1
+        fi
+        SYCL_ARGS=(-DSYCL_TARGETS=NVIDIA
+                   -DSYCL_CUDA_BACKEND=cuda
+                   -DSYCL_CUDA_ARCH="$CUDA_ARCH"
+                   -DCMAKE_CUDA_COMPILER="$CUDA_TOOLKIT/bin/nvcc")
+        ;;
     generic)
         # SSCP: one portable IR in the binary, JIT-compiled to the device on
         # first run.  Builds much faster, costs a JIT pass at startup.
         SYCL_ARGS=(-DSYCL_TARGETS=GENERIC)
         ;;
     *)
-        echo "error: SYCL_MODE must be 'aot' or 'generic', got '$SYCL_MODE'" >&2
+        echo "error: SYCL_MODE must be 'aot', 'aot-clang' or 'generic', got '$SYCL_MODE'" >&2
         exit 1
         ;;
 esac
@@ -137,12 +161,22 @@ if [ "$SYCL_MODE" = aot ]; then
     echo "to build, but nothing is JIT-compiled at first run."
     echo
     echo "WARNING: as of 2026-08-12 this backend is NOT numerically trustworthy."
-    echo "         compute_hessian returns all-NaN and eigensolve returns FLT_MAX"
-    echo "         sentinels under cuda-nvcxx, where the same source under"
-    echo "         SYCL_MODE=generic returns correct finite values (eigen-functor-test"
-    echo "         passes there, fails here).  Everything else -- dualize, tutte,"
-    echo "         forcefield -- passes in both.  Use generic for real runs until"
-    echo "         the hessian/eigensolve kernels are fixed under nvc++."
+    echo "         forcefield_optimize returns all-NaN coordinates under nvc++ at"
+    echo "         -O2 and above; compute_hessian and eigensolve then faithfully"
+    echo "         propagate that NaN, which is why eigen-functor-test fails here"
+    echo "         and passes under SYCL_MODE=generic.  The failure is"
+    echo "         optimization-dependent -- SYCL_EXTRA_FLAGS=-O1 makes it pass --"
+    echo "         so it is a live undefined-behaviour or codegen bug, NOT evidence"
+    echo "         that the generic backend is computing the right answer."
+    echo
+    echo "         Since SDK 26.5 (installed 2026-09-07) this mode does not even"
+    echo "         compile: nvc++'s bundled stdexec fails against libstdc++-12."
+    echo "         Use SYCL_MODE=aot-clang, which keeps AOT without nvc++."
+elif [ "$SYCL_MODE" = aot-clang ]; then
+    echo "Configured $BUILD_DIR  (SYCL: AOT via clang, $(grep '^ACPP_TARGETS' "$BUILD_DIR/CMakeCache.txt" | cut -d= -f2))."
+    echo "Kernels are compiled to sm_$CUDA_ARCH at build time by clang-20 against"
+    echo "$CUDA_TOOLKIT -- nothing is JIT-compiled at first run, and nvc++ is"
+    echo "not involved, so the HPC SDK's stdexec never enters the build."
 else
     echo "Configured $BUILD_DIR  (SYCL: generic/SSCP, kernels JIT at first run)."
 fi

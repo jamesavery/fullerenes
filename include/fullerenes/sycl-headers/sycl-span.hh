@@ -19,8 +19,12 @@ constexpr std::span<U> as_span(std::span<T> s) {
 // so the span operator<< below can stream arrays of arrays: under strict two-phase
 // lookup the os<<element call binds at this template's definition, and std::array's
 // only associated namespace is std, so this global overload must be visible here.
+// Host-only, like its definition: std::ostream is not a literal type, so this
+// can never be constant-evaluated, and under clang CUDA a constexpr function is
+// implicitly __host__ __device__ -- which would both drag std::ostream onto the
+// device and make this declaration disagree with the definition.
 template <typename U, std::size_t N>
-constexpr std::ostream& operator<<(std::ostream& os, const std::array<U,N>& a);
+std::ostream& operator<<(std::ostream& os, const std::array<U,N>& a);
 
 template <typename T>
 inline std::ostream& operator<<(std::ostream& os, std::span<T> v) {

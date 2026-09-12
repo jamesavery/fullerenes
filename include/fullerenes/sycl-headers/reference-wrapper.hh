@@ -46,6 +46,11 @@ struct ReferenceWrapper : public std::reference_wrapper<T> {
     bool operator <=(const std::reference_wrapper<T>& other) const { return get() <= other.get(); }
     bool operator >=(const std::reference_wrapper<T>& other) const { return get() >= other.get(); }
     
+    // Host-only, like its definition: std::ostream is not a literal type, so
+    // this can never be constant-evaluated, and under clang CUDA a constexpr
+    // function is implicitly __host__ __device__ -- which would both drag
+    // std::ostream onto the device and make this friend declaration disagree
+    // with the definition.
     template <typename U>
-    inline constexpr friend std::ostream& operator<<(std::ostream& os, const ReferenceWrapper<U>& ref);
+    inline friend std::ostream& operator<<(std::ostream& os, const ReferenceWrapper<U>& ref);
 };
