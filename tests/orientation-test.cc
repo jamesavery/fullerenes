@@ -220,14 +220,14 @@ TEST_F(OrientationTest, PolyhedronFromCoordinatesFaceStructure) {
 // across the Fortran ABI.  Was test 6, which called layout2d::orient_neighbours
 // directly.
 //
-// STILL RED, and deliberately so: the ASSERT below is on
-// layout2d::layout_is_crossingfree, which is written in slope-intercept form and
-// calls the exact collinearities of an icosahedrally symmetric Tutte layout
-// (C60-GC(1,1), C180-GC(3,0)) intersections.  That defect is tracked separately
-// (claude-projects/curvature-flow/refactor-debt.md,
-// 2026-08-09-layout-is-crossingfree-slope-form) and is not this refactor's to
-// fix; the assertion stays because the drawing being crossing-free is the
-// precondition this case is about.
+// The ASSERT below is on layout2d::layout_is_crossingfree, and this case was
+// red until 2026-09-12 for a defect in that predicate rather than in anything
+// this test drives: it was written in slope-intercept form, whose slope divides
+// by zero on a vertical edge, and C60-GC(1,1)'s Tutte layout puts both ends of
+// edge [8,9] at the same x.  The predicate is the orientation determinant now
+// (see tests/layout-crossingfree-test.cc for the per-defect unit cases), so the
+// assertion holds on all five fixtures.  It stays because the drawing being
+// crossing-free is the precondition this case is about.
 // -------------------------------------------------------------------------
 TEST_F(OrientationTest, SetLayout2dFromGoodLayout) {
   for(const auto& [name, G] : test_graphs) {

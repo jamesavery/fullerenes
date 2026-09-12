@@ -2,9 +2,10 @@
 #
 # Configure the fullerenes build on this machine (Ubuntu 22.04, 2x RTX 4090).
 #
-#   ./cmake_JRHNBR.sh [build-dir] [extra -D args...]   # default: ./build
-#   SYCL_MODE=aot-clang ./cmake_JRHNBR.sh              # AOT via clang, not nvc++
+#   ./cmake_JRHNBR.sh [build-dir] [extra -D args...]   # default: ./build, AOT
 #   SYCL_MODE=generic ./cmake_JRHNBR.sh                # JIT instead of AOT
+#   SYCL_MODE=aot ./cmake_JRHNBR.sh                    # AOT via nvc++ -- DEAD,
+#                                                      # kept only as a record
 #
 # then:
 #
@@ -23,10 +24,15 @@
 #   libstdc++'s <expected> becomes visible.  Using acpp for the WHOLE build
 #   (not just src/sycl) keeps one ABI across the libfullerenes boundary.
 #
-# SYCL_TARGETS = NVIDIA + cuda-nvcxx + sm_89 -- ahead-of-time (AOT) codegen.
-#   Kernels are compiled for the RTX 4090 at build time by NVIDIA's nvc++, so
-#   nothing is JIT-compiled on first run.  Set SYCL_MODE=generic below (or
-#   SYCL_MODE=generic ./cmake_JRHNBR.sh) to get the JIT build back instead.
+# SYCL_TARGETS = NVIDIA + cuda + sm_89 -- ahead-of-time (AOT) codegen, with
+#   clang-20 as the device compiler (SYCL_MODE=aot-clang, the default).  Kernels
+#   are compiled for the RTX 4090 at build time, so nothing is JIT-compiled on
+#   first run.  SYCL_MODE=generic gets the JIT build instead.
+#
+#   The older SYCL_MODE=aot uses nvc++ as the device compiler.  It is kept only
+#   so the failure is documented and reproducible: since HPC SDK 26.5 landed
+#   (2026-09-07) it does not compile at all, and before that it was numerically
+#   wrong.  Do not reach for it.
 #
 #   Do NOT expect CMakeLists' defaults to do this for you: it picks AMD
 #   (hip:gfx90a) on Linux whenever no nvcc is on PATH -- wrong for this box --
@@ -56,7 +62,7 @@ CLANG_C=/usr/lib/llvm-20/bin/clang
 NVCXX=/opt/nvidia/hpc_sdk/Linux_x86_64/2026/compilers/bin/nvc++
 CUDA_TOOLKIT=/usr/local/cuda-12.8  # clang-20 supports CUDA only up to 12.8
 CUDA_ARCH=89                       # RTX 4090.  3090 = 86, A100 = 80, H100 = 90.
-SYCL_MODE="${SYCL_MODE:-aot}"      # aot | aot-clang | generic
+SYCL_MODE="${SYCL_MODE:-aot-clang}"  # aot-clang | generic | aot (dead, see below)
 
 if [ ! -x "$ACPP" ]; then
     echo "error: no AdaptiveCpp compiler at $ACPP" >&2

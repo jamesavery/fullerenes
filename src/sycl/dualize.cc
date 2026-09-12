@@ -78,12 +78,6 @@ struct DeviceDualGraph{
     }
 };
 
-int roundUp(int numToRound, int multiple) 
-{
-    assert(multiple);
-    return ((numToRound + multiple - 1) / multiple) * multiple;
-}
-
 
 // ---------------------------------------------------------------------------
 // View-based batch dualize (Phase 7).
