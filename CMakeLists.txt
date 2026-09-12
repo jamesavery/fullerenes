@@ -14,6 +14,12 @@ enable_language(CXX)
 option(FULLERENES_CORE_ONLY
   "Build only libfullerenes + buckygen (skip Fortran, playground, programs, benchmarks, tests, SYCL, pybind)"
   OFF)
+# A parent that links libfullerenes into its own executables, and would rather
+# not ship the library beside them, can build it static -- again as a cache
+# variable:  set(FULLERENES_SHARED OFF CACHE BOOL "" FORCE)
+option(FULLERENES_SHARED
+  "Build libfullerenes as a shared library (OFF: a static archive)"
+  ON)
 
 if(NOT FULLERENES_CORE_ONLY)
   enable_language(Fortran)
