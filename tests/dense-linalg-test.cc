@@ -521,3 +521,73 @@ TEST(DenseLinalgView, VectorAssignmentsBitIdenticalToOwnerExpressions)
   const double rhs = LinAlg::dot(a, V(a.size(), 1.0));
   EXPECT_EQ(memcmp(&lhs, &rhs, sizeof lhs), 0) << "sum must be dot(v, ones) bitwise";
 }
+
+// ============================================================================
+// The pivot as a total order (dense_linalg_view.hh pivot_key): a collective
+// evaluation -- the largest key over the rows q >= c, then the smallest row
+// carrying it -- must select the row the sequential scan (pivot_row) selects,
+// on exactly the columns no random matrix produces: NaN at the diagonal, NaN
+// below it, signed zeros, infinity, equal magnitudes of opposite sign, ties,
+// subnormals.  This is what lets a lane-parallel elimination reproduce the
+// sequential one byte for byte.
+// ============================================================================
+
+namespace {
+
+// The collective's selection rule, evaluated sequentially: max key, ties to
+// the smaller row (the order is what is pinned; any evaluation of it agrees).
+template <class T>
+int pivot_by_key(LinAlg::MatView<const T> M, int c)
+{
+  int p = c;
+  uint64_t best = LinAlg::pivot_key<T>(M(c, c), true);
+  for (int q = c + 1; q < M.n; q++) {
+    const uint64_t k = LinAlg::pivot_key<T>(M(q, c), false);
+    if (k > best) { best = k; p = q; }
+  }
+  return p;
+}
+
+template <class T>
+void expect_pivot_key_matches_scan(std::vector<T> column, const char* tag)
+{
+  const LinAlg::MatView<const T> M{std::span<const T>(column), (int)column.size(), 1, 1};
+  EXPECT_EQ(pivot_by_key<T>(M, 0), LinAlg::pivot_row<T>(M, 0)) << tag;
+}
+
+template <class T>
+void pivot_key_columns()
+{
+  const T nan = std::numeric_limits<T>::quiet_NaN();
+  const T inf = std::numeric_limits<T>::infinity();
+  const T sub = std::numeric_limits<T>::denorm_min();
+  expect_pivot_key_matches_scan<T>({nan, 1, 2}, "NaN at the diagonal keeps row c");
+  expect_pivot_key_matches_scan<T>({1, nan, 3}, "NaN below the diagonal is skipped");
+  expect_pivot_key_matches_scan<T>({0, nan}, "zero pivot with a NaN below stays at c");
+  expect_pivot_key_matches_scan<T>({nan, nan}, "all NaN keeps row c");
+  expect_pivot_key_matches_scan<T>({T(0), T(-0.0), T(0)}, "signed zeros tie to the first");
+  expect_pivot_key_matches_scan<T>({T(-0.0), T(0)}, "negative zero at the diagonal");
+  expect_pivot_key_matches_scan<T>({1, inf, 2}, "infinity wins");
+  expect_pivot_key_matches_scan<T>({2, -2, 2}, "equal magnitudes tie to the first");
+  expect_pivot_key_matches_scan<T>({1, -3, 3}, "opposite signs, first of the tie");
+  expect_pivot_key_matches_scan<T>({sub, 0, T(-2) * sub}, "subnormals order by magnitude");
+  expect_pivot_key_matches_scan<T>({T(0.5), T(-0.5), T(0.25)}, "exact halves tie");
+}
+
+}  // namespace
+
+TEST(DenseLinalgView, PivotKeyOrderMatchesScan)
+{
+  pivot_key_columns<double>();
+  pivot_key_columns<float>();
+  // Every column of every step of random reductions, and one with a NaN
+  // planted on the diagonal midway: the order agrees at c > 0 as at c == 0.
+  for (int n = 2; n <= 9; n++) {
+    matrix<double> A = random_matrix(n, 700 + n, /*symmetric=*/false);
+    if (n == 6) A(3, 3) = std::numeric_limits<double>::quiet_NaN();
+    const LinAlg::MatConstView M = LinAlg::view_of(A);
+    for (int c = 0; c < n; c++)
+      EXPECT_EQ(pivot_by_key<double>(M, c), LinAlg::pivot_row<double>(M, c))
+          << "random n = " << n << ", column " << c;
+  }
+}
