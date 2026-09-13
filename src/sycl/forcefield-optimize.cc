@@ -41,12 +41,16 @@ struct ForceField
     size_t node_id;
     size_t N;
     const sycl::group<1> cta;
-    real_t *sdata; // Pointer to start of L1 cache array, used exclusively for reduction.
+    // Scratch for flatness_gradient: Nf centroids followed by Nf norms.  Null
+    // on forcefields with no face term.  Every reduction in this kernel goes
+    // through sycl::reduce_over_group, which carries its own scratch, so this
+    // is the only local scratch the force field itself needs.
+    coord3d *face_cache;
 
     ForceField(const NodeNeighbours<K> &G,
                const Constants &c,
                sycl::group<1> cta,
-               real_t *sdata) : node_graph(G), constants(c), cta(cta), sdata(sdata)
+               coord3d *face_cache = nullptr) : node_graph(G), constants(c), cta(cta), face_cache(face_cache)
     {
         node_id = cta.get_local_linear_id();
         N = cta.get_local_linear_range();
@@ -1600,12 +1604,12 @@ struct ForceField
         {
          case FLATNESS_ENABLED: {
              FaceData face(cta, X, node_graph);
-             auto face_grad = face.flatness_gradient(constants, reinterpret_cast<coord3d*>(sdata));
+             auto face_grad = face.flatness_gradient(constants, face_cache);
              return grad + face_grad;
              }
          case FLAT_BOND:{
              FaceData face(cta, X, node_graph);
-             auto face_grad = face.flatness_gradient(constants, reinterpret_cast<coord3d*>(sdata));
+             auto face_grad = face.flatness_gradient(constants, face_cache);
              return grad + face_grad;
              }
          default:{
@@ -1721,6 +1725,10 @@ struct ForceField
         real_t x1, x2;
         x1 = (a + ((real_t)1. - tau) * (b - a));
         x2 = (a + tau * (b - a));
+        // Same write-after-read hazard as inside the loop below: the caller's
+        // previous gradient(X1) read X1 across the whole group and returned a
+        // per-work-item value, so nothing has synchronised since those reads.
+        sycl::group_barrier(cta);
         // Actual coordinates resulting from each traversal
         X1[node_id] = X[node_id] + x1 * r0;
         X2[node_id] = X[node_id] + x2 * r0;
@@ -1730,6 +1738,15 @@ struct ForceField
 
         for (int i = 0; i < 20; i++)
         {
+            // Write-after-read hazard: the probe arrays are shared local memory,
+            // and energy() only barriers on ENTRY -- that orders our writes
+            // before its reads, but nothing orders its reads before the NEXT
+            // iteration's writes.  Without this barrier a fast work-item
+            // overwrites X1/X2 while a slow one is still summing the previous
+            // probe.  reduce_over_group is a group ALGORITHM, not a memory
+            // fence: SYCL 2020 requires only that every work-item encounter it,
+            // so relying on it to publish local memory is undefined behaviour.
+            sycl::group_barrier(cta);
             if (f1 > f2)
             {
                 a = x1;
@@ -1774,7 +1791,16 @@ struct ForceField
 
         // Normalize To match reference python implementation by Buster.
         s_norm = SQRT(sycl::reduce_over_group(cta, dot(s, s), sycl::plus<real_t>{}));
-        // s_norm = SQRT(reduction(sdata, dot(s,s)));
+        // s_norm == 0 means the gradient vanished: this geometry is already
+        // stationary and there is no direction to search.  Dividing would make
+        // every component NaN, the line search would accept it (NaN compares
+        // false both ways), and X would be overwritten with NaN.  The test is
+        // for exact zero only, so a NaN arriving from upstream still
+        // propagates visibly rather than being silently absorbed here.
+        // s_norm comes from a group reduction and is therefore identical in
+        // every work-item, so this return is taken by the whole group at once
+        // and cannot strand anyone at a later barrier.
+        if (s_norm == (real_t)0.0) return;
         s /= s_norm;
 
         sycl::group_barrier(cta);
@@ -1791,7 +1817,15 @@ struct ForceField
 
             // Polak Ribiere method
             g0_norm2 = sycl::reduce_over_group(cta, dot(g0, g0), sycl::plus<real_t>{});
-            beta = sycl::max(sycl::reduce_over_group(cta, dot(g1, (g1 - g0)), sycl::plus<real_t>{}) / g0_norm2, (real_t)0.0);
+            // g0_norm2 == 0 makes the Polak-Ribiere quotient 0/0.  beta = 0 is
+            // the restart this degenerate case calls for anyway: it drops the
+            // conjugacy term and takes the next step along -g1, i.e. steepest
+            // descent, which is what a vanished previous gradient leaves.
+            if (g0_norm2 == (real_t)0.0) {
+                beta = (real_t)0.0;
+            } else {
+                beta = sycl::max(sycl::reduce_over_group(cta, dot(g1, (g1 - g0)), sycl::plus<real_t>{}) / g0_norm2, (real_t)0.0);
+            }
 
             if (alpha > (real_t)0.0)
             {
@@ -1811,6 +1845,12 @@ struct ForceField
 #else
             s_norm = SQRT(sycl::reduce_over_group(cta, dot(s, s), sycl::plus<real_t>{}));
 #endif
+            // Same degenerate case as the initial normalization above: a zero
+            // search direction cannot be normalized, and dividing would turn
+            // every coordinate into NaN on the next step.  Nothing further can
+            // be achieved from here, so stop.  s_norm is a group reduction,
+            // hence uniform, so the whole group leaves the loop together.
+            if (s_norm == (real_t)0.0) break;
             s /= s_norm;
 
             // if (node_id == 0) printf("s_norm = %f\n", s_norm);
@@ -1847,14 +1887,24 @@ static SyclEvent forcefield_optimize_view_batch_impl(
     const int N        = graph.N();
     const int capacity = graph.size();
 
-    auto local_mem_bytes_required = N * 3 * sizeof(coord3d) + N * 2 * sizeof(T);
+    // flatness_gradient caches Nf centroids and Nf norms, in a buffer of its
+    // own: it used to alias the reduction scratch, whose size is unrelated, and
+    // overran it by 72 elements on C60 straight into X.  Only the flatness
+    // forcefields carry the cost; the others allocate a single placeholder
+    // element so the accessor is never zero-sized.
+    constexpr bool uses_face_cache = (FFT == FLATNESS_ENABLED || FFT == FLAT_BOND);
+    const size_t Nf               = (size_t)N / 2 + 2;
+    const size_t face_cache_elems = uses_face_cache ? Nf * 2 : 1;
+
+    auto local_mem_bytes_required = N * 3 * sizeof(coord3d)
+                                  + face_cache_elems * sizeof(coord3d);
     if (Q->get_device().get_info<sycl::info::device::local_mem_size>() < (size_t)local_mem_bytes_required)
         throw std::runtime_error("forcefield_optimize: required local memory (" +
             std::to_string(local_mem_bytes_required) + " bytes) exceeds the device local_mem_size");
 
     return launch_per_isomer(Q, N, capacity, [&](sycl::handler& h, sycl::nd_range<1> ndr) {
-        sycl::local_accessor<T,1>      sdata(N*2, h);
         sycl::local_accessor<coord3d,1> X(N, h);
+        sycl::local_accessor<coord3d,1> face_cache(face_cache_elems, h);
         sycl::local_accessor<coord3d,1> X1(N, h);
         sycl::local_accessor<coord3d,1> X2(N, h);
 
@@ -1878,7 +1928,8 @@ static SyclEvent forcefield_optimize_view_batch_impl(
                 X[tid] = X_acc[tid];
                 sycl::group_barrier(cta);
 
-                ForceField<FFT,T,K> FF(nodeG, constants, cta, sdata.get_pointer());
+                ForceField<FFT,T,K> FF(nodeG, constants, cta,
+                                       static_cast<coord3d*>(face_cache.get_pointer()));
 
                 auto convergence_check = [&]() {
                     coord3d rel_bond_err, rel_angle_err, rel_dihedral_err;
@@ -1899,7 +1950,7 @@ static SyclEvent forcefield_optimize_view_batch_impl(
                     }
                 };
 
-                FF.CG(std::span<coord3d>(static_cast<coord3d*>(X.get_pointer()), N), std::span<coord3d>(static_cast<coord3d*>(X1.get_pointer()), N), std::span<coord3d>(static_cast<coord3d*>(X2.get_pointer()), N), std::max(iterations - 1, size_t(0)));
+                FF.CG(std::span<coord3d>(static_cast<coord3d*>(X.get_pointer()), N), std::span<coord3d>(static_cast<coord3d*>(X1.get_pointer()), N), std::span<coord3d>(static_cast<coord3d*>(X2.get_pointer()), N), iterations ? iterations - 1 : 0);
                 auto E1 = FF.energy(std::span<coord3d>(static_cast<coord3d*>(X.get_pointer()), N));
                 FF.CG(std::span<coord3d>(static_cast<coord3d*>(X.get_pointer()), N), std::span<coord3d>(static_cast<coord3d*>(X1.get_pointer()), N), std::span<coord3d>(static_cast<coord3d*>(X2.get_pointer()), N), std::min(size_t(1), iterations));
                 auto E2 = FF.energy(std::span<coord3d>(static_cast<coord3d*>(X.get_pointer()), N));
