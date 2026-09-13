@@ -22,10 +22,12 @@
 // fp32 tier).  The double instantiation is the historical body VERBATIM --
 // same loop order, same accumulator type, same constants -- so nothing on
 // the double path moved; the frozen-oracle byte gates in dense-linalg-test
-// are what say so.  Deduction convention, chosen so that EVERY existing
-// double call site compiles unchanged: T is deduced where an argument
-// carries it unambiguously (a MatView operand, or the scalar of a scaled
-// update) and is otherwise a DEFAULTED parameter (T = double) with the
+// are what say so.  (One store was added since: row_reduce keeps each
+// multiplier in the entry it eliminates, a cell no output reads.)
+// Deduction convention, chosen so that EVERY existing double call site
+// compiles unchanged: T is deduced where an argument carries it
+// unambiguously (a MatView operand, or the scalar of a scaled update) and
+// is otherwise a DEFAULTED parameter (T = double) with the
 // span arguments in a non-deduced context -- a std::vector<double> then
 // binds exactly as it always did, and a float caller names its scalar
 // (max_abs<float>(...)).
@@ -284,37 +286,57 @@ inline std::uint64_t pivot_key(T entry, bool is_row_c) {
   else                          return std::bit_cast<std::uint64_t>(a);
 }
 
+// swap_entry: column j of a row swap -- the element statement swap_rows
+// loops, and the one a column-parallel swap runs one per lane.
+template <class T>
+inline void swap_entry(MatView<T> M, int c, int p, int j) { std::swap(M(c, j), M(p, j)); }
+
 // swap_rows: rows c and p from column c on, and the right-hand side entries
 // (the columns before c are dead after step c: U lives on and above the
 // diagonal).
 template <class T>
 inline void swap_rows(MatView<T> M, int c, int p, out_<T> b) {
-  for (int j = c; j < M.n; j++) std::swap(M(c, j), M(p, j));
+  for (int j = c; j < M.n; j++) swap_entry(M, c, p, j);
   if (!b.empty()) std::swap(b[c], b[p]);
 }
 
-// eliminate_row: row q of step c -- subtract mult = M(q, c) / M(c, c) times
-// the pivot row from row q on the columns after c and from b; a row whose
-// multiplier is exactly zero is left untouched.  Reads rows c and q, writes
-// row q and b[q] only, so the rows of one step are independent of each
-// other.
+// The two arithmetic statements of an elimination step, on VALUES, stated
+// once so that any loop order composes them -- by row (eliminate_row below,
+// the sequential body) or by column (a lane per column on a GPU, which
+// supplies the pivot-row value from a register): the multiplier of a row,
+// and the update of one entry -- of the matrix, or of the right-hand side.
+// A row whose multiplier is exactly zero is skipped by every composition
+// (the update is not the identity when the pivot row holds an infinity).
+template <class T>
+inline T eliminate_multiplier(T entry_qc, T pivot) { return entry_qc / pivot; }
+template <class T>
+inline void eliminate_entry(T& entry_qj, T mult, T entry_cj) { entry_qj -= mult * entry_cj; }
+
+// eliminate_row: row q of step c -- the multiplier mult = M(q, c) / M(c, c)
+// is STORED in the entry it eliminates (the strict lower triangle thus holds
+// the multipliers, as in-place LU does), then mult times the pivot row is
+// subtracted from row q on the columns after c and from b.  Reads rows c and
+// q, writes row q and b[q] only, so the rows of one step are independent of
+// each other.
 template <class T>
 inline void eliminate_row(MatView<T> M, int c, int q, out_<T> b) {
-  const T mult = M(q, c) / M(c, c);
+  const T mult = eliminate_multiplier(M(q, c), M(c, c));
+  M(q, c) = mult;
   if (mult == 0) return;
-  for (int j = c + 1; j < M.n; j++) M(q, j) -= mult * M(c, j);
-  if (!b.empty()) b[q] -= mult * b[c];
+  for (int j = c + 1; j < M.n; j++) eliminate_entry(M(q, j), mult, M(c, j));
+  if (!b.empty()) eliminate_entry(b[q], mult, b[c]);
 }
 
 // Partial-pivot row reduction of a COPY of A staged in the packed scratch
-// M (capacity n*n): M holds U on and above the diagonal; the returned sign
+// M (capacity n*n): M holds U on and above the diagonal and each step's
+// multipliers below it (in the entries they eliminated); the returned sign
 // is sign(det A).  When b is non-empty the same swaps and forward
 // elimination are applied to it, leaving the triangular system U x = b
-// ready for back_substitute.  L is deliberately NOT formed and the
-// permutation is not recorded -- only U, sign det, and the eliminated RHS
-// are outputs (hence not "lu_decompose": a second RHS cannot be solved
-// from the result).  On Singular, M, sign, and b are only partially
-// reduced.
+// ready for back_substitute.  The permutation is not recorded and a swap
+// does not permute the multipliers of earlier columns, so M is NOT an LU
+// factorisation of P A -- only U, sign det, and the eliminated RHS are
+// outputs (hence not "lu_decompose": a second RHS cannot be solved from
+// the result).  On Singular, M, sign, and b are only partially reduced.
 // @pre A.m == A.n (square); M.size() >= n*n; b empty or b.size() >= n
 template <class T = double>
 inline LuReduction row_reduce(MatView<const T> A, out_<T> Mbuf, out_<T> b) {
