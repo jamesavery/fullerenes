@@ -27,7 +27,13 @@ struct DeviceDualGraph{
             if (dual_neighbours[u][j] == v) return j;
         }
 
-        assert(false);
+        // v is not a neighbour of u: the caller passed an arc this graph does
+        // not have, and every index this function could return is a lie.  Trap
+        // rather than assert: assert() vanishes under NDEBUG, and its failure
+        // handler is a C library symbol no GPU provides, so an ahead-of-time
+        // device compile of an assert here does not assemble ("ptxas fatal:
+        // Unresolved extern function '__assert_fail'").
+        __builtin_trap();
 	return -1;		// Make compiler happy
     }
     K arc_ix(const node2& e){ return arc_ix(e[0], e[1]); }
@@ -71,12 +77,6 @@ struct DeviceDualGraph{
         return min_edge;
     }
 };
-
-int roundUp(int numToRound, int multiple) 
-{
-    assert(multiple);
-    return ((numToRound + multiple - 1) / multiple) * multiple;
-}
 
 
 // ---------------------------------------------------------------------------

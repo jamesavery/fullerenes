@@ -44,8 +44,8 @@ is on), or use clang.
 ## Key Build Options
 
 - `ENABLE_SYCL` — Build GPU code (defaults ON when an AdaptiveCpp compiler is found)
-- `SYCL_TARGETS` — GPU backend: `NVIDIA`, `AMD`, `X86`, or `GENERIC` (single target per build; default: the GPU `nvidia-smi`/`rocminfo` report, else `X86`)
-- `SYCL_CUDA_ARCH` / `SYCL_HIP_ARCH` / `CMAKE_CUDA_ARCHITECTURES` — GPU architecture (default: what the vendor tool reports, e.g. 89 for an RTX 4090; 86 / gfx90a when none is)
+- `SYCL_TARGETS` — either a preset (`NVIDIA`, `AMD`, `X86`, `GENERIC`) or an AdaptiveCpp target list passed through verbatim, e.g. `cuda:sm_80,sm_89` for one library carrying code for an A100 and an RTX 4090 (default: the GPU `nvidia-smi`/`rocminfo` report, else `X86`). Several **architectures** of one backend work; several **backends** (`omp;cuda:...`) are refused at configure time, because acpp's `;` separator is also CMake's list separator, so only the first would reach the compiler. `generic` is the JIT flow and must appear alone.
+- `SYCL_CUDA_ARCH` / `SYCL_HIP_ARCH` / `CMAKE_CUDA_ARCHITECTURES` — GPU architecture, comma-separated for several (e.g. `-DSYCL_CUDA_ARCH=80,89`; default: what the vendor tool reports, e.g. 89 for an RTX 4090; 86 / gfx90a when none is)
 - `FULLERENES_LEGACY_FORTRAN` — Build the legacy Fortran program and its C ABI (default OFF; the only thing that needs a Fortran compiler)
 - `FORTRAN_NMAX` — Max vertices for Fortran static allocation (default 5000; only with the option above)
 - `GPU_MAXREGCOUNT` — GPU register pressure limit (default 80)
@@ -131,7 +131,7 @@ The GPU pipeline processes batches of fullerene isomers through stages: graph du
 
 ### Library Structure
 
-- `fullerenes` (shared lib, `src/c++/`) — Core C++ graph/geometry/spiral library
+- `fullerenes` (shared lib, `src/c++/`; `FULLERENES_SHARED=OFF` builds it static) — Core C++ graph/geometry/spiral library
 - `sycl_fullerene_lib` + component libs (`src/sycl/`) — GPU kernels, each compiled separately with per-module register constraints
 - `fortran_opt`, `fortran_lib`, `fullerene_program` (`src/fortran/`) — the legacy Fortran program, built only under `FULLERENES_LEGACY_FORTRAN`
 - `programs/` — 20+ CLI tools for conversion, generation, and analysis

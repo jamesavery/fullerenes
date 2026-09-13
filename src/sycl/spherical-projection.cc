@@ -55,13 +55,21 @@ CuDeque(const local_accessor<T,1> memory, const int capacity): array(memory), fr
         return (front == 0 && back == capacity-1) || (front == back+1);
     }
     
+    // The preconditions of the four push/pop functions below trap rather than
+    // assert: assert() vanishes under NDEBUG, and its failure handler is a C
+    // library symbol no GPU provides, so an ahead-of-time device compile of an
+    // assert here does not assemble ("ptxas fatal: Unresolved extern function
+    // '__assert_fail'").  Each one guards real corruption -- popping empty
+    // fabricates a T(), pushing full overwrites a live entry -- so none of them
+    // may be dropped instead.
+
     /**
      * @brief  This function is used to pop the first element of the queue.
      * @param  None
      * @retval First element of the queue
      */
     T pop_front(){
-        if (empty()){ assert(false); return T();} 
+        if (empty()){ __builtin_trap(); return T();}
         T return_val = array[front];
         if(front == back) {
             front = -1;
@@ -79,7 +87,7 @@ CuDeque(const local_accessor<T,1> memory, const int capacity): array(memory), fr
      * @return The last element of the queue
      */
     T pop_back(){
-        if (empty()){ assert(false); return T();}
+        if (empty()){ __builtin_trap(); return T();}
         T return_val = array[back];
         if(front == back) {
             front = -1;
@@ -95,7 +103,7 @@ CuDeque(const local_accessor<T,1> memory, const int capacity): array(memory), fr
      *  @param val the value to insert
      */
     void push_back(T val){
-        assert(!full());
+        if(full()) __builtin_trap();
         if (front == -1) {
             front = 0;
             back = 0;
@@ -110,7 +118,7 @@ CuDeque(const local_accessor<T,1> memory, const int capacity): array(memory), fr
      *  @param val the value to insert
      */
     void push_front(T val){
-        assert(!full());
+        if(full()) __builtin_trap();
         if (front == -1) {
             front = 0;
             back = 0;

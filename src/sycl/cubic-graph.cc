@@ -23,7 +23,12 @@ struct DeviceCubicGraph{
         for (uint8_t j = 0; j < 3; j++)
             if ((*this)[u][j] == v) return j;
 
-        assert(false);
+        // v is not a neighbour of u: the caller passed an arc this graph does
+        // not have, and every index this function could return is a lie.  Trap
+        // rather than assert: assert() vanishes under NDEBUG, and its failure
+        // handler is a C library symbol no GPU provides, so an ahead-of-time
+        // device compile of an assert here does not assemble.
+        __builtin_trap();
 	return 0;		// Make compiler happy
     }
 
@@ -95,7 +100,8 @@ struct DeviceCubicGraph{
             u = v;
             v = w;
         }
-        if(i>=f_max) {assert(false); return 0;} //Compiler wants a return statement
+        if(i>=f_max) {__builtin_trap(); return 0;} // the face walk did not close
+                                                   // (see arc_ix on the trap)
         else return i + 1;
     }   
 
