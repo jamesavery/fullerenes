@@ -356,7 +356,10 @@ inline LuReduction row_reduce(MatView<const T> A, out_<T> Mbuf, out_<T> b) {
 }
 
 // Back-substitution on the reduced system (Mbuf = packed U from
-// row_reduce, x the forward-eliminated RHS).
+// row_reduce, x the forward-eliminated RHS).  Each x[c] is a fold in
+// ascending j whose first term needs x[c+1], the value finished last, so
+// the chain of subtractions is sequential by data flow: no lowering can
+// spread it over lanes without changing the association.
 template <class T = double>
 inline void back_substitute(in_<T> Mbuf, int n, out_<T> x) {
   const MatView<const T> M{Mbuf, n, n, n};
