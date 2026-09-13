@@ -432,13 +432,13 @@ TEST(GraphView, EmptyView) {
 TEST(Owned, ResizeWithinCapacityKeepsTheBuffers) {
     Owned<TriangulationView> g(0, 6, 64);           // empty, sized for 64 vertices
     EXPECT_EQ(g.N, 0);
-    EXPECT_EQ(g.capacity, 64);
+    EXPECT_EQ(g.capacity(), 64);
     EXPECT_TRUE(g.owns_memory());
     const node_t*  nb = g.buffer<0>().data();
     const uint8_t* dg = g.buffer<1>().data();
     g.resize(10);
     EXPECT_EQ(g.N, 10);
-    EXPECT_EQ(g.neighbours.size(), size_t(10 * 6));   // the span is the live graph
+    EXPECT_EQ(g.neighbours.size(), size_t(64 * 6));   // the spans cover the storage; N is the graph
     for (node_t u = 0; u < 10; u++) {
         EXPECT_EQ(g.degree(u), 0);
         for (int i = 0; i < 6; i++) EXPECT_EQ(g.neighbours[u * 6 + i], node_t(-1));
@@ -446,10 +446,10 @@ TEST(Owned, ResizeWithinCapacityKeepsTheBuffers) {
     g.resize(64);
     EXPECT_EQ(g.buffer<0>().data(), nb);            // no reallocation within capacity
     EXPECT_EQ(g.buffer<1>().data(), dg);
-    EXPECT_EQ(g.capacity, 64);
+    EXPECT_EQ(g.capacity(), 64);
     g.resize(65);                                   // past capacity: grows
     EXPECT_EQ(g.N, 65);
-    EXPECT_GE(g.capacity, 65);
+    EXPECT_GE(g.capacity(), 65);
     EXPECT_EQ(g.degree(64), 0);
 }
 
@@ -584,19 +584,101 @@ TEST(Owned, ShrinkThenGrowPadsTheReexposedRows) {
     for (int i = 0; i < 3; i++) EXPECT_EQ(g.neighbours[1 * 3 + i], node_t(-1));
 }
 
-TEST(Owned, FirstUnpaddedRowChecksWhatPadRowsEstablishes) {
-    Owned<TriangulationView> g(3, 6);               // three empty rows, padded
+TEST(Owned, RowPaddingPredicateAndItsWitness) {
+    Owned<TriangulationView> g(4, 6);               // four empty rows, padded
     g.compute_twin();                               // the table too: every entry absent
-    EXPECT_EQ(g.first_unpadded_row(), node_t(-1));
-    g.neighbours[1 * 6 + 2] = 0;                    // a slot past row 1's degree
+    EXPECT_TRUE(g.rows_are_padded());
+    g.neighbours[2 * 6 + 2] = 0;                    // a neighbour slot past row 2's degree
+    g.neighbours[1 * 6 + 5] = 0;                    // and one past row 1's: the first is row 1
     EXPECT_EQ(g.first_unpadded_row(), 1);
-    g.neighbours[1 * 6 + 2] = node_t(-1);
-    g.twin[2 * 6 + 5] = 0;                          // a twin entry past row 2's degree
+    g.pad_rows(1, 2);
     EXPECT_EQ(g.first_unpadded_row(), 2);
-    g.pad_rows(2, 3);
-    EXPECT_EQ(g.first_unpadded_row(), node_t(-1));
+    g.neighbours[2 * 6 + 2] = node_t(-1);
+    g.twin[3 * 6 + 5] = 0;                          // a twin entry past row 3's degree
+    EXPECT_EQ(g.first_unpadded_row(), 3);
+    g.pad_rows(3, 4);
+    EXPECT_TRUE(g.rows_are_padded());
     g.insert_edge(arc_t(0, 1));                     // live slots are not padding
-    EXPECT_EQ(g.first_unpadded_row(), node_t(-1));
+    EXPECT_TRUE(g.rows_are_padded());
+    g.deg[0] = 7;                                   // a degree past the stride: not a padded row
+    EXPECT_FALSE(g.row_is_padded(0));
+    g.deg[0] = 1;
+    Owned<GraphView> h(2, 3);                       // no twin table: the neighbour slots alone
+    EXPECT_TRUE(h.rows_are_padded());
+    h.neighbours[1 * 3 + 1] = 0;
+    EXPECT_EQ(h.first_unpadded_row(), 1);
+}
+
+TEST(Owned, RowWritesPadTheirTails) {
+    Owned<GraphView> g(2, 4);
+    g.assign_row(0, {1, 1, 1});
+    g.assign_row(0, {1});                           // shortening: slots 1 and 2 become padding
+    EXPECT_TRUE(g.rows_are_padded());
+    g.resize_row(0, 3);                             // growth exposes padding
+    EXPECT_EQ(g.neighbours[2], node_t(-1));
+    g.neighbours[1] = 1;
+    g.neighbours[2] = 1;
+    g.resize_row(0, 1);                             // shrinking pads the tail again
+    EXPECT_TRUE(g.rows_are_padded());
+    EXPECT_THROW(g.assign_row(1, {0, 0, 0, 0, 0}), Spanify::graph_surgery_error);   // five entries, stride four
+    EXPECT_THROW(g.resize_row(1, 5), Spanify::graph_surgery_error);
+}
+
+TEST(Owned, AViewOverTheOwnersStorageMovesItsCountAlone) {
+    Owned<TriangulationView> g(3, 6, 8);            // three empty rows, storage for eight
+    g.compute_twin();
+    g.insert_edge(arc_t(0, 1));
+    EXPECT_EQ(g.capacity(), 8);                     // the spans cover the storage
+    EXPECT_EQ(g.neighbours.size(), size_t(8 * 6));
+    EXPECT_EQ(g.twin.size(), size_t(8 * 6));
+    TriangulationView v(g);                         // the owner's view: the same storage, the same capacity
+    EXPECT_EQ(v.capacity(), 8);
+    EXPECT_EQ(v.neighbours.data(), g.buffer<0>().data());
+    v.neighbours[5 * 6 + 0] = 7;                    // storage above the graph: the view's caller writes it
+    v.N = 6;                                        // the view's count moves; the owner's does not
+    EXPECT_EQ(v.N, 6);
+    EXPECT_EQ(g.N, 3);
+    EXPECT_EQ(v.neighbours[5 * 6 + 0], 7);
+    EXPECT_EQ(v.degree(0), 1);                      // the graph's rows untouched
+    v.N = 3;
+    EXPECT_TRUE(v.twin_is_valid());                 // the predicates read [0, N)
+    EXPECT_TRUE(v.rows_are_padded());
+    g.resize(6);                                    // the owner's resize pads the rows it exposes
+    EXPECT_EQ(g.capacity(), 8);
+    EXPECT_EQ(g.neighbours[5 * 6 + 0], node_t(-1));
+    EXPECT_TRUE(g.rows_are_padded());
+    Triangulation T(FullereneGraph::C20().dual_graph());
+    Triangulation C(static_cast<const TriangulationView&>(T));   // a copy takes N rows, not the storage
+    EXPECT_EQ(C.N, T.N);
+    EXPECT_EQ(C.capacity(), T.N);
+    EXPECT_TRUE(C == T);
+}
+
+TEST(Owned, CopyEntryTakesTheGraphIntoAViewOverLargerStorage) {
+    FullereneDual src(FullereneGraph::C20().dual_graph());   // twelve vertices, pentagons derived
+    src.compute_twin();
+    ASSERT_TRUE(src.pentagons_valid());
+    const uint8_t stride = uint8_t(src.dmax);
+    Owned<FullereneDualView> store(20, stride);     // storage for twenty rows, every row padded
+    store.compute_twin();
+    FullereneDualView dst(store);
+    dst.N = 0;
+    batch::copy_entry(dst, src);
+    EXPECT_EQ(dst.N, src.N);
+    EXPECT_EQ(dst.capacity(), 20);
+    EXPECT_TRUE(dst == src);                        // the N rows
+    EXPECT_TRUE(dst.twin_is_valid());               // the twin entries
+    EXPECT_TRUE(dst.pentagons_valid());             // the pentagon list
+    EXPECT_EQ(store.N, 20);                         // the owner's own count is not the view's
+    EXPECT_TRUE(store.row_is_padded(19));           // rows past the graph untouched
+    Owned<FullereneDualView> small(4, stride);      // four rows for twelve
+    small.compute_twin();
+    FullereneDualView tiny(small);
+    EXPECT_THROW(batch::copy_entry(tiny, src), std::length_error);
+    Owned<FullereneDualView> other(20, uint8_t(stride + 1));   // another stride
+    other.compute_twin();
+    FullereneDualView wrong(other);
+    EXPECT_THROW(batch::copy_entry(wrong, src), std::invalid_argument);
 }
 
 TEST(Owned, DefaultDualHasItsPentagonSpanAndAMovedFromOwnerHasNone) {
@@ -608,7 +690,7 @@ TEST(Owned, DefaultDualHasItsPentagonSpanAndAMovedFromOwnerHasNone) {
     FullereneDual e(FullereneGraph::C20().dual_graph());
     FullereneDual f(std::move(e));
     EXPECT_FALSE(e.owns_memory());
-    EXPECT_EQ(e.capacity, 0);
+    EXPECT_EQ(e.capacity(), 0);
     EXPECT_EQ(e.N, 0);
     EXPECT_TRUE(e.neighbours.empty());
     EXPECT_TRUE(f.pentagons_valid());

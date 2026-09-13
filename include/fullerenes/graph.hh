@@ -62,10 +62,12 @@ struct Graph : GraphView {
       std::copy(initial_row.begin(), initial_row.end(), owned_neighbours.data() + v * dmax);
   }
 
-  // Copy from adjacency view (copies data, owns it).
+  // Copy from adjacency view (copies the graph's N rows, owns them; a
+  // view's spans may cover storage past its N).
   Graph(const base_t& adj)
-      : owned_neighbours(adj.neighbours.begin(), adj.neighbours.end()),
-        owned_deg(adj.deg.begin(), adj.deg.end()) {
+      : owned_neighbours(adj.neighbours.begin(),
+                         adj.neighbours.begin() + size_t(adj.N) * adj.dmax),
+        owned_deg(adj.deg.begin(), adj.deg.begin() + adj.N) {
     N = adj.N; dmax = adj.dmax; repoint();
   }
 

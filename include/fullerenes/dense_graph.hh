@@ -91,6 +91,10 @@ void row_close_gap(std::span<T> row, int slot, int old_deg) {
 //
 // operator[] returns a span over the row's active entries.
 //
+// A view may cover more rows than its graph -- an owner's storage, a slot
+// of a batch sized for growth: capacity() is the rows its spans hold,
+// N <= capacity(), and every reader stops at N.
+//
 // Template parameter:
 //   K -- index type: int32_t (CPU), uint16_t (GPU)
 // ---------------------------------------------------------------------------
@@ -137,7 +141,8 @@ struct RSRAdjacencyView {
     // and nothing else.)
     // @anchor rsr-pad-rows
     // @pre  range: 0 <= from && from <= to && to <= N
-    // @post empty: all_of(indices(from, to), [&](K u){ return degree(u) == 0; })
+    // @post empty:  all_of(indices(from, to), [&](K u){ return degree(u) == 0; })
+    // @post padded: all_of(indices(from, to), [&](K u){ return row_is_padded(u); })
     void pad_rows(K from, K to) {
         const bool tw = has_twin();
         for (K u = from; u < to; ++u) {
@@ -149,23 +154,40 @@ struct RSRAdjacencyView {
         }
     }
 
-    // The first row of [0, N) whose slots past its degree are not padding
-    // -- a neighbour slot other than K(-1), or, when the table is present,
-    // a twin entry other than no_slot -- or K(-1) when every row is padded.
-    // The check of what pad_rows establishes and every row write keeps
-    // (a row written whole writes its padding too).  O(N * dmax): a
+    // THE ROW-PADDING PREDICATE, per row: every slot of u at or past its
+    // degree holds K(-1), and no_slot in the twin table when the table is
+    // present.  pad_rows writes it; the row writes that shorten a row
+    // restore it (erase_at, resize_row, assign_row -- clear_row, which
+    // drops the degree alone, is the construction-phase exception); a
+    // writer that owns a row's whole width writes it along with the
+    // entries.  A degree past the stride is not a padded row (nothing past
+    // it can be), so a corrupt degree is reported, never skipped.
+    // @anchor rsr-row-is-padded
+    // @pre  vertex: size_t(u) < size_t(N)
+    bool row_is_padded(K u) const {
+        if (deg[u] > dmax) return false;
+        const bool tw = has_twin();
+        for (int i = deg[u]; i < dmax; ++i)
+            if (neighbours[arcid(u, i)] != K(-1) || (tw && twin[arcid(u, i)] != no_slot))
+                return false;
+        return true;
+    }
+
+    // The first row of [0, N) that is not padded, or K(-1) when every row
+    // is -- the witness a checker's diagnosis names.  O(N * dmax): a
     // validator, not a hot-path check.
     // @anchor rsr-first-unpadded-row
-    // @post result == K(-1) || (size_t(result) < size_t(N) && some slot of
-    //       row result at or past deg[result] is not padding)
+    // @post result == K(-1) || (size_t(result) < size_t(N) && !row_is_padded(result))
+    // @post first: all_of(indices(0, result == K(-1) ? N : result), [&](K u){ return row_is_padded(u); })
     K first_unpadded_row() const {
-        const bool tw = has_twin();
         for (K u = 0; u < N; ++u)
-            for (int i = deg[u]; i < dmax; ++i)
-                if (neighbours[arcid(u, i)] != K(-1) || (tw && twin[arcid(u, i)] != no_slot))
-                    return u;
+            if (!row_is_padded(u)) return u;
         return K(-1);
     }
+
+    // THE graph-wide padding predicate -- what a @post padded clause over
+    // the whole graph cites (twin_is_valid's sibling, for the rows' tails).
+    bool rows_are_padded() const { return first_unpadded_row() == K(-1); }
 
     // The same rotation system at dst's stride: row u's entries land in
     // dst's row u, the remaining slots padding.  A row wider than dst's
@@ -813,37 +835,52 @@ struct RSRAdjacencyView {
 
     void clear_row(K u) { deg[u] = 0; }
 
+    // u's degree becomes n.  The slots at or past n hold K(-1) afterwards
+    // (on growth the exposed slots are padding for the caller to fill; on
+    // shrink the abandoned entries become padding), so the row-padding
+    // predicate's neighbour half holds of u whatever the row held.
+    // @pre  fits: n <= dmax -- violation throws graph_surgery_error{RowFull}
+    // @post degree(u) == n
+    // @post padded: the neighbour slots of u at or past n hold K(-1)
     void resize_row(K u, int n) {
-        assert(n <= dmax);
-        for (int i = deg[u]; i < n; ++i)
+        if (n > dmax)
+            surgery_fail("resize_row", graph_surgery_error::Code::RowFull, u, K(-1));
+        for (int i = std::min(int(deg[u]), n); i < dmax; ++i)
             neighbours[u * dmax + i] = K(-1);
         deg[u] = uint8_t(n);
     }
 
-    void assign_row(K u, std::initializer_list<K> v) {
-        assert(int(v.size()) <= dmax);
+    // u's whole row: v in the live prefix, K(-1) in every slot past it,
+    // so the row-padding predicate's neighbour half holds of u afterwards
+    // whatever the row held (pad_rows is this for the empty row).  The
+    // twin is left stale, as for every word of this group.
+    // @pre  fits: int(v.size()) <= dmax -- violation throws graph_surgery_error{RowFull}
+    // @post row:    degree(u) == v.size() && equal(v, nbrs(u))
+    // @post padded: the neighbour slots of u at or past degree(u) hold K(-1)
+    void assign_row(K u, std::span<const K> v) {
+        if (int(v.size()) > dmax)
+            surgery_fail("assign_row", graph_surgery_error::Code::RowFull, u, K(-1));
         deg[u] = uint8_t(v.size());
         int i = 0;
         for (K x : v) neighbours[u * dmax + i++] = x;
+        for (; i < dmax; ++i) neighbours[u * dmax + i] = K(-1);
     }
-
+    void assign_row(K u, std::initializer_list<K> v) {
+        assign_row(u, std::span<const K>(v.begin(), v.size()));
+    }
     void assign_row(K u, const std::vector<K>& v) {
-        assert(int(v.size()) <= dmax);
-        deg[u] = uint8_t(v.size());
-        for (int i = 0; i < int(v.size()); ++i)
-            neighbours[u * dmax + i] = v[i];
-    }
-
-    void assign_row(K u, std::span<const K> v) {
-        assert(int(v.size()) <= dmax);
-        deg[u] = uint8_t(v.size());
-        for (int i = 0; i < int(v.size()); ++i)
-            neighbours[u * dmax + i] = v[i];
+        assign_row(u, std::span<const K>(v));
     }
 
     // --- Backward compat with vector<vector<>> interface ---
 
     int size() const { return N; }
+
+    // The rows the spans hold.  A view over exactly its graph has
+    // capacity() == N; one over storage sized for growth (an owner's, a
+    // batch slot's, an enumerator's working graph) has N <= capacity(),
+    // and the rows [N, capacity()) are storage, not vertices.
+    int capacity() const { return static_cast<int>(deg.size()); }
 
     bool operator==(const RSRAdjacencyView& other) const {
         if (N != other.N || dmax != other.dmax) return false;
@@ -1019,12 +1056,14 @@ struct OwnedDenseGraph : RSRAdjacencyView<K> {
         }
     }
 
-    // Converting constructor from RSRAdjacencyView (copies data).
+    // Converting constructor from RSRAdjacencyView (copies the graph's N
+    // rows; a view's spans may cover storage past its N).
     OwnedDenseGraph(const RSRAdjacencyView<K>& v) {
         this->N = v.N; this->dmax = v.dmax;
         if (v.N > 0 && v.neighbours.data()) {
-            owned_neighbours.assign(v.neighbours.begin(), v.neighbours.end());
-            owned_deg.assign(v.deg.begin(), v.deg.end());
+            owned_neighbours.assign(v.neighbours.begin(),
+                                    v.neighbours.begin() + size_t(v.N) * v.dmax);
+            owned_deg.assign(v.deg.begin(), v.deg.begin() + v.N);
         }
         repoint();
     }
