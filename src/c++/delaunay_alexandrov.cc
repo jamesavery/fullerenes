@@ -432,12 +432,33 @@ static AlexandrovSolver::TrajEntry make_traj(
   e.phase = phase; e.step = step; e.t = t;
   e.kappa_max = LinAlg::max_abs(kappa);
   e.kappa = kappa;
+  e.r = r;
   e.positions = Reconstruct::from_radii(T, r);   // empty/NaN if Gram-BFS fails
+  // Live faces in compact order; compact[f] maps a DCEL face id to its index in
+  // e.faces so the gluing below refers to compact indices.
+  std::vector<int> compact(T.nf, -1);
   for (int f = 0; f < T.nf; f++) {
     if (T.f_he[f] < 0 || !T.alive(T.f_he[f])) continue;   // dead face slot
+    compact[f] = (int)e.faces.size();
     const auto h = T.face_halfedges(f);
     e.faces.push_back({T.he_origin[h[0]], T.he_origin[h[1]], T.he_origin[h[2]]});
     e.face_len.push_back({T.he_length[h[0]], T.he_length[h[1]], T.he_length[h[2]]});
+  }
+  // The gluing across each base edge, per slot (see TrajEntry): the twin half-edge's
+  // face and its cycle slot there, plus the GCP dihedral at the edge.
+  for (int f = 0; f < T.nf; f++) {
+    if (compact[f] < 0) continue;
+    const auto h = T.face_halfedges(f);
+    std::array<int,3>    tw;
+    std::array<double,3> th;
+    for (int s = 0; s < 3; s++) {
+      const int t = T.twin(h[s]);
+      const int g = T.he_face[t];
+      tw[s] = (g >= 0 && compact[g] >= 0) ? 3 * compact[g] + T.cycle_slot(t) : -1;
+      th[s] = GCP::theta(T, r, h[s]);
+    }
+    e.face_twin.push_back(tw);
+    e.face_theta.push_back(th);
   }
   return e;
 }

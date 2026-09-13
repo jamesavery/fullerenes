@@ -153,6 +153,16 @@ struct AlexandrovSolver {
   // close into a polytope), and the triangular faces of T (which change at edge
   // flips, so each entry is self-contained).  positions is empty for that step
   // iff Gram-BFS reconstruction failed (κ too high / degenerate iterate).
+  //
+  // The gluing is recorded per face SLOT, not per vertex pair: T is a delta-complex
+  // (multi-edges, self-loops, bigon faces), so "the face across edge (i,j)" is
+  // ambiguous from labels alone.  Slot s of face f is its base edge from corner s to
+  // corner s+1 (mod 3); face_twin[f][s] = 3*g + s' names the face g and slot s' glued
+  // to it (the DCEL twin half-edge's face and cycle slot), and face_theta[f][s] is
+  // the GCP dihedral θ at that base edge.  With r and face_len every pyramid is a
+  // rigid tetrahedron and the complex is reconstructible exactly, whether or not
+  // positions is available -- the seam for drawing the abstract GCP (the
+  // delaunay-geometry GUI cuts every radial face and spreads the defect).
   bool record_trajectory = false;
   struct TrajEntry {
     char   phase;                          // 'T' continuation, 'N' Newton polish
@@ -160,6 +170,7 @@ struct AlexandrovSolver {
     double t;                              // homotopy parameter (0 in Newton)
     double kappa_max;                      // max|κ|
     std::vector<double> kappa;             // per-cone angle defect κ_v
+    std::vector<double> r;                 // radii r_v (exact; positions may be empty)
     std::vector<coord3d> positions;        // reconstructed cones (apex at origin)
     std::vector<std::array<int,3>> faces;  // triangular faces of T at this step
     std::vector<std::array<double,3>> face_len;  // base edge lengths of faces[f], in its
@@ -167,6 +178,8 @@ struct AlexandrovSolver {
                                            // needed to build each rigid pyramid exactly
                                            // (Gram-BFS distorts cotree edges, so |pᵢ−pⱼ|
                                            // is unreliable; the radii rᵥ=|pᵥ| are exact).
+    std::vector<std::array<int,3>>    face_twin;   // 3*g + s' glued across slot s (−1: none)
+    std::vector<std::array<double,3>> face_theta;  // θ at slot s (NaN where undefined)
   };
   std::vector<TrajEntry> trajectory;
 
