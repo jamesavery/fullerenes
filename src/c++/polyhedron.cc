@@ -290,8 +290,7 @@ static void orient_polyhedron_neighbours(Polyhedron& P)
 Polyhedron::Polyhedron(const PlanarGraphView& G, const vector<coord3d>& points_, const int face_max_) :
   base_t(G), face_max(face_max_)
 {
-  owned_points = points_;
-  repoint();
+  if(!points_.empty()) set_points(points_);   // absent coordinates stay at the origin
   if(!is_consistently_oriented()) orient_polyhedron_neighbours(*this);
 
   if(face_max == INT_MAX){
@@ -304,9 +303,7 @@ Polyhedron::Polyhedron(const PlanarGraphView& G, const vector<coord3d>& points_,
 Polyhedron::Polyhedron(const PlanarGraphView& G, std::span<coord3d> points_, const int face_max_) :
   base_t(G), face_max(face_max_)
 {
-  // Copy coordinates into owned storage
-  owned_points.assign(points_.begin(), points_.end());
-  repoint();
+  if(!points_.empty()) set_points(points_);   // copied into owned storage
   if(!is_consistently_oriented()) orient_polyhedron_neighbours(*this);
 
   if(face_max == INT_MAX){
@@ -605,8 +602,7 @@ Polyhedron Polyhedron::fullerene_polyhedron(FullereneGraph G)
   }
 
   Polyhedron P(G,x0,6);
-  P.owned_points = G.optimized_geometry(P.points);
-  P.repoint();
+  P.set_points(G.optimized_geometry(P.points));
 
   P.move_to_origin();		// Center of mass at (0,0,0)
   P.align_with_axes(MassModel::Atoms);

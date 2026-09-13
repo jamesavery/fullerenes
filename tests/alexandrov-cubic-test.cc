@@ -51,13 +51,28 @@ double volume(const DelaunayTriangulation& D, const vector<coord3d>& pos)
   return V;
 }
 
+enum class Regime { Banded, Exact };
+
+// Build through one regime (class banner, step 2), then solve.
+AlexandrovSolver::AlexandrovPolytope build_and_solve(AlexandrovIDTCubic& AC,
+                                                     const Triangulation& T,
+                                                     Regime regime)
+{
+  if (regime == Regime::Exact) AC.build(T);
+  else                         AC.build_banded(T);
+  return AC.solver.solve_polytope();
+}
+
+vector<int> sorted(vector<int> v) { sort(v.begin(), v.end()); return v; }
+
 void expect_closed_form(int N, bool IPR, int n_cones, int npent,
-                        double R_exact, double vol_exact)
+                        double R_exact, double vol_exact,
+                        Regime regime = Regime::Exact)
 {
   Triangulation T = nth_dual(N, IPR, 0);
 
   AlexandrovIDTCubic AC;
-  auto P = AC.solve_polytope(T);
+  auto P = build_and_solve(AC, T, regime);
 
   ASSERT_TRUE(AC.solver.valid())
       << AlexandrovSolver::status_str(AC.solver.stats_status);
@@ -96,7 +111,8 @@ TEST(AlexandrovCubic, C20IsRegularDodecahedron)
   const double S5 = sqrt(5.0);
   expect_closed_form(20, false, 20, 3,
                      sqrt(3.0) * (1 + S5) / 4,   // circumradius, unit edge
-                     (15 + 7 * S5) / 4);         // volume, unit edge
+                     (15 + 7 * S5) / 4,          // volume, unit edge
+                     Regime::Banded);
 }
 
 TEST(AlexandrovCubic, C60IhIsTruncatedIcosahedron)
@@ -104,7 +120,79 @@ TEST(AlexandrovCubic, C60IhIsTruncatedIcosahedron)
   const double S5 = sqrt(5.0);
   expect_closed_form(60, true, 60, 1,
                      sqrt(58 + 18 * S5) / 4,
+                     (125 + 43 * S5) / 4, Regime::Banded);
+}
+
+// The same closed forms through the exact regime (build, the default:
+// exact algebraic signs plus the canonical completion).  C20's kis surface
+// is twelve cocircular pentagon cells, so this case also exercises the
+// completion: every pentagon must be fanned (flips > 0) and the polytope
+// unchanged.
+TEST(AlexandrovCubicExact, C20IsRegularDodecahedron)
+{
+  const double S5 = sqrt(5.0);
+  expect_closed_form(20, false, 20, 3,
+                     sqrt(3.0) * (1 + S5) / 4,
+                     (15 + 7 * S5) / 4);
+}
+
+TEST(AlexandrovCubicExact, C60IhIsTruncatedIcosahedron)
+{
+  const double S5 = sqrt(5.0);
+  expect_closed_form(60, true, 60, 1,
+                     sqrt(58 + 18 * S5) / 4,
                      (125 + 43 * S5) / 4);
+}
+
+// Both regimes keep the same cones (the reduced triangulations are
+// compared corpus-wide by tools/bench_cubic_regimes); the exact build
+// reports its completion, which refuses no cell and, these kis surfaces
+// carrying cocircular pentagon cells, always fans.
+TEST(AlexandrovCubicExact, RegimesAgreeOnConesAndCompletionFans)
+{
+  for (int N : {20, 36, 40}) {
+    Triangulation T = nth_dual(N, false, 0);
+    AlexandrovIDTCubic banded, exact;
+    banded.build_banded(T);
+    const auto completion = exact.build(T);
+    EXPECT_EQ(banded.solver.D.nv, exact.solver.D.nv) << "C" << N;
+    EXPECT_EQ(sorted(banded.cone_kis_vertex), sorted(exact.cone_kis_vertex)) << "C" << N;
+    EXPECT_EQ(completion.ambiguous, 0) << "C" << N;
+    EXPECT_EQ(completion.nondisk, 0) << "C" << N;
+    EXPECT_GT(completion.flips, 0) << "C" << N;
+  }
+}
+
+// Point tracking through the exact build: every removed kis vertex (face
+// centres and hexagon-only cubic vertices) rides the removal and the
+// completion's flips as a tracked point, and ends in a live face with
+// normalized, non-negative barycentric coordinates, its label intact.
+TEST(AlexandrovCubicExact, TrackedRemovalSurvivesCompletion)
+{
+  for (int N : {36, 60}) {
+    Triangulation T = nth_dual(N, N == 60, 0);
+    AlexandrovIDTCubic exact;
+    exact.track_removed = true;
+    const auto completion = exact.build(T);
+    EXPECT_GT(completion.flips, 0) << "C" << N;
+    const DelaunayTriangulation& D = exact.solver.D;
+    ASSERT_TRUE(D.tracker.active) << "C" << N;
+    const int kis_nv = T.N + 2 * T.N - 4;
+    EXPECT_EQ(D.tracker.view.n, kis_nv - D.nv) << "C" << N;
+    vector<int> labels, expected;
+    for (int i = 0; i < D.tracker.view.n; i++) {
+      labels.push_back(D.tracker.view.label[i]);
+      const int f = D.tracker.view.face[i];
+      EXPECT_TRUE(f >= 0 && f < D.nf && D.f_he[f] >= 0) << "C" << N << " point " << i;
+      const double* b = D.tracker.view.b_of(i);
+      EXPECT_NEAR(b[0] + b[1] + b[2], 1.0, 1e-9) << "C" << N << " point " << i;
+      EXPECT_TRUE(b[0] >= 0 && b[1] >= 0 && b[2] >= 0) << "C" << N << " point " << i;
+    }
+    const vector<int> cones = sorted(exact.cone_kis_vertex);
+    for (int v = 0; v < kis_nv; v++)
+      if (!binary_search(cones.begin(), cones.end(), v)) expected.push_back(v);
+    EXPECT_EQ(sorted(labels), expected) << "C" << N;
+  }
 }
 
 // The Gauss-Newton trust-region fallback -- the solver path through the
@@ -124,9 +212,17 @@ TEST(AlexandrovCubic, C40Idx18ReachesGaussNewtonAndConverges)
     EXPECT_LT(s.stats_final_kappa, 1e-10);
     EXPECT_FALSE(pos.empty());
   }
-  {   // cubic/kis path
+  {   // cubic/kis path (exact, the default)
     AlexandrovIDTCubic c;
     const vector<coord3d> pos = c.solve(T);
+    EXPECT_TRUE(c.solver.valid());
+    EXPECT_LT(c.solver.stats_final_kappa, 1e-10);
+    EXPECT_FALSE(pos.empty());
+  }
+  {   // cubic/kis path, tolerance-based regime
+    AlexandrovIDTCubic c;
+    c.build_banded(T);
+    const vector<coord3d> pos = c.solver.solve();
     EXPECT_TRUE(c.solver.valid());
     EXPECT_LT(c.solver.stats_final_kappa, 1e-10);
     EXPECT_FALSE(pos.empty());

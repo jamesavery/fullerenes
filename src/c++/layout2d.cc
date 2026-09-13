@@ -1,4 +1,5 @@
 #include <sstream>
+#include <algorithm>
 #include <math.h>
 #include "fullerenes/layout2d.hh"
 #include "fullerenes/cubicgraph.hh"
@@ -58,29 +59,101 @@ void orient_neighbours(GraphView& G, const vector<coord2d>& layout)
   }
 }
 
+// BOUNDARY 2 -- contract at the declaration.  The rows built from the matrix
+// are in ascending index order, an ordering with no geometric meaning, which
+// for anything bigger than a triangle is a rotation system of the wrong genus:
+// nothing to preserve, only an embedding to establish.
+PlanarGraph planargraph_from_adjacency_matrix(int N, std::span<const int> A, int stride)
+{
+  Graph nb(N, GRAPH_DMAX);
+  for(int i=0;i<N;i++)
+    for(int j=i+1;j<N;j++)
+      if(A[size_t(i)*stride+j]) {
+        nb.push_back(i, j);
+        nb.push_back(j, i);
+      }
+  Graph G(nb);
+  planar_orient(G);
+  require_oriented_surface(G, "planargraph_from_adjacency_matrix");
+  return PlanarGraph(G);
+}
+
+// BOUNDARY 4 -- contract at the declaration.  orient_neighbours is faithful to
+// whatever drawing it is given, so a drawing with crossings yields a consistent
+// orientation of a higher-genus surface; the rows G arrived with are saved
+// first and put back unless the re-sorted ones are still a genus-0 embedding.
+OrientedSurface set_layout2d_verified(GraphView& G, const vector<coord2d>& drawing)
+{
+  vector<vector<node_t>> arrived(G.N);
+  for(node_t u=0;u<G.N;u++) arrived[u].assign(G[u].begin(), G[u].end());
+
+  orient_neighbours(G, drawing);
+  const OrientedSurface S = G.oriented_surface();
+  if(S.code != OrientedSurface::Code::Ok)
+    for(node_t u=0;u<G.N;u++) std::copy(arrived[u].begin(), arrived[u].end(), G[u].begin());
+  return S;
+}
+
+// Sign of the 2x2 determinant (b-a) x (c-a): +1 if a->b->c turns left, -1 if it
+// turns right, 0 if the three points are collinear.  This is the orientation
+// predicate, and it is the only form in which a segment-crossing test may be
+// asked here: the slope-intercept form this replaced divided by (ax - bx),
+// which is exactly zero on a vertical edge, so it handed inf/NaN slopes to
+// comparisons that then decided nothing.  Tutte layouts of the symmetric
+// Goldberg-Coxeter fullerenes are full of exactly-vertical edges, so that was
+// not a measure-zero worry: C60-GC(1,1) put both ends of edge [8,9] at
+// x = 0.36562987420987297 and the predicate called a non-crossing a crossing.
+//
+// Exact for collinearity in the reals; with double coordinates it is exact only
+// up to the roundoff of the two products.  A caller needing a decision on
+// genuinely near-degenerate input wants a filtered or exact evaluation instead.
+static int orient(const coord2d& a, const coord2d& b, const coord2d& c)
+{
+  const double det = (b.first - a.first) * (c.second - a.second)
+                   - (b.second - a.second) * (c.first - a.first);
+  return (det > 0) - (det < 0);
+}
+
+// p is collinear with a,b (caller has checked); does it lie within the segment?
+static bool on_segment(const coord2d& a, const coord2d& b, const coord2d& p)
+{
+  return std::min(a.first,b.first)  <= p.first  && p.first  <= std::max(a.first,b.first)
+      && std::min(a.second,b.second) <= p.second && p.second <= std::max(a.second,b.second);
+}
+
 bool layout_is_crossingfree(const PlanarGraphView& G, const vector<coord2d>& layout)
 {
   assert(layout.size() == G.N);
-  vector<edge_t> es = G.undirected_edges();
-  for (edge_t e1: es){
-    for (edge_t e2: es){
-      if (e1.first == e2.first || e1.second == e2.first || e1.first == e2.second || e1.second == e2.second) continue;
-      const double e1ax = layout[e1.first].first,
-                   e1ay = layout[e1.first].second,
-                   e1bx = layout[e1.second].first,
-                   e1by = layout[e1.second].second,
-                   e2ax = layout[e2.first].first,
-                   e2ay = layout[e2.first].second,
-                   e2bx = layout[e2.second].first,
-                   e2by = layout[e2.second].second;
-      const double a1 = (e1ay - e1by)/(e1ax - e1bx);
-      const double b1 = e1ay - a1 * e1ax;
-      if ((e2ay > a1*e2ax+b1 && e2by > a1*e2bx+b1) || (e2ay < a1*e2ax+b1 && e2by < a1*e2bx+b1)) continue;
-      const double a2 = (e2ay - e2by)/(e2ax - e2bx);
-      const double b2 = e2ay - a2 * e2ax;
-      if ((e1ay > a2*e1ax+b2 && e1by > a2*e1bx+b2) || (e1ay < a2*e1ax+b2 && e1by < a2*e1bx+b2)) continue;
-      cerr << "edges " << e1 << " and " << e2 << " intersect." << endl;
-      return false;
+  const vector<edge_t> es = G.undirected_edges();
+  // j>i: the relation is symmetric, so half the pairs are the whole test.
+  for (size_t i = 0; i < es.size(); i++){
+    for (size_t j = i+1; j < es.size(); j++){
+      const edge_t e1 = es[i], e2 = es[j];
+      // Adjacent edges legitimately touch at the shared vertex.
+      if (e1.first == e2.first || e1.second == e2.first ||
+          e1.first == e2.second || e1.second == e2.second) continue;
+
+      const coord2d &a = layout[e1.first], &b = layout[e1.second],
+                    &c = layout[e2.first], &d = layout[e2.second];
+      const int abc = orient(a,b,c), abd = orient(a,b,d),
+                cda = orient(c,d,a), cdb = orient(c,d,b);
+
+      // Proper crossing: each segment's endpoints straddle the other's line.
+      if (abc * abd < 0 && cda * cdb < 0){
+        cerr << "edges " << e1 << " and " << e2 << " intersect." << endl;
+        return false;
+      }
+
+      // Degenerate contact, named separately from a crossing: edges sharing no
+      // vertex that nonetheless meet, either collinearly overlapping or with an
+      // endpoint landing on the other's interior.  Not a crossing, but not a
+      // valid straight-line embedding either.
+      const bool touches = (abc == 0 && on_segment(a,b,c)) || (abd == 0 && on_segment(a,b,d))
+                        || (cda == 0 && on_segment(c,d,a)) || (cdb == 0 && on_segment(c,d,b));
+      if (touches){
+        cerr << "edges " << e1 << " and " << e2 << " touch without sharing a vertex." << endl;
+        return false;
+      }
     }
   }
   return true;

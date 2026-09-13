@@ -59,11 +59,20 @@ struct SyclVector
     inline constexpr T &at(size_t index) { assert(index < size_); return data_[index]; }
     inline constexpr const T &at(size_t index) const { assert(index < size_); return data_[index]; }
 
-    inline constexpr bool operator==(const SyclVector<T> &other) const {
+    // Host-only, and deliberately NOT constexpr: each of the three calls a
+    // non-constexpr host function (span_fuzzy_equal; reserve, which allocates),
+    // so none of them could ever be constant-evaluated -- the marker was inert.
+    // It was not harmless, though: clang's CUDA mode makes a constexpr function
+    // implicitly __host__ __device__, so these got compiled for the device,
+    // where the host callee is unavailable ("reference to __host__ function
+    // 'reserve' in __host__ __device__ function").  Growing a vector on the
+    // device is not a thing we can do or want to do; dropping constexpr says so
+    // and keeps them off the device.
+    inline bool operator==(const SyclVector<T> &other) const {
         return span_fuzzy_equal(std::span<T>(*this), std::span<T>(other));
     }
 
-    inline constexpr void push_back(const T &value) { 
+    inline void push_back(const T &value) {
         if(size_ == capacity_){
             size_t new_capacity = capacity_ == 0 ? 1 : 2*capacity_;
             reserve(new_capacity);
@@ -71,7 +80,7 @@ struct SyclVector
         data_[size_++] = value;
     }
 
-    inline constexpr void push_back(T &&value) { 
+    inline void push_back(T &&value) {
         if(size_ == capacity_){
             size_t new_capacity = capacity_ == 0 ? 1 : 2*capacity_;
             reserve(new_capacity);

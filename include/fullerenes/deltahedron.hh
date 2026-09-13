@@ -158,10 +158,14 @@ public:
   Deltahedron(const TriangulationView& T, std::span<const coord3d> points);
   Deltahedron(const Polyhedron& P);  // must be a triangulation
 
-  // Replace owned coordinate storage and repoint the span.
-  void set_points(std::vector<coord3d> pts) {
-    owned_points = std::move(pts);
-    repoint();
+  // Write the coordinates: one per vertex, copied into the owner's storage.
+  // @pre  size: pts.size() == size_t(N)
+  // @throws std::invalid_argument on a size mismatch
+  void set_points(std::span<const coord3d> pts) {
+    if (pts.size() != size_t(N))
+      throw std::invalid_argument("Deltahedron::set_points: " + std::to_string(pts.size())
+                                  + " coordinates for " + std::to_string(N) + " vertices");
+    std::copy(pts.begin(), pts.end(), points.begin());
   }
 
   // PLY mesh I/O (see polyhedron-io.cc / deltahedron-io.cc). from_ply builds an

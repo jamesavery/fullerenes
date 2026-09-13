@@ -1,6 +1,7 @@
 // Law tests for the rotation-system words on RSRAdjacencyView
-// (dense_graph.hh: target, next/prev = sigma/sigma^-1, reverse_arc =
-// alpha, next_on_face, arcid/arc_of, find_arc).
+// (dense_graph.hh: source/slot/arc_at, target, arc, next/prev =
+// sigma/sigma^-1, reverse_arc = alpha, next_on_face, arcid/arc_of,
+// find_arc).
 //
 // The laws are pinned here rather than left to incidental use: sigma's
 // orbit is exactly the rotation, prev inverts next, alpha is an
@@ -104,9 +105,12 @@ TYPED_TEST(ArcNav, SigmaOrbitIsTheRotation) {
             // next's orbit from slot 0 visits every slot once and closes.
             auto a = typename decltype(G)::arcix_t{TypeParam(u), 0};
             std::set<int> seen;
-            for (int k = 0; k < d; k++) { seen.insert(a.second); a = G.next(a); }
+            for (int k = 0; k < d; k++) {
+                seen.insert(decltype(G)::slot(a));
+                a = G.next(a);
+            }
             EXPECT_EQ((int)seen.size(), d);
-            EXPECT_EQ(a.second, 0);       // sigma^degree = id
+            EXPECT_EQ(decltype(G)::slot(a), 0);   // sigma^degree = id
         }
         for (auto a : this->arcs(G)) {
             EXPECT_EQ(G.prev(G.next(a)), a);   // prev . next = id
@@ -120,10 +124,11 @@ TYPED_TEST(ArcNav, AlphaIsAnInvolutionThatFlipsTheArc) {
         SCOPED_TRACE(f.name);
         auto G = this->build(f.rot);
         ASSERT_TRUE(G.twin_is_valid());
+        using V = typename TestFixture::View;
         for (auto a : this->arcs(G)) {
             const auto r = G.reverse_arc(a);
-            EXPECT_EQ(G.target(a), r.first);       // head of a = tail of alpha(a)
-            EXPECT_EQ(G.target(r), a.first);       // and vice versa
+            EXPECT_EQ(G.target(a), V::source(r));  // head of a = tail of alpha(a)
+            EXPECT_EQ(G.target(r), V::source(a));  // and vice versa
             EXPECT_EQ(G.reverse_arc(r), a);        // involution
         }
     }
@@ -136,8 +141,9 @@ TYPED_TEST(ArcNav, AlphaAgreesWithTheFindScan) {
     for (const auto& f : this->fixtures()) {
         SCOPED_TRACE(f.name);
         auto G = this->build(f.rot);
+        using V = typename TestFixture::View;
         for (auto a : this->arcs(G))
-            EXPECT_EQ(G.reverse_arc(a), G.find_arc(G.target(a), a.first));
+            EXPECT_EQ(G.reverse_arc(a), G.find_arc(G.target(a), V::source(a)));
     }
 }
 
@@ -150,9 +156,10 @@ TYPED_TEST(ArcNav, PhiWalksTheSameFaceAsTheVertexPairForm) {
     for (const auto& f : this->fixtures()) {
         SCOPED_TRACE(f.name);
         auto G = this->build(f.rot);
+        using V = typename TestFixture::View;
         for (auto a : this->arcs(G)) {
             const auto v = G.target(a);
-            const auto expect = G.prev(G.find_arc(v, a.first));   // prev(v,u)
+            const auto expect = G.prev(G.find_arc(v, V::source(a)));  // prev(v,u)
             EXPECT_EQ(G.next_on_face(a), expect);
         }
     }
@@ -206,9 +213,54 @@ TYPED_TEST(ArcNav, ArcIdRoundTrips) {
         SCOPED_TRACE(f.name);
         auto G = this->build(f.rot);
         for (auto a : this->arcs(G)) {
+            const auto [u, i] = a;
             EXPECT_EQ(G.arc_of(G.arcid(a)), a);
-            EXPECT_EQ(G.arcid(a), G.arcid(a.first, a.second));
+            EXPECT_EQ(G.arcid(a), G.arcid(u, i));
         }
+    }
+}
+
+// @ref rsr-arc-projections, rsr-arc-at (dense_graph.hh)
+TYPED_TEST(ArcNav, SourceSlotProjectionsInvertArcAt) {
+    using V = typename TestFixture::View;
+    // The projections are static (spellable without a view) and pin the
+    // component ORDER: source is the vertex, slot the rotation position
+    // -- never the target.
+    static_assert(V::source({TypeParam(3), uint8_t(2)}) == TypeParam(3));
+    static_assert(V::slot({TypeParam(3), uint8_t(2)}) == uint8_t(2));
+    for (const auto& f : this->fixtures()) {
+        SCOPED_TRACE(f.name);
+        auto G = this->build(f.rot);
+        // Both halves of arc_at's projection law, over the full live
+        // domain, and the round trip back through arc_at.
+        for (int v = 0; v < this->N; v++)
+            for (int k = 0; k < G.degree(TypeParam(v)); k++) {
+                const auto a = G.arc_at(TypeParam(v), k);
+                EXPECT_EQ(V::source(a), TypeParam(v));
+                EXPECT_EQ(V::slot(a), uint8_t(k));
+                EXPECT_EQ(G.arc_at(V::source(a), V::slot(a)), a);
+            }
+        // source is tied to the GRAPH, not just the pair: the arc's
+        // source is its reverse's target.
+        for (auto a : this->arcs(G))
+            EXPECT_EQ(G.target(G.reverse_arc(a)), V::source(a));
+    }
+}
+
+// @ref rsr-arc-value (dense_graph.hh)
+TYPED_TEST(ArcNav, ArcIsTheSourceTargetPair) {
+    using V = typename TestFixture::View;
+    // Differential: the expected pair comes straight from the fixture's
+    // rotation lists, never through the view's own reads, so a bug shared
+    // between arc's two components (a wrong arcid, say) cannot hide.
+    for (const auto& f : this->fixtures()) {
+        SCOPED_TRACE(f.name);
+        auto G = this->build(f.rot);
+        for (size_t v = 0; v < f.rot.size(); v++)
+            for (size_t k = 0; k < f.rot[v].size(); k++)
+                EXPECT_EQ(G.arc(G.arc_at(TypeParam(v), int(k))),
+                          (typename V::arc_t{TypeParam(v),
+                                             TypeParam(f.rot[v][k])}));
     }
 }
 
@@ -216,6 +268,49 @@ TYPED_TEST(ArcNav, FindArcOnAbsentEdgeCarriesNoSlot) {
     // The 5-wheel has absent edges (the tetrahedron is complete): rim
     // vertices 1 and 3 are not adjacent.
     auto G = this->build(this->fixtures()[1].rot);
-    EXPECT_EQ(G.find_arc(TypeParam(1), TypeParam(3)).second,
-              RSRAdjacencyView<TypeParam>::no_slot);
+    using V = typename TestFixture::View;
+    EXPECT_EQ(V::slot(G.find_arc(TypeParam(1), TypeParam(3))), V::no_slot);
+}
+
+// @ref rsr-find-reverse, rsr-compute-twin, rsr-twin-mismatch (dense_graph.hh)
+TYPED_TEST(ArcNav, ComputeTwinMatchesTheRotationDerivedTwin) {
+    // Differential: the fixture's twin was derived from the rotation
+    // lists; the view's compute_twin derives from the arrays through its
+    // own find, INTO the same storage (no allocation).  Zero the table and
+    // let the view rebuild it in place.
+    using V = typename TestFixture::View;
+    for (const auto& f : this->fixtures()) {
+        SCOPED_TRACE(f.name);
+        auto G = this->build(f.rot);
+        const std::vector<uint8_t> expect = this->twin;
+        std::fill(this->twin.begin(), this->twin.end(), 0);
+        G.compute_twin();
+        for (auto a : this->arcs(G)) {
+            EXPECT_EQ(this->twin[G.arcid(a)], expect[G.arcid(a)]);
+            EXPECT_EQ(G.find_reverse(a), G.reverse_arc(a));   // the locator IS alpha
+        }
+        // Padding slots hold the named dead value.
+        for (int u = 0; u < this->N; u++)
+            for (int i = G.degree(TypeParam(u)); i < this->dmax; i++)
+                EXPECT_EQ(this->twin[(size_t)u * this->dmax + i], V::no_slot);
+        EXPECT_EQ(G.twin_mismatch(), TypeParam(-1));
+        EXPECT_TRUE(G.twin_is_valid());
+    }
+}
+
+TYPED_TEST(ArcNav, TwinMismatchNamesTheFirstDisagreeingVertex) {
+    // On the 5-wheel, vertex 3's slot-0 arc goes to 4 (row 4 = {5, 0, 3},
+    // so the locator's slot is 2).  Point the cached entry one slot on --
+    // a live slot of row 4 that does not hold 3 -- and the first vertex
+    // the validator names is 3; the per-row repair clears it.
+    auto G = this->build(this->fixtures()[1].rot);
+    const auto a = G.arc_at(TypeParam(3), 0);
+    const uint8_t good = this->twin[G.arcid(a)];
+    this->twin[G.arcid(a)] = uint8_t((good + 1) % G.degree(G.target(a)));
+    EXPECT_EQ(G.twin_mismatch(), TypeParam(3));
+    EXPECT_FALSE(G.twin_is_valid());
+    G.compute_twin_row(TypeParam(3));
+    EXPECT_EQ(this->twin[G.arcid(a)], good);
+    EXPECT_EQ(G.twin_mismatch(), TypeParam(-1));
+    EXPECT_TRUE(G.twin_is_valid());
 }

@@ -35,6 +35,7 @@
 #include <map>
 #include <numeric>
 #include <set>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -431,12 +432,33 @@ static AlexandrovSolver::TrajEntry make_traj(
   e.phase = phase; e.step = step; e.t = t;
   e.kappa_max = LinAlg::max_abs(kappa);
   e.kappa = kappa;
+  e.r = r;
   e.positions = Reconstruct::from_radii(T, r);   // empty/NaN if Gram-BFS fails
+  // Live faces in compact order; compact[f] maps a DCEL face id to its index in
+  // e.faces so the gluing below refers to compact indices.
+  std::vector<int> compact(T.nf, -1);
   for (int f = 0; f < T.nf; f++) {
     if (T.f_he[f] < 0 || !T.alive(T.f_he[f])) continue;   // dead face slot
+    compact[f] = (int)e.faces.size();
     const auto h = T.face_halfedges(f);
     e.faces.push_back({T.he_origin[h[0]], T.he_origin[h[1]], T.he_origin[h[2]]});
     e.face_len.push_back({T.he_length[h[0]], T.he_length[h[1]], T.he_length[h[2]]});
+  }
+  // The gluing across each base edge, per slot (see TrajEntry): the twin half-edge's
+  // face and its cycle slot there, plus the GCP dihedral at the edge.
+  for (int f = 0; f < T.nf; f++) {
+    if (compact[f] < 0) continue;
+    const auto h = T.face_halfedges(f);
+    std::array<int,3>    tw;
+    std::array<double,3> th;
+    for (int s = 0; s < 3; s++) {
+      const int t = T.twin(h[s]);
+      const int g = T.he_face[t];
+      tw[s] = (g >= 0 && compact[g] >= 0) ? 3 * compact[g] + T.cycle_slot(t) : -1;
+      th[s] = GCP::theta(T, r, h[s]);
+    }
+    e.face_twin.push_back(tw);
+    e.face_theta.push_back(th);
   }
   return e;
 }
@@ -1616,18 +1638,12 @@ DelaunayTriangulation::EdgeLengthFn AlexandrovIDTCubic::KisMetric::edge_length_f
   };
 }
 
-void AlexandrovIDTCubic::build(const TriangulationView& T)
+AlexandrovIDTCubic::ConeLabels
+AlexandrovIDTCubic::cone_labels(const KisMetric& M, const DelaunayTriangulation& D,
+                                const vector<int>& new_to_old)
 {
-  KisMetric M = kis_metric(T);
-
-  vector<int> new_to_old;
-  DelaunayTriangulation D = DelaunayTriangulation::compute(
-      M.K, M.edge_length_fn(), FLAT_TOL, &new_to_old, track_removed);
-
-  cone_triangle.clear();
-  cone_npent.clear();
-  cone_kis_vertex = new_to_old;
-  double total = 0;
+  ConeLabels L;
+  L.kis_vertex = new_to_old;
   for (int i = 0; i < D.nv; i++) {
     const int old = new_to_old[i];
     if (old < M.Nv)
@@ -1636,20 +1652,70 @@ void AlexandrovIDTCubic::build(const TriangulationView& T)
     const tri_t& f = M.triangle[old - M.Nv];
     int k = 0;
     for (int j = 0; j < 3; j++) k += (M.fdeg[f[j]] == 5);
+    L.triangle.push_back(f);
+    L.npent.push_back(k);
+  }
+  return L;
+}
+
+void AlexandrovIDTCubic::check_curvature_quantum(const DelaunayTriangulation& D,
+                                                 const ConeLabels& L)
+{
+  double total = 0;
+  for (int i = 0; i < D.nv; i++) {
+    const int k = L.npent[i];
     const double kappa = 2 * M_PI - D.v_cone_angle[i];
     if (k < 1 || fabs(kappa - k * M_PI / 15) > KAPPA_TOL)
       throw logic_error("AlexandrovIDTCubic: cone " + to_string(i) +
                         " has kappa = " + to_string(kappa) + ", expected " +
                         to_string(k) + "*pi/15");
     total += kappa;
-    cone_triangle.push_back(f);
-    cone_npent.push_back(k);
   }
   if (fabs(total - 4 * M_PI) > TOTAL_KAPPA_TOL)
     throw logic_error("AlexandrovIDTCubic: total curvature " +
                       to_string(total) + " != 4*pi");
+}
 
+void AlexandrovIDTCubic::set_cones(ConeLabels L)
+{
+  cone_triangle   = std::move(L.triangle);
+  cone_npent      = std::move(L.npent);
+  cone_kis_vertex = std::move(L.kis_vertex);
+}
+
+void AlexandrovIDTCubic::build_banded(const TriangulationView& T)
+{
+  KisMetric M = kis_metric(T);
+  vector<int> new_to_old;
+  DelaunayTriangulation D = DelaunayTriangulation::compute(
+      M.K, M.edge_length_fn(), FLAT_TOL, &new_to_old, track_removed);
+  ConeLabels L = cone_labels(M, D, new_to_old);
+  check_curvature_quantum(D, L);
+  set_cones(std::move(L));
   solver.D = std::move(D);
+}
+
+DelaunayView::CompletionStats AlexandrovIDTCubic::build(const TriangulationView& T)
+{
+  KisMetric M = kis_metric(T);
+  DelaunayTriangulation D =
+      DelaunayTriangulation::from_intrinsic_metric(M.K, M.edge_length_fn());
+  // Tracking, when requested, precedes the reduction (the compute(...,
+  // track_removed) contract); remove_and_complete_cyclotomic_kis passes the
+  // point tracker through every flip and every star retriangulation, the
+  // completion included.
+  if (track_removed) D.enable_point_tracking();
+  const DelaunayView::CompletionStats completion =
+      D.remove_and_complete_cyclotomic_kis(M.Nv, std::span<const int>(M.fdeg));
+  // Compaction after the completion: the exact lengths live only inside
+  // that call, and compaction is a monotone relabelling (compact_vertices,
+  // @post monotone), under which the completion's corner order is unchanged.
+  const vector<int> new_to_old = D.compact_vertices();
+  ConeLabels L = cone_labels(M, D, new_to_old);
+  check_curvature_quantum(D, L);
+  set_cones(std::move(L));
+  solver.D = std::move(D);
+  return completion;
 }
 
 std::vector<coord3d> AlexandrovIDTCubic::solve(const TriangulationView& T)

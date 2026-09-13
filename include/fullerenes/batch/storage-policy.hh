@@ -14,11 +14,16 @@
 //
 // Keep all higher-level code backend-agnostic by going through this alias.
 
+// The choice is the BUILD's, recorded in the generated config.hh by
+// ENABLE_SYCL, never inferred from which compiler is reading this header: a
+// translation unit compiled by acpp in an ENABLE_SYCL=OFF tree, or by clang
+// against an ENABLE_SYCL=ON library, must still agree with the library on
+// Batch's layout.  (Before 2026-09-06 the acpp/SYCL predefined macros also
+// selected SyclVector, so acpp as host compiler with SYCL off produced
+// objects that could not link.)
+#include "fullerenes/config.hh"
+
 #if defined(FULLERENES_ENABLE_SYCL)
-#  define BATCH_STORAGE_USE_SYCL 1
-#elif defined(SYCL_LANGUAGE_VERSION)
-#  define BATCH_STORAGE_USE_SYCL 1
-#elif defined(__ACPP__) || defined(__ADAPTIVECPP__) || defined(__HIPSYCL__) || defined(__OPENSYCL__) || defined(SYCL_IMPLEMENTATION_ONEAPI)
 #  define BATCH_STORAGE_USE_SYCL 1
 #else
 #  define BATCH_STORAGE_USE_SYCL 0

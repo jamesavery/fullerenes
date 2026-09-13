@@ -39,20 +39,12 @@ namespace batch {
 
 namespace detail {
 
-// tuple_t = std::tuple<std::span<T0>&, std::span<T1>&, ...> -- what V::to_tuple()
-// returns.  Strip cvref to get the underlying tuple of lvalue-reference spans.
-template<class V>
-using field_tuple_t = std::remove_cvref_t<
-    decltype(std::declval<V&>().to_tuple())>;
-
-// span<Ti> (value, no reference) for field I.
-template<class V, std::size_t I>
-using field_span_t = std::remove_reference_t<
-    std::tuple_element_t<I, field_tuple_t<V>>>;
-
-// element_type of that span (e.g. int32_t, uint8_t, coord3<double>).
-template<class V, std::size_t I>
-using field_element_t = typename field_span_t<V, I>::element_type;
+// The contract's derived types live with the contract (batchable.hh): the
+// field tuple, each field's span and element type, the loop over fields.
+using batch::field_tuple_t;
+using batch::field_span_t;
+using batch::field_element_t;
+using batch::for_each_field;
 
 // tuple<span<T0>, span<T1>, ...> -- storage-view tuple used by BatchView<V>.
 template<class V, std::size_t... Is>
@@ -69,14 +61,6 @@ auto make_buffer_tuple_t(std::index_sequence<Is...>)
 template<class V>
 using buffer_tuple_t = decltype(make_buffer_tuple_t<V>(
     std::make_index_sequence<V::n_fields>{}));
-
-// Apply a callable at each field index 0..V::n_fields-1.
-template<class V, class F>
-constexpr void for_each_field(F&& f) {
-    [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-        (f(std::integral_constant<std::size_t, Is>{}), ...);
-    }(std::make_index_sequence<V::n_fields>{});
-}
 
 } // namespace detail
 

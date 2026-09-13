@@ -46,6 +46,8 @@ struct graph_surgery_error : public std::logic_error {
         NotLiveArc,              // an arcix names no live arc
         SuccessorNotNeighbour,   // a named successor is absent from the row
         TwinAbsent,              // reverse_arc on a graph with no twin table
+        ShapeMismatch,           // a destination view's N or stride differs from the source's
+        BadPermutation,          // a relabelling that is not a permutation of the vertices
     };
     Code code;
     long long u, v;   // the endpoints the operation was called with (-1: n/a)
@@ -89,6 +91,10 @@ void row_close_gap(std::span<T> row, int slot, int old_deg) {
 //
 // operator[] returns a span over the row's active entries.
 //
+// A view may cover more rows than its graph -- an owner's storage, a slot
+// of a batch sized for growth: capacity() is the rows its spans hold,
+// N <= capacity(), and every reader stops at N.
+//
 // Template parameter:
 //   K -- index type: int32_t (CPU), uint16_t (GPU)
 // ---------------------------------------------------------------------------
@@ -120,6 +126,122 @@ struct RSRAdjacencyView {
     RSRAdjacencyView(K N, int dmax, std::span<K> neighbours, std::span<uint8_t> deg,
                      std::span<uint8_t> twin = {})
         : N(N), dmax(dmax), neighbours(neighbours), deg(deg), twin(twin) {}
+
+    // -----------------------------------------------------------------------
+    // Row-layout words: the padding invariant, and the whole-graph relayouts
+    // an owner composes with an allocation (owned.hh).  All three write a
+    // destination view and allocate nothing.
+    // -----------------------------------------------------------------------
+
+    // Pad the rows [from, to): degree 0, every neighbour slot K(-1), every
+    // twin slot no_slot when the table is present -- THE padding invariant,
+    // which an owner establishes on the rows it exposes (Owned::resize) and
+    // a construction pass re-establishes on rows it abandons.  Idempotent.
+    // (clear_row(u), further down, is a different word: it drops u's degree
+    // and nothing else.)
+    // @anchor rsr-pad-rows
+    // @pre  range: 0 <= from && from <= to && to <= N
+    // @post empty:  all_of(indices(from, to), [&](K u){ return degree(u) == 0; })
+    // @post padded: all_of(indices(from, to), [&](K u){ return row_is_padded(u); })
+    void pad_rows(K from, K to) {
+        const bool tw = has_twin();
+        for (K u = from; u < to; ++u) {
+            deg[u] = 0;
+            for (int i = 0; i < dmax; ++i) {
+                neighbours[arcid(u, i)] = K(-1);
+                if (tw) twin[arcid(u, i)] = no_slot;
+            }
+        }
+    }
+
+    // THE ROW-PADDING PREDICATE, per row: every slot of u at or past its
+    // degree holds K(-1), and no_slot in the twin table when the table is
+    // present.  pad_rows writes it; the row writes that shorten a row
+    // restore it (erase_at, resize_row, assign_row -- clear_row, which
+    // drops the degree alone, is the construction-phase exception); a
+    // writer that owns a row's whole width writes it along with the
+    // entries.  A degree past the stride is not a padded row (nothing past
+    // it can be), so a corrupt degree is reported, never skipped.
+    // @anchor rsr-row-is-padded
+    // @pre  vertex: size_t(u) < size_t(N)
+    bool row_is_padded(K u) const {
+        if (deg[u] > dmax) return false;
+        const bool tw = has_twin();
+        for (int i = deg[u]; i < dmax; ++i)
+            if (neighbours[arcid(u, i)] != K(-1) || (tw && twin[arcid(u, i)] != no_slot))
+                return false;
+        return true;
+    }
+
+    // The first row of [0, N) that is not padded, or K(-1) when every row
+    // is -- the witness a checker's diagnosis names.  O(N * dmax): a
+    // validator, not a hot-path check.
+    // @anchor rsr-first-unpadded-row
+    // @post result == K(-1) || (size_t(result) < size_t(N) && !row_is_padded(result))
+    // @post first: all_of(indices(0, result == K(-1) ? N : result), [&](K u){ return row_is_padded(u); })
+    K first_unpadded_row() const {
+        for (K u = 0; u < N; ++u)
+            if (!row_is_padded(u)) return u;
+        return K(-1);
+    }
+
+    // THE graph-wide padding predicate -- what a @post padded clause over
+    // the whole graph cites (twin_is_valid's sibling, for the rows' tails).
+    bool rows_are_padded() const { return first_unpadded_row() == K(-1); }
+
+    // The same rotation system at dst's stride: row u's entries land in
+    // dst's row u, the remaining slots padding.  A row wider than dst's
+    // stride is REFUSED by name -- truncating it would leave an asymmetric
+    // rotation system with no diagnosis.  dst's twin, if present, is left
+    // for the caller to recompute.
+    // @anchor rsr-restride-into
+    // @pre  shape: dst.N == N                        -- violation throws ShapeMismatch
+    // @pre  fits:  all_of(indices(N), [&](K u){ return degree(u) <= dst.dmax; })
+    //                                                -- violation throws RowFull
+    // @post rows:  all_of(indices(N), [&](K u){ return equal(nbrs(u), dst.nbrs(u)); })
+    // @throws graph_surgery_error{ShapeMismatch, RowFull}
+    void restride_into(RSRAdjacencyView& dst) const {
+        if (dst.N != N) surgery_fail("restride_into", Code::ShapeMismatch, dst.N, K(-1));
+        for (K u = 0; u < N; ++u) {
+            const int d = deg[u];
+            if (d > dst.dmax) surgery_fail("restride_into", Code::RowFull, u, K(-1));
+            dst.deg[u] = uint8_t(d);
+            for (int i = 0; i < dst.dmax; ++i)
+                dst.neighbours[dst.arcid(u, i)] = i < d ? neighbours[arcid(u, i)] : K(-1);
+        }
+    }
+
+    // The relabelled rotation system: row u lands in dst's row pi[u] with
+    // every target relabelled, and a row with pi[u] < 0 is DROPPED -- the
+    // compaction case, legal only for a vertex no kept row points at.  Twin
+    // entries are slots, which relabelling leaves unchanged, so the table
+    // travels with its rows whenever both sides carry one.
+    // @anchor rsr-relabel-into
+    // @pre  stride:    dst.dmax == dmax              -- violation throws ShapeMismatch
+    // @pre  length:    pi.size() == size_t(N)
+    // @pre  injective: all_of(indices(N), [&](K u){ return pi[u] < 0 || count(pi, pi[u]) == 1; })
+    // @pre  onto:      count_if(pi, [](int w){ return w >= 0; }) == dst.N
+    // @pre  closed:    all_of(indices(N), [&](K u){ return pi[u] < 0 ||
+    //                      all_of(nbrs(u), [&](K v){ return pi[v] >= 0; }); })
+    // @post rows: all_of(indices(N), [&](K u){ return pi[u] < 0 ||
+    //                 equal(nbrs(u), dst.nbrs(K(pi[u])), [&](K v, K w){ return w == pi[v]; }); })
+    // @post twin: implies(has_twin() && dst.has_twin(), dst.twin_is_valid() == twin_is_valid())
+    //             (under @pre closed; a dropped vertex a kept row points at breaks both)
+    // @throws graph_surgery_error{ShapeMismatch}
+    void relabel_into(std::span<const int> pi, RSRAdjacencyView& dst) const {
+        if (dst.dmax != dmax) surgery_fail("relabel_into", Code::ShapeMismatch, K(-1), K(-1));
+        const bool carry_twin = has_twin() && dst.has_twin();
+        for (K u = 0; u < N; ++u) {
+            if (pi[u] < 0) continue;
+            const K w = K(pi[u]);
+            dst.deg[w] = deg[u];
+            for (int i = 0; i < dmax; ++i) {
+                const bool live = i < deg[u];
+                dst.neighbours[dst.arcid(w, i)] = live ? K(pi[neighbours[arcid(u, i)]]) : K(-1);
+                if (carry_twin) dst.twin[dst.arcid(w, i)] = live ? twin[arcid(u, i)] : no_slot;
+            }
+        }
+    }
 
     // -----------------------------------------------------------------------
     // Batchability contract (see include/fullerenes/batch/batchable.hh).
@@ -183,21 +305,48 @@ struct RSRAdjacencyView {
     }
 
     // --- Arc-index navigation: the rotation-system words ------------------
-    // O(1) per call except find_arc (O(degree)).  target reads an arc's
-    // head; next/prev are sigma/sigma^-1, reverse_arc is alpha, and
-    // next_on_face walks the face orbit -- the vocabulary rotation-system
-    // algorithms compose from; the laws each word carries are on its
-    // declaration, pinned by tests/arc-nav-test.cc.
+    // O(1) per call except find_arc (O(degree)).  source/slot project an
+    // arc's components and arc_at rebuilds it; target reads an arc's head
+    // and arc(a) is its {source, target} value; next/prev are
+    // sigma/sigma^-1, reverse_arc is alpha, and next_on_face walks the
+    // face orbit -- the vocabulary rotation-system algorithms compose
+    // from; the laws each word carries are on its declaration, pinned by
+    // tests/arc-nav-test.cc.
 
     // THE live-arc predicate: what every "@pre live:" below cites and what
     // require_live_arc enforces.  Total: no read outside the arrays.
     bool is_live_arc(arcix_t a) const {
-        return size_t(a.first) < size_t(N) && int(a.second) < degree(a.first);
+        const auto [u, i] = a;
+        return size_t(u) < size_t(N) && int(i) < degree(u);
     }
 
     arcix_t find_arc(K u, K v) const {
-        return {u, uint8_t(find(u, v))};
+        return arc_at(u, find(u, v));     // an absent edge carries no_slot
     }
+
+    // The arc at rotation slot k of v -- the slot-indexed arc build, and
+    // the inverse of the source/slot projections below (their round trip
+    // arc_at(source(a), slot(a)) == a holds for EVERY arc value, no_slot
+    // arcs included).  Unguarded like its sibling words: out of range the
+    // arc is well-formed but denotes a padding read (k narrows to uint8_t;
+    // the row-width bound dmax <= 255 keeps every meaningful k faithful).
+    // @anchor rsr-arc-at
+    // @pre  live: k >= 0 && k < degree(v)   (for the result to name a live
+    //       arc; the padding case above is deliberate and outside it)
+    // @post projection: source(result) == v && slot(result) == k
+    arcix_t arc_at(K v, int k) const { return {v, uint8_t(k)}; }
+
+    // The (source, slot) projections -- the named reads of arcix_t's two
+    // components.  Pure (no graph read) and static, so a caller without a
+    // view can spell them too.  Where BOTH components are consumed, prefer
+    // the destructuring this header uses itself: auto [u, i] = a;
+    // (The target is NOT a component: it lives in the adjacency row, read
+    // by target(a) below.)
+    // @anchor rsr-arc-projections
+    // @post result == a.first
+    static constexpr K source(arcix_t a) { return a.first; }
+    // @post result == a.second
+    static constexpr uint8_t slot(arcix_t a) { return a.second; }
 
     // Flat arc id in [0, N*dmax): the dense canonical index of the directed arc at
     // position i in u's row (the arc u -> neighbours[u*dmax+i]). It indexes both
@@ -207,17 +356,29 @@ struct RSRAdjacencyView {
     // recoverable O(1): source = id/dmax (arc_of), target = neighbours[id]. size_t so
     // the index can never overflow before the (size_t-sized) backing buffer does.
     size_t  arcid(K u, int i) const { return size_t(u) * dmax + i; }
-    size_t  arcid(arcix_t a)  const { return arcid(a.first, a.second); }
-    arcix_t arc_of(size_t id) const { return {K(id / dmax), uint8_t(id % dmax)}; }
+    size_t  arcid(arcix_t a)  const { return arcid(source(a), slot(a)); }
+    arcix_t arc_of(size_t id) const { return arc_at(K(id / dmax), int(id % dmax)); }
 
     // @pre live: is_live_arc(a)
     K target(arcix_t a) const {
         return neighbours[arcid(a)];
     }
 
+    // The arc VALUE an index names: the {source, target} vertex pair.
+    // For code that keeps the pair as a datum (a key, a record, a trace
+    // line) -- NOT for row iteration, which reads target(a) directly.
+    // @anchor rsr-arc-value
+    // @pre  live: is_live_arc(a)
+    // @post value: result == arc_t{source(a), target(a)}
+    arc_t arc(arcix_t a) const { return {source(a), target(a)}; }
+    // arc_t converts IMPLICITLY to arcix_t (std::pair's converting
+    // constructor), so without this guard arc(arc(a)) would compile and
+    // read a target vertex as a rotation slot.
+    arc_t arc(arc_t) const = delete;
+
     // sigma: the cyclic successor in the source's rotation.
     // @pre  live: is_live_arc(a)  (an empty row would divide by zero)
-    // @post orbit: next^degree(a.first) is the identity on a's row
+    // @post orbit: next^degree(source(a)) is the identity on a's row
     arcix_t next(arcix_t a) const {
         auto [u, i] = a;
         uint8_t d = deg[u];
@@ -238,10 +399,10 @@ struct RSRAdjacencyView {
     // @post involution: !twin_is_valid() || reverse_arc(result) == a
     // @throws graph_surgery_error{TwinAbsent} when !has_twin()
     arcix_t reverse_arc(arcix_t a) const {
+        auto [u, i] = a;
         if (!has_twin())
             surgery_fail("reverse_arc", graph_surgery_error::Code::TwinAbsent,
-                         a.first, K(-1));
-        auto [u, i] = a;
+                         u, K(-1));
         K v = neighbours[arcid(u, i)];
         uint8_t j = twin[arcid(u, i)];
         return {v, j};
@@ -260,13 +421,130 @@ struct RSRAdjacencyView {
     }
 
     // =======================================================================
+    // The twin table: derivation and validity, both from the LOCATOR
+    //
+    // alpha has ONE reference definition, the locator: the reverse of the
+    // arc u -> v is the arc at the slot of v's row that holds u, which is
+    // find(v, u).  The twin table is a CACHE of that answer, one byte per
+    // arc, so that reverse_arc is O(1).  Everything below is stated against
+    // the locator: compute_twin writes it into the view's own span (no
+    // allocation -- the storage is the owner's, and a view over caller
+    // arrays derives its table in place), twin_mismatch names the first
+    // vertex whose cached answer differs from it, and twin_is_valid IS
+    // "there is no such vertex".  One definition; the validator, the
+    // derivation and the surgery's maintenance all answer to it.
+    //
+    // SIMPLE GRAPHS.  find resolves the FIRST occurrence of u in v's row,
+    // so on a graph with parallel arcs u -> v the locator names one slot
+    // for both and the derived table is not an involution; the library's
+    // face tracing makes the same assumption (graphview.hh's
+    // is_consistently_oriented note, and the open question it cites), and
+    // the surgery below refuses to create parallel arcs.  Validity here
+    // means agreement with the locator, and on a simple graph that agreement
+    // implies the involution.
+    // =======================================================================
+
+    // The reverse arc BY THE LOCATOR -- alpha's reference definition, read
+    // off the adjacency alone.  An absent reverse comes back carrying
+    // no_slot (find_arc's convention).
+    // @anchor rsr-find-reverse
+    // @pre  live: is_live_arc(a)
+    // @pre  target_in_range: size_t(target(a)) < size_t(N)
+    // @post result == find_arc(target(a), source(a))
+    arcix_t find_reverse(arcix_t a) const {
+        return find_arc(target(a), source(a));
+    }
+
+    // Derive the twin table INTO the view's own span from the adjacency:
+    // every live arc's entry becomes the locator's slot (no_slot where the
+    // reverse is absent -- the caller decides whether that is a contract
+    // violation, as Owned::compute_twin does), every padding slot becomes
+    // no_slot, the named dead value.  Total: reads only rows of vertices in
+    // range; an out-of-range target leaves no_slot like an absent reverse.
+    // O(sum of degree^2).
+    // @anchor rsr-compute-twin
+    // @pre  present: has_twin() && twin.size() >= size_t(N) * dmax
+    // @post agrees:  twin_mismatch() == K(-1) whenever every arc has a
+    //                reverse and every target is in range
+    void compute_twin() {
+        for (K u = 0; u < N; ++u) {
+            const int d = deg[u];
+            for (int i = 0; i < dmax; ++i) {
+                uint8_t s = no_slot;
+                if (i < d) {
+                    const K v = neighbours[arcid(u, i)];
+                    if (size_t(v) < size_t(N)) s = slot(find_reverse(arc_at(u, i)));
+                }
+                twin[arcid(u, i)] = s;
+            }
+        }
+    }
+
+    // The same for ONE row -- the per-row repair after a construction-phase
+    // edit of that row alone.  Entries of OTHER rows that point into this
+    // one are not touched (they name slots, and only this row's slots may
+    // have moved).
+    // @pre  present: has_twin()
+    // @pre  vertex:  size_t(u) < size_t(N)
+    void compute_twin_row(K u) {
+        const int d = deg[u];
+        for (int i = 0; i < dmax; ++i) {
+            uint8_t s = no_slot;
+            if (i < d) {
+                const K v = neighbours[arcid(u, i)];
+                if (size_t(v) < size_t(N)) s = slot(find_reverse(arc_at(u, i)));
+            }
+            twin[arcid(u, i)] = s;
+        }
+    }
+
+    // The first live arc whose cached reverse is ABSENT (entry no_slot), or
+    // {K(-1), no_slot} when every live arc has one -- what an owner's
+    // compute_twin reads to refuse an asymmetric graph by name.  A table
+    // read, O(sum of degrees); the table-against-graph check is
+    // twin_mismatch below.
+    // @anchor rsr-first-twinless-arc
+    // @pre  present: has_twin()
+    // @post absent: source(result) == K(-1) ||
+    //               (is_live_arc(result) && twin[arcid(source(result), slot(result))] == no_slot)
+    arcix_t first_twinless_arc() const {
+        for (K u = 0; u < N; ++u)
+            for (int i = 0; i < deg[u]; ++i)
+                if (twin[arcid(u, i)] == no_slot) return arc_at(u, i);
+        return {K(-1), no_slot};
+    }
+
+    // The first vertex with a live arc whose cached entry is not the
+    // locator's answer, or K(-1) when the table agrees everywhere.  A live
+    // arc WITHOUT a reverse is a mismatch too: the table caches alpha, and
+    // an arc the graph does not close has no alpha to cache (so an
+    // asymmetric graph is never valid, whatever its table says).  Total:
+    // an out-of-range target is a mismatch, never a read through it.
+    // O(sum of degree^2) -- a validator, not a hot-path check.
+    // @anchor rsr-twin-mismatch
+    // @pre  present: has_twin()
+    // @post result == K(-1) || (some live arc of result has no reverse or
+    //       disagrees with find_reverse)
+    K twin_mismatch() const {
+        for (K u = 0; u < N; ++u)
+            for (int i = 0; i < deg[u]; ++i) {
+                const K v = neighbours[arcid(u, i)];
+                if (size_t(v) >= size_t(N)) return u;
+                const uint8_t s = slot(find_reverse(arc_at(u, i)));
+                if (s == no_slot || twin[arcid(u, i)] != s) return u;
+            }
+        return K(-1);
+    }
+
+    // =======================================================================
     // Embedded-edge surgery
     //
     // The operations in this section edit the rotation system as a SYMMETRIC
     // pair -- both directed arcs of an edge in one call -- and are the only
     // mutators that maintain the twin table.  What "valid twin" means is
-    // defined ONCE, executably, by twin_is_valid() below; every contract in
-    // this section cites it by name.
+    // defined ONCE, executably, by twin_is_valid() below -- agreement with
+    // the locator (the section above); every contract in this section cites
+    // it by name.
     //
     // Positions are corners: insert_edge_at(a_u, a_v) lands the new edge in
     // the corner AFTER arc a_u in u's rotation and after a_v in v's.  The
@@ -294,30 +572,23 @@ struct RSRAdjacencyView {
     using Code = graph_surgery_error::Code;
 
     // THE twin-validity predicate -- the definition every @pre/@post twin
-    // clause in this header cites.  Empty twin is vacuously valid; else
-    // every live arc's entry names a live slot of a valid target row that
-    // points back at it (its reverse), both ways (involution).  The RSR
-    // sibling of validate(PlanarCSR) in planar_csr.hh.  Total: survives
-    // arbitrary garbage (out-of-range targets are reported false, never
-    // read through).  O(N*dmax) -- a validator, not a hot-path check.
+    // clause in this header cites: an empty twin is vacuously valid, and a
+    // present one is valid iff NO vertex disagrees with the locator
+    // (twin_mismatch above).  On a simple graph that is exactly "every live
+    // arc's entry names the live slot of the target row that points back at
+    // it, both ways": the entry equals find(v, u), so slot j holds u, and
+    // the reverse arc's own entry equals find(u, v) == i.  The RSR sibling
+    // of validate(PlanarCSR) in planar_csr.hh.  Total: survives arbitrary
+    // garbage (an out-of-range target is a mismatch, never read through).
+    // O(sum of degree^2) -- a validator, not a hot-path check.
     bool twin_is_valid() const {
-        if (!has_twin()) return true;
-        for (K u = 0; u < N; ++u)
-            for (int i = 0; i < deg[u]; ++i) {
-                const K v = neighbours[arcid(u, i)];
-                const int j = twin[arcid(u, i)];
-                if (size_t(v) >= size_t(N))     return false;
-                if (j >= deg[v])                return false;
-                if (neighbours[arcid(v, j)] != u) return false;
-                if (twin[arcid(v, j)] != i)     return false;
-            }
-        return true;
+        return !has_twin() || twin_mismatch() == K(-1);
     }
 
     // The linear slot at which an arc inserted into the corner after a
     // lands.  Deliberately NOT next(a): next wraps slot deg-1 back to 0,
     // while the corner after the last arc is the append slot deg.
-    int slot_after(arcix_t a) const { return a.second + 1; }
+    int slot_after(arcix_t a) const { return slot(a) + 1; }
 
     // New edge u--v landing in the corner after a_u (in u's rotation) and
     // after a_v (in v's).
@@ -325,14 +596,14 @@ struct RSRAdjacencyView {
     // @pre  live_u: is_live_arc(a_u)
     // @pre  live_v: is_live_arc(a_v)
     // @pre  (the slot core's @pre, at slots slot_after(a_u) / slot_after(a_v))
-    // @post target(result.first) == a_v.first && target(result.second) == a_u.first
+    // @post target(result.first) == source(a_v) && target(result.second) == source(a_u)
     // @post twin: twin_is_valid()
     // @throws graph_surgery_error{NotLiveArc} and the slot core's codes
     std::pair<arcix_t, arcix_t> insert_edge_at(arcix_t a_u, arcix_t a_v) {
         require_live_arc("insert_edge_at", a_u);
         require_live_arc("insert_edge_at", a_v);
-        return insert_edge_slots(a_u.first, slot_after(a_u),
-                                 a_v.first, slot_after(a_v));
+        return insert_edge_slots(source(a_u), slot_after(a_u),
+                                 source(a_v), slot_after(a_v));
     }
 
     // Remove the edge carried by live arc a (and its reverse, resolved via
@@ -350,8 +621,10 @@ struct RSRAdjacencyView {
     std::pair<arcix_t, arcix_t> remove_edge_at(arcix_t a) {
         require_live_arc("remove_edge_at", a);
         const arcix_t r = has_twin() ? reverse_arc(a)
-                                     : find_arc(target(a), a.first);
-        return remove_edge_slots(a.first, a.second, r.first, r.second);
+                                     : find_arc(target(a), source(a));
+        const auto [u, s_u] = a;
+        const auto [v, s_v] = r;
+        return remove_edge_slots(u, s_u, v, s_v);
     }
 
     // --- Slot-addressed cores (the one surgery implementation) -----------
@@ -370,7 +643,7 @@ struct RSRAdjacencyView {
     // @pre  slots:    0 <= s_u && s_u <= degree(u) && 0 <= s_v && s_v <= degree(v)
     // @pre  absent:   find(u, v) < 0 && find(v, u) < 0
     // @pre  twin:     twin_is_valid()
-    // @post result == std::pair{arcix_t{u, s_u}, arcix_t{v, s_v}} && target(result.first) == v
+    // @post result == std::pair{arc_at(u, s_u), arc_at(v, s_v)} && target(result.first) == v
     // @post twin:     twin_is_valid()
     // @throws graph_surgery_error{VertexOutOfRange, SelfLoop, RowFull,
     //         SlotOutOfRange, AsymmetricAdjacency, EdgePresent}
@@ -481,8 +754,8 @@ struct RSRAdjacencyView {
 
     void require_live_arc(const char* op, arcix_t a) const {
         if (!is_live_arc(a))
-            surgery_fail(op, Code::NotLiveArc, a.first, K(-1),
-                         " (arc slot " + std::to_string(int(a.second)) + ")");
+            surgery_fail(op, Code::NotLiveArc, source(a), K(-1),
+                         " (arc slot " + std::to_string(int(slot(a))) + ")");
     }
 
     // The ONE builder for every surgery diagnosis: code -> sentence, plus
@@ -502,6 +775,8 @@ struct RSRAdjacencyView {
             case Code::NotLiveArc:            why = "not a live arc"; break;
             case Code::SuccessorNotNeighbour: why = "the named successor is not a neighbour"; break;
             case Code::TwinAbsent:            why = "no twin table (reverse_arc needs one)"; break;
+            case Code::ShapeMismatch:         why = "the destination's vertex count or stride differs"; break;
+            case Code::BadPermutation:        why = "not a permutation of the vertices"; break;
         }
         std::string msg = std::string(op) + "(" + std::to_string((long long)u) + "," +
                           std::to_string((long long)v) + "): " + why + detail;
@@ -560,37 +835,52 @@ struct RSRAdjacencyView {
 
     void clear_row(K u) { deg[u] = 0; }
 
+    // u's degree becomes n.  The slots at or past n hold K(-1) afterwards
+    // (on growth the exposed slots are padding for the caller to fill; on
+    // shrink the abandoned entries become padding), so the row-padding
+    // predicate's neighbour half holds of u whatever the row held.
+    // @pre  fits: n <= dmax -- violation throws graph_surgery_error{RowFull}
+    // @post degree(u) == n
+    // @post padded: the neighbour slots of u at or past n hold K(-1)
     void resize_row(K u, int n) {
-        assert(n <= dmax);
-        for (int i = deg[u]; i < n; ++i)
+        if (n > dmax)
+            surgery_fail("resize_row", graph_surgery_error::Code::RowFull, u, K(-1));
+        for (int i = std::min(int(deg[u]), n); i < dmax; ++i)
             neighbours[u * dmax + i] = K(-1);
         deg[u] = uint8_t(n);
     }
 
-    void assign_row(K u, std::initializer_list<K> v) {
-        assert(int(v.size()) <= dmax);
+    // u's whole row: v in the live prefix, K(-1) in every slot past it,
+    // so the row-padding predicate's neighbour half holds of u afterwards
+    // whatever the row held (pad_rows is this for the empty row).  The
+    // twin is left stale, as for every word of this group.
+    // @pre  fits: int(v.size()) <= dmax -- violation throws graph_surgery_error{RowFull}
+    // @post row:    degree(u) == v.size() && equal(v, nbrs(u))
+    // @post padded: the neighbour slots of u at or past degree(u) hold K(-1)
+    void assign_row(K u, std::span<const K> v) {
+        if (int(v.size()) > dmax)
+            surgery_fail("assign_row", graph_surgery_error::Code::RowFull, u, K(-1));
         deg[u] = uint8_t(v.size());
         int i = 0;
         for (K x : v) neighbours[u * dmax + i++] = x;
+        for (; i < dmax; ++i) neighbours[u * dmax + i] = K(-1);
     }
-
+    void assign_row(K u, std::initializer_list<K> v) {
+        assign_row(u, std::span<const K>(v.begin(), v.size()));
+    }
     void assign_row(K u, const std::vector<K>& v) {
-        assert(int(v.size()) <= dmax);
-        deg[u] = uint8_t(v.size());
-        for (int i = 0; i < int(v.size()); ++i)
-            neighbours[u * dmax + i] = v[i];
-    }
-
-    void assign_row(K u, std::span<const K> v) {
-        assert(int(v.size()) <= dmax);
-        deg[u] = uint8_t(v.size());
-        for (int i = 0; i < int(v.size()); ++i)
-            neighbours[u * dmax + i] = v[i];
+        assign_row(u, std::span<const K>(v));
     }
 
     // --- Backward compat with vector<vector<>> interface ---
 
     int size() const { return N; }
+
+    // The rows the spans hold.  A view over exactly its graph has
+    // capacity() == N; one over storage sized for growth (an owner's, a
+    // batch slot's, an enumerator's working graph) has N <= capacity(),
+    // and the rows [N, capacity()) are storage, not vertices.
+    int capacity() const { return static_cast<int>(deg.size()); }
 
     bool operator==(const RSRAdjacencyView& other) const {
         if (N != other.N || dmax != other.dmax) return false;
@@ -766,12 +1056,14 @@ struct OwnedDenseGraph : RSRAdjacencyView<K> {
         }
     }
 
-    // Converting constructor from RSRAdjacencyView (copies data).
+    // Converting constructor from RSRAdjacencyView (copies the graph's N
+    // rows; a view's spans may cover storage past its N).
     OwnedDenseGraph(const RSRAdjacencyView<K>& v) {
         this->N = v.N; this->dmax = v.dmax;
         if (v.N > 0 && v.neighbours.data()) {
-            owned_neighbours.assign(v.neighbours.begin(), v.neighbours.end());
-            owned_deg.assign(v.deg.begin(), v.deg.end());
+            owned_neighbours.assign(v.neighbours.begin(),
+                                    v.neighbours.begin() + size_t(v.N) * v.dmax);
+            owned_deg.assign(v.deg.begin(), v.deg.begin() + v.N);
         }
         repoint();
     }

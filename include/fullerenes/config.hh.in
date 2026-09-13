@@ -6,3 +6,7 @@
 
 #define FULLERENE_DATABASE_PATH "@FULLERENE_DATABASE_PATH@"
 #cmakedefine ENABLE_CUDA "@ENABLE_CUDA@"
+// Defined iff the library was built with ENABLE_SYCL: batch::Batch then owns
+// USM storage (SyclVector), else std::vector.  Consumers get the library's
+// choice through this header; see batch/storage-policy.hh.
+#cmakedefine FULLERENES_ENABLE_SYCL

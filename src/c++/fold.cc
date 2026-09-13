@@ -346,10 +346,20 @@ Triangulation Folding::fold()
   // from one copy, so the row is coherent in that copy's frame; a single-copy
   // vertex's frame is the global one, so it fills just its empty slots.
   // Slot s of the scan convention holds direction unit[(6-s)%6].
+  //
+  // Exception -- a flat vertex the seam cuts AT AN OUTLINE CORNER: no single
+  // copy then develops its whole disc (the copy's material wedge is the
+  // corner's angle, under 2pi), so the directions outside that wedge have no
+  // chart there and resolve_arc has nothing to walk.  Those labels are exactly
+  // the ones assemble_corners has already assembled by the glue-chained
+  // holonomy walk, which rotates through every copy; skip them here and read
+  // their cycle from corner_cycles below.  (Only developments whose outline
+  // corners are all cones -- the star unfolding -- avoid the case entirely.)
   {
     const SeamAtlas atlas(outline);
     for(node_t u = 0; u < N; u++){
       if(degrees[u] != 6) continue;
+      if(corner_cycles.count(u)) continue;
       if(node_pos[u].size() > 1){
         const auto ring = unit_ring(atlas, final_grid, node_pos[u][0]);
         for(int j = 0; j < 6; j++) neighbours[u][(6 - j) % 6] = ring[j];
@@ -365,16 +375,22 @@ Triangulation Folding::fold()
   // Build each vertex's oriented neighbour cycle and WRITE it to oriented
   // positions in the graph (neighbours[u*dmax + i]), never push_back.
   //
-  // Two sources, one per vertex class (all plane-CCW): cones (degree != 6)
-  // from corner_cycles (the ctor's holonomy walks); flat vertices from the
-  // slots (in-sheet scan + the completion above).  The slots run CW by index
-  // (slot s = direction unit[(6-s)%6]), so they are emitted reversed to give
-  // the plane-CCW cycle.
+  // Two sources, one per vertex class (all plane-CCW): outline-corner labels
+  // from corner_cycles (the ctor's holonomy walks) -- every cone, since a cone
+  // cannot sit in the flat interior of a development, plus any flat vertex the
+  // seam cuts at a corner; all remaining flat vertices from the slots (in-sheet
+  // scan + the completion above).  The slots run CW by index (slot s =
+  // direction unit[(6-s)%6]), so they are emitted reversed to give the
+  // plane-CCW cycle.
   Graph nbr(N, GRAPH_DMAX);
   for(node_t u = 0; u < N; u++){
     vector<node_t> cw;
-    if(degrees[u] != 6){
-      cw = corner_cycles.at(u);
+    const auto cyc = corner_cycles.find(u);
+    if(cyc != corner_cycles.end()){
+      cw = cyc->second;
+    } else if(degrees[u] != 6){
+      throw std::logic_error("fold: cone " + std::to_string(u) + " is not an outline corner "
+                             "(a cone of a flat development must lie on the seam)");
     } else {
       for(int d = 5; d >= 0; d--)
         if(neighbours[u][d] != -1) cw.push_back(neighbours[u][d]);

@@ -14,9 +14,26 @@ enable_language(CXX)
 option(FULLERENES_CORE_ONLY
   "Build only libfullerenes + buckygen (skip Fortran, playground, programs, benchmarks, tests, SYCL, pybind)"
   OFF)
+# A parent that links libfullerenes into its own executables, and would rather
+# not ship the library beside them, can build it static -- again as a cache
+# variable:  set(FULLERENES_SHARED OFF CACHE BOOL "" FORCE)
+option(FULLERENES_SHARED
+  "Build libfullerenes as a shared library (OFF: a static archive)"
+  ON)
 
-if(NOT FULLERENES_CORE_ONLY)
+# The legacy Fortran program (src/fortran: the Schwerdtfeger-Wirz-Avery
+# "Fullerene" v4.5) and graph_fortran.cc, the C++ side of its ABI.  Nothing
+# else in the tree links or calls Fortran -- every algorithm it carried that
+# the library needs has a C++ home (claude-projects/unfortran) -- so it is
+# opt-in: the default build, tests included, needs no Fortran compiler.  Off
+# means enable_language(Fortran) never runs.  Forced off under core-only.
+cmake_dependent_option(FULLERENES_LEGACY_FORTRAN
+  "Build the legacy Fortran program and its C ABI (needs a Fortran compiler)"
+  OFF "NOT FULLERENES_CORE_ONLY" OFF)
+
+if(FULLERENES_LEGACY_FORTRAN)
   enable_language(Fortran)
+  set(FORTRAN_NMAX 5000 CACHE STRING "Maximum vertex count for Fortran routines using statically allocated memory")
 endif()
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
   # Only when this repo is the top-level project: never rewrite a parent
@@ -26,7 +43,6 @@ endif()
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(FULLERENE_DATABASE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/database/ CACHE PATH "Path to fullerene database root")
-set(FORTRAN_NMAX 5000 CACHE STRING "Maximum vertex count for Fortran routines using statically allocated memory")
 
 find_package(GSL)
 find_package(GTest)
@@ -49,11 +65,54 @@ endif()
 # Shared between CUDA and SYCL
 set(GPU_MAXREGCOUNT 80)
 
+# --- Which GPU is actually in this machine? ---------------------------------
+# The evidence is what the vendor tools REPORT, not whether they are installed:
+# a box can carry rocminfo and /opt/rocm from a package with no AMD GPU in it
+# (rocminfo then exits nonzero: "ROCk module is NOT loaded"), and NVIDIA's
+# nvc++ backend does not put nvcc on PATH, so check_language(CUDA) says
+# nothing about the two RTX cards it drives.  So: an NVIDIA GPU is one that
+# nvidia-smi lists with a compute capability; an AMD GPU is a gfx agent
+# rocminfo lists (gfx000 is a CPU agent).  Each yields the architecture too,
+# which becomes the default for the *_ARCH knobs below; an explicit
+# -D on any of them still wins, these are only the defaults.
+find_program(NVIDIA_SMI nvidia-smi)
+find_program(ROCMINFO rocminfo HINTS ENV ROCM_PATH /opt/rocm PATH_SUFFIXES bin)
+mark_as_advanced(NVIDIA_SMI ROCMINFO)
+set(NVIDIA_GPU_ARCH "")   # e.g. 89 (sm_89), from the first GPU nvidia-smi lists
+set(AMD_GPU_ARCH "")      # e.g. gfx90a, from the first GPU agent rocminfo lists
+if(NVIDIA_SMI)
+  execute_process(COMMAND ${NVIDIA_SMI} --query-gpu=compute_cap --format=csv,noheader
+                  RESULT_VARIABLE _rc OUTPUT_VARIABLE _out ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
+  if(_rc EQUAL 0 AND _out MATCHES "^([0-9]+)\\.([0-9]+)")
+    set(NVIDIA_GPU_ARCH "${CMAKE_MATCH_1}${CMAKE_MATCH_2}")
+  endif()
+endif()
+if(ROCMINFO)
+  execute_process(COMMAND ${ROCMINFO} RESULT_VARIABLE _rc OUTPUT_VARIABLE _out ERROR_QUIET)
+  if(_rc EQUAL 0 AND _out MATCHES "(gfx[1-9][0-9a-f]*)")
+    set(AMD_GPU_ARCH "${CMAKE_MATCH_1}")
+  endif()
+endif()
+if(NVIDIA_GPU_ARCH)
+  message(STATUS "GPU: NVIDIA, compute capability sm_${NVIDIA_GPU_ARCH} (nvidia-smi)")
+endif()
+if(AMD_GPU_ARCH)
+  message(STATUS "GPU: AMD, ${AMD_GPU_ARCH} (rocminfo)")
+endif()
+if(NOT NVIDIA_GPU_ARCH AND NOT AMD_GPU_ARCH)
+  message(STATUS "GPU: none reported by nvidia-smi or rocminfo")
+endif()
+
 # Do we have CUDA compilers?
 check_language(CUDA)
 cmake_dependent_option(ENABLE_CUDA "Build CUDA GPU code" ON "CMAKE_CUDA_COMPILER" OFF)
 if(CMAKE_CUDA_COMPILER)
-  set(CMAKE_CUDA_ARCHITECTURES 86 CACHE INTEGER "Architecture for your NVIDIA GPU: 50|60|70|75|80|86|89|90. See https://arnon.dk/matching-sm-architectures-arch-and-gencode-for-various-nvidia-cards/")
+  if(NVIDIA_GPU_ARCH)
+    set(_cuda_arch_default ${NVIDIA_GPU_ARCH})
+  else()
+    set(_cuda_arch_default 86)
+  endif()
+  set(CMAKE_CUDA_ARCHITECTURES ${_cuda_arch_default} CACHE STRING "Architecture for your NVIDIA GPU: 50|60|70|75|80|86|89|90 (default: what nvidia-smi reports). See https://arnon.dk/matching-sm-architectures-arch-and-gencode-for-various-nvidia-cards/")
 endif()
 
 # Can we do SYCL with AdaptiveCpp compilers?
@@ -80,7 +139,7 @@ endif()
 option(ENABLE_SYCL "Build SYCL GPU code (requires AdaptiveCpp)" ${ENABLE_SYCL_DEFAULT})
 if(FULLERENES_CORE_ONLY)
   # Core-only must not let an auto-detected acpp flip the library ABI via
-  # add_compile_definitions(FULLERENES_ENABLE_SYCL=1) below.
+  # FULLERENES_ENABLE_SYCL in config.hh below.
   set(ENABLE_SYCL OFF)
 endif()
 
@@ -105,51 +164,159 @@ if(ENABLE_SYCL)
   if(NOT SYCL_COMPILER)
     message(FATAL_ERROR "ENABLE_SYCL=ON requires AdaptiveCpp compiler (acpp or syclcc)")
   endif()
-  # Force batch::Batch storage to use SyclVector (USM) even in translation
-  # units compiled by the host C++ compiler (programs/, benchmarks/), so
-  # host-populated batch buffers are accessible to SYCL kernels.
-  add_compile_definitions(FULLERENES_ENABLE_SYCL=1)
+  # batch::Batch storage is SyclVector (USM) in every translation unit of a
+  # SYCL build -- host-compiled ones (programs/, benchmarks/) included, so
+  # host-populated batch buffers are accessible to SYCL kernels.  The switch
+  # is FULLERENES_ENABLE_SYCL in the generated config.hh (configure_file
+  # below), which out-of-tree consumers see too; it used to be a compile
+  # definition here, invisible to them.
+  set(FULLERENES_ENABLE_SYCL ON)
 
-  if(CMAKE_CUDA_COMPILER)
+  # The default target is the GPU the machine reports (above); a CUDA
+  # toolchain with no GPU listed still means NVIDIA (it compiles); and with
+  # neither, the CPU backend, which always builds -- never a guess at a
+  # vendor that would then demand its toolkit.  -DSYCL_TARGETS= overrides.
+  if(NVIDIA_GPU_ARCH OR CMAKE_CUDA_COMPILER)
     set(SYCL_DEFAULT_TARGET "NVIDIA")
-  elseif(APPLE)
-    set(SYCL_DEFAULT_TARGET "X86")
-  else()
+  elseif(AMD_GPU_ARCH)
     set(SYCL_DEFAULT_TARGET "AMD")
+  else()
+    set(SYCL_DEFAULT_TARGET "X86")
   endif()
-  
-  set(SYCL_TARGETS ${SYCL_DEFAULT_TARGET} CACHE STRING "AMD|NVIDIA|X86|GENERIC (Target preset for AdaptiveCpp)")
-  message("SYCL compile enabled with ${SYCL_TARGETS} target")
+
+  # SYCL_TARGETS takes either a convenience preset -- AMD, NVIDIA, X86, GENERIC,
+  # expanded below using the architecture the machine reports -- or an
+  # AdaptiveCpp target list passed through verbatim, so everything acpp can
+  # express is reachable without adding an option per capability:
+  #
+  #   -DSYCL_TARGETS=NVIDIA                 the detected NVIDIA GPU
+  #   -DSYCL_TARGETS=cuda:sm_80,sm_89       one library for A100 and RTX 4090
+  #   -DSYCL_TARGETS=omp+cuda:sm_89         CPU and NVIDIA in one build
+  #   -DSYCL_TARGETS=generic                portable IR, JIT at first run
+  #
+  # Backends are separated by '+' or ';' and architectures within a backend by
+  # ','.  acpp's own separator is ';', but that is CMake's list separator and
+  # the shell's command separator, so -DSYCL_TARGETS=omp;cuda:sm_89 needs
+  # escaping in both.  '+' needs none; the two are accepted interchangeably.
+  set(SYCL_TARGETS ${SYCL_DEFAULT_TARGET} CACHE STRING "AdaptiveCpp targets: a preset (AMD|NVIDIA|X86|GENERIC) or a target list such as cuda:sm_80,sm_89 or omp+cuda:sm_89 (default: the GPU nvidia-smi/rocminfo report, else X86)")
 
   set(SYCL_BASE_FLAGS -O3)
   set(SYCL_EXTRA_FLAGS "" CACHE STRING "Extra SYCL compiler flags")
-  
-  if(SYCL_TARGETS STREQUAL "AMD") 
-    add_definitions(-DSOLVER_BACKEND=ROCSOLVER_BACKEND)
-    set(SYCL_HIP_ARCH "gfx90a" CACHE STRING "HIP GPU architecture for AdaptiveCpp AMD builds")
-    set(ACPP_TARGETS_DEFAULT "hip:${SYCL_HIP_ARCH}")
-  elseif(SYCL_TARGETS STREQUAL "NVIDIA")
-    add_definitions(-DSOLVER_BACKEND=CUSOLVER_BACKEND)
-    set(SYCL_CUDA_ARCH "86" CACHE STRING "CUDA architecture for NVIDIA builds (e.g. 80, 86, 90)")
-    set(SYCL_CUDA_BACKEND "cuda-nvcxx" CACHE STRING "AdaptiveCpp NVIDIA backend (cuda|cuda-nvcxx)")
-    if(SYCL_CUDA_BACKEND STREQUAL "cuda")
-      set(ACPP_TARGETS_DEFAULT "cuda:sm_${SYCL_CUDA_ARCH}")
+
+  # A ';'-separated value arrives as a CMake list; rejoin it, then normalise
+  # both accepted separators to '+' so the rest of this block sees one string.
+  string(REPLACE ";" "+" _sycl_targets_in "${SYCL_TARGETS}")
+  string(TOUPPER "${_sycl_targets_in}" _sycl_targets_preset)
+
+  if(_sycl_targets_preset STREQUAL "AMD")
+    if(AMD_GPU_ARCH)
+      set(_hip_arch_default ${AMD_GPU_ARCH})
     else()
-      # nvc++ backend avoids clang CUDA header/toolchain incompatibilities.
-      set(ACPP_TARGETS_DEFAULT "cuda-nvcxx:sm_${SYCL_CUDA_ARCH}")
+      set(_hip_arch_default "gfx90a")
     endif()
-  elseif(SYCL_TARGETS STREQUAL "X86")
+    set(SYCL_HIP_ARCH ${_hip_arch_default} CACHE STRING "HIP GPU architecture(s) for the AMD preset, comma-separated (default: what rocminfo reports)")
+    set(ACPP_TARGETS_RESOLVED "hip:${SYCL_HIP_ARCH}")
+  elseif(_sycl_targets_preset STREQUAL "NVIDIA")
+    if(NVIDIA_GPU_ARCH)
+      set(_cuda_arch_default ${NVIDIA_GPU_ARCH})
+    else()
+      set(_cuda_arch_default 86)
+    endif()
+    set(SYCL_CUDA_ARCH ${_cuda_arch_default} CACHE STRING "CUDA architecture(s) for the NVIDIA preset, comma-separated, e.g. 89 or 80,90 (default: what nvidia-smi reports)")
+    set(SYCL_CUDA_BACKEND "cuda-nvcxx" CACHE STRING "AdaptiveCpp NVIDIA backend (cuda|cuda-nvcxx)")
+    # "80,90" -> "sm_80,sm_90": acpp wants the prefix on every architecture.
+    string(REPLACE "," ";" _cuda_arch_list "${SYCL_CUDA_ARCH}")
+    set(_cuda_arch_spec "")
+    foreach(_arch IN LISTS _cuda_arch_list)
+      string(STRIP "${_arch}" _arch)
+      if(_cuda_arch_spec)
+        string(APPEND _cuda_arch_spec ",sm_${_arch}")
+      else()
+        set(_cuda_arch_spec "sm_${_arch}")
+      endif()
+    endforeach()
+    set(ACPP_TARGETS_RESOLVED "${SYCL_CUDA_BACKEND}:${_cuda_arch_spec}")
+  elseif(_sycl_targets_preset STREQUAL "X86")
     # library-only backend sidesteps known accelerated CPU compiler crashes.
-    set(ACPP_TARGETS_DEFAULT "omp.library-only")
-  elseif(SYCL_TARGETS STREQUAL "GENERIC")
-    set(ACPP_TARGETS_DEFAULT "generic")
+    set(ACPP_TARGETS_RESOLVED "omp.library-only")
+  elseif(_sycl_targets_preset STREQUAL "GENERIC")
+    set(ACPP_TARGETS_RESOLVED "generic")
+  else()
+    # Not a preset: an acpp target list, passed through as given.
+    string(REPLACE "+" ";" ACPP_TARGETS_RESOLVED "${_sycl_targets_in}")
+  endif()
+
+  # Every backend must be one acpp knows, so a mistyped preset is caught here
+  # rather than passed through as a target list: -DSYCL_TARGETS=NVIDA would
+  # otherwise configure cleanly, leave SOLVER_BACKEND undefined and
+  # --acpp-cuda-path underived, and surface much later as an opaque acpp error.
+  foreach(_backend IN LISTS ACPP_TARGETS_RESOLVED)
+    if(NOT _backend MATCHES "^(omp|cuda|cuda-nvcxx|hip|generic)([.:]|$)")
+      message(FATAL_ERROR
+        "SYCL_TARGETS: '${_backend}' (from '${SYCL_TARGETS}') is neither a "
+        "preset (AMD|NVIDIA|X86|GENERIC) nor an AdaptiveCpp backend "
+        "(omp|cuda|cuda-nvcxx|hip|generic).  Check the spelling.")
+    endif()
+  endforeach()
+
+  # generic is the SSCP flow, not another backend to add alongside the rest:
+  # combining it with an ahead-of-time target fails at link time, so reject it
+  # here where the message can say why.
+  list(LENGTH ACPP_TARGETS_RESOLVED _n_backends)
+  if(_n_backends GREATER 1)
+    foreach(_backend IN LISTS ACPP_TARGETS_RESOLVED)
+      if(_backend MATCHES "^[Gg]eneric")
+        message(FATAL_ERROR
+          "SYCL_TARGETS: 'generic' cannot be combined with other targets "
+          "(got '${SYCL_TARGETS}').  It selects the portable-IR SSCP flow that "
+          "JITs at runtime, and linking it beside an ahead-of-time target "
+          "fails.  Use generic alone, or list only ahead-of-time targets.")
+      endif()
+    endforeach()
+  endif()
+
+  # What the rest of the build needs to know about the resolved targets.  These
+  # replace tests on the preset name, which cannot answer the question once the
+  # value is a list.
+  set(SYCL_HAS_NVCXX OFF)
+  set(SYCL_HAS_CUDA  OFF)
+  set(SYCL_HAS_HIP   OFF)
+  foreach(_backend IN LISTS ACPP_TARGETS_RESOLVED)
+    if(_backend MATCHES "^cuda-nvcxx")
+      set(SYCL_HAS_NVCXX ON)
+      set(SYCL_HAS_CUDA ON)
+    elseif(_backend MATCHES "^cuda")
+      set(SYCL_HAS_CUDA ON)
+    elseif(_backend MATCHES "^hip")
+      set(SYCL_HAS_HIP ON)
+    endif()
+  endforeach()
+
+  # One dense-solver backend per build; CUDA wins if a list names both.
+  if(SYCL_HAS_CUDA)
+    add_definitions(-DSOLVER_BACKEND=CUSOLVER_BACKEND)
+  elseif(SYCL_HAS_HIP)
+    add_definitions(-DSOLVER_BACKEND=ROCSOLVER_BACKEND)
   endif()
 
   # Keep backend target selection aligned with SYCL_TARGETS to avoid stale cache values.
-  set(ACPP_TARGETS "${ACPP_TARGETS_DEFAULT}" CACHE STRING "AdaptiveCpp backend targets" FORCE)
+  set(ACPP_TARGETS "${ACPP_TARGETS_RESOLVED}" CACHE STRING "AdaptiveCpp backend targets" FORCE)
+  message(STATUS "SYCL compile enabled with targets: ${ACPP_TARGETS}")
 
-  set(SYCL_FLAGS ${SYCL_BASE_FLAGS} --acpp-targets=${ACPP_TARGETS})
-  if(SYCL_TARGETS STREQUAL "NVIDIA" AND SYCL_CUDA_BACKEND STREQUAL "cuda" AND CMAKE_CUDA_COMPILER)
+  # Several architectures in one backend (cuda:sm_80,sm_89) are comma-separated
+  # and need no care.  Several BACKENDS are separated by ';', which is also
+  # CMake's list separator, so the targets flag is kept OUT of SYCL_FLAGS and
+  # handed to consumers on its own, with the separator backslash-escaped.
+  # Consumers must expand it QUOTED -- "${SYCL_TARGETS_FLAG}".  That is the
+  # whole trick: an escaped ';' survives being stored in COMPILE_OPTIONS and
+  # written to the build rule, but an unquoted ${...} expansion on the way
+  # there consumes the escape and splits the element, after which every backend
+  # past the first reaches the compiler as a stray input file
+  # ("--acpp-targets=omp cuda:sm_89").
+  string(REPLACE ";" "\\;" _acpp_targets_arg "${ACPP_TARGETS}")
+  set(SYCL_TARGETS_FLAG "--acpp-targets=${_acpp_targets_arg}")
+  set(SYCL_FLAGS ${SYCL_BASE_FLAGS})
+  if(SYCL_HAS_CUDA AND NOT SYCL_HAS_NVCXX AND CMAKE_CUDA_COMPILER)
     get_filename_component(CUDA_BIN_DIR ${CMAKE_CUDA_COMPILER} DIRECTORY)
     get_filename_component(CUDA_TOOLKIT_ROOT ${CUDA_BIN_DIR} DIRECTORY)
     list(APPEND SYCL_FLAGS --acpp-cuda-path=${CUDA_TOOLKIT_ROOT})
@@ -170,7 +337,7 @@ if(ENABLE_SYCL)
   if(TBB_LIB)
     list(APPEND SYCL_RUNTIME_LIBS ${TBB_LIB})
   endif()
-  if(SYCL_TARGETS STREQUAL "NVIDIA" AND SYCL_CUDA_BACKEND STREQUAL "cuda-nvcxx")
+  if(SYCL_HAS_NVCXX)
     find_library(OPENMP_RUNTIME_LIB NAMES omp)
     if(NOT OPENMP_RUNTIME_LIB)
       find_file(
@@ -209,7 +376,7 @@ include_directories(AFTER SYSTEM include)
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/include/)
 
 # Fortran compiler flags
-if(NOT FULLERENES_CORE_ONLY)
+if(FULLERENES_LEGACY_FORTRAN)
   if(DEFINED ENV{CRAYPE_VERSION})
     message("Cray compiler environment detected")
     set(CMAKE_Fortran_FLAGS "-fPIC -O3")
@@ -249,9 +416,9 @@ configure_file(
   ${CMAKE_CURRENT_BINARY_DIR}/include/fullerenes/config.hh
   )
 
-if(NOT FULLERENES_CORE_ONLY)
+if(FULLERENES_LEGACY_FORTRAN)
   # Fortran configure file.  NOTE: writes into the SOURCE tree -- gated so a
-  # pristine submodule checkout stays clean in core-only mode.
+  # checkout that never builds the Fortran stays clean.
   configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/include/fullerenes/config.f.in
     ${CMAKE_CURRENT_SOURCE_DIR}/src/fortran/config.f
@@ -259,7 +426,7 @@ if(NOT FULLERENES_CORE_ONLY)
 endif()
 
 
-if(NOT FULLERENES_CORE_ONLY)
+if(FULLERENES_LEGACY_FORTRAN)
   add_subdirectory(src/fortran)
 endif()
 add_subdirectory(src/contrib)
@@ -278,7 +445,17 @@ if(ENABLE_SYCL)
   set(PREVIOUS_CXX_COMPILER ${CMAKE_CXX_COMPILER})
   set(PREVIOUS_CXX_FLAGS ${CMAKE_CXX_FLAGS})
   set(PREVIOUS_CXX_STANDARD ${CMAKE_CXX_STANDARD})
-  if(SYCL_TARGETS STREQUAL "NVIDIA" AND SYCL_CUDA_BACKEND STREQUAL "cuda-nvcxx")
+  if(SYCL_HAS_NVCXX)
+    # This backend drives NVIDIA's nvc++ (not clang) for the SYCL translation
+    # units, but CMAKE_CXX_FLAGS was computed against the HOST compiler.  When
+    # the host compiler is clang -- or acpp, which CMake identifies as Clang --
+    # the block above appended clang-only switches that nvc++ rejects outright
+    # ("nvc++-Error-Unknown switch: -Wno-builtin-macro-redefined"), failing
+    # every SYCL TU.  Strip them: the __cpp_concepts override exists solely to
+    # unhide libstdc++'s <expected> under clang, and nvc++ neither needs nor
+    # understands it.
+    string(REPLACE "-Wno-builtin-macro-redefined" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+    string(REPLACE "-D__cpp_concepts=202002L" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
     string(REPLACE "-fopenmp" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
     string(REGEX REPLACE " +" " " CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
   else()

@@ -4,16 +4,17 @@
 // 12 degree-5 vertices, strictly ascending, in a 12-slot span.  Producers
 // establish it (derive_pentagons -- all pentagon logic lives on the VIEW; the
 // FullereneDual owner is a thin allocation wrapper), surgery maintains it
-// (substitute_pentagons, atomic), and pentagons_valid() is the boundary gate.
+// (substitute_new_pentagons, atomic), and pentagons_valid() is the boundary gate.
 // Covered here: derivation (both failure directions), the gate (each leg
 // isolated), every guard of the substitution with byte-unchanged state after
 // each throw, the k = 0 and k = 12 extremes, ownership (copy, move, and the
 // N == 0 escape), both enumeration queues, staleness after relabelling, the
-// batch contract's first constant-size field, and one coupled
-// adjacency-surgery + substitution round trip.
+// batch contract's first constant-size field, and the adjacency surgery
+// meeting the list at the boundary gate.
 
 #include <gtest/gtest.h>
 #include <algorithm>
+#include <numeric>
 #include <vector>
 
 #include <fullerenes/triangulation.hh>
@@ -142,117 +143,116 @@ TEST(Pentagons, DeriveThrowsOnMisshapenSpan) {
 }
 
 // ---------------------------------------------------------------------------
-// Atomic substitution -- on a dual that has hexagons (C24: 12 + 2)
+// The substitution, on hand-set degrees (so the arrival ids are the test's)
 // ---------------------------------------------------------------------------
 
-struct C24 : public ::testing::Test {
-    FullereneDual g;
-    std::vector<node_t> hexagons;
-    void SetUp() override {
-        g = buckygen_dual(24);
-        ASSERT_EQ(g.N, 14);
-        ASSERT_TRUE(g.pentagons_valid());
-        hexagons = vertices_of_degree(g, 6);
-        ASSERT_EQ(hexagons.size(), 2u);
-    }
-};
+// Twelve pentagons at chosen ids in a graph of N vertices, degrees only:
+// the list is a function of the degrees, and the substitution's
+// precondition (arrivals above every survivor) needs no adjacency.
+static Owned<FullereneDualView> degrees_with_pentagons(int N, std::initializer_list<node_t> pent) {
+    Owned<FullereneDualView> g(N, 6);
+    for (node_t v = 0; v < N; v++) g.deg[v] = 6;
+    for (node_t v : pent) g.deg[v] = 5;
+    g.derive_pentagons();
+    return g;
+}
+static const std::initializer_list<node_t> first_twelve{0,1,2,3,4,5,6,7,8,9,10,11};
 
-TEST_F(C24, SubstituteIsSortedSetAlgebra) {
-    const auto original = pentagon_list(g);
-    const std::array<node_t,2> dep{original[0], original[5]};
-    const std::array<node_t,2> arr{hexagons[1], hexagons[0]};  // unsorted input
-
-    g.substitute_pentagons(dep, arr);
-    auto expect = original;
-    expect.erase(std::find(expect.begin(), expect.end(), dep[0]));
-    expect.erase(std::find(expect.begin(), expect.end(), dep[1]));
-    expect.insert(expect.end(), {hexagons[0], hexagons[1]});
-    std::sort(expect.begin(), expect.end());
+TEST(Pentagons, SubstituteNewAppendsWithoutSorting) {
+    auto g = degrees_with_pentagons(14, first_twelve);
+    const std::array<node_t,2> dep{3, 7}, arr{13, 12};      // arrivals in either order
+    g.substitute_new_pentagons(dep, arr);
+    const std::vector<node_t> expect{0,1,2,4,5,6,8,9,10,11,12,13};
     EXPECT_EQ(pentagon_list(g), expect);
-    // List-level only: the degrees now disagree, and the boundary gate says so.
-    EXPECT_FALSE(g.pentagons_valid());
-
-    // The inverse substitution restores the invariant exactly.
-    g.substitute_pentagons(arr, dep);
-    EXPECT_EQ(pentagon_list(g), original);
+    EXPECT_FALSE(g.pentagons_valid());                        // list-level only: degrees lag
+    g.deg[3] = 6; g.deg[7] = 6; g.deg[12] = 5; g.deg[13] = 5;
     EXPECT_TRUE(g.pentagons_valid());
+    // The reverse substitution names arrivals below the list: refused, atomically.
+    expect_pentagon_error(g, Code::ArrivalNotAboveList,
+                          [&]{ g.substitute_new_pentagons(arr, dep); });
 }
 
-TEST_F(C24, IdentitySubstitution) {
+TEST(Pentagons, IdentitySubstitution) {
+    auto g = degrees_with_pentagons(14, first_twelve);
     const auto original = pentagon_list(g);
-    g.substitute_pentagons({}, {});
+    g.substitute_new_pentagons({}, {});
     EXPECT_EQ(pentagon_list(g), original);
     EXPECT_TRUE(g.pentagons_valid());
 }
 
-TEST_F(C24, SubstituteGuards) {
-    const node_t p0 = g.pentagons[0], p1 = g.pentagons[1];
-    const node_t h0 = hexagons[0],    h1 = hexagons[1];
-
+TEST(Pentagons, SubstituteNewGuards) {
+    auto g = degrees_with_pentagons(14, first_twelve);
     expect_pentagon_error(g, Code::SubstitutionUnbalanced, [&]{
-        const std::array<node_t,1> d{p0};
-        g.substitute_pentagons(d, {}); });
+        const std::array<node_t,1> d{0};
+        g.substitute_new_pentagons(d, {}); });
     expect_pentagon_error(g, Code::PentagonAbsent, [&]{
-        const std::array<node_t,1> d{h0}, a{h1};       // departure not a pentagon
-        g.substitute_pentagons(d, a); });
+        const std::array<node_t,1> d{12}, a{13};              // departure not a pentagon
+        g.substitute_new_pentagons(d, a); });
     expect_pentagon_error(g, Code::DeparturesNotDistinct, [&]{
-        const std::array<node_t,2> d{p0, p0}, a{h0, h1};
-        g.substitute_pentagons(d, a); });
-    expect_pentagon_error(g, Code::PentagonPresent, [&]{
-        const std::array<node_t,1> d{p0}, a{p1};       // arrival already listed
-        g.substitute_pentagons(d, a); });
+        const std::array<node_t,2> d{0, 0}, a{12, 13};
+        g.substitute_new_pentagons(d, a); });
+    expect_pentagon_error(g, Code::ArrivalNotAboveList, [&]{
+        const std::array<node_t,1> d{0}, a{5};                // a survivor
+        g.substitute_new_pentagons(d, a); });
     expect_pentagon_error(g, Code::ArrivalsNotDistinct, [&]{
-        const std::array<node_t,2> d{p0, p1}, a{h0, h0};
-        g.substitute_pentagons(d, a); });
+        const std::array<node_t,2> d{0, 1}, a{12, 12};
+        g.substitute_new_pentagons(d, a); });
     expect_pentagon_error(g, Code::PentagonVertexOutOfRange, [&]{
-        const std::array<node_t,1> d{p0}, a{node_t(g.N)};
-        g.substitute_pentagons(d, a); });
+        const std::array<node_t,1> d{0}, a{node_t(g.N)};
+        g.substitute_new_pentagons(d, a); });
     EXPECT_TRUE(g.pentagons_valid());
 }
 
-TEST_F(C24, SubstituteRejectsOversizedRequest) {
-    // k > n_pentagons must refuse before the fixed scratch arrays are touched.
+TEST(Pentagons, ArrivalBetweenSurvivorsIsRefused) {
+    // A gap in the ids: an arrival that is no pentagon but sits below the
+    // largest survivor is refused by the same comparison as a survivor is.
+    auto g = degrees_with_pentagons(14, {0,1,2,3,4,5,6,7,8,9,10,13});
+    expect_pentagon_error(g, Code::ArrivalNotAboveList, [&]{
+        const std::array<node_t,1> d{0}, a{11};
+        g.substitute_new_pentagons(d, a); });
+    const std::array<node_t,1> d{13}, a{12};                  // above every survivor: accepted
+    g.substitute_new_pentagons(d, a);
+    const std::vector<node_t> expect{0,1,2,3,4,5,6,7,8,9,10,12};
+    EXPECT_EQ(pentagon_list(g), expect);
+}
+
+TEST(Pentagons, SubstituteRejectsOversizedRequest) {
+    // k > n_pentagons must refuse before the fixed scratch array is touched.
+    auto g = degrees_with_pentagons(14, first_twelve);
     std::array<node_t, n_pent + 1> d{}, a{};
     expect_pentagon_error(g, Code::SubstitutionTooLong,
-                          [&]{ g.substitute_pentagons(d, a); });
+                          [&]{ g.substitute_new_pentagons(d, a); });
 }
 
-TEST_F(C24, InvariantViolationFailsLoudly) {
+TEST(Pentagons, TamperedListPassesThroughAndTheGateNamesIt) {
     // Sortedness is the producers' documented @inv, deliberately NOT
-    // re-scanned per call (the orientation discipline).  What the op promises
-    // on a violated list is no silent memory corruption: an argument guard
-    // misfires honestly, or the O(1) conservation tripwire refuses before
-    // the bounded merge.  Pinned on one concrete tampered shape.
-    std::reverse(g.pentagons.begin(), g.pentagons.end());
-    const std::array<node_t,1> d{g.pentagons[0]}, a{hexagons[0]};
-    const auto tampered = pentagon_list(g);
-    EXPECT_THROW(g.substitute_pentagons(d, a), pentagon_error);
-    EXPECT_EQ(tampered, pentagon_list(g));   // pre-write refusal: unchanged
-
-    // Restored, the very same substitution goes through.
-    std::reverse(g.pentagons.begin(), g.pentagons.end());
-    ASSERT_TRUE(g.pentagons_valid());
-    g.substitute_pentagons(d, a);
-    EXPECT_FALSE(g.pentagons_valid());       // list-level only, as designed
+    // re-scanned per call (the orientation discipline): a tampered list
+    // passes through the substitution as the survivors it holds, and the
+    // boundary gate names it -- with the degrees made to agree, so the
+    // order is the only thing the gate can object to.
+    auto g = degrees_with_pentagons(14, first_twelve);
+    std::reverse(g.pentagons.begin(), g.pentagons.end());      // [11 .. 0]
+    const std::array<node_t,1> d{11}, a{12};
+    g.substitute_new_pentagons(d, a);
+    const std::vector<node_t> expect{10,9,8,7,6,5,4,3,2,1,0,12};
+    EXPECT_EQ(pentagon_list(g), expect);
+    g.deg[11] = 6; g.deg[12] = 5;
+    EXPECT_FALSE(g.pentagons_valid());
 }
 
 TEST(Pentagons, ReplaceAllPentagons) {
-    // k = n_pentagons, the maximal case: every slot of the scratch arrays in
-    // use.  C60's dual (32 vertices) has 20 hexagons to draw arrivals from.
-    FullereneDual g = buckygen_dual(60);
-    ASSERT_EQ(g.N, 32);
+    // k = n_pentagons, the maximal case: every survivor leaves and the
+    // twelve arrivals, given in descending order, come out ascending.
+    auto g = degrees_with_pentagons(24, first_twelve);
     const auto original = pentagon_list(g);
-    const auto hexes    = vertices_of_degree(g, 6);
-    ASSERT_GE((int)hexes.size(), n_pent);
-
-    const std::span<const node_t> arr(hexes.data(), n_pent);
-    g.substitute_pentagons(original, arr);
-    std::vector<node_t> expect(arr.begin(), arr.end());
-    std::sort(expect.begin(), expect.end());
+    std::vector<node_t> arr(n_pent);
+    std::iota(arr.rbegin(), arr.rend(), node_t(12));           // 23 .. 12
+    g.substitute_new_pentagons(original, arr);
+    std::vector<node_t> expect(n_pent);
+    std::iota(expect.begin(), expect.end(), node_t(12));
     EXPECT_EQ(pentagon_list(g), expect);
-
-    g.substitute_pentagons(arr, original);
-    EXPECT_EQ(pentagon_list(g), original);
+    for (node_t v = 0; v < 12; v++) g.deg[v] = 6;
+    for (node_t v = 12; v < 24; v++) g.deg[v] = 5;
     EXPECT_TRUE(g.pentagons_valid());
 }
 
@@ -265,7 +265,7 @@ TEST(Pentagons, OwnedCopyEstablishesOverOwnStorage) {
     FullereneDual b(a);                          // FullereneDual copy
     EXPECT_TRUE(b.pentagons_valid());
     EXPECT_NE(a.pentagons.data(), b.pentagons.data());
-    EXPECT_EQ(b.pentagons.data(), b.owned_pentagons.data());
+    EXPECT_EQ(b.pentagons.data(), b.buffer<3>().data());
 
     FullereneDual c(static_cast<const GraphView&>(a));   // foreign-view copy
     EXPECT_TRUE(c.pentagons_valid());
@@ -275,13 +275,13 @@ TEST(Pentagons, MoveCarriesListAndClearsSource) {
     FullereneDual a = C20_dual();
     FullereneDual b(std::move(a));
     EXPECT_TRUE(b.pentagons_valid());
-    EXPECT_EQ(b.pentagons.data(), b.owned_pentagons.data());
+    EXPECT_EQ(b.pentagons.data(), b.buffer<3>().data());
     EXPECT_TRUE(a.pentagons.empty());
 
     FullereneDual c;
     c = std::move(b);
     EXPECT_TRUE(c.pentagons_valid());
-    EXPECT_EQ(c.pentagons.data(), c.owned_pentagons.data());
+    EXPECT_EQ(c.pentagons.data(), c.buffer<3>().data());
     EXPECT_TRUE(b.pentagons.empty());
 }
 
@@ -385,12 +385,12 @@ TEST(Pentagons, BatchCarriesPentagons) {
 // The loop closed: adjacency surgery and list surgery meet at the gate
 // ---------------------------------------------------------------------------
 
-TEST(Pentagons, SurgeryAndSubstitutionAgree) {
+TEST(Pentagons, SurgeryAndListMeetAtTheGate) {
     // Degree-level round trip (this is a unit test of the degree <-> list
     // coupling, not of a planar-embedding pipeline): demote two adjacent
     // hexagons by removing their shared edge, promote two non-adjacent
-    // pentagons by inserting one, then perform the matching list
-    // substitution -- the boundary gate must close.
+    // pentagons by inserting one; the list is stale until its producer
+    // re-derives it at the boundary, and the gate says so on both sides.
     FullereneDual g = buckygen_dual(60);
     const auto pents = pentagon_list(g);
     const auto hexes = vertices_of_degree(g, 6);
@@ -412,8 +412,6 @@ TEST(Pentagons, SurgeryAndSubstitutionAgree) {
     g.remove_edge({h1, h2});        // 6,6 -> 5,5
     g.insert_edge({p1, p2});        // 5,5 -> 6,6
     EXPECT_FALSE(g.pentagons_valid());
-
-    const std::array<node_t,2> dep{p1, p2}, arr{h1, h2};
-    g.substitute_pentagons(dep, arr);
+    g.derive_pentagons();
     EXPECT_TRUE(g.pentagons_valid());
 }

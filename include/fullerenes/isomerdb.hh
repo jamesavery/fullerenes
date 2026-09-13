@@ -86,8 +86,9 @@ public:
     // The record of the isomer whose dual is D: the fields in `producers` are
     // computed (RSPI always -- it is the key), the others left zero.  The
     // canonical RSPI is FullereneDualView::regular_rspi, the database's key.
-    // Definition staged in claude-projects/unfortran until HueckelAnalysis and
-    // hamiltonian_cycle_count are promoted.
+    // Defined in isomerdb_record.cc, which composes the producers
+    // (regular_rspi, neighbour_indices, Symmetry, hueckel::analyze,
+    // hamilton_cycle_count); isomerdb.cc itself stays a reader/writer.
     // @anchor isomer-record-from-dual
     static EntryResult from_dual(const FullereneDualView& D, Field producers);
     // A filled HOMO level: the Fortran's closed/open distinction, and the
@@ -226,6 +227,16 @@ public:
   static IsomerDB readPDB(int N=20, bool IPR=false, string extension = "");
   static string   PDBfilename(int N, Corpus corpus, string extension = "");
   static string   PDBfilename(int N, bool IPR=false, string extension = "") { return PDBfilename(N, IPR? Corpus::IPR : Corpus::All, extension); }
+  // Whether this corpus's file for C_N is present under database_path.  The
+  // corpus argument is not decoration: the database ships one file per size
+  // and corpus, and All/ can be installed while IPR/ is not -- so a caller
+  // (a test deciding whether to skip, say) must ask about the corpus it is
+  // about to read, not about a stand-in.
+  // @anchor isomerdb-is-installed
+  // @post agrees_with_available: implies(is_fullerene_size(N),
+  //           result == contains(available_sizes(corpus), N))
+  static bool is_installed(int N, Corpus corpus);
+  static bool is_installed(int N, bool IPR=false) { return is_installed(N, IPR? Corpus::IPR : Corpus::All); }
   // The sizes whose text file exists under database_path for this corpus.
   static vector<int> available_sizes(Corpus corpus);
 

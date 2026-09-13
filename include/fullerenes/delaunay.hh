@@ -39,6 +39,12 @@ struct CanonicalTesselation {
   // equality / ordering).
   std::vector<Polygon> cells;
 
+  // The cell's normal form: rotated to its lex-min rotation (oriented
+  // surface, no reverse) -- delaunay_detail::least_rotation over index
+  // positions, the one word the canonical completion's corner key uses
+  // too.  Every Polygon in `cells` is normalized.
+  static Polygon normalized(Polygon p);
+
   bool operator==(const CanonicalTesselation& o) const { return cells == o.cells; }
   bool operator!=(const CanonicalTesselation& o) const { return cells != o.cells; }
   bool operator< (const CanonicalTesselation& o) const { return cells <  o.cells; }
@@ -491,6 +497,23 @@ struct DelaunayTriangulation : DelaunayView, DelaunayStorage {
   //         vertices) -- loud, never a silently wrong reduction.
   void remove_flat_vertices_exact(const std::function<void(int)>& on_pop = {});
 
+  // The FLATTENED-KIS exact removal driver (the third regime,
+  // fullerenes/delaunay_cyclotomic.hh; mathematics in
+  // claude-projects/delaunay/cyclotomic-idt.tex): derives + verifies the
+  // cyclotomic (lsq, wedge, curvature-index) carry from THIS fresh kis
+  // DCEL -- face-centre vertices first (kis ids < n_centres),
+  // centre_size their face sizes, 5 or 6 -- and runs the flat removal
+  // under CyclotomicMetric, so every geometric decision is an exact rank-4
+  // ring sign (flatness is the combinatorial curvature index).  Loud entry
+  // boundary like remove_flat_vertices_exact.
+  // @throws std::runtime_error when the DCEL is not a fresh FULLERENE kis
+  //         complex under this centre bookkeeping (edge/face classes,
+  //         curvature indices, Gauss-Bonnet sum k = 60 all verified); the
+  //         usual view trips convert to throws as in remove_flat_vertices.
+  void remove_flat_vertices_cyclotomic_kis(
+      int n_centres, std::span<const int> centre_size,
+      const std::function<void(int)>& on_pop = {});
+
   // The exact-regime entry boundary as a value: derive the integer squared
   // lengths from he_length and VERIFY both exactness preconditions loudly
   // (the shared body remove_flat_vertices_exact and
@@ -501,18 +524,24 @@ struct DelaunayTriangulation : DelaunayView, DelaunayStorage {
 
   // Canonical completion of the Delaunay tesselation (the view body's doc,
   // delaunay_view.hh, carries the algorithm and the full contract):
-  // retriangulate every cocircular cell as the fan from its canonical
-  // corner, so the triangulation handed downstream is a function of the
-  // labeled input complex alone -- independent of the flip order that
-  // produced it.  Exact regime (derives and verifies the Lsq carry exactly
-  // as remove_flat_vertices_exact; same loud preconditions), and checks
-  // the is_delaunay() precondition itself.  Tesselation-invariant,
-  // Delaunay-preserving, idempotent.  Refusal classes, counted per cell
-  // and left untouched, never guessed at: .ambiguous (periodic boundary
-  // rotation word: no label-determined apex) and .nondisk (a component
-  // failing the disk Euler count -- on a Delaunay complex with embedded
-  // cells the class is provably empty by the empty-circumdisk property;
-  // the gate is the fail-loud backstop beyond that scope).
+  // retriangulate every cocircular cell canonically, so the triangulation
+  // handed downstream is a function of the labeled input complex alone --
+  // independent of the flip order that produced it.  A cell whose boundary
+  // rotation word has one minimum becomes the fan from that corner
+  // (.fanned); one with two becomes the symmetric split about the chord
+  // joining them (.periodic_completed), which needs no apex and gives the
+  // same chords from either minimum.  Those are the only cases on a convex
+  // polyhedral metric, so every fullerene completes.  Exact regime (derives and verifies the
+  // Lsq carry exactly as remove_flat_vertices_exact; same loud
+  // preconditions), and checks the is_delaunay() precondition itself.
+  // Tesselation-invariant, Delaunay-preserving, idempotent.  Refusal
+  // classes, counted per cell and left untouched, never guessed at:
+  // .ambiguous (three or four minima -- impossible on a convex polyhedral
+  // metric, reachable only on a one-cell flat torus) and .nondisk (a
+  // component failing the
+  // disk Euler count -- on a Delaunay complex with embedded cells the class
+  // is provably empty by the empty-circumdisk property; the gate is the
+  // fail-loud backstop beyond that scope).
   // Transport-hooked: with tracking active, tracked points ride the flips.
   // NOT transactional: a throw can leave the complex part-completed with
   // the status latched.
@@ -521,12 +550,29 @@ struct DelaunayTriangulation : DelaunayView, DelaunayStorage {
   //         the fan-conversion step budget (via the Status latch).
   DelaunayView::CompletionStats canonical_completion_exact();
 
+  // The FLATTENED-KIS removal followed by its canonical completion: the
+  // removal of remove_flat_vertices_cyclotomic_kis, then the canonical
+  // completion (the view body's doc above), both under ONE cyclotomic
+  // carry.  The two operations are one owner word here because the exact
+  // lengths and wedges are not recoverable from the float shadows once the
+  // removal has run, and the entry boundary demands a FRESH kis complex,
+  // which no longer exists (the dual chain's pair,
+  // remove_flat_vertices_exact + canonical_completion_exact, re-derives
+  // its integer carry instead).  Entry boundary and throws as the removal
+  // word's; the completion runs on the removal's post-condition (Delaunay
+  // under the metric) with no separate check, and carries the view body's
+  // completion contract.
+  DelaunayView::CompletionStats remove_and_complete_cyclotomic_kis(
+      int n_centres, std::span<const int> centre_size,
+      const std::function<void(int)>& on_pop = {});
+
   // Renumber the live vertices to 0..n_live-1 (dropping removed ones) and
   // shrink nv, rewriting he_origin and the per-vertex arrays. Needed after a
   // removal that leaves live vertices scattered (the metric-based path, which
   // unlike compute(T) does not sort flats last), because AlexandrovSolver
   // sizes its system by nv and assumes every index 0..nv-1 is a live cone.
-  // Returns new_to_old: the original index of each surviving vertex.
+  // Returns new_to_old: the original index of each surviving vertex, in
+  // increasing order (the view body's @post monotone).
   std::vector<int> compact_vertices();
 
   // --- Edge/face allocation ---

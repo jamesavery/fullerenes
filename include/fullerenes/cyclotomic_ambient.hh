@@ -3,21 +3,6 @@
 // cyclotomic_ambient.hh -- the AMBIENT rings above Z[gamma]: construction
 // and cross-check machinery for cyclotomic.hh, NOT run-path code.
 //
-//   Zeta30   Z[zeta_30] as the rank-2 module Z[gamma] + Z[gamma] zeta
-//            (zeta^2 = gamma zeta - 1): the ring the kis module's POINTS
-//            live in (x kPointScale).  Squared lengths and wedges of
-//            coordinate constructions fall out as Real30 elements (lsq,
-//            wedge), so every carried quantity of the working surface can
-//            be re-derived from explicit points and compared exactly --
-//            the verification role.  The walk identity (whitepaper
-//            @ref eq:walk) is five_pentagon_spoke().  KINSHIP: this is
-//            the same quadratic-tower body as Eisenstein (eisenstein.hh)
-//            at the trace gamma = 1 = 2 cos(pi/3) -- product, conjugation
-//            (zeta -> gamma - zeta), norm x^2 + gamma x y + y^2, and the
-//            wedge x y' - y x' all specialize term-for-term; the two stay
-//            separate because Eisenstein is the unchecked, device-legal,
-//            int-based hot path and this is checked host-tier scaffolding.
-//
 //   sigma7   The generator of Gal(Q(gamma)/Q) (cyclic of order 4,
 //            gamma -> 2 cos(7 pi/15)), as an integer matrix on the power
 //            basis: lets tests state Galois facts (norm rationality, the
@@ -40,6 +25,7 @@
 // throughout (real_part_with_abs calls std::cos).
 // ============================================================================
 
+#include "bigint_fixed.hh"
 #include "cyclotomic.hh"
 
 namespace cyclotomic {
@@ -79,10 +65,10 @@ inline constexpr auto kPow60 = make_pow_table60();
 
 // ---------------------------------------------------------------------------
 // The ring Z[zeta_60] (its rank-16 product folds through kPow60 with
-// per-coordinate amplification <= 58 B^2, inside the shared operand
-// guard).
+// per-coordinate amplification <= 58 B^2, the guard's constant).
 // ---------------------------------------------------------------------------
-struct Zeta60 : CheckedCoeffRing<Zeta60, 16> {
+struct Zeta60 : CheckedCoeffRing<Zeta60, 16, long long> {
+  static constexpr int kAmplification = 58;
   static const std::array<long long, 16>& pow_row(int k) {
     return detail::kPow60[k];
   }
@@ -235,6 +221,104 @@ inline constexpr auto make_two_cos_table60() {
   return P;
 }
 inline constexpr auto kTwoCosInC = make_two_cos_table60();
+
+// ---- The bisection driver (host tier): the sign of B(alpha) for alpha
+// the root of a monic Psi isolated in a dyadic interval, by exact
+// fixed-capacity integer arithmetic.  Once the working ring's rung 2; the
+// working ring now decides every sign by one fixed-point evaluation
+// (cyclotomic.hh), and this driver serves the conductor-60 oracle below
+// and its cross-checks only.  Capacities: the binding intermediate is
+// lhs = Bmid << smid at the deepest iteration, ~ (deg+1)*smid + 63 bits;
+// the rank-4 sizing (kMaxDyadicBits, Big) stays as the driver's smallest
+// instantiation, exercised by the property suite.
+inline constexpr int kMaxDyadicBits = 384;
+inline constexpr int kLimbs = (4 * kMaxDyadicBits) / 64 + 4;
+using Big = FixedBigInt<kLimbs>;
+
+// Exact integer 2^(s*deg) * poly(m/2^s), coefficients B, by Horner.
+template <class B>
+inline B eval_scaled(const B* coeff, int deg, const B& m, int s) {
+  B r = coeff[deg];
+  for (int k = deg - 1; k >= 0; k--)
+    r = r * m + (coeff[k] << (s * (deg - k)));
+  return r;
+}
+
+// @pre B not identically zero; Psi(lo) and Psi(hi) of opposite signs with
+// exactly one root of Psi inside.  @variant max_bits - s.  In its own
+// frame (the FixedBigInt arrays are multi-KB).
+template <class B>
+[[gnu::noinline]] inline SignOr sign_at_isolated_root(
+    const B* Bc, int deg, const B* Psi, int psi_deg, long long m0, int s0,
+    int max_bits, SignTrace* tr) {
+  const int hdeg = deg > 0 ? deg : 1;   // constant B still Horners at deg 1
+
+  // |B'(x)| on [0,2] is bounded by M = sum k |b_k| 2^{k-1}: magnitudes
+  // only, so each term enters with sgn forced positive (no cancellation).
+  B M = B{};
+  for (int k = 1; k <= deg; k++) {
+    B t = Bc[k];
+    t.sgn = t.n ? 1 : 0;
+    for (int rep = 0; rep < k; rep++) M = M + (t << (k - 1));
+  }
+
+  B m = B::from_i128(m0);
+  int s = s0;
+  auto psi_sign_at = [&](const B& mm, int ss) -> std::optional<int> {
+    const B val = eval_scaled(Psi, psi_deg, mm, ss);
+    if (val.overflowed()) return std::nullopt;
+    return val.sgn;
+  };
+  const auto lo0 = psi_sign_at(m, s);
+  if (!lo0) {
+    if (tr) tr->refusal = Refusal::BigWidth;
+    return std::nullopt;
+  }
+  const int lo_sign = *lo0;
+
+  while (s < max_bits) {
+    if (tr) tr->bisections++;
+    // Conclusive when |B(mid)| > M * width (mid is the parent interval's
+    // midpoint, so |alpha - mid| <= 2^-smid): |Bmid|*2^{smid} vs
+    // M*2^{smid*hdeg}, both exactly scaled.
+    const B mid = (m << 1) + B::from_i128(1);
+    const int smid = s + 1;
+    const B Bmid = eval_scaled(Bc, hdeg, mid, smid);
+    const B lhs = Bmid << smid;
+    const B rhs = M << (smid * hdeg);
+    if (Bmid.overflowed() || lhs.overflowed() || rhs.overflowed()) {
+      if (tr) tr->refusal = Refusal::BigWidth;
+      return std::nullopt;
+    }
+    if (B::cmp_mag(lhs, rhs) > 0) return sign_from_int(Bmid.sgn);
+
+    const auto ms = psi_sign_at(mid, smid);
+    if (!ms || *ms == 0) {   // *ms == 0: alpha rational -- corrupt input
+      if (tr) tr->refusal = Refusal::BigWidth;
+      return std::nullopt;
+    }
+    m = (*ms == lo_sign) ? mid : (m << 1);
+    s = smid;
+  }
+  if (tr) tr->refusal = Refusal::DyadicCap;
+  return std::nullopt;   // fail-loud backstop (see the oracle banner)
+}
+
+// Rung 1, the double evaluation against its derived bound: conclusive iff
+// |val| clears it.
+inline std::optional<Sign> rung1(double val, double abs_sum, double relerr,
+                                 SignTrace* tr) {
+  const double err = abs_sum * relerr;
+  if (val > err) {
+    if (tr) tr->rung = 1;
+    return Sign::Positive;
+  }
+  if (val < -err) {
+    if (tr) tr->rung = 1;
+    return Sign::Negative;
+  }
+  return std::nullopt;
+}
 
 // Rung-2 capacities (termination bound in the oracle banner; the binding
 // intermediate is again lhs = Bmid << smid, provably 99 of the 100 limbs).
@@ -403,68 +487,9 @@ inline Real30 sigma7(const Real30& x) {
   return r;
 }
 
-// ---------------------------------------------------------------------------
-// Zeta30: Z[zeta_30] as the rank-2 module over Z[gamma] with basis
-// {1, zeta}, zeta = zeta_30 = e^{i pi/15}, zeta^2 = gamma zeta - 1.  The
-// construction ring: kis module points (x kPointScale) are Zeta30 values,
-// and the working surface's carried quantities fall out exactly:
-//   lsq(u)      = |u|^2       = u.x^2 + gamma u.x u.y + u.y^2   (Real30)
-//   wedge(u, v) = the delta-normalized cross product = x y' - y x'
-// (with 16 Area^2 = (2 - gamma_2) wedge^2, whitepaper @ref eq:heron).
-// See the file banner for the Eisenstein kinship (gamma = 1 instance).
-// ---------------------------------------------------------------------------
-struct Zeta30 {
-  Real30 x, y;   // x + y * zeta
-
-  bool ok() const { return x.ok && y.ok; }
-
-  static Zeta30 integer(long long n) { return {Real30::integer(n), {}}; }
-  static Zeta30 zeta_pow(int k) {
-    k = ((k % 30) + 30) % 30;
-    Zeta30 r = integer(1);
-    const Zeta30 z{{}, Real30::integer(1)};
-    for (int i = 0; i < k; i++) r = r * z;
-    return r;
-  }
-  // The walk identity (whitepaper @ref eq:walk): the kPointScale-scaled
-  // pentagon spoke 5 R5 zeta_60^9 = 2 + z^-3 + z^3 + z^6 + 2 z^9 + z^12
-  // (z = zeta_30) -- sigma-even, hence HERE, one conductor down from its
-  // two sigma-odd factors.
-  static Zeta30 five_pentagon_spoke() {
-    return integer(2) + zeta_pow(-3) + zeta_pow(3) + zeta_pow(6) +
-           2 * zeta_pow(9) + zeta_pow(12);
-  }
-
-  bool is_zero() const { return x.is_zero() && y.is_zero(); }
-  friend bool operator==(const Zeta30& u, const Zeta30& v) {
-    return u.x == v.x && u.y == v.y;
-  }
-  friend Zeta30 operator+(const Zeta30& u, const Zeta30& v) {
-    return {u.x + v.x, u.y + v.y};
-  }
-  friend Zeta30 operator-(const Zeta30& u, const Zeta30& v) {
-    return {u.x - v.x, u.y - v.y};
-  }
-  Zeta30 operator-() const { return {-x, -y}; }
-  friend Zeta30 operator*(long long n, const Zeta30& u) {
-    return {n * u.x, n * u.y};
-  }
-  // (x + y zeta)(x' + y' zeta) with zeta^2 = gamma zeta - 1.
-  friend Zeta30 operator*(const Zeta30& u, const Zeta30& v) {
-    return {u.x * v.x - u.y * v.y,
-            u.x * v.y + u.y * v.x + Real30::gamma() * (u.y * v.y)};
-  }
-  // Complex conjugation: zeta -> gamma - zeta.
-  Zeta30 conj() const { return {x + Real30::gamma() * y, -y}; }
-
-  // |u|^2, a Real30 (the identity (conj(u) u).y == 0 holds by algebra).
-  Real30 lsq() const { return x * x + Real30::gamma() * (x * y) + y * y; }
-};
-
-// The delta-normalized wedge of two vectors: Im(conj(u) v)/sin(pi/15).
-inline Real30 wedge(const Zeta30& u, const Zeta30& v) {
-  return u.x * v.y - u.y * v.x;
-}
+// (Zeta30, the Z[zeta_30] point ring, was PROMOTED to cyclotomic.hh when
+// the CyclotomicMetric's star development made it run-path -- layer 2;
+// its embedding below stays here with the conductor-60 machinery.)
 
 // Embedding Z[zeta_30] -> Z[zeta_60]: zeta_30 = zeta_60^2.
 inline Zeta60 to_zeta60(const Zeta30& u) {

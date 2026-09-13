@@ -1,16 +1,22 @@
-add_library(fullerenes SHARED
+if(FULLERENES_SHARED)
+  set(_fullerenes_lib_type SHARED)
+else()
+  set(_fullerenes_lib_type STATIC)
+endif()
+add_library(fullerenes ${_fullerenes_lib_type}
   graph.cc cubicgraph.cc planargraph.cc fullerenegraph.cc triangulation.cc polyhedron.cc
   spiralc.cc planargraph-io.cc polyhedron-io.cc debug.cc fold.cc  unfold.cc  seam_step.cc geometryc.cc
-  delaunay.cc  delaunay_alexandrov.cc  dense_linalg.cc  graph_fortran.cc isomerdb.cc fortran_format.cc graph_spectrum.cc layout.cc layout2d.cc argparser.cc
+  delaunay.cc  delaunay_alexandrov.cc  dense_linalg.cc  isomerdb.cc fortran_format.cc graph_spectrum.cc hueckel.cc hamilton_cycle.cc isomerdb_record.cc layout.cc layout2d.cc argparser.cc
   polyhedron-optimize.cc symmetry.cc eisenstein.cc eisenstein_raster.cc eisenstein_atlas.cc barycentric.cc
   delaunay_strip.cc delaunay_unfold.cc delaunay_metric.cc eisenstein_paint.cc eisenstein_paint_geometry.cc wu_forcefield.cc
   deltahedron.cc deltahedron-io.cc deltahedron-cones.cc curvature-flow.cc buckinverse.cc ../contrib/mgmres.cc ${MORE_SOURCES}
 )
 
-#Ensure that CMAKE_Fortran_IMPLICIT_LINK_LIBRARIES is defined
-if(NOT FULLERENES_CORE_ONLY AND NOT CMAKE_Fortran_IMPLICIT_LINK_LIBRARIES)
-  #Terminate
-  message(FATAL_ERROR "CMAKE_Fortran_IMPLICIT_LINK_LIBRARIES is not defined")
+# The C++ side of the legacy Fortran program's ABI: 90 extern "C" entry
+# points the Fortran calls, marshalling only.  Compiled into the library only
+# when that program is built, so the default library carries no dead ABI.
+if(FULLERENES_LEGACY_FORTRAN)
+  target_sources(fullerenes PRIVATE graph_fortran.cc)
 endif()
 
 # Export the include dirs on the target so a parent project consuming this
@@ -28,11 +34,12 @@ find_package(OpenMP)
 # and the Fortran solvers never used them.  See dense_linalg.hh for why the
 # library must not silently regain a BLAS dependency.
 #
-# fortran_opt deliberately NOT linked either: the last C++ -> Fortran call
+# No Fortran archive is linked either: the last C++ -> Fortran call
 # (optimized_geometry -> sa_optff_) was replaced by the native Wu force
-# field (wu_forcefield.cc); the legacy Fortran is now reachable only from
-# the legacy fullerene_program, and the cross-validation parity tests
-# (claude-projects/unfortran/tests) link the Fortran archives directly.
+# field (wu_forcefield.cc).  The legacy Fortran is reachable only from the
+# legacy fullerene_program, built under FULLERENES_LEGACY_FORTRAN; the
+# cross-validation parity tests (claude-projects/unfortran/tests) link its
+# archives directly and need that option on.
 target_link_libraries(fullerenes PUBLIC buckygen)
 if(OpenMP_CXX_FOUND)
   # PRIVATE on purpose.  The library's own use of OpenMP (Gradient.cc,

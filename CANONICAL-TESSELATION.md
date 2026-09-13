@@ -68,24 +68,38 @@ Downstream consumers read a triangulation, not a tesselation, so the
 per-cell triangulation freedom is a reproducibility hole: two runs that
 flip in different orders hand downstream different (equally valid)
 refinements. `DelaunayView::canonical_completion` closes it by
-retriangulating every cocircular cell that has interior edges — subject to
-the two refusal classes below — as the FAN from its canonical corner: the
-corner whose boundary rotation word is lexicographically minimal, keyed on
-(vertex id, exact squared length). (`canonical_tesselation` compares by
-the same key shape over the caller's label map; the orders coincide when
-that map is monotone, identity included.) Fan conversion uses only tight
-flips — zero-energy Delaunay moves inside the cell's circle — so the
-tesselation, the SURFACE metric, and every vertex cone angle are unchanged
-(the edge-length field is not: each flip replaces one diagonal of a cyclic
-quadrilateral with the other). The completed triangulation of every fanned
-cell is then a function of the labeled input complex alone.
+retriangulating every cocircular cell that has interior edges from its
+CANONICAL CORNER: the corner whose boundary rotation word is
+lexicographically minimal, keyed on (vertex id, exact squared length).
+(`canonical_tesselation` compares by the same key shape over the caller's
+label map; the orders coincide when that map is monotone, identity
+included.) Conversion uses only tight flips — zero-energy Delaunay moves
+inside the cell's circle — so the tesselation, the SURFACE metric, and
+every vertex cone angle are unchanged (the edge-length field is not: each
+flip replaces one diagonal of a cyclic quadrilateral with the other). The
+completed triangulation is then a function of the labeled input complex
+alone.
 
-Two refusal classes are counted by name and left untouched, never guessed
-at:
+How many corners attain the minimum selects the construction:
 
-- **ambiguous** — the boundary word is periodic (several corners share the
-  minimal rotation): no label-determined apex exists; such isomers compare
-  at the tesselation level.
+- **one** — the cell becomes the FAN from that corner. `fanned` counts
+  these; it is the only case any fullerene surface has yet produced.
+- **two** — §4 shows the two corners are then antipodal and the chord
+  joining them is a diameter of the circumcircle. The cell becomes that
+  diameter plus the fan of each half from its own end. Read from either
+  end the diagonal set is the same, so nothing is chosen between the two
+  minima and the result is again a function of the labeled complex.
+  `periodic_completed` counts these. The construction, its proof, its
+  O(d) cost and its flip bound are in
+  `claude-projects/delaunay/CANONICAL-TOTALITY-DESIGN.md`.
+- **three or four** — §4 excludes this on every convex polyhedral
+  metric, which is every surface this pipeline reads; the known
+  realizations are flat tori consisting of a single cell. `ambiguous`
+  counts them, they are left untouched, and such a complex compares at
+  the tesselation level.
+
+One refusal class remains, counted by name and never guessed at:
+
 - **nondisk** — the component fails the disk Euler count. A triangulated
   disk with d boundary edges and no interior vertices has exactly d−3
   interior edges, each crossed once from each side by the boundary walk:
@@ -108,55 +122,93 @@ pipeline the point is doubly moot: a reduced complex has no live flat
 vertices at all, and the owner entry checks `is_delaunay()` before
 running.
 
-## 4. When ambiguity can occur at all
+## 4. How many corners can attain the minimum
 
 Let a cocircular cell have d corners (d >= 4: it has an interior edge) and
-boundary word of period p | d, p < d, with k = d/p >= 2 repeats.
-Developed injectively, the cell is a polygon inscribed in a circle with
-interior angle sum (d−2)π. Each corner is a sector at a cone; no cone is
-interior (§3), so the cell's total angle at any one cone is strictly less
-than that cone's angle — 5π/3 on a REDUCED FULLERENE DUAL (every live
-vertex a 5π/3 cone), the hypothesis this bound needs. Period p makes the
-corner labels p-periodic, so the corners fall into p residue classes of k
-corners each; two classes may share a cone, so let q <= p be the number of
-distinct cones. Summing corners by cone:
+boundary word of least period p | d, p < d, with k = d/p >= 2 repeats.
+The word is fixed by exactly k of its d rotations, so k is also the
+number of corners attaining the least rotation. Period p makes the
+corner labels p-periodic, so the corners fall into p residue classes of
+k corners each; two classes may share a vertex, so let q <= p be the
+number of distinct vertices.
 
-    (d − 2)π < q · 5π/3 <= p · 5π/3   ⟹   k < 5/3 + 2/p.
+By §3 the cell has no interior vertices, so it is a triangulated disk of
+exactly d−2 triangles and its corner angles sum to (d−2)π — a triangle
+count, independent of whether the cell develops injectively. The corners
+at one vertex are disjoint sectors of that vertex's link, so
 
-p = 1 gives k = d < 11/3, i.e. d <= 3 — excluded by d >= 4. For p >= 2
-this forces **k = 2**, and then p < 6: **p ∈ {2,3,4,5}, d ∈ {4,6,8,10}**.
-Sharper: with d = 2p, q <= p−1 would give 2p − 2 < 5(p−1)/3, i.e. p < 1 —
-impossible — so q = p and **every cone appears at exactly two corners**,
-at antipodal positions i and i + d/2: the cell is invariant under the
-half-turn about its circumcenter, and the chord joining each antipodal
-pair is a diameter of the circumcircle — a geodesic loop at that cone,
-which the current triangulation may or may not realize as an edge. (With
-flat 2π vertices instead of 5π/3 cones the same computation still forces
-k = 2 but no longer bounds p; and a non-embedded cell — an empty disk
-wrapping past the injectivity radius — relaxes the angle sum, so the
-class is constrained, not impossible, off the reduced-dual hypothesis.)
+    (d − 2)π = Σ_i α_i <= Σ_{v on C} Θ_v <= 2πq.
+
+**Sphere bound.** If every Θ_v <= 2π and the surface is a sphere, the
+inequality is strict: equality throughout would make every vertex on the
+cell flat with its whole link inside this one cell, so no other triangle
+could meet those vertices, the cell would be the entire surface, and the
+total curvature would be 0 rather than 4π. So (d−2)π < 2πq <= 2πp, that
+is p(k−2) < 2. Then k = 3 forces p = 1 and d = 3, excluded; k >= 4 fails
+outright. So **k = 2** for p >= 2, and 2p − 2 < 2q with q <= p forces
+**q = p**, every vertex occurring at exactly two corners.
+
+**The hypothesis is convexity.** By Alexandrov's realisation theorem a
+sphere with every cone angle at most 2π is precisely a convex polyhedral
+metric, degenerate doubly covered polygons included. So the bound holds
+on every convex polyhedral metric and on nothing larger, and it needs no
+further cone hypothesis: it covers the fullerene dual and the flattened
+kis alike, where **the minimum is attained once or twice, never more**.
+Positive total curvature is what the proof spends, which is why the
+bound fails on a flat torus (§6 of the design document: one-cell
+hexagonal and square tori attain k = 3 and k = 4).
+
+**Reduced dual.** With Θ_v = 5π/3 the same inequality gives 2p − 2 <=
+5p/3, so p <= 6; p = 6 would force equality throughout, hence a single
+cell with V = E = p and F = 1, Euler characteristic 1, impossible for a
+closed oriented surface. So **p ∈ {2,3,4,5}, d ∈ {4,6,8,10}**.
+
+**Reduced flattened kis.** Its surviving vertices carry curvature
+r_v·π/15 with r_v ∈ {1,2,3}; with q = p the same argument gives
+Σ r_v <= 29, hence **p <= 29 and d <= 58**. Neither 10 nor 58 is a
+hard-coded capacity anywhere in the code.
+
+**The half-turn.** Periodicity includes the squared side lengths, and
+equal chords of a circle subtend equal gaps, so corresponding gaps agree
+and each period subtends 2π/k. For k = 2 the two minima are antipodal and
+the chord between them is a diameter of the circumcircle — a geodesic
+loop at that vertex, which the current triangulation may or may not
+realize as an edge. That diameter is what the two-minimum construction of
+§3 finds or creates. The proofs are in
+`claude-projects/delaunay/CANONICAL-TOTALITY-DESIGN.md`; the argument
+above corrects an earlier version of this section that asserted strict
+inequality vertex by vertex without the sphere hypothesis.
 
 The minimal lattice realization of the k = 2 half-turn shape is an
 inscribed rectangle: sides² {1, 3}, diameter² 4 (two 30-60-90 lattice
 triangles, tau = 2, F == 0 on the diagonal exactly).
-`claude-projects/delaunay/tools/test_canonical_completion_branches` builds a flat
-torus from two such rectangles — its vertices are flat 2π points, so it
-realizes the ambiguity BRANCH rather than §4's reduced-dual hypothesis
-class — whose cells carry period-2 boundary words, (u,1),(x,3),(u,1),(x,3)
-and its u↔x partner, and asserts the completion refuses both as
-ambiguous: the branch is exercised, not merely trusted.
+`claude-projects/delaunay/tools/test_canonical_completion_branches` builds
+two witnesses, both flat tori, so both exercise the branch rather than
+§4's cone hypothesis. The first glues two such rectangles; its cells carry
+period-2 boundary words, (u,1),(x,3),(u,1),(x,3) and its u↔x partner, and
+their diameters are already the whole diagonal set, so the completion
+makes no flip — while flipping both diameters away and re-completing must
+return the identical labelled complex. The second is the quotient of the
+plane by the lattice generated by (2,0) and (1,√3), whose single
+cocircular cell is a regular hexagon of period 3: its two minima are
+three steps apart and are two OCCURRENCES of one vertex, so the chord
+between them is a self-loop that no lookup by vertex identifier could
+find. Every triangulation of that hexagon is enumerated by search over
+cocircular flips, and all of them complete to one labelled complex.
 
-Empirically the class is EMPTY over the full C20–C100 reduced space
-(0 ambiguous; the validation record above) — measured fact, not theorem;
-the validator's independent period cross-check (computed from the
-pre-completion tesselation) keeps under-detection falsifiable.
+Empirically the periodic class is EMPTY over the full C20–C100 reduced
+space (0 cells with two or more minima; the validation record above) —
+measured fact, not theorem; the validator's independent multiplicity
+cross-check, computed from the pre-completion tesselation, keeps
+under-detection falsifiable.
 
 ## 5. What the gates compare
 
 Per PRIMITIVES-SPEC §5.0 (parallel-primitives, ruling 2026-08-23):
 Delaunay-bearing results conform at the canonical-tesselation level (A3);
 after canonical completion, the exact-regime triangulation is unique
-wherever no cell is refused (ambiguous or nondisk), and completed
+wherever no cell is refused (three or more minima, or non-disk), and
+completed
 complexes compare by the canonical DCEL word (lex-min BFS serialization —
 a complete invariant of a CONNECTED labeled complex; the face-multiset
 form is not, since it forgets the gluing). DCEL bytes remain meaningful

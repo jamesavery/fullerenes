@@ -153,6 +153,16 @@ struct AlexandrovSolver {
   // close into a polytope), and the triangular faces of T (which change at edge
   // flips, so each entry is self-contained).  positions is empty for that step
   // iff Gram-BFS reconstruction failed (κ too high / degenerate iterate).
+  //
+  // The gluing is recorded per face SLOT, not per vertex pair: T is a delta-complex
+  // (multi-edges, self-loops, bigon faces), so "the face across edge (i,j)" is
+  // ambiguous from labels alone.  Slot s of face f is its base edge from corner s to
+  // corner s+1 (mod 3); face_twin[f][s] = 3*g + s' names the face g and slot s' glued
+  // to it (the DCEL twin half-edge's face and cycle slot), and face_theta[f][s] is
+  // the GCP dihedral θ at that base edge.  With r and face_len every pyramid is a
+  // rigid tetrahedron and the complex is reconstructible exactly, whether or not
+  // positions is available -- the seam for drawing the abstract GCP (the
+  // delaunay-geometry GUI cuts every radial face and spreads the defect).
   bool record_trajectory = false;
   struct TrajEntry {
     char   phase;                          // 'T' continuation, 'N' Newton polish
@@ -160,6 +170,7 @@ struct AlexandrovSolver {
     double t;                              // homotopy parameter (0 in Newton)
     double kappa_max;                      // max|κ|
     std::vector<double> kappa;             // per-cone angle defect κ_v
+    std::vector<double> r;                 // radii r_v (exact; positions may be empty)
     std::vector<coord3d> positions;        // reconstructed cones (apex at origin)
     std::vector<std::array<int,3>> faces;  // triangular faces of T at this step
     std::vector<std::array<double,3>> face_len;  // base edge lengths of faces[f], in its
@@ -167,6 +178,8 @@ struct AlexandrovSolver {
                                            // needed to build each rigid pyramid exactly
                                            // (Gram-BFS distorts cotree edges, so |pᵢ−pⱼ|
                                            // is unreliable; the radii rᵥ=|pᵥ| are exact).
+    std::vector<std::array<int,3>>    face_twin;   // 3*g + s' glued across slot s (−1: none)
+    std::vector<std::array<double,3>> face_theta;  // θ at slot s (NaN where undefined)
   };
   std::vector<TrajEntry> trajectory;
 
@@ -473,13 +486,36 @@ struct AlexandrovSolver {
 //      center is flat by construction (5 wedges of 2pi/5, resp. 6 of
 //      pi/3), and hexagon-only cubic vertices are flat, so the metric's
 //      cones are exactly the pentagon-incident cubic vertices.
-//   2. DelaunayTriangulation::compute(K, edge_length_fn, FLAT_TOL,
-//      &new_to_old) removes the flat vertices and reports the survivors.
+//   2. Flat-vertex removal, in one of two regimes (a regime = which
+//      implementation of the predicates decides):
+//        build(T)         THE DEFAULT, exact: remove_and_complete_cyclotomic_kis
+//                         -- flatness by the integer cone-excess count, every
+//                         other predicate the exact sign of one element of
+//                         Z[2cos(pi/15)] (fullerenes/cyclotomic.hh,
+//                         delaunay_cyclotomic.hh), then the canonical
+//                         completion, so solver.D is the canonical
+//                         triangulation of the kis surface: a function of
+//                         the labelled graph, not of the order in which flips
+//                         are performed (cyclotomic-idt.tex, "Invariance").
+//        build_banded(T)  DelaunayTriangulation::compute(K, edge_length_fn,
+//                         FLAT_TOL, &new_to_old): floating-point predicates
+//                         with a tolerance band and the flatness tolerance.
+//                         No canonical completion.  Kept as the reference
+//                         the parallel (CPU/GPU) implementation of this
+//                         pipeline still mirrors, until that implementation
+//                         carries the exact policy too; measured on every
+//                         isomer through C100 to reach the same reduction as
+//                         the exact regime (claude-projects/delaunay/tools/
+//                         bench_cubic_regimes).
+//      Both compact to cone ids and label the cones the same way.
 //   3. AlexandrovSolver on the resulting 20..60-cone iDT, unmodified.
 //
-// NOTE: the metric is not Loeschian (pentagon geometry brings sqrt(5));
-// none of the integer-exact Eisenstein machinery applies to solver.D --
-// only the float predicates (Diamond, cocircular_edges(tol)) may be used.
+// NOTE: the metric is not Loeschian (pentagon geometry brings sqrt(5)), so
+// the integer-exact Eisenstein machinery does not apply to solver.D; the
+// exact regime is the cyclotomic one above.  After either build only the
+// float predicates (Diamond, cocircular_edges(tol)) can be asked of
+// solver.D: the exact algebraic lengths exist only during the build, and
+// the double lengths that survive in solver.D do not determine them.
 // ============================================================================
 
 struct AlexandrovIDTCubic {
@@ -503,7 +539,7 @@ struct AlexandrovIDTCubic {
   AlexandrovSolver solver;
 
   // Configure-before-build knob: when set, the flat-vertex removal inside
-  // build() TRACKS every removed kis vertex (DelaunayTriangulation point
+  // build() / build_banded() TRACKS every removed kis vertex (DelaunayTriangulation point
   // tracker), so after solve() the kappa=0 solver.D carries each hexagon
   // center, pentagon center and hexagon-only cubic vertex as a
   // (cell, barycentric) location on the cubic polytope's surface --
@@ -512,10 +548,19 @@ struct AlexandrovIDTCubic {
   // cubic face center; id T.N + t = cubic vertex t in T.triangles() order).
   bool track_removed = false;
 
-  // Cone bookkeeping, filled by build().  Cone i is vertex i of solver.D.
+  // Cone bookkeeping, filled by build() and build_banded().  Cone i is
+  // vertex i of solver.D.
   std::vector<tri_t> cone_triangle;  // dual triangle (CCW, T labels) = the cubic vertex
   std::vector<int>   cone_npent;     // k = #pentagon corners (deg-5 T vertices), 1..3
   std::vector<int>   cone_kis_vertex; // kis id of cone i (= T.N + its triangle index)
+
+  // The same three, as one value: what cone_labels computes and both
+  // builds install.
+  struct ConeLabels {
+    std::vector<tri_t> triangle;
+    std::vector<int>   npent;
+    std::vector<int>   kis_vertex;
+  };
 
   // The kis complex of the dual triangulation T, plus its metric.
   struct KisMetric {
@@ -537,7 +582,8 @@ struct AlexandrovIDTCubic {
   // @throws std::logic_error when pre(fullerene) is violated
   static KisMetric kis_metric(const TriangulationView& T);
 
-  // kis -> flat removal (lib compute) -> cone iDT in solver.D + cone labels.
+  // kis -> exact flat removal and canonical completion -> compaction ->
+  // cone iDT in solver.D + cone labels.  Returns the completion's counts.
   // @anchor cubic-build
   // @pre  as cubic-kis-metric (T is an oriented fullerene dual)
   // @post cone_triangle.size() == solver.D.nv &&
@@ -547,10 +593,30 @@ struct AlexandrovIDTCubic {
   //                       - cone_npent[i]*M_PI/15) <= KAPPA_TOL; })
   // @post gauss_bonnet: |sum_i (2*M_PI - v_cone_angle[i]) - 4*M_PI|
   //           <= TOTAL_KAPPA_TOL
+  // @post every cocircular cell is triangulated canonically: the fan from
+  //       its unique least-rotation corner, or, when exactly two corners tie,
+  //       the symmetric split about the diameter joining them (result.fanned
+  //       and result.periodic_completed count the two).  Only a word with
+  //       three or four least corners, or a failed disk gate, is refused --
+  //       result.ambiguous / result.nondisk, neither of which can occur on a
+  //       cone surface
   // @throws std::logic_error when a cone guard trips (a flat vertex
   //         survived removal, kappa != k*pi/15, or total curvature != 4pi
-  //         -- all "can't happen" on a correct kis metric)
-  void build(const TriangulationView& T);
+  //         -- all "can't happen" on a correct kis metric);
+  //         std::runtime_error when the exact predicates refuse a decision
+  //         or a completion invariant trips (the throw set of
+  //         remove_and_complete_cyclotomic_kis)
+  DelaunayView::CompletionStats build(const TriangulationView& T);
+
+  // The tolerance-based regime of the same build (class banner, step 2):
+  // DelaunayTriangulation::compute under the float predicates, no
+  // completion, then the same compaction and cone labelling.
+  // @anchor cubic-build-banded
+  // @pre  as cubic-build
+  // @post cone_triangle.size() == solver.D.nv && cone_npent.size() ==
+  //       solver.D.nv; kappa_is_k_pi_15 and gauss_bonnet as cubic-build
+  // @throws std::logic_error as cubic-build's cone guards
+  void build_banded(const TriangulationView& T);
 
   // build(T) + solver.solve().
   // @anchor cubic-solve
@@ -586,4 +652,18 @@ struct AlexandrovIDTCubic {
   //           result.n_hex == T.N - 12
   FlatFaceCensus flat_face_census(const TriangulationView& T,
                                   const CanonicalTesselation& tess) const;
+
+ private:
+  // The cone labels of the compacted complex D: cone i is kis vertex
+  // new_to_old[i], a cubic vertex T.N + t with its dual triangle and its
+  // pentagon-corner count k.  Pure.
+  // @throws std::logic_error when a face centre survived the removal
+  static ConeLabels cone_labels(const KisMetric& M, const DelaunayTriangulation& D,
+                                const std::vector<int>& new_to_old);
+  // The curvature quantum: every cone's double-precision curvature is
+  // k*pi/15 within KAPPA_TOL and they sum to 4*pi within TOTAL_KAPPA_TOL.
+  // @throws std::logic_error otherwise
+  static void check_curvature_quantum(const DelaunayTriangulation& D,
+                                      const ConeLabels& L);
+  void set_cones(ConeLabels L);
 };

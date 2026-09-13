@@ -62,10 +62,12 @@ struct Graph : GraphView {
       std::copy(initial_row.begin(), initial_row.end(), owned_neighbours.data() + v * dmax);
   }
 
-  // Copy from adjacency view (copies data, owns it).
+  // Copy from adjacency view (copies the graph's N rows, owns them; a
+  // view's spans may cover storage past its N).
   Graph(const base_t& adj)
-      : owned_neighbours(adj.neighbours.begin(), adj.neighbours.end()),
-        owned_deg(adj.deg.begin(), adj.deg.end()) {
+      : owned_neighbours(adj.neighbours.begin(),
+                         adj.neighbours.begin() + size_t(adj.N) * adj.dmax),
+        owned_deg(adj.deg.begin(), adj.deg.begin() + adj.N) {
     N = adj.N; dmax = adj.dmax; repoint();
   }
 
@@ -171,6 +173,22 @@ struct Graph : GraphView {
     owned_neighbours.resize(new_N * dmax, node_t(-1));
     owned_deg.resize(new_N, 0);
     N = node_t(new_N);
+    repoint();
+  }
+
+  // An EMPTY N-by-dmax graph in this storage -- the owning_graph word a
+  // filler needs (BuckyGen::dual_slot): reallocated only when the shape
+  // changes, every row empty, any twin span dropped.
+  void reshape(node_t N_, int dmax_) {
+    if (N != N_ || dmax != dmax_ || owned_neighbours.size() != size_t(N_) * dmax_) {
+      owned_neighbours.assign(size_t(N_) * dmax_, node_t(-1));
+      owned_deg.assign(size_t(N_), 0);
+      N = N_; dmax = dmax_;
+    } else {
+      std::fill(owned_neighbours.begin(), owned_neighbours.end(), node_t(-1));
+      std::fill(owned_deg.begin(), owned_deg.end(), 0);
+    }
+    twin = {};
     repoint();
   }
 

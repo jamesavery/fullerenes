@@ -14,6 +14,7 @@ config.mod
 libgraph.a
 fullerene
 build/*
+build-*
 database/*
 output/*
 app-*

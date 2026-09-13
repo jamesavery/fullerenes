@@ -89,6 +89,10 @@ if(GTest_FOUND)
   target_link_libraries(orientation-test fullerenes GTest::GTest GTest::Main)
   add_test(NAME orientation-test COMMAND orientation-test)
 
+  add_executable(layout-crossingfree-test layout-crossingfree-test.cc)
+  target_link_libraries(layout-crossingfree-test fullerenes GTest::GTest GTest::Main)
+  add_test(NAME layout-crossingfree-test COMMAND layout-crossingfree-test)
+
   add_executable(ply-io-test ply-io-test.cc)
   target_link_libraries(ply-io-test fullerenes GTest::GTest GTest::Main)
   add_test(NAME ply-io-test COMMAND ply-io-test)
@@ -132,9 +136,24 @@ if(GTest_FOUND)
   target_link_libraries(planargraph-ascii-test fullerenes GTest::GTest GTest::Main)
   add_test(NAME planargraph-ascii-test COMMAND planargraph-ascii-test)
 
+  # Own main: --sizes N,N,... widens the database sweep; the default list is
+  # what CTest runs, and the database-dependent cases skip when it is absent.
+  add_executable(hueckel-test hueckel-test.cc)
+  target_link_libraries(hueckel-test fullerenes GTest::GTest)
+  add_test(NAME hueckel-test COMMAND hueckel-test)
+
+  # Own main (--sizes), hence GTest::GTest without GTest::Main.
+  add_executable(hamilton-cycle-test hamilton-cycle-test.cc)
+  target_link_libraries(hamilton-cycle-test fullerenes GTest::GTest)
+  add_test(NAME hamilton-cycle-test COMMAND hamilton-cycle-test)
+
   add_executable(isomerdb-test isomerdb-test.cc)
   target_link_libraries(isomerdb-test fullerenes GTest::GTest GTest::Main)
   add_test(NAME isomerdb-test COMMAND isomerdb-test)
+
+  add_executable(isomerdb-record-test isomerdb-record-test.cc)
+  target_link_libraries(isomerdb-record-test fullerenes GTest::GTest)
+  add_test(NAME isomerdb-record-test COMMAND isomerdb-record-test)
 
   add_executable(alexandrov-cubic-test alexandrov-cubic-test.cc)
   target_link_libraries(alexandrov-cubic-test fullerenes buckygen GTest::GTest GTest::Main)

@@ -348,20 +348,21 @@ struct CornerAngleData {
 };
 
 Deltahedron::Deltahedron(const TriangulationView& T, const vector<coord3d>& pts)
-  : base_t(static_cast<const GraphView&>(T), std::vector<coord3d>(pts))
+  : base_t(static_cast<const GraphView&>(T))
 {
-  assert((int)points.size() == N);
+  set_points(pts);          // refuses a coordinate count other than N
 }
 
 Deltahedron::Deltahedron(const TriangulationView& T, std::span<const coord3d> pts)
-  : base_t(static_cast<const GraphView&>(T), std::vector<coord3d>(pts.begin(), pts.end()))
+  : base_t(static_cast<const GraphView&>(T))
 {
-  assert((int)points.size() == N);
+  set_points(pts);
 }
 
 Deltahedron::Deltahedron(const Polyhedron& P)
-  : base_t(static_cast<const GraphView&>(P), std::vector<coord3d>(P.points.begin(), P.points.end()))
+  : base_t(static_cast<const GraphView&>(P))
 {
+  set_points(P.points);
   assert(P.is_triangulation());
 }
 

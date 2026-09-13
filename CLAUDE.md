@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Fullerenes is a C++17/Fortran application for topological analysis and 3D structure generation of fullerene isomers (carbon cage molecules). It performs graph-theoretic analysis, geometry optimization, and supports GPU acceleration via SYCL (Intel DPC++). The codebase combines a legacy Fortran solver with a modern C++ front-end and GPU-accelerated computational kernels.
+Fullerenes is a C++23 library and toolset for topological analysis and 3D structure generation of fullerene isomers (carbon cage molecules). It performs graph-theoretic analysis, geometry optimization, and supports GPU acceleration via SYCL (Intel DPC++). The legacy Fortran program it grew out of is still in the tree (`src/fortran/`) but is opt-in and nothing depends on it — see "Legacy Fortran" below.
 
 ## Build Commands
 
@@ -21,7 +21,8 @@ cmake ..
 cmake --build build
 
 # Build with SYCL GPU support (requires Intel DPC++ compiler)
-# CMake auto-detects sycl-ls and sets SYCL_TARGETS to NVIDIA, AMD, or X86
+# SYCL_TARGETS defaults to the GPU the machine reports (nvidia-smi -> NVIDIA,
+# rocminfo -> AMD, neither -> X86), and the *_ARCH knobs to its architecture
 cmake -DENABLE_SYCL=ON -DSYCL_TARGETS=NVIDIA ..
 
 # Run all tests (CTest)
@@ -36,20 +37,23 @@ init, this has been observed with gcc-14 + `-std=gnu++23` miscompiling the
 file-scope `vector<vector<string>>` initializers in `isomerdb.cc` /
 `polyhedron-io.cc` / `planargraph-io.cc` — a regression in that gcc's C++23
 support, not a bug in this code. Work around it with an older gcc point
-release, e.g. `-DCMAKE_C_COMPILER=gcc-13 -DCMAKE_CXX_COMPILER=g++-13
--DCMAKE_Fortran_COMPILER=gfortran-13`, or use clang.
+release, e.g. `-DCMAKE_C_COMPILER=gcc-13 -DCMAKE_CXX_COMPILER=g++-13`
+(and `-DCMAKE_Fortran_COMPILER=gfortran-13` if `FULLERENES_LEGACY_FORTRAN`
+is on), or use clang.
 
 ## Key Build Options
 
-- `ENABLE_SYCL` — Build GPU code (auto-detected from `sycl-ls`)
-- `SYCL_TARGETS` — GPU backend: `NVIDIA`, `AMD`, or `X86` (single target per build)
-- `CMAKE_CUDA_ARCHITECTURES` — NVIDIA SM architecture (e.g. 86 for RTX 3090)
-- `FORTRAN_NMAX` — Max vertices for Fortran static allocation (default 5000)
+- `ENABLE_SYCL` — Build GPU code (defaults ON when an AdaptiveCpp compiler is found)
+- `SYCL_TARGETS` — either a preset (`NVIDIA`, `AMD`, `X86`, `GENERIC`) or an AdaptiveCpp target list passed through verbatim, e.g. `cuda:sm_80,sm_89` for one library carrying code for an A100 and an RTX 4090 (default: the GPU `nvidia-smi`/`rocminfo` report, else `X86`). Several **architectures** of one backend work; several **backends** (`omp;cuda:...`) are refused at configure time, because acpp's `;` separator is also CMake's list separator, so only the first would reach the compiler. `generic` is the JIT flow and must appear alone.
+- `SYCL_CUDA_ARCH` / `SYCL_HIP_ARCH` / `CMAKE_CUDA_ARCHITECTURES` — GPU architecture, comma-separated for several (e.g. `-DSYCL_CUDA_ARCH=80,89`; default: what the vendor tool reports, e.g. 89 for an RTX 4090; 86 / gfx90a when none is)
+- `FULLERENES_LEGACY_FORTRAN` — Build the legacy Fortran program and its C ABI (default OFF; the only thing that needs a Fortran compiler)
+- `FORTRAN_NMAX` — Max vertices for Fortran static allocation (default 5000; only with the option above)
 - `GPU_MAXREGCOUNT` — GPU register pressure limit (default 80)
 
 ## Dependencies
 
-Required: CMake 3.5+, C++17 compiler, Fortran compiler (gfortran), GSL, GTest, OpenMP.
+Required: CMake 3.5+, C++23 compiler, GSL, GTest, OpenMP.  A Fortran compiler
+(gfortran) only for `-DFULLERENES_LEGACY_FORTRAN=ON`.
 (BLAS/LAPACK are deliberately NOT dependencies: all dense linear algebra goes
 through the in-house BLAS-free `dense_linalg` module — see its header for why.)
 Optional (GPU): Intel DPC++ compiler (`icpx`/`clang++`), CUDA toolkit, oneDPL.
@@ -127,15 +131,24 @@ The GPU pipeline processes batches of fullerene isomers through stages: graph du
 
 ### Library Structure
 
-- `fullerenes` (shared lib, `src/c++/`) — Core C++ graph/geometry/spiral library
+- `fullerenes` (shared lib, `src/c++/`; `FULLERENES_SHARED=OFF` builds it static) — Core C++ graph/geometry/spiral library
 - `sycl_fullerene_lib` + component libs (`src/sycl/`) — GPU kernels, each compiled separately with per-module register constraints
-- `fortran_opt`, `fortran_lib` (`src/fortran/`) — Legacy Fortran solvers (static allocation, configured via `config.f.in`)
+- `fortran_opt`, `fortran_lib`, `fullerene_program` (`src/fortran/`) — the legacy Fortran program, built only under `FULLERENES_LEGACY_FORTRAN`
 - `programs/` — 20+ CLI tools for conversion, generation, and analysis
 - `src/contrib/mgmres.cc` — External GMRES solver contribution
 
-### Fortran Integration
+### Legacy Fortran
 
-Fortran routines handle ring spiral indexing, coordinate generation, force-field optimization, and Schlegel diagrams. They use static allocation bounded by `FORTRAN_NMAX`. The C++/Fortran interface is in `fortran.hh` and `graph_fortran.cc`.
+`src/fortran/` is the "Fullerene" program v4.5 (Schwerdtfeger, Wirz & Avery):
+ring spirals, coordinate generation, force-field optimization, Schlegel
+diagrams, Hückel analysis, Hamiltonian cycles, the isomer database writer.
+Every part of it the library needs has a C++ home (the port is documented in
+`claude-projects/unfortran/`), `libfullerenes.so` carries no Fortran symbol,
+and no C++ code calls into it. It is built only with
+`-DFULLERENES_LEGACY_FORTRAN=ON`, which also compiles `src/c++/graph_fortran.cc`
+— the C++ side of the program's ABI, marshalling only — into the library. It
+uses static allocation bounded by `FORTRAN_NMAX`. The `claude-projects/unfortran`
+parity tests link its archives as an oracle and need the option on.
 
 ## Branches
 
