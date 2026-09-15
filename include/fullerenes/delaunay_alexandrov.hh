@@ -303,11 +303,44 @@ struct AlexandrovSolver {
                                   const std::vector<double>& delta,
                                   bool* clipped = nullptr);
 
-  // Flip T to the weighted-Delaunay triangulation of r (B-I bad-edge
-  // rule), up to the internal iteration cap.  Returns the number of
-  // flips performed.  Exposed for external polish implementations
-  // (polish_override) — same single-source-of-truth rationale as
-  // feasible_step.
+  // The flip cap of one weighted-Delaunay repair: a GUARD against a scan
+  // that does not terminate, never a knob.  A legal-flip sequence
+  // terminates (the Bobenko-Izmestiev piecewise-quadratic extension
+  // strictly increases at every flip), so the cap is sized to the complex
+  // and generous: one repair legitimately flips every cocircular
+  // quadrilateral whose tie a step breaks, dozens on the cubic metric's
+  // equal-radius start.  ONE spelling, for this library and for the
+  // parallel-primitives port.
+  static constexpr int flip_cap(int nh) { return 4 * nh; }
+
+  // The outcome of one repair: T is weighted-Delaunay for r with r
+  // feasible (Delaunay); r is infeasible for T before or after a flip
+  // (Infeasible); a bad edge's diamond does not support a flip, the B-I
+  // obstruction and evidence against the weights (Unflippable); the cap
+  // was reached with a bad edge left, an unfinished computation and never
+  // a verdict on the weights (Budget: T's status latch trips
+  // BudgetExceeded, so the run is refused by name).
+  enum class Repair { Delaunay, Infeasible, Unflippable, Budget };
+
+  // Repair T to the weighted-Delaunay triangulation of r by legal flips
+  // (θ_e > π on a strictly convex diamond), with r required feasible for T
+  // before the first flip and after every flip; `flips` counts the flips
+  // applied.  A non-finite dihedral is infeasibility, never a bad edge.
+  // The continuation's corrector, the polish entry and the polish trials
+  // all run this; the optimize framework's cell-resolved model does too.
+  // @anchor topology-repair
+  // @pre  as gcp-kappa
+  // @post Delaunay: T is weighted-Delaunay for r and r ∈ F(T).  Otherwise
+  //       T holds the flips applied so far: a caller discards the copy or
+  //       refuses the state, never evaluates on it as if admissible.
+  static Repair repair(DelaunayTriangulation& T, const std::vector<double>& r,
+                       int& flips);
+
+  // The unconditional flip loop: flip every bad edge, a non-finite
+  // dihedral included, until none remains or the cap is reached, with NO
+  // feasibility gate.  Returns the number of flips performed.  Not on any
+  // solve path (those repair); kept as the elementary operation the
+  // optimize sub-project's tests exercise directly.
   // @anchor topology-flip-to-weighted-delaunay
   // @pre  as gcp-kappa
   static int flip_to_weighted_delaunay(DelaunayTriangulation& T,

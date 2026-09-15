@@ -32,6 +32,7 @@
 #include "fullerenes/matrix.hh"
 #include <cstdio>
 #include <cmath>
+#include <limits>
 #include <map>
 #include <numeric>
 #include <set>
@@ -541,6 +542,8 @@ pair<bool, double> update(double actual, double predicted, double dnorm,
 // Layer 4: Topology operations
 // ============================================================================
 
+using Repair = AlexandrovSolver::Repair;   // the outcome of a repair, read by every layer below
+
 namespace Topology {
 
 // B-I 2008 §3.4 (lines 614–640) define an edge h as "bad" iff the function
@@ -601,17 +604,42 @@ int needs_flip(const DelaunayTriangulation& T, const vector<double>& r) {
   return -1;
 }
 
-// Flip until needs_flip(T, r) returns -1 (or 20 iter cap).
-// Returns number of flips performed.
+// The unconditional flip loop (AlexandrovSolver::flip_to_weighted_delaunay's
+// contract): every bad edge is flipped, a non-finite dihedral included, up
+// to the cap.  Not on any solve path.
 int flip_to_weighted_delaunay(DelaunayTriangulation& T, const vector<double>& r) {
   int total = 0;
-  for (int iter = 0; iter < 20; iter++) {
+  for (int iter = 0, cap = AlexandrovSolver::flip_cap(T.nh); iter < cap; iter++) {
     int h = needs_flip(T, r);
     if (h < 0) break;
     if (T.flip_edge(h)) total++;
     else break;
   }
   return total;
+}
+
+// Repair T to the weighted-Delaunay complex of r by legal flips
+// (AlexandrovSolver::repair's contract).  Feasibility is tested before the
+// first flip and after every flip, so needs_flip's NaN clause cannot fire
+// here: a pyramid that does not close is Infeasible, never a bad edge.
+// @variant the B-I piecewise-quadratic extension, which every legal flip
+//          strictly increases over a finite set of triangulations: the loop
+//          terminates without the cap, which guards a broken predicate only
+// @post Delaunay: T weighted-Delaunay for r and r ∈ F(T); Budget: T's
+//       status latch reads BudgetExceeded
+Repair repair(DelaunayTriangulation& T, const vector<double>& r, int& flips) {
+  const int cap = AlexandrovSolver::flip_cap(T.nh);
+  for (int iter = 0; iter <= cap; iter++) {
+    if (!GCP::feasible(T, r)) return Repair::Infeasible;
+    int h = needs_flip(T, r);
+    if (h < 0) return Repair::Delaunay;
+    if (iter == cap) break;
+    if (!T.flip_edge(h)) return Repair::Unflippable;
+    flips++;
+  }
+  T.trip(DelaunayView::Status::BudgetExceeded,
+         "Alexandrov repair: flip cap reached with a bad edge left", cap);
+  return Repair::Budget;
 }
 
 } // namespace Topology
@@ -647,11 +675,19 @@ constexpr int CORRECTOR_MAX_ITER = 8;
 constexpr double CORRECTOR_TOL = 1e-12;
 
 // One predictor-corrector step.  Returns the corrector iteration count
-// alongside the (t, r) iterate — always present; "accepted" iff
-// nit ∈ [0, CORRECTOR_MAX_ITER).  t, r are valid only if accepted.
+// alongside the (t, r, T) iterate — always present; "accepted" iff
+// nit ∈ [0, CORRECTOR_MAX_ITER).  t, r, T are valid only if accepted: T is
+// then the weighted-Delaunay complex of r (the trial copy the corrector
+// repaired), and `flips` counts the flips that repair applied.
+// predictor_refused: the tangent system J·ṙ = κ₁ had no usable solution.
+// That system does not contain dt, so halving dt re-runs an identical
+// computation; the track stops instead.
 struct StepResult {
   int nit;
   double t; V r;
+  DelaunayTriangulation T;
+  int flips;
+  bool predictor_refused;
   bool accepted() const { return nit >= 0 && nit < CORRECTOR_MAX_ITER; }
 };
 
@@ -676,13 +712,27 @@ V initial_radii(const DelaunayTriangulation& T) {
   return V(T.nv, 2 * R);
 }
 
-// Plain Newton driving κ(r) → target: r −= J⁻¹(κ(r) − target).
-// Returns the iteration count: nit ∈ [0, max_iter) converged to tol, max_iter
-// if not, −1 on a failed linear solve.  (Newton::polish is the trust-region
-// κ→0 analogue.)
-int newton_correct(const DelaunayTriangulation& T, V& r, const V& target,
-                   double tol, int max_iter) {
+// Newton driving κ(r) → target: r −= J⁻¹(κ(r) − target), where κ is the
+// curvature of the generalized convex polyhedron of r.  Returns the
+// iteration count: nit ∈ [0, max_iter) converged to tol, max_iter if not,
+// −1 when an iterate left the admissible set (the repair did not reach
+// Delaunay) or a linear solve failed.  `flips` counts the flips the repairs
+// applied.  (Newton::polish is the trust-region κ→0 analogue; its trials
+// keep the same invariant.)
+// @inv  every κ and J is evaluated on the weighted-Delaunay complex of the
+//       iterate it is evaluated at: T is repaired in place before each
+//       evaluation (Topology::repair)
+// @post nit ∈ [0, max_iter): κ(T, r) = target to tol, T weighted-Delaunay
+//       for r and r ∈ F(T)
+//
+// Evaluating on a stale complex is not a harmless approximation: past a flip
+// boundary the stale κ is not the curvature of any convex polyhedron, and a
+// corrector that converges there can land where the flipped complex has no
+// closing pyramid for the radii at all, with no step size that recovers it.
+int newton_correct(DelaunayTriangulation& T, V& r, const V& target,
+                   double tol, int max_iter, int& flips) {
   for (int nit = 0; nit < max_iter; nit++) {
+    if (Topology::repair(T, r, flips) != Repair::Delaunay) return -1;
     V F = GCP::kappa(T, r) - target;
     if (LinAlg::max_abs(F) < tol) return nit;
     auto dr = LinAlg::solve(GCP::jacobian(T, r), F);
@@ -710,17 +760,21 @@ int newton_correct(const DelaunayTriangulation& T, V& r, const V& target,
 constexpr double DT_MIN = 1e-9;
 constexpr double DT_MAX = 0.1;
 
-// One natural-continuation step to t1 = t0 − dt: Euler predictor r0 − dt·(dr/dt)
-// then a fixed-t1 Newton correction of κ(r) onto t1·κ₁.
+// One natural-continuation step to t1 = t0 − dt on a TRIAL copy of T: Euler
+// predictor r0 − dt·(dr/dt), then the fixed-t1 Newton correction of κ(r) onto
+// t1·κ₁ with every iterate on its own weighted-Delaunay complex.  The copy is
+// the step's commit-or-nothing unit (the polish's TRIAL invariant): an
+// accepted step's (r, T) are adopted together, a rejected step leaves the
+// caller's T untouched.  The copy carries any active point tracker with it.
 StepResult natural_step(const DelaunayTriangulation& T,
                         double t0, const V& r0, const V& kappa1,
                         const matrix<double>& J, double dt) {
   double t1 = t0 - dt;
   auto v = dr_dt(J, kappa1);
-  if (!LinAlg::is_usable_step(v)) return {-1, t1, r0};
-  V r = r0 - v * dt;
-  int nit = newton_correct(T, r, kappa1 * t1, CORRECTOR_TOL, CORRECTOR_MAX_ITER);
-  return nit < 0 ? StepResult{-1, t1, r0} : StepResult{nit, t1, std::move(r)};
+  if (!LinAlg::is_usable_step(v)) return {-1, t1, r0, T, 0, true};
+  StepResult s{0, t1, r0 - v * dt, T, 0, false};
+  s.nit = newton_correct(s.T, s.r, kappa1 * t1, CORRECTOR_TOL, CORRECTOR_MAX_ITER, s.flips);
+  return s;
 }
 
 // Record (t, r) in the extrapolation history, collapsing same-t entries
@@ -733,10 +787,11 @@ void record_history(vector<pair<double, V>>& history, double t, const V& r) {
 }
 
 // Natural t-continuation: trace κ(r)=t·κ₁ from t=1 toward t_target by
-// natural_step predictor-corrector steps, re-Delaunay-flipping after each
-// accepted step and adapting dt (clamped against overshooting t_target).
-//   Pre:  r ∈ F(T), 0 < κᵢ(T, r) < δᵢ, t_target > 0.
-//   Post: t_final ≤ t_target if the continuation reached it, else it stalled.
+// natural_step predictor-corrector steps, adopting each accepted step's
+// repaired complex and adapting dt (clamped against overshooting t_target).
+//   Pre:  r ∈ F(T), T weighted-Delaunay for r, 0 < κᵢ(T, r) < δᵢ, t_target > 0.
+//   Post: t_final ≤ t_target if the continuation reached it, else it stalled;
+//         T is weighted-Delaunay for r and r ∈ F(T) at every accepted step.
 TrackResult natural_track(DelaunayTriangulation& T, V r, const V& kappa1,
                           double t_target, double dt_init,
                           vector<AlexandrovSolver::TraceEntry>* trace,
@@ -750,12 +805,16 @@ TrackResult natural_track(DelaunayTriangulation& T, V r, const V& kappa1,
     auto J = GCP::jacobian(T, r);
     auto result = natural_step(T, t, r, kappa1, J, min(dt, t - t_target));
 
+    // A refused predictor ends the track after this step's records: dt is
+    // not in the tangent system, so no halving can change the outcome.
+    const bool stop = !result.accepted() && result.predictor_refused;
     if (result.accepted()) {
       t = result.t; r = std::move(result.r);
-      stats.flips += Topology::flip_to_weighted_delaunay(T, r);
+      T = std::move(result.T);                  // weighted-Delaunay for r
+      stats.flips += result.flips;
       record_history(history, t, r);
       dt = adapt_dt(dt, result.nit, CORRECTOR_MAX_ITER, DT_MAX);
-    } else {
+    } else if (!stop) {
       dt *= 0.5;
       if (dt < DT_MIN) break;
     }
@@ -763,7 +822,7 @@ TrackResult natural_track(DelaunayTriangulation& T, V r, const V& kappa1,
       trace->push_back(make_trace('T', step_i, t, dt, result.nit,
                                    GCP::kappa(T, r), J));
     if (diag) {
-      auto Jd = GCP::jacobian(T, r);  // J on the (possibly post-flip) state
+      auto Jd = GCP::jacobian(T, r);  // J on the adopted (repaired) state
       diag->push_back(make_diag('T', step_i, t, dt, result.nit,
                                   T, r, GCP::kappa(T, r), Jd, stats.flips));
     }
@@ -771,6 +830,7 @@ TrackResult natural_track(DelaunayTriangulation& T, V r, const V& kappa1,
       traj->push_back(make_traj('T', step_i, t, T, r, GCP::kappa(T, r)));
     stats.steps++;
     stats.newton_total += max(result.nit, 0);
+    if (stop) break;
   }
   return {t, std::move(r), std::move(history), stats};
 }
@@ -840,7 +900,12 @@ pair<bool, double> polish(DelaunayTriangulation& T, V& r,
   int rejects = 0;
   int flips_local = flips_cum ? *flips_cum : 0;
 
-  flips_local += Topology::flip_to_weighted_delaunay(T, r);   // ENTRY invariant
+  // ENTRY invariant, as a repair: the state must be feasible on its own
+  // weighted-Delaunay complex, or there is nothing to polish.
+  if (Topology::repair(T, r, flips_local) != Repair::Delaunay) {
+    if (flips_cum) *flips_cum = flips_local;
+    return {false, max_abs(GCP::kappa(T, r))};
+  }
 
   for (int iter = 0; iter < max_iter; iter++) {
     auto kappa = GCP::kappa(T, r);
@@ -866,8 +931,13 @@ pair<bool, double> polish(DelaunayTriangulation& T, V& r,
     // cell.  The copy snapshots any active point tracker; adopting it on
     // acceptance keeps transport commit-or-nothing.
     DelaunayTriangulation T_trial = T;
-    int    trial_flips = Topology::flip_to_weighted_delaunay(T_trial, r_trial);
-    double E_trial   = energy(GCP::kappa(T_trial, r_trial));
+    int    trial_flips = 0;
+    // A trial outside the admissible set (its repair does not reach
+    // Delaunay) has infinite energy: the update below rejects it, and
+    // nothing is evaluated there.
+    double E_trial   = Topology::repair(T_trial, r_trial, trial_flips) == Repair::Delaunay
+                           ? energy(GCP::kappa(T_trial, r_trial))
+                           : std::numeric_limits<double>::infinity();
 
     auto [ok, D2] = TrustRegion::update(E - E_trial, pred, norm(delta), Delta, Delta_max);
     // If we clipped, cap Δ at the step we actually took so the next
@@ -935,7 +1005,10 @@ coord3d place_vertex(coord3d pu, coord3d pv, double g_wu, double g_wv,
   return (side > 0) ? proj - n*scale : proj + n*scale;
 }
 
-// 3D reconstruction from converged (T, r) with κ ≈ 0.
+// 3D reconstruction from converged (T, r) with κ ≈ 0.  Returns the empty
+// vector when a placement refuses: the seed face's two closures (the jy2 and
+// kz2 tests below), a later pyramid's closure (place_vertex's NaN), or a
+// complex with no live face.
 vector<coord3d> from_radii(const DelaunayTriangulation& T, const V& r) {
   int n = T.nv;
   vector<coord3d> pos(n, coord3d(0,0,0));
@@ -944,7 +1017,7 @@ vector<coord3d> from_radii(const DelaunayTriangulation& T, const V& r) {
   // Seed face: place vertex i on x-axis, j in xy-plane, k with z ≥ 0.
   int f0 = -1;
   for (int f = 0; f < T.nf; f++) if (T.f_he[f] >= 0) { f0 = f; break; }
-  if (f0 < 0) return pos;
+  if (f0 < 0) return {};
 
   const auto [h0, h1, h2] = T.face_halfedges(f0);
   const auto [i, j, k]    = T.face_vertices(f0);
@@ -988,6 +1061,7 @@ vector<coord3d> from_radii(const DelaunayTriangulation& T, const V& r) {
 
         pos[w] = place_vertex(pos[u], pos[v], g_wu, g_wv, r[w],
                                old_w >= 0 ? pos[old_w] : coord3d(0,0,0));
+        if (std::isnan(pos[w][0])) return {};   // the placement's own refusal
         placed[w] = true;
       }
       face_done[fa] = true;
@@ -1330,6 +1404,11 @@ vector<double> AlexandrovSolver::feasible_step(const DelaunayTriangulation& T,
 int AlexandrovSolver::flip_to_weighted_delaunay(DelaunayTriangulation& T,
                                                  const vector<double>& r) {
   return Topology::flip_to_weighted_delaunay(T, r);
+}
+
+AlexandrovSolver::Repair AlexandrovSolver::repair(DelaunayTriangulation& T,
+                                                  const vector<double>& r, int& flips) {
+  return Topology::repair(T, r, flips);
 }
 
 double AlexandrovSolver::theta(const DelaunayTriangulation& T,

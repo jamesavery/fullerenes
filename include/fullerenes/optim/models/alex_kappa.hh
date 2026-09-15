@@ -28,6 +28,7 @@
 #include "fullerenes/delaunay_alexandrov.hh"
 
 #include <algorithm>
+#include <limits>
 #include <span>
 #include <vector>
 
@@ -65,20 +66,29 @@ struct AlexKappa {
 
 // Cell-resolved kappa: R(r) = kappa(WD(T, r), r), where WD(T, r) is the
 // weighted-Delaunay triangulation reached from the BASE cell by
-// AlexandrovSolver::flip_to_weighted_delaunay.  The base cell T is
-// weighted-Delaunay for the committed point r_base (established by the
-// entry flip in the constructor); an evaluation at r == r_base uses T
-// directly, any other r a flipped scratch copy (cached on the last
-// query point, so the accepted trial's cell is adopted without a
-// second flip).  commit(r) is the post_accept hook's body.
-// @inv  T is weighted-Delaunay for r_base
+// AlexandrovSolver::repair.  The base cell T is weighted-Delaunay for the
+// committed point r_base (established by the entry repair in the
+// constructor); an evaluation at r == r_base uses T directly, any other r
+// a repaired scratch copy (cached on the last query point, so the
+// accepted trial's cell is adopted without a second repair).  commit(r)
+// is the post_accept hook's body.
+//
+// A point whose repair does not reach a weighted-Delaunay complex it is
+// feasible for lies outside the admissible set: its energy is +infinity,
+// so a trust-region update rejects it unevaluated (the parent polish's
+// rule), and its residual and Jacobian are whatever the partial repair
+// leaves, never read on an accepted path.
+// @inv  T is weighted-Delaunay for r_base whenever base_admissible
 struct AlexKappaWD {
   DelaunayTriangulation& T;
 
-  // @post T is weighted-Delaunay for r0 (the parent's ENTRY invariant)
+  // @post base_admissible iff T is weighted-Delaunay for r0 with r0 feasible
+  //       (the parent's ENTRY invariant)
   AlexKappaWD(DelaunayTriangulation& T_, std::span<const double> r0)
       : T(T_), r_base(r0.begin(), r0.end()) {
-    AlexandrovSolver::flip_to_weighted_delaunay(T, r_base);
+    int flips = 0;
+    base_admissible =
+        AlexandrovSolver::repair(T, r_base, flips) == AlexandrovSolver::Repair::Delaunay;
   }
 
   std::size_t residual_size() const { return (std::size_t)T.nv; }
@@ -90,7 +100,9 @@ struct AlexKappaWD {
     J = AlexandrovSolver::jacobian(cell(r), la::V(r.begin(), r.end()));
   }
   double energy(SeqCtx, std::span<const double> r) const {
-    return la::energy(AlexandrovSolver::kappa(cell(r), la::V(r.begin(), r.end())));
+    const DelaunayTriangulation& Tc = cell(r);
+    if (!admissible(r)) return std::numeric_limits<double>::infinity();
+    return la::energy(AlexandrovSolver::kappa(Tc, la::V(r.begin(), r.end())));
   }
   double gradient(SeqCtx, std::span<const double> r, std::span<double> g) const {
     const la::V rv(r.begin(), r.end());
@@ -100,23 +112,30 @@ struct AlexKappaWD {
     return la::energy(k);
   }
 
-  // Adopt r's cell as the base (the accepted trial's flipped copy when
-  // it is the cached query point; a fresh flip otherwise).
-  // @post T is weighted-Delaunay for r; r_base == r
+  // Adopt r's cell as the base (the accepted trial's repaired copy when
+  // it is the cached query point; a fresh repair otherwise).
+  // @post T is weighted-Delaunay for r and base_admissible, when r is
+  //       admissible (an accepted trial always is: its energy was finite);
+  //       r_base == r
   void commit(std::span<const double> r) {
     if (same(r, r_scratch)) {
       T = std::move(T_scratch);
+      base_admissible = scratch_admissible;
       r_scratch.clear();
     } else {
-      AlexandrovSolver::flip_to_weighted_delaunay(T, la::V(r.begin(), r.end()));
+      int flips = 0;
+      base_admissible = AlexandrovSolver::repair(T, la::V(r.begin(), r.end()), flips) ==
+                        AlexandrovSolver::Repair::Delaunay;
     }
     r_base.assign(r.begin(), r.end());
   }
 
  private:
   la::V r_base;                               // the committed point
+  bool  base_admissible = false;              // T weighted-Delaunay for r_base, r_base feasible
   mutable la::V r_scratch;                    // last non-base query point (empty: none)
   mutable DelaunayTriangulation T_scratch;    // its weighted-Delaunay cell
+  mutable bool scratch_admissible = false;    // the scratch repair reached Delaunay
 
   static bool same(std::span<const double> a, const la::V& b) {
     return a.size() == b.size() && std::equal(a.begin(), a.end(), b.begin());
@@ -126,9 +145,15 @@ struct AlexKappaWD {
     if (!same(r, r_scratch)) {
       T_scratch = T;
       r_scratch.assign(r.begin(), r.end());
-      AlexandrovSolver::flip_to_weighted_delaunay(T_scratch, r_scratch);
+      int flips = 0;
+      scratch_admissible = AlexandrovSolver::repair(T_scratch, r_scratch, flips) ==
+                           AlexandrovSolver::Repair::Delaunay;
     }
     return T_scratch;
+  }
+  // Whether r's cell (after cell(r)) is one r is admissible on.
+  bool admissible(std::span<const double> r) const {
+    return same(r, r_base) ? base_admissible : scratch_admissible;
   }
 };
 
