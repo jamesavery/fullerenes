@@ -21,6 +21,7 @@
 //   5. Reconstruct: place vertices in R^3 from converged (T, r)
 
 #include "fullerenes/delaunay.hh"
+#include "fullerenes/delaunay_polytope.hh"
 #include "fullerenes/eisenstein.hh"
 #include "fullerenes/geometry.hh"
 #include "fullerenes/triangulation.hh"

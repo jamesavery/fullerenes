@@ -337,33 +337,11 @@ static double pyramid_h_sq_at(const DelaunayTriangulation& T,
   return d.base_ok ? d.h_sq : -1.0;
 }
 
-// Mean edge length ⟨ℓ⟩ over alive edges — the length scale used by the
-// volume normalisation and the convexity tolerance.  1 on an edgeless T.
-static double mean_edge_length(const DelaunayTriangulation& T) {
-  double sum_l = 0; int n_e = 0;
-  for (int h = 0; h < T.nh; h += 2) {
-    if (!T.alive(h)) continue;
-    sum_l += T.he_length[h]; n_e++;
-  }
-  return (n_e > 0) ? sum_l / n_e : 1.0;
-}
-
-// Six times the signed volume enclosed by pos under T's face structure:
-// Σ_f a·(b×c) over live faces (signed tetrahedra from the origin) —
-// positive iff the CCW half-edge convention has outward normals.  The
-// same divergence-theorem quantity as PolyhedronView::volume_tetra, on
-// (DCEL, pos) data.  Used by the outward-orientation flip, the volume-
-// degeneracy gate, and the convexity precondition.
-static double signed_volume6(const DelaunayTriangulation& T,
-                              const vector<coord3d>& pos) {
-  double vol6 = 0;
-  for (int f = 0; f < T.nf; f++) {
-    if (T.f_he[f] < 0) continue;
-    const auto v = T.face_vertices(f);
-    vol6 += pos[v[0]].dot(pos[v[1]].cross(pos[v[2]]));
-  }
-  return vol6;
-}
+// The mean edge length and the enclosed signed volume are the acceptance
+// gate's own bodies (delaunay_polytope.hh), shared with the device
+// validator; named here for the call sites below.
+using polytope::mean_edge_length;
+using polytope::signed_volume6;
 
 // Pack one continuation- or Newton-step trajectory-diagnostic record.  Cheap to
 // compute (O(nh) for theta + h_sq scans, plus one LU for det sign);
@@ -1391,104 +1369,72 @@ AlexandrovSolver::ValidationStatus AlexandrovSolver::validate_polytope(
     const vector<coord3d>& pos, PolytopeValidation* out, bool verbose) {
   using VS = AlexandrovSolver::ValidationStatus;
   // Public entry: r/pos are caller-supplied (the instance path's were
-  // solver-sized by construction), and three ladder rungs index them by
-  // D.nv before is_convex's own check — enforce the @pre up front.
+  // solver-sized by construction), and the ladder indexes both by D.nv —
+  // enforce the @pre up front.
   if ((int)r.size() < D.nv || (int)pos.size() != D.nv)
     throw std::invalid_argument(
         "AlexandrovSolver::validate_polytope: r.size() >= T.nv and "
         "pos.size() == T.nv required (r " + std::to_string(r.size()) +
         ", pos " + std::to_string(pos.size()) + ", nv " +
         std::to_string(D.nv) + ")");
+
+  // THE GATE IS polytope::validate (delaunay_polytope.hh) — the same bodies
+  // a device batch runs over one isomer's workspace.  All this wrapper adds
+  // is the interior-edge predicate in the host's arithmetic (an edge of the
+  // 2-skeleton's interior is one whose dihedral is π, bigons excepted: the
+  // inessential mask of bi-inessential-edges, here as a predicate so no
+  // per-edge vector is built), the record's shape, and the diagnostics.
+  const auto tight = [&](int h) {
+    if (!D.alive(h) || D.is_bigon(h)) return false;
+    const double th = GCP::theta(D, r, h);
+    return std::isfinite(th) && std::fabs(th - M_PI) < 1e-7;
+  };
+  polytope::Record rec;
+  const polytope::Verdict verdict = polytope::validate(D, pos, tight, &rec);
+
   PolytopeValidation v;
-  // Early failures copy the record as computed so far (later checks keep
-  // their defaults) — the `done` wrapper is the one exit path.
-  auto done = [&](VS s) { if (out) *out = v; return s; };
+  v.t0_simplicial         = AlexandrovSolver::is_simplicial(D);  // diagnostic only
+  v.tbar_simple_polygonal = rec.simple;
+  v.tbar_n_cells          = rec.n_cells;
+  v.volume_norm           = rec.volume_norm;
+  v.no_self_intersect     = rec.no_self_cross;
+  v.convex                = rec.convex;
+  if (out) *out = v;
 
-  // ── SIMPLICITY ──────────────────────────────────────────────────────
-  //   T̄(0) must be a simple polygonal tesselation with F ≥ 3.
-  //   inessential_eps stays at the strict default (1e-7).  Loosening it
-  //   risks falsely collapsing borderline simple edges with |θ − π|
-  //   slightly above 1e-7 but well below "almost flat", which can fold
-  //   a non-degenerate polytope into a drum-cap.  Multi-edges that
-  //   legitimately collapsed to one polytope edge typically reach
-  //   |θ − π| ≲ 1e-7 once Newton converges; if the continuation stalls
-  //   before that (κ residual > tol), the F ≥ 3 check catches the
-  //   resulting degeneracy.
-  v.t0_simplicial = AlexandrovSolver::is_simplicial(D);  // diagnostic only
-  vector<int> labels(D.nv);
-  std::iota(labels.begin(), labels.end(), 0);
-  auto tbar = AlexandrovSolver::polytope_tesselation(D, r, labels);
-  v.tbar_n_cells = tbar.n_cells();
-  v.tbar_simple_polygonal = AlexandrovSolver::is_simple_polygonal(tbar);
-
-  bool simple = v.tbar_simple_polygonal && v.tbar_n_cells >= 3;
-  if (!simple) {
-    if (verbose)
-      printf("  VALIDATION (simplicity) failed: T̄(0) simple_polygonal=%d, "
-             "n_cells=%d (need F≥3), T(0) simplicial=%d (diagnostic).\n",
-             v.tbar_simple_polygonal, v.tbar_n_cells,
-             v.t0_simplicial);
-    return done(VS::FAIL_NOT_SIMPLE);
+  switch (verdict) {
+    case polytope::Verdict::WalkUnclosed:
+      // A cell boundary that does not close is a corrupt complex, not a
+      // verdict on a polytope: loud, as it has always been (a silently
+      // empty tesselation would compare equal to a legitimately empty one).
+      throw std::runtime_error(
+          "AlexandrovSolver::validate_polytope: the cell-boundary walk from "
+          "half-edge " + std::to_string(rec.witness) + " did not close — a "
+          "well-formed tesselation always does");
+    case polytope::Verdict::NotSimple:
+      if (verbose)
+        printf("  VALIDATION (simplicity) failed: T̄(0) simple_polygonal=%d, "
+               "n_cells=%d (need F≥3), T(0) simplicial=%d (diagnostic).\n",
+               v.tbar_simple_polygonal, v.tbar_n_cells, v.t0_simplicial);
+      return VS::FAIL_NOT_SIMPLE;
+    case polytope::Verdict::VolumeDegenerate:
+      if (verbose)
+        printf("  VALIDATION (well-formedness/volume) failed: vol_norm=%.3e "
+               "(threshold %.2e).\n", v.volume_norm, polytope::kVolumeFloor);
+      return VS::FAIL_VOLUME_DEGENERATE;
+    case polytope::Verdict::SelfIntersecting:
+      if (verbose)
+        printf("  VALIDATION (well-formedness/self-intersection) failed: "
+               "two non-adjacent triangles cross in 3D.\n");
+      return VS::FAIL_SELF_INTERSECTING;
+    case polytope::Verdict::NotConvex:
+      if (verbose)
+        printf("  VALIDATION (convexity) failed: some vertex sticks out "
+               "beyond a face plane.\n");
+      return VS::FAIL_NOT_CONVEX;
+    case polytope::Verdict::Ok:
+      return VS::OK;
   }
-
-  // Compute volume_norm = |V| / ⟨ℓ⟩³ for the well-formedness gate and
-  // diagnostic stat.
-  double volume = std::abs(signed_volume6(D, pos)) / 6.0;
-  double mean_l = mean_edge_length(D);
-  v.volume_norm = volume / (mean_l * mean_l * mean_l);
-
-  // ── WELL-FORMEDNESS ─────────────────────────────────────────────────
-  //   Non-degenerate volume AND embedded surface (no 3D self-intersection).
-  //   Both are central definitional requirements for a valid polytope.
-  //   - Volume: empirical 1.03M scan shows a clean ~5-orders-of-magnitude
-  //     gap between healthy polytopes (vol_norm ≥ 0.12, median 1.01) and
-  //     degenerate ones (vol_norm ≤ 1e-6, includes drum-caps and
-  //     Newton-stalled cases).  vol_norm > 0.01 sits in the empty gap.
-  //   - Self-intersection: two non-adjacent triangles crossing in 3D
-  //     means the surface is not embedded — it's not a valid polytope
-  //     at all.  Convexity does imply non-self-intersection, so on
-  //     convex outputs the test is informationally subsumed; but this
-  //     does NOT make the test optional.  It is part of the definition
-  //     of "well-formed polytope" and must be enforced independently
-  //     so that any failure (numerical or otherwise) is flagged with
-  //     its true cause rather than swept into a different bucket.
-  constexpr double VOLUME_NORM_DEGENERATE = 0.01;
-  bool well_formed_volume = std::isfinite(v.volume_norm) &&
-                              v.volume_norm >= VOLUME_NORM_DEGENERATE;
-  v.no_self_intersect =
-      !AlexandrovSolver::has_self_intersection(D, pos);
-  // Volume gate first, then self-intersection gate.  Order is the order
-  // of stats_status when multiple fail.
-  if (!well_formed_volume) {
-    if (verbose)
-      printf("  VALIDATION (well-formedness/volume) failed: vol_norm=%.3e "
-             "(threshold %.2e).\n",
-             v.volume_norm, VOLUME_NORM_DEGENERATE);
-    return done(VS::FAIL_VOLUME_DEGENERATE);
-  }
-  if (!v.no_self_intersect) {
-    if (verbose)
-      printf("  VALIDATION (well-formedness/self-intersection) failed: "
-             "two non-adjacent triangles cross in 3D.\n");
-    return done(VS::FAIL_SELF_INTERSECTING);
-  }
-
-  // ── CONVEXITY ───────────────────────────────────────────────────────
-  //   Every non-face vertex on the inside of every face plane.
-  //   Alexandrov's theorem requires the polytope to be convex; failure
-  //   here indicates the reconstruction landed in a geometrically
-  //   non-convex configuration.  Outward normal taken from the half-
-  //   edge CCW convention; defensive precondition inside is_convex
-  //   verifies signed volume is strictly positive.
-  v.convex = AlexandrovSolver::is_convex(D, pos);
-  if (!v.convex) {
-    if (verbose)
-      printf("  VALIDATION (convexity) failed: some vertex sticks out "
-             "beyond a face plane.\n");
-    return done(VS::FAIL_NOT_CONVEX);
-  }
-
-  return done(VS::OK);
+  return VS::FAIL_NOT_SIMPLE;   // unreachable: the switch is closed
 }
 
 // The 5-step B-I algorithm: initial radii → continuation (κ(r)=t·κ₁, t:1→0)
@@ -1762,176 +1708,18 @@ bool AlexandrovSolver::is_simple_polygonal(const CanonicalTesselation& tess) {
 bool AlexandrovSolver::is_convex(const DelaunayTriangulation& T,
                                    const vector<coord3d>& pos,
                                    double tol) {
+  // The gate's own body (delaunay_polytope.hh), shared with the device
+  // validator; the size check is this entry point's (the body indexes pos
+  // by T's vertex count).
   if ((int)pos.size() != T.nv) return false;
-
-  double mean_l  = mean_edge_length(T);
-  double abs_tol = tol * mean_l;   // relative tolerance
-
-  // Defensive precondition: signed volume from the CCW half-edge convention
-  // must be strictly positive.  The vertex test below uses (b−a) × (c−a)
-  // for three consecutive vertices in he_next order as the outward normal;
-  // that direction is outward only if the global signed volume comes out
-  // positive in this same convention.  Reconstruct::from_radii enforces
-  // this by flipping positions when needed, but other callers (diagnostics
-  // bypassing the solver pipeline) might not — so we double-check here.
-  //
-  // Threshold strictly > 0 (with a numerical-noise margin scaled by
-  // mean_edge_length³): rejects (a) flat polytopes (vol = 0, e.g. drum-cap)
-  // since the vertex test would vacuously pass on coplanar configurations
-  // and (b) globally inverted positions (vol < 0) where the CCW normal
-  // points inward.
-  double vol6 = signed_volume6(T, pos);
-  double vol_threshold6 = 1e-6 * mean_l * mean_l * mean_l;  // 1e-7 vol_norm
-  if (!std::isfinite(vol6) || vol6 < vol_threshold6) return false;
-
-  // Outward normal is defined locally by the CCW half-edge order: walking
-  // he_next around any face traverses its boundary CCW as seen from outside,
-  // so (b−a) × (c−a) for three consecutive vertices points outward.  This
-  // assumes Reconstruct::from_radii has already flipped positions to enforce
-  // positive signed volume — verified by the precondition above.  No
-  // spherical-approximation assumption: works for nanotubes, oblate
-  // polytopes, etc.
-  for (int f = 0; f < T.nf; f++) {
-    if (T.f_he[f] < 0) continue;
-    const auto [va, vb, vc] = T.face_vertices(f);
-    coord3d a = pos[va], b = pos[vb], c = pos[vc];
-    coord3d nf_raw = (b - a).cross(c - a);
-    double nlen = sqrt(nf_raw.dot(nf_raw));
-    if (nlen < 1e-15) continue;                 // degenerate triangle, skip
-    coord3d nf = nf_raw * (1.0 / nlen);
-
-    // Every other vertex must be on inside (signed dist ≤ tol·mean_edge).
-    for (int v = 0; v < T.nv; v++) {
-      if (v == va || v == vb || v == vc) continue;
-      double d = (pos[v] - a).dot(nf);
-      if (d > abs_tol) return false;
-    }
-  }
-  return true;
+  return polytope::is_convex(T, pos, tol);
 }
-
-namespace {
-// Möller-Trumbore-style triangle-triangle intersection in 3D.
-// Returns true if triangles (a0,b0,c0) and (a1,b1,c1) intersect with
-// non-empty common interior, with `tol` slack on signed-distance tests.
-// Sharing a vertex/edge is allowed (returns false in that case — the
-// caller filters adjacent triangles up front).
-//
-// Algorithm: for each triangle, classify the other triangle's vertices
-// by signed distance to its plane.  If all three are on one side
-// (strictly), no intersection.  Otherwise, compute the line of
-// intersection of the two planes, project both triangles' edge crossings
-// onto it, check parameter intervals overlap.
-bool tri_tri_intersect(const coord3d& a0, const coord3d& b0, const coord3d& c0,
-                        const coord3d& a1, const coord3d& b1, const coord3d& c1,
-                        double tol) {
-  auto plane_dist = [&](const coord3d& a, const coord3d& b, const coord3d& c,
-                          const coord3d& p) {
-    coord3d n = (b - a).cross(c - a);
-    return n.dot(p - a);   // unscaled signed distance · 2·area
-  };
-  double da0 = plane_dist(a1, b1, c1, a0);
-  double db0 = plane_dist(a1, b1, c1, b0);
-  double dc0 = plane_dist(a1, b1, c1, c0);
-  if ((da0 > tol && db0 > tol && dc0 > tol) ||
-      (da0 < -tol && db0 < -tol && dc0 < -tol)) return false;
-  double da1 = plane_dist(a0, b0, c0, a1);
-  double db1 = plane_dist(a0, b0, c0, b1);
-  double dc1 = plane_dist(a0, b0, c0, c1);
-  if ((da1 > tol && db1 > tol && dc1 > tol) ||
-      (da1 < -tol && db1 < -tol && dc1 < -tol)) return false;
-
-  // Both triangles' planes interleave.  Compute their line of
-  // intersection direction L and project each triangle to it; check
-  // overlap of parameter intervals.
-  coord3d n0 = (b0 - a0).cross(c0 - a0);
-  coord3d n1 = (b1 - a1).cross(c1 - a1);
-  coord3d L  = n0.cross(n1);
-  double L2 = L.dot(L);
-  // |L|² = |n0|²·|n1|² · sin²(angle).  Treat as coplanar when
-  // sin² < 1e-12 (≈ 1 micro-radian misalignment).  Healthy polytopes
-  // cannot have two distinct flat 2-faces in the same plane (that
-  // would be drum-cap, caught by the volume gate), so coplanar pairs
-  // are sub-triangulations of the same T̄(0) face and never represent
-  // real surface self-intersection.
-  double n0_2 = n0.dot(n0), n1_2 = n1.dot(n1);
-  if (L2 < 1e-12 * n0_2 * n1_2) {
-    // Coplanar non-adjacent triangles.  On a valid convex polytope this
-    // happens for sub-triangulations of the same flat 2-face: the iDT
-    // triangulates a flat polygonal face into multiple coplanar
-    // triangles, which then "share coplanar interior" without that
-    // being a true 3D self-intersection of the polytope's surface.
-    // The other case — two distinct coplanar 2-faces in the same plane
-    // — only happens for degenerate drum-cap polytopes, which the
-    // upstream volume gate already rejects.  So coplanar pairs are
-    // either benign (same face) or already caught (drum-cap); reporting
-    // intersection here would only false-positive on legitimate
-    // multi-triangle flat faces (e.g. C24-D6d, C36-D6h hexagonal caps).
-    return false;
-  }
-  // For a triangle, project vertices to L (as scalar t = (p−origin)·L̂).
-  // Compute t-interval where triangle crosses the other plane.
-  auto interval = [&](const coord3d& a, const coord3d& b, const coord3d& c,
-                        double da, double db, double dc) {
-    auto edge_t = [&](const coord3d& p, const coord3d& q,
-                        double dp, double dq) {
-      double s = dp / (dp - dq);
-      coord3d x = p + (q - p) * s;
-      return x.dot(L);
-    };
-    pair<double,double> r{1e300, -1e300};
-    auto upd = [&](double t) {
-      if (t < r.first)  r.first  = t;
-      if (t > r.second) r.second = t;
-    };
-    if ((da > 0) != (db > 0)) upd(edge_t(a, b, da, db));
-    if ((db > 0) != (dc > 0)) upd(edge_t(b, c, db, dc));
-    if ((dc > 0) != (da > 0)) upd(edge_t(c, a, dc, da));
-    // Vertices exactly on plane (within tol) included.
-    if (fabs(da) <= tol) upd(a.dot(L));
-    if (fabs(db) <= tol) upd(b.dot(L));
-    if (fabs(dc) <= tol) upd(c.dot(L));
-    return r;
-  };
-  auto i0 = interval(a0, b0, c0, da0, db0, dc0);
-  auto i1 = interval(a1, b1, c1, da1, db1, dc1);
-  if (i0.first  > i0.second) return false;        // triangle 0 doesn't cross plane 1
-  if (i1.first  > i1.second) return false;        // triangle 1 doesn't cross plane 0
-  return !(i0.second < i1.first - tol || i1.second < i0.first - tol);
-}
-} // anonymous namespace
 
 bool AlexandrovSolver::has_self_intersection(const DelaunayTriangulation& T,
                                                 const vector<coord3d>& pos,
                                                 double tol) {
   if ((int)pos.size() != T.nv) return false;
-
-  // Collect each face's three vertex indices once.
-  struct Tri { int a, b, c; };
-  vector<Tri> tris;
-  tris.reserve(T.nf);
-  for (int f = 0; f < T.nf; f++) {
-    if (T.f_he[f] < 0) continue;
-    const auto v = T.face_vertices(f);
-    tris.push_back({v[0], v[1], v[2]});
-  }
-
-  for (size_t i = 0; i < tris.size(); i++) {
-    for (size_t j = i + 1; j < tris.size(); j++) {
-      const auto& A = tris[i];
-      const auto& B = tris[j];
-      // Skip adjacent triangles (any shared vertex).
-      bool share = (A.a == B.a || A.a == B.b || A.a == B.c ||
-                    A.b == B.a || A.b == B.b || A.b == B.c ||
-                    A.c == B.a || A.c == B.b || A.c == B.c);
-      if (share) continue;
-      if (tri_tri_intersect(pos[A.a], pos[A.b], pos[A.c],
-                              pos[B.a], pos[B.b], pos[B.c], tol)) {
-        return true;
-      }
-    }
-  }
-  return false;
+  return polytope::has_self_intersection(T, pos, tol);
 }
 
 // ============================================================================

@@ -163,6 +163,10 @@ if(GTest_FOUND)
   target_link_libraries(alexandrov-flat-test fullerenes GTest::GTest GTest::Main)
   add_test(NAME alexandrov-flat-test COMMAND alexandrov-flat-test)
 
+  add_executable(alexandrov-validate-test alexandrov-validate-test.cc)
+  target_link_libraries(alexandrov-validate-test fullerenes buckygen GTest::GTest GTest::Main)
+  add_test(NAME alexandrov-validate-test COMMAND alexandrov-validate-test)
+
   add_executable(dense-linalg-test dense-linalg-test.cc)
   target_link_libraries(dense-linalg-test fullerenes GTest::GTest GTest::Main)
   add_test(NAME dense-linalg-test COMMAND dense-linalg-test)
