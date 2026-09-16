@@ -21,11 +21,13 @@
 //   5. Reconstruct: place vertices in R^3 from converged (T, r)
 
 #include "fullerenes/delaunay.hh"
+#include "fullerenes/eisenstein.hh"
 #include "fullerenes/geometry.hh"
 #include "fullerenes/triangulation.hh"
 #include <array>
 #include <cmath>
 #include <functional>
+#include <span>
 #include <vector>
 
 struct AlexandrovSolver {
@@ -357,6 +359,87 @@ struct AlexandrovSolver {
   // @pre  h is a live half-edge of T; r as in gcp-kappa
   static double theta(const DelaunayTriangulation& T,
                        const std::vector<double>& r, int h);
+
+  // ── The doubling witness: the exact certificate that a twelve-cone DUAL
+  //    metric is a convex polygon doubled along its boundary, i.e. that its
+  //    Alexandrov realization is flat (delaunay-geometry/
+  //    validated-alexandrov.tex, "Flat realizations", whose verifier this
+  //    transcribes onto the solver's own complex).  A flat metric is what
+  //    the continuation cannot deliver: the pyramids flatten as the
+  //    curvature is driven down, kappa reaches zero exactly and no placement
+  //    closes.  The floor state's complex nevertheless holds the witness:
+  //    the polygon's twelve boundary edges are edges of the limiting
+  //    polytope (the fold), so they persist in the weighted-Delaunay complex
+  //    near it, their dihedral angles tending to 0 while the eighteen
+  //    diagonals inside the two sheets tend to pi.
+  //
+  //    The verdict is the PROPOSAL's (twelve edges), never the state's, and
+  //    nothing numerical enters it.  The twelve must form one cycle through
+  //    the twelve cones whose complement is two sheets of ten faces.  Each
+  //    sheet is developed in the Eisenstein lattice from its faces' integer
+  //    squared lengths -- the dual metric's lengths are square roots of
+  //    lattice norms, so each rounds to its norm, and place_third_eis_total
+  //    places every face's apex across the sheet's interior edges, the root
+  //    edge's few unit-orbit representatives (Sector0Reps) tried in turn --
+  //    and every occurrence of a cone must land at one position (a cone
+  //    inside the sheet would show as a holonomy).  The developed boundary,
+  //    read with the sheet on its left, must turn left by exactly 30 degrees
+  //    at every corner, an integer identity on consecutive edge vectors u, v:
+  //    wedge(u, v) > 0, dot2(u, v) > 0, dot2(u, v)^2 = 3 |u|^2 |v|^2.  A flat
+  //    disk without interior cone whose boundary is straight between twelve
+  //    corners of interior angle 150 degrees is a convex polygon with those
+  //    corners; the other sheet has the complementary 150 degrees at every
+  //    cone (the cone angle being 300 degrees) and the same sides in the
+  //    same order, hence is the congruent polygon; the gluing along the
+  //    cycle is the complex's own.  A proposal that fails proves nothing.
+  //
+  //    A doubled polygon is a CORRECT realization of its metric (Alexandrov's
+  //    theorem includes the degenerate ones) that no consumer can use as a
+  //    three-dimensional geometry: callers report it by name, never as a
+  //    delivered polytope and never as a solver failure. ──
+  enum class DoublingVerdict {
+    Witness,               // the twelve edges bound a doubled convex polygon
+    NotTwelveCones,        // the complex is not a twelve-cone complex
+    NotTwelveEdges,        // a repeated, dead or loop edge in the proposal
+    NotOneCycle,           // a cone is not on the cycle exactly twice, or the
+                           // cycle does not visit each cone once
+    NotTwoSheets,          // the faces off the cycle are not two connected
+                           // components of ten faces
+    LengthNotANorm,        // a squared edge length rounds to no lattice norm
+                           // (not the dual metric)
+    NoLatticeDevelopment,  // no root orbit develops a sheet on the lattice
+    SheetNotFlat,          // two routes to a face, or two occurrences of a
+                           // cone, disagree: a cone inside the sheet
+    NotThirtyDegrees,      // a corner does not turn left by exactly 30 degrees
+  };
+  static const char* doubling_verdict_str(DoublingVerdict v);
+
+  struct DoubledPolygon {
+    DoublingVerdict verdict = DoublingVerdict::NotTwelveEdges;
+    bool ok() const { return verdict == DoublingVerdict::Witness; }
+    std::array<int, 12> boundary{};        // the fold: half-edges with the first sheet on
+                                           // their left, in cycle order
+    std::array<int, 12> corner{};          // the cones in that order (corner[k] = origin
+                                           // of boundary[k])
+    std::array<Eisenstein, 12> polygon{};  // the corners' exact lattice positions in the
+                                           // first sheet's development
+    std::array<int, 10> sheet_a{}, sheet_b{};   // the faces of the two sheets
+    long long area = 0;                    // of the polygon, in unit triangles: half the
+                                           // dual's face count
+  };
+  // The proposal from a state, verified: the twelve live non-loop edges of
+  // smallest dihedral angle theta at (D, r), a non-finite theta sorting last.
+  // @anchor alexandrov-doubled-polygon
+  // @pre  D is a live complex of the DUAL metric (every live edge length is
+  //       the square root of an Eisenstein norm); r.size() >= D.nv
+  // @post result.ok() only if the twelve edges verify as in the paragraph
+  //       above; then result.area == (number of live faces of D) / 2 and
+  //       result.corner is a permutation of the twelve cones
+  static DoubledPolygon doubled_polygon(const DelaunayView& D, std::span<const double> r);
+  // The verification of a proposal, edge e being the half-edges 2e and 2e+1.
+  // @pre  as alexandrov-doubled-polygon (no radii needed)
+  static DoubledPolygon verify_doubled_polygon(const DelaunayView& D,
+                                               std::span<const int, 12> edges);
 
   // Per-half-edge "inessential" mask: tight[h] iff |θ_e − π| < ε for the
   // GCP dihedral at edge h.  At κ=0 the inessential edges are precisely the

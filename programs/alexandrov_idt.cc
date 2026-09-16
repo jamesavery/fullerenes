@@ -45,7 +45,10 @@
 // On a failed validation the mesh is still written when positions exist
 // (failed cases must be inspectable); the status is printed and reflected in
 // the exit code: 0 = OK, 1 = solved-but-invalid or no positions,
-// 2 = bad usage / unparsable name.
+// 2 = bad usage / unparsable name, 3 = the dual metric is a doubled convex
+// polygon (AlexandrovSolver::doubled_polygon: a correct flat realization,
+// certified exactly, with no three-dimensional geometry to write -- its
+// corners are printed with their lattice coordinates instead).
 
 #include "fullerenes/delaunay_alexandrov.hh"
 #include "fullerenes/delaunay.hh"
@@ -192,6 +195,7 @@ int main(int argc, char** argv)
     AlexandrovIDTCubic AC;           // storage for the cubic path
     AlexandrovSolver   S_dual;       // storage for the dual path
     AlexandrovSolver::AlexandrovPolytope P;
+    AlexandrovSolver::DoubledPolygon flat;   // the dual path's post-mortem on a refusal
     const AlexandrovSolver* Sp = nullptr;
     string summary_line;             // stdout T̄(0) summary
     string census_comment;           // PLY status comment
@@ -218,6 +222,9 @@ int main(int argc, char** argv)
         S_dual.D = std::move(D);
         P = S_dual.solve_polytope();
         Sp = &S_dual;
+        // A refused dual solve is asked for its doubling witness: a flat
+        // metric is a correct result the solve cannot deliver as a polytope.
+        if (!P.ok()) flat = AlexandrovSolver::doubled_polygon(S_dual.D, S_dual.r);
         const int n_cells = P.tesselation.n_cells();
         const int n_simplex = 2 * 12 - 4;   // 20: a fully-triangulated icosahedron
         const bool simplicial = (n_cells == n_simplex);
@@ -234,6 +241,13 @@ int main(int argc, char** argv)
     printf("%s  [%s metric]\n", name.c_str(), metric_name(metric));
     print_solver_stats(*Sp, P);
     printf("%s\n", summary_line.c_str());
+    if (flat.ok()) {
+        printf("doubled polygon  area %lld unit triangles  corners", flat.area);
+        for (int k = 0; k < 12; k++)
+            printf(" %d@(%d,%d)", flat.corner[k], flat.polygon[k].first, flat.polygon[k].second);
+        printf("\n");
+        return 3;
+    }
 
     if (P.positions.empty()) {
         fprintf(stderr, "no positions (status %s) -- nothing to write\n",

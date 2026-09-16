@@ -25,6 +25,8 @@
 //   Continuation — natural-t predictor-corrector homotopy tracking
 //   Newton       — trust-region Newton polish for κ(r)=0
 //   Reconstruct  — BFS vertex placement from Gram matrix entries
+//   Flat         — the doubling witness: the exact certificate of a flat
+//                  realization (a convex polygon doubled along its boundary)
 //   AlexandrovSolver / AlexandrovIDTCubic — the public entry points
 
 #include "fullerenes/delaunay_alexandrov.hh"
@@ -35,6 +37,7 @@
 #include <limits>
 #include <map>
 #include <numeric>
+#include <optional>
 #include <set>
 #include <span>
 #include <stdexcept>
@@ -94,8 +97,7 @@ double phi(const vector<double>& r, double L, int i, int j) {
 // Single source for alpha() and the min-h² diagnostic (pyramid_h_sq_at).
 struct PyramidDev { double wy, py, h_sq; bool base_ok; };
 
-PyramidDev develop_pyramid(const DelaunayTriangulation& T,
-                            const vector<double>& r, int h) {
+PyramidDev develop_pyramid(const DelaunayView& T, span<const double> r, int h) {
   int u = T.he_origin[h], v = T.he_origin[T.he_next[h]], w = T.he_origin[T.prev(h)];
   double luv = T.he_length[h], lvw = T.he_length[T.he_next[h]], lwu = T.he_length[T.prev(h)];
 
@@ -113,7 +115,7 @@ PyramidDev develop_pyramid(const DelaunayTriangulation& T,
 // Dihedral angle α at base edge h in the pyramid over face(h):
 // α = atan2(h, py) in the development above, where h is the pyramid
 // height and py the signed distance from the apex projection to edge uv.
-double alpha(const DelaunayTriangulation& T, const vector<double>& r, int h) {
+double alpha(const DelaunayView& T, span<const double> r, int h) {
   auto d = develop_pyramid(T, r, h);
   if (!d.base_ok) return NAN;                    // triangle inequality violation
   int u = T.he_origin[h];
@@ -124,7 +126,7 @@ double alpha(const DelaunayTriangulation& T, const vector<double>& r, int h) {
 }
 
 // Total dihedral angle θ at edge h: sum of α from both adjacent pyramids.
-double theta(const DelaunayTriangulation& T, const vector<double>& r, int h) {
+double theta(const DelaunayView& T, span<const double> r, int h) {
   return alpha(T, r, h) + alpha(T, r, T.twin(h));
 }
 
@@ -1078,6 +1080,267 @@ vector<coord3d> from_radii(const DelaunayTriangulation& T, const V& r) {
 
 } // namespace Reconstruct
 
+// ============================================================================
+// Flat: the doubling witness (the header's alexandrov-doubled-polygon
+// paragraph) -- the exact verification that twelve edges of a twelve-cone
+// complex of the DUAL metric bound a convex polygon doubled along its
+// boundary.  Lattice arithmetic only (eisenstein.hh); the radii enter only
+// through the proposal, the twelve edges of smallest dihedral angle.
+// ============================================================================
+
+namespace Flat {
+
+using Verdict = AlexandrovSolver::DoublingVerdict;
+using Witness = AlexandrovSolver::DoubledPolygon;
+
+// The integer squared length of a live half-edge: the dual metric's edge
+// lengths are square roots of Eisenstein norms, so the double rounds to its
+// norm (the canonical tesselation rounds the same way).
+long long lattice_norm(const DelaunayView& D, int h) {
+  return llround(D.he_length[h] * D.he_length[h]);
+}
+
+// The apex c on the LEFT of the placed base a -> b of a positively oriented
+// lattice triangle with integer squared sides |ab|^2, |ac|^2, |bc|^2, or
+// nothing when no lattice triangle has these sides on this base.
+optional<Eisenstein> apex(Eisenstein a, Eisenstein b, long long ab2, long long ac2,
+                          long long bc2) {
+  return place_third_eis_total(a, b, (int)ab2, (int)ac2, (int)bc2, +1);
+}
+
+// The development of one sheet from one root: the positions of its faces'
+// corner occurrences (indexed by half-edge, the occurrence of the origin)
+// in the chart of the sheet's first face, whose first edge is laid along
+// `root`, a lattice vector of that edge's norm.  Faces are placed one after
+// another across the sheet's interior edges, each apex from the face's own
+// integer squared sides; a face reached twice must agree, and every
+// occurrence of a cone must land at one position (a cone inside the sheet
+// would show as a holonomy).
+struct Sheet {
+  Verdict verdict = Verdict::NoLatticeDevelopment;
+  vector<Eisenstein> pos;     // per half-edge
+  vector<char> placed;        // per half-edge
+};
+
+Sheet develop_sheet(const DelaunayView& D, span<const int> faces,
+                    const vector<char>& on_cycle, Eisenstein root) {
+  Sheet S;
+  S.pos.assign(D.nh, Eisenstein(0, 0));
+  S.placed.assign(D.nh, 0);
+  vector<char> in_sheet(D.nf, 0), face_placed(D.nf, 0);
+  for (int f : faces) in_sheet[f] = 1;
+  {
+    // The root face: corner 0 at the origin, corner 1 along the root, the
+    // third corner on their left.
+    const array<int, 3> hs = D.face_halfedges(faces[0]);
+    const Eisenstein p0(0, 0), p1 = root;
+    const auto p2 = apex(p0, p1, lattice_norm(D, hs[0]), lattice_norm(D, hs[2]),
+                         lattice_norm(D, hs[1]));
+    if (!p2) return S;
+    S.pos[hs[0]] = p0; S.pos[hs[1]] = p1; S.pos[hs[2]] = *p2;
+    for (int h : hs) S.placed[h] = 1;
+    face_placed[faces[0]] = 1;
+  }
+  vector<int> queue{faces[0]};
+  for (size_t q = 0; q < queue.size(); q++) {
+    const int f = queue[q];
+    for (int h : D.face_halfedges(f)) {
+      if (on_cycle[D.edge(h)]) continue;
+      const int t = D.twin(h), g = D.he_face[t];
+      if (!in_sheet[g]) { S.verdict = Verdict::NotTwoSheets; return S; }
+      // The twin face's corners: origin(t) = dest(h) at p_j, dest(t) =
+      // origin(h) at p_i, and its third corner l on the left of j -> i.
+      const Eisenstein p_i = S.pos[h], p_j = S.pos[D.he_next[h]];
+      const int nt = D.he_next[t], pt = D.prev(t);
+      const auto p_l = apex(p_j, p_i, lattice_norm(D, t), lattice_norm(D, pt),
+                            lattice_norm(D, nt));
+      if (!p_l) { S.verdict = Verdict::NoLatticeDevelopment; return S; }
+      if (face_placed[g]) {
+        if (S.pos[t] != p_j || S.pos[nt] != p_i || S.pos[pt] != *p_l) {
+          S.verdict = Verdict::SheetNotFlat;   // two routes to a face disagree
+          return S;
+        }
+        continue;
+      }
+      S.pos[t] = p_j; S.pos[nt] = p_i; S.pos[pt] = *p_l;
+      S.placed[t] = S.placed[nt] = S.placed[pt] = 1;
+      face_placed[g] = 1;
+      queue.push_back(g);
+    }
+  }
+  for (int f : faces)
+    if (!face_placed[f]) { S.verdict = Verdict::NotTwoSheets; return S; }   // not connected
+  // Every occurrence of a cone in the sheet at one position.
+  vector<char> seen(D.nv, 0);
+  vector<Eisenstein> at(D.nv, Eisenstein(0, 0));
+  for (int h = 0; h < D.nh; h++) {
+    if (!S.placed[h]) continue;
+    const int v = D.he_origin[h];
+    if (!seen[v]) { seen[v] = 1; at[v] = S.pos[h]; }
+    else if (at[v] != S.pos[h]) { S.verdict = Verdict::SheetNotFlat; return S; }   // a cone inside
+  }
+  S.verdict = Verdict::Witness;
+  return S;
+}
+
+// The developed boundary turns left by exactly 30 degrees at every corner:
+// with u, v the consecutive edge vectors, wedge(u, v) > 0, dot2(u, v) > 0
+// and dot2(u, v)^2 = 3 |u|^2 |v|^2 (dot2 being twice the inner product, the
+// last is cos^2 = 3/4).
+bool turns_by_thirty_degrees(const array<Eisenstein, 12>& p) {
+  for (int k = 0; k < 12; k++) {
+    const Eisenstein u = p[(k + 1) % 12] - p[k], v = p[(k + 2) % 12] - p[(k + 1) % 12];
+    const long long w = wedge(u, v), d = dot2(u, v);
+    const long long uu = u.norm2(), vv = v.norm2();
+    if (!(w > 0) || !(d > 0) || d * d != 3 * uu * vv) return false;
+  }
+  return true;
+}
+
+// The verification of a proposal: twelve edge indices (edge e is the pair
+// of half-edges 2e, 2e+1).
+Witness verify(const DelaunayView& D, span<const int, 12> edges) {
+  Witness out;
+  if (D.nv != 12) { out.verdict = Verdict::NotTwelveCones; return out; }
+  const int ne = D.nh / 2;
+  vector<char> on_cycle(ne, 0);
+  vector<int> degree(D.nv, 0);
+  for (int e : edges) {
+    if (e < 0 || e >= ne || on_cycle[e]) { out.verdict = Verdict::NotTwelveEdges; return out; }
+    const int h = 2 * e;
+    if (!D.alive(h) || D.he_origin[h] == D.dest(h)) {
+      out.verdict = Verdict::NotTwelveEdges;   // dead, or a loop cannot bound a polygon
+      return out;
+    }
+    on_cycle[e] = 1;
+    degree[D.he_origin[h]]++;
+    degree[D.dest(h)]++;
+  }
+  for (int v = 0; v < D.nv; v++)
+    if (degree[v] != 2) { out.verdict = Verdict::NotOneCycle; return out; }
+  // Every live edge length a lattice norm: the dual metric.
+  for (int h = 0; h < D.nh; h += 2) {
+    if (!D.alive(h)) continue;
+    const long long n = lattice_norm(D, h);
+    if (n <= 0 || n > numeric_limits<int>::max() || !first_rep_of_norm((int)n)) {
+      out.verdict = Verdict::LengthNotANorm;
+      return out;
+    }
+  }
+
+  // The two sheets: the components of the live faces across the non-cycle
+  // edges.
+  vector<int> component(D.nf, -1);
+  int components = 0;
+  for (int f0 = 0; f0 < D.nf; f0++) {
+    if (D.f_he[f0] < 0 || component[f0] >= 0) continue;
+    if (components == 2) { out.verdict = Verdict::NotTwoSheets; return out; }
+    vector<int> queue{f0};
+    component[f0] = components;
+    for (size_t q = 0; q < queue.size(); q++)
+      for (int h : D.face_halfedges(queue[q])) {
+        if (on_cycle[D.edge(h)]) continue;
+        const int g = D.he_face[D.twin(h)];
+        if (component[g] < 0) { component[g] = components; queue.push_back(g); }
+      }
+    components++;
+  }
+  if (components != 2) { out.verdict = Verdict::NotTwoSheets; return out; }
+  vector<int> a, b;
+  for (int f = 0; f < D.nf; f++)
+    if (D.f_he[f] >= 0) (component[f] == 0 ? a : b).push_back(f);
+  if (a.size() != 10 || b.size() != 10) { out.verdict = Verdict::NotTwoSheets; return out; }
+  copy(a.begin(), a.end(), out.sheet_a.begin());
+  copy(b.begin(), b.end(), out.sheet_b.begin());
+
+  // The boundary of the first sheet, oriented: the cycle half-edges whose
+  // face lies in it (a face is on the left of its half-edges), chained.
+  // Twelve cones of degree two on twelve edges form one cycle iff the walk
+  // below closes after twelve steps through twelve distinct cones.
+  vector<int> leaving(D.nv, -1);
+  for (int e : edges)
+    for (int h : {2 * e, 2 * e + 1})
+      if (component[D.he_face[h]] == 0) leaving[D.he_origin[h]] = h;
+  int h = leaving[D.he_origin[2 * edges[0]]];
+  if (h < 0) h = leaving[D.dest(2 * edges[0])];
+  for (int k = 0; k < 12; k++) {
+    if (h < 0) { out.verdict = Verdict::NotOneCycle; return out; }
+    out.boundary[k] = h;
+    out.corner[k] = D.he_origin[h];
+    h = leaving[D.dest(h)];
+  }
+  if (h != out.boundary[0]) { out.verdict = Verdict::NotOneCycle; return out; }
+  for (int k = 0; k < 12; k++)
+    for (int l = 0; l < k; l++)
+      if (out.corner[k] == out.corner[l]) { out.verdict = Verdict::NotOneCycle; return out; }
+
+  // Both sheets develop as flat disks, the root edge's unit-orbit
+  // representatives tried in turn: a representative of the wrong orbit
+  // fails to place some apex on the lattice and is passed over, while a
+  // holonomy is a property of the sheet and ends the search.
+  auto develop = [&](span<const int> faces) {
+    const int h0 = D.face_halfedges(faces[0])[0];
+    Sheet S;
+    for (Eisenstein root : Sector0Reps((int)lattice_norm(D, h0))) {
+      S = develop_sheet(D, faces, on_cycle, root);
+      if (S.verdict != Verdict::NoLatticeDevelopment) break;
+    }
+    return S;
+  };
+  const Sheet SA = develop(out.sheet_a);
+  if (SA.verdict != Verdict::Witness) { out.verdict = SA.verdict; return out; }
+  const Sheet SB = develop(out.sheet_b);
+  if (SB.verdict != Verdict::Witness) { out.verdict = SB.verdict; return out; }
+
+  // Both boundaries turn by 30 degrees at every corner.  The second sheet's
+  // boundary runs the cycle the other way: read it with that sheet on its
+  // left, from the twins in reverse order.
+  for (int k = 0; k < 12; k++) out.polygon[k] = SA.pos[out.boundary[k]] - SA.pos[out.boundary[0]];
+  if (!turns_by_thirty_degrees(out.polygon)) { out.verdict = Verdict::NotThirtyDegrees; return out; }
+  array<Eisenstein, 12> pb{};
+  for (int k = 0; k < 12; k++) pb[k] = SB.pos[D.twin(out.boundary[(12 - k) % 12])];
+  const Eisenstein origin_b = pb[0];
+  for (int k = 0; k < 12; k++) pb[k] = pb[k] - origin_b;
+  if (!turns_by_thirty_degrees(pb)) { out.verdict = Verdict::NotThirtyDegrees; return out; }
+  // The area, in unit triangles: the sum of wedges around the boundary.
+  for (int k = 0; k < 12; k++) out.area += wedge(out.polygon[k], out.polygon[(k + 1) % 12]);
+  out.verdict = Verdict::Witness;
+  return out;
+}
+
+// The dihedral at a base edge, for the PROPOSAL only: the flat limit's
+// pyramids have no height, and a state reached at the floor of its
+// arithmetic misses zero by that arithmetic's resolution, so a pyramid
+// that fails to close by rounding counts as flat, its dihedral 0 or pi by
+// the side of the apex's projection (GCP::alpha would refuse it).  A base
+// that fails the triangle inequality has no dihedral (non-finite, sorted
+// last).  The verdict never reads this.
+double proposal_alpha(const DelaunayView& D, span<const double> r, int h) {
+  const GCP::PyramidDev d = GCP::develop_pyramid(D, r, h);
+  if (!d.base_ok) return numeric_limits<double>::quiet_NaN();
+  return atan2(sqrt(max(0.0, d.h_sq)), d.py);
+}
+
+// The proposal from a state, verified: the twelve live non-loop edges of
+// smallest dihedral angle, a non-finite angle sorting last.
+Witness proposal(const DelaunayView& D, span<const double> r) {
+  vector<pair<double, int>> order;
+  for (int h = 0; h < D.nh; h += 2) {
+    if (!D.alive(h) || D.he_origin[h] == D.dest(h)) continue;
+    const double th = proposal_alpha(D, r, h) + proposal_alpha(D, r, D.twin(h));
+    order.push_back({isfinite(th) ? th : numeric_limits<double>::infinity(), D.edge(h)});
+  }
+  stable_sort(order.begin(), order.end(),
+              [](const pair<double, int>& x, const pair<double, int>& y) { return x.first < y.first; });
+  Witness out;
+  if (order.size() < 12) { out.verdict = Verdict::NotTwelveEdges; return out; }
+  array<int, 12> edges{};
+  for (int k = 0; k < 12; k++) edges[k] = order[k].second;
+  return verify(D, edges);
+}
+
+} // namespace Flat
+
 } // anonymous namespace
 
 // ============================================================================
@@ -1414,6 +1677,31 @@ AlexandrovSolver::Repair AlexandrovSolver::repair(DelaunayTriangulation& T,
 double AlexandrovSolver::theta(const DelaunayTriangulation& T,
                                 const vector<double>& r, int h) {
   return GCP::theta(T, r, h);
+}
+
+const char* AlexandrovSolver::doubling_verdict_str(DoublingVerdict v) {
+  switch (v) {
+    case DoublingVerdict::Witness:              return "doubled polygon";
+    case DoublingVerdict::NotTwelveCones:       return "not a twelve-cone complex";
+    case DoublingVerdict::NotTwelveEdges:       return "not twelve distinct live non-loop edges";
+    case DoublingVerdict::NotOneCycle:          return "not one cycle through the twelve cones";
+    case DoublingVerdict::NotTwoSheets:         return "the cycle does not cut two sheets of ten faces";
+    case DoublingVerdict::LengthNotANorm:       return "an edge length is not a lattice norm";
+    case DoublingVerdict::NoLatticeDevelopment: return "a sheet has no lattice development";
+    case DoublingVerdict::SheetNotFlat:         return "a sheet is not a flat disk";
+    case DoublingVerdict::NotThirtyDegrees:     return "a corner does not turn by 30 degrees";
+  }
+  return "?";
+}
+
+AlexandrovSolver::DoubledPolygon AlexandrovSolver::doubled_polygon(const DelaunayView& D,
+                                                                   span<const double> r) {
+  return Flat::proposal(D, r);
+}
+
+AlexandrovSolver::DoubledPolygon AlexandrovSolver::verify_doubled_polygon(
+    const DelaunayView& D, span<const int, 12> edges) {
+  return Flat::verify(D, edges);
 }
 
 vector<bool> AlexandrovSolver::inessential_edges(const DelaunayTriangulation& T,
