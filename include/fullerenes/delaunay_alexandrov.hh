@@ -412,6 +412,8 @@ struct AlexandrovSolver {
     SheetNotFlat,          // two routes to a face, or two occurrences of a
                            // cone, disagree: a cone inside the sheet
     NotThirtyDegrees,      // a corner does not turn left by exactly 30 degrees
+    NoFoldFound,           // the SEARCH below examined every fold the complex
+                           // contains and none verified
   };
   static const char* doubling_verdict_str(DoublingVerdict v);
 
@@ -428,8 +430,34 @@ struct AlexandrovSolver {
     long long area = 0;                    // of the polygon, in unit triangles: half the
                                            // dual's face count
   };
+  // FLATNESS IS A PROPERTY OF THE METRIC, and every condition above is a
+  // condition on the complex: the cycle and the two sheets are combinatorial,
+  // the developments and the 30-degree identity are exact integer arithmetic
+  // on the edge lengths.  Nothing in the certificate mentions radii,
+  // coordinates or a solve.  So the input complex decides it, by SEARCH
+  // rather than by proposal: the folds a twelve-cone complex contains are
+  // the twelve-edge cycles through its cones, of which the degree-two and
+  // single-cycle conditions leave a few dozen, each verified exactly.  On
+  // the five fullerenes known to be flat (C96, C120, C170, C180 and the IPR
+  // C384) the fold is already an edge set of the INTRINSIC DELAUNAY complex
+  // -- no solve, and no flipping toward it, is needed -- and in each case
+  // exactly one of the candidates verifies.
+  //
+  // Prefer this entry point: its verdict cannot be lost to a solve that
+  // refused before reaching a state near the flat limit, and it is the same
+  // in every scalar tier.  Exhaustive recognition of flatness is still not
+  // claimed -- a fold needing a refinement the complex does not contain
+  // would be reported NoFoldFound, never as a wrong answer.
+  // @anchor alexandrov-doubled-polygon-search
+  // @pre  D is a live twelve-cone complex of the DUAL metric
+  // @post result.ok() only if some fold of D verified; then the polygon is
+  //       that fold's, and area == (live faces of D) / 2
+  static DoubledPolygon doubled_polygon(const DelaunayView& D);
+
   // The proposal from a state, verified: the twelve live non-loop edges of
   // smallest dihedral angle theta at (D, r), a non-finite theta sorting last.
+  // Kept for diagnostics -- it says whether the state a solve reached is the
+  // fold -- but the search above is what decides flatness.
   // @anchor alexandrov-doubled-polygon
   // @pre  D is a live complex of the DUAL metric (every live edge length is
   //       the square root of an Eisenstein norm); r.size() >= D.nv

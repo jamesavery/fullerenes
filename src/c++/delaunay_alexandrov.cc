@@ -1299,6 +1299,61 @@ double proposal_alpha(const DelaunayView& D, span<const double> r, int h) {
   return atan2(sqrt(max(0.0, d.h_sq)), d.py);
 }
 
+// ── The SEARCH: every fold the complex contains, verified.  Flatness is a
+//    property of the metric (the header's alexandrov-doubled-polygon-search
+//    paragraph), so no radii enter.  Backtracking over the cones' incident
+//    edges from cone 0; a delta-complex may join two cones by several edges,
+//    so the walk carries EDGE indices, never vertex pairs.  Each cone is
+//    entered once, so the walk is bounded by the twelve cones' incidences.
+// ──
+struct FoldSearch {
+  const DelaunayView& D;
+  struct Inc { int edge, to; };
+  vector<vector<Inc>> inc;
+  vector<char> seen;
+  array<int, 12> edges{};
+  Witness out;
+  bool done = false;
+
+  explicit FoldSearch(const DelaunayView& D_) : D(D_), inc(D_.nv), seen(D_.nv, 0) {
+    for (int h = 0; h < D.nh; h += 2) {
+      if (!D.alive(h)) continue;
+      const int u = D.he_origin[h], v = D.dest(h);
+      if (u == v) continue;                       // a loop cannot bound a polygon
+      inc[u].push_back({h / 2, v});
+      inc[v].push_back({h / 2, u});
+    }
+  }
+
+  // Depth is the number of cones already on the path (cone 0 included).
+  void walk(int v, int depth) {
+    if (done) return;
+    for (const Inc& c : inc[v]) {
+      if (done) return;
+      if (depth == 12) {                          // the twelfth edge closes at cone 0
+        if (c.to != 0 || c.edge == edges[0]) continue;
+        edges[11] = c.edge;
+        const Witness w = verify(D, span<const int, 12>(edges.data(), 12));
+        if (w.ok()) { out = w; done = true; }
+        continue;
+      }
+      if (seen[c.to]) continue;
+      edges[depth - 1] = c.edge;
+      seen[c.to] = 1;
+      walk(c.to, depth + 1);
+      seen[c.to] = 0;
+    }
+  }
+
+  Witness run() {
+    out.verdict = Verdict::NoFoldFound;
+    if (D.nv != 12) { out.verdict = Verdict::NotTwelveCones; return out; }
+    seen[0] = 1;
+    walk(0, 1);
+    return out;
+  }
+};
+
 // The proposal from a state, verified: the twelve live non-loop edges of
 // smallest dihedral angle, a non-finite angle sorting last.
 Witness proposal(const DelaunayView& D, span<const double> r) {
@@ -1636,8 +1691,13 @@ const char* AlexandrovSolver::doubling_verdict_str(DoublingVerdict v) {
     case DoublingVerdict::NoLatticeDevelopment: return "a sheet has no lattice development";
     case DoublingVerdict::SheetNotFlat:         return "a sheet is not a flat disk";
     case DoublingVerdict::NotThirtyDegrees:     return "a corner does not turn by 30 degrees";
+    case DoublingVerdict::NoFoldFound:          return "no fold of this complex verifies";
   }
   return "?";
+}
+
+AlexandrovSolver::DoubledPolygon AlexandrovSolver::doubled_polygon(const DelaunayView& D) {
+  return Flat::FoldSearch(D).run();
 }
 
 AlexandrovSolver::DoubledPolygon AlexandrovSolver::doubled_polygon(const DelaunayView& D,

@@ -56,6 +56,33 @@ const char* const kOrdinary[] = {
 
 }  // namespace
 
+// The SEARCH decides flatness on the input complex: no solve, no radii, no
+// coordinates.  The fold is already an edge set of the intrinsic Delaunay
+// complex on every fullerene known to be flat, so the solver's floor state
+// is not needed to find it.
+TEST(AlexandrovFlat, TheInputComplexDecidesFlatness) {
+  for (const Flat& f : kFlat) {
+    SCOPED_TRACE(f.name);
+    const DelaunayTriangulation D = DelaunayTriangulation::compute(dual_of(f.name));
+    const AlexandrovSolver::DoubledPolygon W = AlexandrovSolver::doubled_polygon(D);
+    ASSERT_TRUE(W.ok()) << AlexandrovSolver::doubling_verdict_str(W.verdict);
+    EXPECT_EQ(W.area, f.carbons / 2);
+    array<int, 12> corners = W.corner;
+    sort(corners.begin(), corners.end());
+    for (int k = 0; k < 12; k++) EXPECT_EQ(corners[k], k) << "the corners are the twelve cones";
+  }
+}
+
+TEST(AlexandrovFlat, OrdinaryInputComplexesHoldNoFold) {
+  for (const char* name : kOrdinary) {
+    SCOPED_TRACE(name);
+    const DelaunayTriangulation D = DelaunayTriangulation::compute(dual_of(name));
+    const AlexandrovSolver::DoubledPolygon W = AlexandrovSolver::doubled_polygon(D);
+    EXPECT_FALSE(W.ok()) << "a realizable metric has no fold";
+    EXPECT_EQ(W.verdict, AlexandrovSolver::DoublingVerdict::NoFoldFound);
+  }
+}
+
 TEST(AlexandrovFlat, KnownFlatFullerenesAreCertified) {
   for (const Flat& f : kFlat) {
     SCOPED_TRACE(f.name);
