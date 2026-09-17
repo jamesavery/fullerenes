@@ -9,18 +9,25 @@
 #include <pybind11/numpy.h>
 #include <pybind11/stl.h>
 
+#include <cstdio>
 #include <string>
 #include <vector>
 
 #include "common.hh"
+#include "geo_io.hh"
 
-#include "fullerenes/polyhedron.hh"
+#include "fullerenes/deltahedron.hh"
 #include "fullerenes/fullerenegraph.hh"
+#include "fullerenes/geo-format.hh"
+#include "fullerenes/polyhedron.hh"
+#include "fullerenes/triangulation.hh"
 
 namespace py = pybind11;
 
-using PyPoly = pyf::PyGeom<Polyhedron, PolyhedronView<double>>;
-using PyFG = pyf::PyGraph<FullereneGraph, FullereneGraphView>;
+using PyPoly  = pyf::PyGeom<Polyhedron, PolyhedronView<double>>;
+using PyDelta = pyf::PyGeom<Deltahedron, DeltahedronView<double>>;
+using PyFG    = pyf::PyGraph<FullereneGraph, FullereneGraphView>;
+using PyFD    = pyf::PyGraph<FullereneDual, FullereneDualView>;
 
 // Mechanical method surface (the nullary scalar queries volume/surface_area/
 // diameter/width_height_depth/is_invalid and the planar-graph queries), emitted
@@ -39,7 +46,107 @@ static auto with_polyhedron(PyPoly& w, F&& f) {
     return f(tmp);
 }
 
+// A Polyhedron to hand to the C++ writers: the owned object itself, or a copy of
+// a View-mode wrapper's arrays.
+static Polyhedron materialize(PyPoly& w) {
+    if (w.mode == PyPoly::Mode::Owned) return w.owned;
+    PolyhedronView<double> v = w.view();
+    return Polyhedron(v, std::vector<coord3d>(v.points.begin(), v.points.end()));
+}
+
+namespace {
+
+using pyf::open_for_reading;
+using pyf::unique_file;
+using pyf::write_file;
+
+// The adjacency of any bound graph or geometry object, for coordinate-only files.
+PlanarGraphView planar_view_of(py::handle g) {
+    if (py::isinstance<PyPoly>(g))  return g.cast<PyPoly&>().view();
+    if (py::isinstance<PyDelta>(g)) return g.cast<PyDelta&>().view();
+    if (py::isinstance<PyFG>(g))    return g.cast<PyFG&>().view();
+    if (py::isinstance<PyFD>(g))    return g.cast<PyFD&>().view();
+    throw py::type_error("graph must be a Polyhedron, Deltahedron, FullereneGraph or FullereneDual");
+}
+
+std::string repr(const geo_options& o) {
+    static const char* const types[] = {"FIXED", "NONE", "F32", "F64"};
+    std::string s = std::string("GeoOptions(type=GeoType.") + types[int(o.type)];
+    if (o.type == geo_type::FIXED)
+        s += ", width=" + std::to_string(o.width) + ", scale=" + py::repr(py::float_(o.scale)).cast<std::string>();
+    if (o.offset) s += ", offset=True";
+    s += std::string(", graph=") + (o.graph ? "True" : "False");
+    if (o.triangulation) s += ", triangulation=True";
+    if (o.record_n) s += ", record_n=True";
+    s += ", N=" + std::to_string(o.N) + ", deg_min=" + std::to_string(o.deg_min)
+       + ", deg_bits=" + std::to_string(o.deg_bits);
+    if (o.sync) s += ", sync=True";
+    return s + ")";
+}
+
+uint8_t checked_width(int width) {
+    if (width < 0 || width > 255) throw std::invalid_argument("width " + std::to_string(width) + " outside 0..255");
+    return uint8_t(width);
+}
+
+void register_geo_types(py::module_& m) {
+    py::enum_<geo_type>(m, "GeoType", "Coordinate storage of a .geo file (GEO-FORMAT.md sec. 6).")
+        .value("FIXED", geo_type::FIXED, "Fixed point of GeoOptions.width bits (2..30), with a scale per record "
+                                         "(GeoOptions.scale == 0) or for the file.")
+        .value("NONE", geo_type::NONE, "No coordinates: an archive of surface graphs.")
+        .value("F32", geo_type::F32, "IEEE float32.")
+        .value("F64", geo_type::F64, "IEEE float64 (lossless).");
+
+    py::class_<geo_options>(m, "GeoOptions",
+        "What a .geo writer asks for (GEO-FORMAT.md sec. 13). N = 0 and deg_min = deg_bits = -1 "
+        "are derived tightly from the polyhedra a file is created with; a file created by "
+        "appending must declare its degree range (with a graph) and N (with record_n).")
+        .def(py::init([](geo_type type, int width, float scale, bool offset, bool graph, bool triangulation,
+                         bool record_n, uint32_t N, int deg_min, int deg_bits, bool sync) {
+                 geo_options o;
+                 o.type = type; o.width = checked_width(width); o.scale = scale; o.offset = offset;
+                 o.graph = graph; o.triangulation = triangulation; o.record_n = record_n; o.N = N;
+                 o.deg_min = deg_min; o.deg_bits = deg_bits; o.sync = sync;
+                 return o;
+             }),
+             py::kw_only(), py::arg("type") = geo_type::F64, py::arg("width") = 0, py::arg("scale") = 0.0f,
+             py::arg("offset") = false, py::arg("graph") = true, py::arg("triangulation") = false,
+             py::arg("record_n") = false, py::arg("N") = 0, py::arg("deg_min") = -1, py::arg("deg_bits") = -1,
+             py::arg("sync") = false)
+        .def_readwrite("type", &geo_options::type)
+        .def_property("width", [](const geo_options& o) { return int(o.width); },
+                               [](geo_options& o, int w) { o.width = checked_width(w); },
+                      "Fixed-point bits, 2..30 (0 for the float types and NONE).")
+        .def_readwrite("scale", &geo_options::scale, "FIXED: 0 = a scale per record, > 0 = the file's scale.")
+        .def_readwrite("offset", &geo_options::offset, "FIXED: an offset per record (the bounding-box midpoint).")
+        .def_readwrite("graph", &geo_options::graph, "Store the connectivity (a half-edge twin matching).")
+        .def_readwrite("triangulation", &geo_options::triangulation, "Every face is a triangle (checked).")
+        .def_readwrite("record_n", &geo_options::record_n, "A vertex count per record; N is then a capacity.")
+        .def_readwrite("N", &geo_options::N, "Vertex capacity; 0 = derive.")
+        .def_readwrite("deg_min", &geo_options::deg_min, "Smallest admissible degree; -1 = derive.")
+        .def_readwrite("deg_bits", &geo_options::deg_bits, "Degree field width; -1 = derive.")
+        .def_readwrite("sync", &geo_options::sync, "fsync after each write step.")
+        .def("__repr__", [](const geo_options& o) { return repr(o); });
+
+    py::class_<geo_header>(m, "GeoHeader", "A .geo file's header (GEO-FORMAT.md sec. 4).")
+        .def_property_readonly("options", [](const geo_header& h) { return h.opt; },
+                               "The file's resolved options (a copy).")
+        .def_readonly("count", &geo_header::count, "Number of records.")
+        .def_readonly("checksum", &geo_header::checksum, "The stored checksum (sec. 9).")
+        .def("record_size", &geo_header::record_size, "R, the size of every record in bytes.")
+        .def("record_offset", &geo_header::record_offset, py::arg("index"), "Where record `index` starts.")
+        .def("edge_capacity", &geo_header::edge_capacity, "E_cap, the edge slots of every record (sec. 7.2).")
+        .def("__repr__", [](const geo_header& h) {
+            return "<GeoHeader count=" + std::to_string(h.count) + " record_size=" + std::to_string(h.record_size())
+                 + " " + repr(h.opt) + ">";
+        });
+}
+
+}  // namespace
+
 void register_polyhedron(py::module_& m) {
+    register_geo_types(m);
+
     py::enum_<MassModel>(m, "MassModel",
         "Which mass distribution an inertia tensor / principal frame describes. "
         "The two are NOT interchangeable: over 40 C60/C70 cages the tensors agree "
@@ -159,6 +266,40 @@ void register_polyhedron(py::module_& m) {
     cls.def("to_latex", [](PyPoly& w) {
         return with_polyhedron(w, [](const Polyhedron& P) { return P.to_latex(); });
     });
+
+    // --- Compact binary geometry (.geo, GEO-FORMAT.md) ---
+    cls.def("to_geo", [](PyPoly& w, const std::string& path, bool append, const geo_options& opt) {
+        return with_polyhedron(w, [&](const Polyhedron& P) {
+            return write_file(path, append, [&](FILE* f) { return Polyhedron::to_geo(P, f, append, opt); });
+        });
+    }, py::arg("path"), py::arg("append") = false, py::arg("options") = geo_options{},
+       "Write as a single-record .geo file, or append a record (creating the file when "
+       "absent). Returns False when a write failed. Raises ValueError for invalid "
+       "options and RuntimeError when the polyhedron does not fit the file.");
+    cls.def_static("to_geo_batch", [](const std::string& path, std::vector<PyPoly*> polyhedra,
+                                      const geo_options& opt) {
+        std::vector<Polyhedron> Ps;
+        Ps.reserve(polyhedra.size());
+        for (PyPoly* w : polyhedra) Ps.push_back(materialize(*w));
+        return write_file(path, false, [&](FILE* f) { return Polyhedron::to_geo(Ps, f, opt); });
+    }, py::arg("path"), py::arg("polyhedra"), py::arg("options") = geo_options{},
+       "Write a fresh .geo file holding every polyhedron, with the options' derived "
+       "fields taken tightly from all of them.");
+    cls.def_static("from_geo", [](const std::string& path, uint64_t index, py::object graph) {
+        const unique_file f = open_for_reading(path);
+        if (graph.is_none()) return PyPoly::from_owned(Polyhedron::from_geo(f.get(), index));
+        return PyPoly::from_owned(Polyhedron::from_geo(f.get(), planar_view_of(graph), index));
+    }, py::arg("path"), py::arg("index") = 0, py::arg("graph") = py::none(),
+       "Read record `index`. A file without connectivity needs `graph` (a Polyhedron, "
+       "Deltahedron, FullereneGraph or FullereneDual with the record's vertex count). "
+       "IndexError past the last record; RuntimeError for a malformed file or a "
+       "record with self-loops or parallel edges.");
+    cls.def_static("read_geo_header", [](const std::string& path) {
+        return Polyhedron::read_geo_header(open_for_reading(path).get());
+    }, py::arg("path"), "The header of a .geo file.");
+    cls.def_static("verify_geo", [](const std::string& path) {
+        return Polyhedron::verify_geo(open_for_reading(path).get());
+    }, py::arg("path"), "Whether a .geo file's stored checksum matches its records.");
 
     cls.def("__repr__", [](PyPoly& w) {
         return "<Polyhedron N=" + std::to_string(w.N()) + ">";

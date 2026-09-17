@@ -24,7 +24,6 @@ void register_generated_FullereneGraph(py::class_<pyf::PyGraph<FullereneGraph, F
     cls.def("is_cubic", [](W& w) { return w.view().is_cubic(); });
     cls.def("is_triangulation", [](W& w) { return w.view().is_triangulation(); });
     cls.def("count_perfect_matchings", [](W& w) { return w.view().count_perfect_matchings(); });
-    cls.def("is_consistently_oriented", [](W& w) { return w.view().is_consistently_oriented(); });
     cls.def("adjacency_is_symmetric", [](W& w) { return w.view().adjacency_is_symmetric(); });
     cls.def("is_simple", [](W& w) { return w.view().is_simple(); });
     cls.def("has_separating_triangles", [](W& w) { return w.view().has_separating_triangles(); });
@@ -35,6 +34,7 @@ void register_generated_FullereneGraph(py::class_<pyf::PyGraph<FullereneGraph, F
 
 void register_generated_FullereneDual(py::class_<pyf::PyGraph<FullereneDual, FullereneDualView>>& cls) {
     using W = pyf::PyGraph<FullereneDual, FullereneDualView>;
+    cls.def("pentagons_valid", [](W& w) { return w.view().pentagons_valid(); });
     cls.def("cubic_faces", [](W& w) { return pyf::faces_copy(w.view().cubic_faces()); });
     cls.def("max_degree", [](W& w) { return w.view().max_degree(); });
     cls.def("compute_faces_oriented", [](W& w) { return pyf::tris_copy(w.view().compute_faces_oriented()); });
@@ -44,7 +44,6 @@ void register_generated_FullereneDual(py::class_<pyf::PyGraph<FullereneDual, Ful
     cls.def("is_cubic", [](W& w) { return w.view().is_cubic(); });
     cls.def("is_triangulation", [](W& w) { return w.view().is_triangulation(); });
     cls.def("count_perfect_matchings", [](W& w) { return w.view().count_perfect_matchings(); });
-    cls.def("is_consistently_oriented", [](W& w) { return w.view().is_consistently_oriented(); });
     cls.def("adjacency_is_symmetric", [](W& w) { return w.view().adjacency_is_symmetric(); });
     cls.def("is_simple", [](W& w) { return w.view().is_simple(); });
     cls.def("has_separating_triangles", [](W& w) { return w.view().has_separating_triangles(); });
@@ -64,7 +63,6 @@ void register_generated_Polyhedron(py::class_<pyf::PyGeom<Polyhedron, Polyhedron
     cls.def("is_cubic", [](W& w) { return w.view().is_cubic(); });
     cls.def("is_triangulation", [](W& w) { return w.view().is_triangulation(); });
     cls.def("count_perfect_matchings", [](W& w) { return w.view().count_perfect_matchings(); });
-    cls.def("is_consistently_oriented", [](W& w) { return w.view().is_consistently_oriented(); });
     cls.def("adjacency_is_symmetric", [](W& w) { return w.view().adjacency_is_symmetric(); });
     cls.def("is_simple", [](W& w) { return w.view().is_simple(); });
     cls.def("has_separating_triangles", [](W& w) { return w.view().has_separating_triangles(); });
@@ -87,7 +85,6 @@ void register_generated_Deltahedron(py::class_<pyf::PyGeom<Deltahedron, Deltahed
     cls.def("is_cubic", [](W& w) { return w.view().is_cubic(); });
     cls.def("is_triangulation", [](W& w) { return w.view().is_triangulation(); });
     cls.def("count_perfect_matchings", [](W& w) { return w.view().count_perfect_matchings(); });
-    cls.def("is_consistently_oriented", [](W& w) { return w.view().is_consistently_oriented(); });
     cls.def("adjacency_is_symmetric", [](W& w) { return w.view().adjacency_is_symmetric(); });
     cls.def("is_simple", [](W& w) { return w.view().is_simple(); });
     cls.def("has_separating_triangles", [](W& w) { return w.view().has_separating_triangles(); });

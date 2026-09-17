@@ -28,7 +28,7 @@
 
 [meta]
 # Provided by the hand-written core (bind_*_common) or batchability contract noise.
-skip = ["is_a_fullerene", "to_tuple", "get_element_counts", "polar_mapping"]
+skip = ["is_a_fullerene", "is_consistently_oriented", "to_tuple", "get_element_counts", "polar_mapping"]
 # Top-level .pyi function stubs (module funcs, hand-written like preamble_klass).
 pyi_module_functions = [
   'def version() -> str: ...',
@@ -57,6 +57,70 @@ pyname = "MassModel"
 stub = [
   'SOLID: MassModel',
   'ATOMS: MassModel',
+]
+
+[[preamble_klass]]
+pyname = "GeoType"
+stub = [
+  'FIXED: GeoType',
+  'NONE: GeoType',
+  'F32: GeoType',
+  'F64: GeoType',
+]
+
+[[preamble_klass]]
+pyname = "GeoOptions"
+stub = [
+  'def __init__(self, *, type: GeoType = ..., width: int = ..., scale: float = ..., offset: bool = ..., graph: bool = ..., triangulation: bool = ..., record_n: bool = ..., N: int = ..., deg_min: int = ..., deg_bits: int = ..., sync: bool = ...) -> None: ...',
+  'type: GeoType',
+  'width: int',
+  'scale: float',
+  'offset: bool',
+  'graph: bool',
+  'triangulation: bool',
+  'record_n: bool',
+  'N: int',
+  'deg_min: int',
+  'deg_bits: int',
+  'sync: bool',
+]
+
+[[preamble_klass]]
+pyname = "GeoHeader"
+stub = [
+  'options: GeoOptions',
+  'count: int',
+  'checksum: int',
+  'def record_size(self) -> int: ...',
+  'def record_offset(self, index: int) -> int: ...',
+  'def edge_capacity(self) -> int: ...',
+]
+
+[[preamble_klass]]
+pyname = "DelaunayTriangulation"
+stub = [
+  '@staticmethod',
+  'def compute(dual: "FullereneDual") -> "DelaunayTriangulation": ...',
+  'nv: int',
+  'nh: int',
+  'nf: int',
+  'he_origin: numpy.ndarray',
+  'he_next: numpy.ndarray',
+  'he_face: numpy.ndarray',
+  'he_length: numpy.ndarray',
+  'he_angle: numpy.ndarray',
+  'v_out: numpy.ndarray',
+  'v_orig_degree: numpy.ndarray',
+  'v_cone_angle: numpy.ndarray',
+  'f_he: numpy.ndarray',
+  'def check_consistency(self) -> bool: ...',
+  'def is_simplicial(self) -> bool: ...',
+  'def vertex_angle_sums(self) -> numpy.ndarray: ...',
+  'def to_geo(self, path: str, points: numpy.ndarray | None = ..., append: bool = ..., options: GeoOptions = ...) -> bool: ...',
+  '@staticmethod',
+  'def read_geo_topology(path: str, index: int = ...) -> tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray | None]: ...',
+  '@staticmethod',
+  'def from_geo(path: str, index: int = ..., *, lengths: numpy.ndarray, orig_degree: int | numpy.ndarray) -> "DelaunayTriangulation": ...',
 ]
 
 [[preamble_klass]]
@@ -186,6 +250,15 @@ extra_stub = [
   'def write(self, path: str) -> bool: ...',
   'def to_povray(self) -> str: ...',
   'def to_latex(self) -> str: ...',
+  'def to_geo(self, path: str, append: bool = ..., options: GeoOptions = ...) -> bool: ...',
+  '@staticmethod',
+  'def to_geo_batch(path: str, polyhedra: list["Polyhedron"], options: GeoOptions = ...) -> bool: ...',
+  '@staticmethod',
+  'def from_geo(path: str, index: int = ..., graph: "Polyhedron | Deltahedron | FullereneGraph | FullereneDual | None" = ...) -> "Polyhedron": ...',
+  '@staticmethod',
+  'def read_geo_header(path: str) -> GeoHeader: ...',
+  '@staticmethod',
+  'def verify_geo(path: str) -> bool: ...',
 ]
 
 [[klass]]

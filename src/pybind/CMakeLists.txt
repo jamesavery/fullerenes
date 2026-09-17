@@ -100,6 +100,7 @@ pybind11_add_module(_fullerenes
     src/isomerdb.cc
     src/enumeration.cc
     src/polyhedron.cc
+    src/delaunay_triangulation.cc
     src/deltahedron.cc
     src/symmetry.cc
     src/bindings_generated.cc)

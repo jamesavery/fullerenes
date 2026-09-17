@@ -269,6 +269,15 @@ void bind_adjacency_accessors(PyClass& cls) {
     });
     cls.def("adjacency", [](W& w) { return adjacency_list(w.view()); },
             "Neighbour lists as list[list[int]] (a copy; padding removed).");
+    // Parameterised since the library's is_consistently_oriented(int genus = 0),
+    // so hand-written here rather than generated (the generator binds nullary
+    // methods only); listed in spec.toml's global skip.
+    cls.def("is_consistently_oriented", [](W& w, int genus) {
+        return w.view().is_consistently_oriented(genus);
+    }, py::arg("genus") = 0,
+       "Whether the rotation system (the row order) embeds the graph in the closed "
+       "orientable surface of this genus -- 0, the sphere, by default. Requires a "
+       "connected graph.");
 }
 
 // Graph classes: the shared adjacency accessors + is_a_fullerene.

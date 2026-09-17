@@ -360,6 +360,7 @@ PYI_ADJ_CORE = [
     "    @property",
     "    def deg(self) -> numpy.ndarray: ...",
     "    def adjacency(self) -> list[list[int]]: ...",
+    "    def is_consistently_oriented(self, genus: int = ...) -> bool: ...",
 ]
 PYI_GRAPH_EXTRA = ["    def is_a_fullerene(self) -> bool: ..."]
 PYI_GEOM_EXTRA = ["    @property", "    def points(self) -> numpy.ndarray: ..."]

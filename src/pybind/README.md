@@ -8,7 +8,7 @@ share one allocation — no marshalling on the hot path.
 ## Status
 
 Complete and in-tree. The binding builds as an optional CMake target
-(`-DENABLE_PYTHON=ON`); the surface is **9 classes + 6 module functions**, covered
+(`-DENABLE_PYTHON=ON`); the surface is **14 classes + 6 module functions**, covered
 by the pytest suite and two fail-closed drift gates (see
 `doc/pybind-interface.tex` for the full write-up). GPU/SYCL batch is deferred by
 design.
@@ -83,6 +83,21 @@ P.optimize()
 P.volume(), P.surface_area(), P.diameter()
 xyz = P.points                   # float64 (N,3) view
 P.write("c20.mol2")              # or .to_povray() / .to_latex()
+
+# Compact binary .geo archives (GEO-FORMAT.md): fixed-size records, one seek each.
+P.write("c20.q12.geo")           # by name: .geo f64, .f32.geo, .q<w>.geo w-bit fixed point
+opt = f.GeoOptions(type=f.GeoType.FIXED, width=16, deg_min=3, deg_bits=0)
+for Q in cages:                  # appending creates the file; declare the degree range
+    Q.to_geo("cages.geo", append=True, options=opt)
+f.Polyhedron.from_geo("cages.geo", 7)          # record 7
+f.Polyhedron.read_geo_header("cages.geo").count, f.Polyhedron.verify_geo("cages.geo")
+
+# Intrinsic Delaunay triangulations: .geo stores connectivity only, so reading one
+# takes the metric as arrays, in the half-edge numbering read_geo_topology reports.
+idt = f.DelaunayTriangulation.compute(fd)
+idt.to_geo("idt.geo", points=xyz12)              # (nv, 3) positions, or GeoType.NONE
+origin, nxt, pts = f.DelaunayTriangulation.read_geo_topology("idt.geo")
+idt2 = f.DelaunayTriangulation.from_geo("idt.geo", lengths=L, orig_degree=5)   # L[k]: edge k
 
 # Equilateral-triangle dual embedding:
 D = f.Deltahedron.from_dual(fd)

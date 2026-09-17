@@ -20,6 +20,7 @@
 
 #include "fullerenes/isomerdb.hh"
 #include "fullerenes/graphview.hh"   // pentagon_error
+#include "fullerenes/mesh-io-error.hh"
 
 namespace py = pybind11;
 
@@ -29,6 +30,7 @@ void register_fullerene_dual(py::module_& m);
 void register_isomerdb(py::module_& m);
 void register_enumeration(py::module_& m);
 void register_polyhedron(py::module_& m);
+void register_delaunay_triangulation(py::module_& m);
 void register_deltahedron(py::module_& m);
 void register_symmetry(py::module_& m);
 
@@ -39,10 +41,18 @@ PYBIND11_MODULE(_fullerenes, m) {
     // from_arrays handed a graph that is not a fullerene dual) -- surface it
     // as ValueError like the neighbouring input validation, not the
     // RuntimeError that std::logic_error would default to.
+    // A .geo record index past the end is IndexError, like every other
+    // out-of-range index argument; the other mesh_io_error codes keep the
+    // RuntimeError a std::runtime_error defaults to.
     py::register_exception_translator([](std::exception_ptr p) {
         try { if (p) std::rethrow_exception(p); }
         catch (const pentagon_error& e) {
             PyErr_SetString(PyExc_ValueError, e.what());
+        }
+        catch (const mesh_io_error& e) {
+            PyErr_SetString(e.code == mesh_io_error::Code::IndexOutOfRange ? PyExc_IndexError
+                                                                           : PyExc_RuntimeError,
+                            e.what());
         }
     });
 
@@ -75,7 +85,8 @@ PYBIND11_MODULE(_fullerenes, m) {
     register_fullerene_dual(m);
     register_isomerdb(m);
     register_enumeration(m);
-    register_polyhedron(m);
+    register_polyhedron(m);                 // before DelaunayTriangulation: registers GeoOptions
+    register_delaunay_triangulation(m);
     register_deltahedron(m);
     register_symmetry(m);
 }
