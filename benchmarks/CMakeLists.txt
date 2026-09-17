@@ -38,6 +38,12 @@ if(OpenMP_CXX_FOUND)
   target_link_libraries(bench_alexandrov OpenMP::OpenMP_CXX)
 endif()
 
+add_executable(geo_measure geo_measure.cc)
+target_link_libraries(geo_measure fullerenes)
+if(OpenMP_CXX_FOUND)
+  target_link_libraries(geo_measure OpenMP::OpenMP_CXX)
+endif()
+
 add_executable(diag_selfloop diag_selfloop.cc)
 target_link_libraries(diag_selfloop fullerenes)
 
