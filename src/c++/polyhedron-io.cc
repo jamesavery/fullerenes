@@ -10,10 +10,10 @@
 #include <unordered_map>
 
 //////////////////////////// FORMAT MULTIPLEXING ////////////////////////////
-vector<string> Polyhedron::formats{"ascii","planarcode","xyz","mol2","mathematica","latex","cc1","turbomole","gaussian","wavefront","spiral","ply"};
-vector<string> Polyhedron::format_alias{"txt","pc","xyz","mol2","m","tex","cc1","turbomole","com","obj","rspi","ply"};
-vector<string> Polyhedron::input_formats{"xyz","mol2","ply"}; // TODO: "ascii","planarcode","obj"
-vector<string> Polyhedron::output_formats{"ascii","xyz","mol2","cc1","turbomole","gaussian","spiral","ply"};
+vector<string> Polyhedron::formats{"ascii","planarcode","xyz","mol2","mathematica","latex","cc1","turbomole","gaussian","wavefront","spiral","ply","geo"};
+vector<string> Polyhedron::format_alias{"txt","pc","xyz","mol2","m","tex","cc1","turbomole","com","obj","rspi","ply","geo"};
+vector<string> Polyhedron::input_formats{"xyz","mol2","ply","geo"}; // TODO: "ascii","planarcode","obj"
+vector<string> Polyhedron::output_formats{"ascii","xyz","mol2","cc1","turbomole","gaussian","spiral","ply","geo"};
 
 int Polyhedron::format_id(string name)
 {
@@ -37,6 +37,8 @@ Polyhedron Polyhedron::from_file(FILE *file, string format)
     return from_mol2(file);
   case PLY:
     return from_ply(file);
+  case GEO:
+    return from_geo(file);
   default: {
     // Reject a genuinely-unknown format here: PlanarGraph::from_file still
     // abort()s on its own default, which would bypass the catchable mesh_io_error
@@ -83,6 +85,8 @@ bool Polyhedron::to_file(const Polyhedron &G, FILE *file, string format)
     return Polyhedron::to_wavefront_obj(G,file);
   case PLY:
     return Polyhedron::to_ply(G,file);
+  case GEO:
+    return Polyhedron::to_geo(G,file);
   case SPIRAL:
     return PlanarGraph::to_spiral(G,file);
   default:
@@ -95,19 +99,48 @@ bool Polyhedron::to_file(const Polyhedron &G, FILE *file, string format)
 Polyhedron Polyhedron::from_file(string filename)
 {
   FILE *file = fopen(filename.c_str(),"rb");
+  if(!file) throw mesh_io_error(mesh_io_error::Code::NullFile, "Polyhedron::from_file: cannot open " + filename);
   string extension = filename_extension(filename);
-  Polyhedron G = from_file(file,extension);
-  fclose(file);
-  return G;
+  try {
+    Polyhedron G = from_file(file,extension);
+    fclose(file);
+    return G;
+  } catch(...) { fclose(file); throw; }
+}
+
+// The coordinate format a .geo file name asks for (GEO-FORMAT.md sec. 10):
+// name.geo is f64, name.f32.geo f32, name.q<w>.geo w-bit fixed point with a scale
+// per record; the graph is always included.
+static geo_options geo_options_for(const string& filename)
+{
+  geo_options opt;
+  const string stem = filename.substr(0, filename.size() - 4);   // without ".geo"
+  const string tag  = filename_extension(stem);
+  if(tag == "f32") opt.type = geo_type::F32;
+  else if(tag.size() >= 2 && tag.size() <= 4 && tag[0] == 'q'
+          && all_of(tag.begin()+1, tag.end(), [](char c){ return c >= '0' && c <= '9'; })){
+    const int width = stoi(tag.substr(1));
+    if(width < 2 || width > 30)
+      throw invalid_argument("Polyhedron::to_file: fixed-point width " + tag.substr(1) + " in " + filename
+                             + " outside 2..30");
+    opt.type  = geo_type::FIXED;
+    opt.width = uint8_t(width);
+  }
+  return opt;
 }
 
 bool Polyhedron::to_file(const Polyhedron &G, string filename)
 {
+  string extension = filename_extension(filename);
+  const bool geo = format_id(extension) == GEO;
+  const geo_options opt = geo ? geo_options_for(filename) : geo_options{};
   FILE *file = fopen(filename.c_str(),"wb");
-  string extension = filename_extension(filename);  
-  to_file(G,file,extension);
-  fclose(file);
-  return true;			// TODO: Check success
+  if(!file) return false;
+  bool ok = false;
+  try {
+    ok = geo ? to_geo(G, file, false, opt) : to_file(G,file,extension);
+  } catch(...) { fclose(file); throw; }
+  return (fclose(file) == 0) && ok;
 }
 
 
@@ -887,4 +920,123 @@ bool Polyhedron::to_ply(const Polyhedron &P, FILE *file, bool binary)
 {
   write_ply(file, P.points, P.faces(), binary);
   return ferror(file) == 0;
+}
+
+////////////////////////////// COMPACT BINARY GEOMETRY (.geo) //////////////////////////////
+// Polyhedron <-> geo_record; the format itself is geo-format.cc (GEO-FORMAT.md).
+
+namespace {
+
+using geo_code = mesh_io_error::Code;
+
+// P's rows as half-edges (GEO-FORMAT.md sec. 7.4): the twin of slot (u, i), v = row u [i],
+// is the slot of u in row v, which is unique in a simple graph.
+geo_record geo_record_of(const Polyhedron &P, const geo_options &opt)
+{
+  geo_record r;
+  r.n = P.N;
+  if (opt.type != geo_type::NONE) {
+    if (P.points.size() < size_t(P.N))
+      throw invalid_argument("Polyhedron::to_geo: " + to_string(P.points.size()) + " points for "
+                             + to_string(P.N) + " vertices");
+    r.x.assign(P.points.begin(), P.points.begin() + P.N);
+  }
+  if (!opt.graph) return r;
+
+  r.degree.resize(P.N);
+  for (node_t u = 0; u < P.N; u++) r.degree[u] = P.degree(u);
+  const vector<int> off = geo::row_offsets(r.degree);
+  r.twin.resize(off[P.N]);
+  vector<node_t> last(P.N, -1);   // last[v] == u: u's row already lists v
+  for (node_t u = 0; u < P.N; u++) {
+    const auto row = P.nbrs(u);
+    for (int i = 0; i < int(row.size()); i++) {
+      const node_t v = row[i];
+      if (v < 0 || v >= P.N)
+        throw mesh_io_error(geo_code::InvalidTopology, "Polyhedron::to_geo: vertex " + to_string(u)
+                                                       + " has neighbour " + to_string(v));
+      if (v == u || last[v] == u)
+        throw mesh_io_error(geo_code::NonSimplicial, "Polyhedron::to_geo: vertex " + to_string(u)
+                                                     + " has a self-loop or a repeated neighbour");
+      last[v] = u;
+      const auto back = P.nbrs(v);
+      const auto j = find(back.begin(), back.end(), u);
+      if (j == back.end())
+        throw mesh_io_error(geo_code::InvalidTopology, "Polyhedron::to_geo: arc " + to_string(u) + "->"
+                                                       + to_string(v) + " has no reverse arc");
+      r.twin[off[u] + i] = off[v] + int(j - back.begin());
+    }
+  }
+  return r;
+}
+
+// The simple graph of a decoded record, as oriented rows.
+vector<vector<node_t>> geo_rows(const geo_record &r)
+{
+  if (!geo::is_simple(r))
+    throw mesh_io_error(geo_code::NonSimplicial, "Polyhedron::from_geo: the record has a self-loop or a "
+                                                 "parallel edge; read it as a DelaunayTriangulation");
+  const vector<int> off = geo::row_offsets(r.degree);
+  vector<int> origin(off[r.n]);
+  for (int v = 0; v < r.n; v++) fill(origin.begin() + off[v], origin.begin() + off[v+1], v);
+
+  vector<vector<node_t>> rows(r.n);
+  for (int v = 0; v < r.n; v++) {
+    if (r.degree[v] > 255)
+      throw mesh_io_error(geo_code::CapacityExceeded, "Polyhedron::from_geo: vertex " + to_string(v)
+                                                      + " has degree " + to_string(r.degree[v]) + " > 255");
+    for (int h = off[v]; h < off[v+1]; h++) rows[v].push_back(origin[r.twin[h]]);
+  }
+  return rows;
+}
+
+Polyhedron polyhedron_of(const geo_record &r)
+{
+  vector<vector<node_t>> rows = geo_rows(r);
+  vector<node_t> flat; vector<uint8_t> deg;
+  neighbours_t view = csr_view(rows, flat, deg);
+  return Polyhedron(PlanarGraphView(view.N, view.dmax, view.neighbours, view.deg), r.x);
+}
+
+} // namespace
+
+geo_header Polyhedron::read_geo_header(FILE *file) { return geo::read_header(file); }
+
+bool Polyhedron::verify_geo(FILE *file) { return geo::verify(file); }
+
+Polyhedron Polyhedron::from_geo(FILE *file, uint64_t index)
+{
+  geo_header H;
+  const geo_record r = geo::read_record(file, index, &H);
+  if (H.opt.type == geo_type::NONE)
+    throw mesh_io_error(geo_code::UnsupportedFormat, "Polyhedron::from_geo: the file holds no coordinates");
+  if (!H.opt.graph)
+    throw mesh_io_error(geo_code::UnsupportedFormat, "Polyhedron::from_geo: the file holds no graph; "
+                                                     "pass one to from_geo(file, G, index)");
+  return polyhedron_of(r);
+}
+
+Polyhedron Polyhedron::from_geo(FILE *file, const PlanarGraphView &G, uint64_t index)
+{
+  if (geo::read_header(file).opt.graph)
+    throw invalid_argument("Polyhedron::from_geo: the file carries its own graph; use from_geo(file, index)");
+  const geo_record r = geo::read_record(file, index);
+  if (r.n != G.N)
+    throw invalid_argument("Polyhedron::from_geo: record " + to_string(index) + " has " + to_string(r.n)
+                           + " vertices, the graph " + to_string(G.N));
+  return Polyhedron(G, r.x);
+}
+
+bool Polyhedron::to_geo(const Polyhedron &P, FILE *file, bool append, const geo_options &opt)
+{
+  const geo_record r = geo_record_of(P, opt);
+  return append ? geo::append(file, opt, r) : geo::write(file, opt, span<const geo_record>(&r, 1));
+}
+
+bool Polyhedron::to_geo(span<const Polyhedron> Ps, FILE *file, const geo_options &opt)
+{
+  vector<geo_record> records;
+  records.reserve(Ps.size());
+  for (const Polyhedron &P : Ps) records.push_back(geo_record_of(P, opt));
+  return geo::write(file, opt, records);
 }

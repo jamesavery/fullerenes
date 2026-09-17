@@ -1050,3 +1050,117 @@ DelaunayTriangulation DelaunayTriangulation::from_ascii(FILE* file)
   return D;
 }
 
+
+// ============================================================================
+// Compact binary serialization (.geo) -- GEO-FORMAT.md; the codec is geo-format.cc.
+//
+// The file's rows are the counter-clockwise rotations from v_out (ccw), so the file's
+// face successor rot^-1(twin(h)) = cw(twin(h)) is he_next[h]: the library identity
+// cw(h) = he_next[twin(h)]. Edge k of the file is the k-th pair of the twin walk.
+// ============================================================================
+
+bool DelaunayTriangulation::to_geo(const DelaunayTriangulation& D, std::span<const coord3d> x, FILE* file,
+                                   bool append, geo_options opt)
+{
+  const std::string op = "DelaunayTriangulation::to_geo: ";
+  if (!opt.graph) throw std::invalid_argument(op + "a triangulation is written with its graph");
+  opt.triangulation = true;
+  const size_t n_coords = opt.type == geo_type::NONE ? 0 : size_t(D.nv);
+  if (x.size() != n_coords)
+    throw std::invalid_argument(op + std::to_string(x.size()) + " positions for " + std::to_string(n_coords));
+
+  geo_record r;
+  r.n = D.nv;
+  r.x.assign(x.begin(), x.end());
+  r.degree.assign(D.nv, 0);
+  std::vector<int> slot(D.nh, -1);   // slot[h]: h's half-edge number in the file
+  std::vector<int> order;            // its inverse
+  for (int v = 0; v < D.nv; v++) {
+    const int h0 = D.v_out[v];
+    if (h0 < 0)
+      throw std::invalid_argument(op + "vertex " + std::to_string(v)
+                                  + " is dead (non-compacted DCEL; compact_vertices first)");
+    int h = h0;
+    do {
+      if (!D.alive(h) || D.he_origin[h] != v || slot[h] >= 0)
+        throw std::invalid_argument(op + "the rotation around vertex " + std::to_string(v) + " is broken");
+      slot[h] = int(order.size());
+      order.push_back(h);
+      r.degree[v]++;
+      h = D.ccw(h);
+    } while (h != h0);
+  }
+  for (int h = 0; h < D.nh; h++)
+    if (D.alive(h) && slot[h] < 0)
+      throw std::invalid_argument(op + "half-edge " + std::to_string(h) + " is in no vertex rotation");
+  r.twin.resize(order.size());
+  for (size_t i = 0; i < order.size(); i++) r.twin[i] = slot[D.twin(order[i])];
+
+  return append ? geo::append(file, opt, r) : geo::write(file, opt, std::span<const geo_record>(&r, 1));
+}
+
+DelaunayTriangulation DelaunayTriangulation::from_geo(FILE* file, uint64_t index, const GeoEdgeLength& length,
+                                                      const GeoOrigDegree& orig_degree, std::vector<coord3d>* x)
+{
+  using Code = mesh_io_error::Code;
+  const std::string op = "DelaunayTriangulation::from_geo: ";
+  if (!length || !orig_degree) throw std::invalid_argument(op + "both metric callbacks are required");
+
+  geo_header H;
+  geo_record r = geo::read_record(file, index, &H);
+  if (!H.opt.graph) throw mesh_io_error(Code::UnsupportedFormat, op + "the file holds no graph");
+  if (!H.opt.triangulation)
+    throw mesh_io_error(Code::NotATriangulation, op + "the record is not flagged as an exact triangulation");
+
+  const std::vector<int> off  = geo::row_offsets(r.degree);
+  const std::vector<int> next = geo::face_successors(r);
+  const int A = off[r.n];
+  std::vector<int> dt(A, -1);   // file half-edge -> DCEL half-edge: edge k is 2k, 2k+1
+  for (int h = 0, k = 0; h < A; h++)
+    if (dt[h] < 0) { dt[h] = 2 * k; dt[r.twin[h]] = 2 * k + 1; k++; }
+
+  DelaunayTriangulation D;
+  D.nv = r.n;
+  D.ensure_vertices(r.n);
+  D.nh = A;
+  D.ensure_halfedges(A);
+  for (int v = 0; v < r.n; v++) {
+    for (int h = off[v]; h < off[v + 1]; h++) {
+      D.he_origin[dt[h]] = v;
+      D.he_next[dt[h]]   = dt[next[h]];
+    }
+    D.v_out[v] = dt[off[v]];
+  }
+
+  // Faces: the he_next cycles, triangles by the record's flag (checked by the codec).
+  D.owned_f_he.clear();
+  for (int h = 0; h < A; h++) {
+    if (D.he_face[h] >= 0) continue;
+    const int f = (int)D.owned_f_he.size();
+    D.owned_f_he.push_back(h);
+    for (int g = h, s = 0; s < 3; s++, g = D.he_next[g]) D.he_face[g] = f;
+  }
+  D.nf = (int)D.owned_f_he.size();
+  D.owned_free_faces.resize(D.owned_f_he.size());
+  D.repoint();
+
+  for (int k = 0; 2 * k < A; k++) {
+    const double L = length(D, 2 * k);
+    if (!(std::isfinite(L) && L > 0))
+      throw std::invalid_argument(op + "edge " + std::to_string(k) + " was given length " + std::to_string(L));
+    D.he_length[2 * k] = D.he_length[2 * k + 1] = L;
+  }
+  for (int v = 0; v < r.n; v++) {
+    const int d = orig_degree(v);
+    if (d < 0)
+      throw std::invalid_argument(op + "vertex " + std::to_string(v) + " was given original degree "
+                                  + std::to_string(d));
+    D.v_orig_degree[v] = d;
+  }
+  D.recompute_all_angles();
+  if (!D.check_consistency())
+    throw std::invalid_argument(op + "the supplied metric fails check_consistency (a triangle inequality)");
+
+  if (x) *x = std::move(r.x);
+  return D;
+}

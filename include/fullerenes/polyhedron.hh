@@ -7,27 +7,10 @@
 
 #include "fullerenes/owned.hh"
 #include "fullerenes/fullerenegraph.hh"
+#include "fullerenes/geo-format.hh"
+#include "fullerenes/mesh-io-error.hh"
 
 using namespace std;
-
-// Failure reading or interpreting a geometry file. A catchable std::runtime_error
-// subtype thrown by the from_file / from_ply / to_ply readers so a malformed file
-// never takes down the host process. The Code is a closed, reason-named set of the
-// modeled failure categories (style-failures.md); .what() carries the specifics.
-struct mesh_io_error : std::runtime_error {
-  enum class Code {
-    NullFile,           // no readable / writable stream
-    UnsupportedFormat,  // header format unsupported, or a required property/type missing
-    MalformedFile,      // truncated body, bad element count, or allocation failure
-    InvalidTopology,    // out-of-range index, non-manifold arc, open fan, bad degree, inconsistent winding
-    NotATriangulation,  // a valid polyhedron, but the target type requires triangular faces
-    FaceTooLarge,       // writer: a face has more than 255 vertices
-    UnknownFormat,      // from_file: file extension / format string not recognised
-    EmptyGraph,         // from_file: the delegated parser produced zero vertices
-  };
-  Code code;
-  mesh_io_error(Code code_, const std::string &what_) : std::runtime_error(what_), code(code_) {}
-};
 
 // Polyhedron: owned planar graph with 3D vertex coordinates.
 // Inherits geometry methods from PolyhedronView via Owned<PolyhedronView<double>>.
@@ -82,7 +65,7 @@ struct Polyhedron : public Owned<PolyhedronView<double>> {
 
   // Graph I/O
   static vector<string> formats,format_alias, input_formats, output_formats;
-  enum {ASCII,PLANARCODE,XYZ,MOL2,MATHEMATICA,LATEX,CC1,TURBOMOLE,GAUSSIAN,WAVEFRONT_OBJ,SPIRAL,PLY} formats_t;
+  enum {ASCII,PLANARCODE,XYZ,MOL2,MATHEMATICA,LATEX,CC1,TURBOMOLE,GAUSSIAN,WAVEFRONT_OBJ,SPIRAL,PLY,GEO} formats_t;
   static int format_id(string id);
 
   static Polyhedron from_file(string path);
@@ -109,6 +92,30 @@ struct Polyhedron : public Owned<PolyhedronView<double>> {
   // @throws mesh_io_error  on a null file (NullFile) or a face with > 255 vertices (FaceTooLarge)
   static bool to_ply(const Polyhedron &G, FILE *file, bool binary=true);
   static bool to_cc1(const Polyhedron &G, FILE *file);
+
+  // Compact binary geometry (.geo, GEO-FORMAT.md): fixed-size records of fixed-point
+  // or float coordinates and optional connectivity, one seek per record.
+  //
+  // from_geo: record `index`, with its own graph.
+  //   @throws mesh_io_error as geo::read_record; UnsupportedFormat for a record
+  //           without coordinates or graph; NonSimplicial for a self-loop or
+  //           parallel edge (read those as DelaunayTriangulation)
+  // from_geo(file, G, index): record `index` of a file without graph, on G.
+  //   @throws as above; std::invalid_argument when the file has a graph or the
+  //           record's vertex count differs from G.N
+  // to_geo: P as one record, a fresh single-record file, or appended (GEO-FORMAT.md sec. 10).
+  //   Rows are written as stored; they must be the counter-clockwise rotation system.
+  //   @post   result == no stdio write failed
+  //   @throws mesh_io_error NonSimplicial, InvalidTopology, CapacityExceeded,
+  //           ValueOutOfRange, HeaderMismatch; std::invalid_argument
+  // to_geo(Ps, file, opt): a fresh file with every polyhedron of Ps, the options'
+  //   derive fields taken tightly from all of them.
+  static geo_header read_geo_header(FILE *file);
+  static bool       verify_geo(FILE *file);
+  static Polyhedron from_geo(FILE *file, uint64_t index = 0);
+  static Polyhedron from_geo(FILE *file, const PlanarGraphView &G, uint64_t index = 0);
+  static bool       to_geo(const Polyhedron &P, FILE *file, bool append = false, const geo_options &opt = {});
+  static bool       to_geo(std::span<const Polyhedron> Ps, FILE *file, const geo_options &opt = {});
 
   string to_latex(bool show_dual = false, bool number_vertices = false, bool include_latex_header = false) const;
   string to_povray(double w_cm = -1, double h_cm = 10,

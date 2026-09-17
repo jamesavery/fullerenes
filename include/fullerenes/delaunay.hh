@@ -5,6 +5,7 @@
 #include "geometry.hh"
 #include "delaunay_view.hh"        // DelaunayView, Diamond, dcel_capacities
 #include "delaunay_transport.hh"   // DelaunayPointTrackerView, TrackerTransport
+#include "geo-format.hh"          // geo_options for the .geo serialization
 
 #include <array>
 #include <cstdio>       // FILE* for the .idt serialization (to_ascii / from_ascii)
@@ -822,6 +823,37 @@ struct DelaunayTriangulation : DelaunayView, DelaunayStorage {
   //       as a silently-wrong triangulation.
   // @throws std::runtime_error naming the fault on malformed input.
   static DelaunayTriangulation from_ascii(FILE* file);
+
+  // --- Serialization (.geo, GEO-FORMAT.md) ---
+  // One record of the compact binary format: connectivity as a twin matching (faithful to
+  // multi-edges and self-loops) plus optional vertex positions `x`. The metric is not
+  // stored. The record is flagged as an exact triangulation (opt.triangulation is forced on);
+  // edge k of the file is the k-th pair of the twin walk (GEO-FORMAT.md sec. 7.5), rows start
+  // at v_out.
+  //
+  // @pre  D is compacted (every vertex in [0, nv) live); x.size() == nv, or x empty for
+  //       opt.type == NONE; opt.graph
+  // @post result == no stdio write failed
+  // @throws as Polyhedron::to_geo; std::invalid_argument when a precondition fails
+  static bool to_geo(const DelaunayTriangulation& D, std::span<const coord3d> x, FILE* file,
+                     bool append = false, geo_options opt = {});
+
+  // The metric a .geo record does not store, supplied by the caller: the length of every
+  // edge, asked once per edge with its even half-edge h on the complete topology (origins,
+  // he_next, faces, v_out set), and every vertex's original degree.
+  using GeoEdgeLength = std::function<double(const DelaunayTriangulation& D, int h)>;
+  using GeoOrigDegree = std::function<int(int v)>;
+
+  // Record `index` of a .geo file; its positions go to *x when x is non-null.
+  // Half-edges 2k, 2k+1 are edge k of the file.
+  // @post the result passes check_consistency()
+  // @throws mesh_io_error as geo::read_record; UnsupportedFormat for a file without graph;
+  //         NotATriangulation for a record not flagged as an exact triangulation;
+  //         std::invalid_argument when the supplied metric is not positive and finite or
+  //         fails check_consistency (triangle inequality)
+  static DelaunayTriangulation from_geo(FILE* file, uint64_t index, const GeoEdgeLength& length,
+                                        const GeoOrigDegree& orig_degree,
+                                        std::vector<coord3d>* x = nullptr);
 };
 
 // ---------------------------------------------------------------------------
