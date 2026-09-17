@@ -388,6 +388,18 @@ struct DelaunayView {
   // state or clobber the original diagnostic.  The owner converts a non-Ok
   // status to its documented throws at its boundary.
   enum class Status : int { Ok, CapacityExceeded, BudgetExceeded, InvariantViolated };
+  // The status's name, for a diagnostic that reports which obligation the
+  // complex failed.  Device-legal (a closed switch over string literals), so
+  // a batch kernel can record it beside the site below.
+  static constexpr const char* status_name(Status s) {
+    switch (s) {
+      case Status::Ok:                return "Ok";
+      case Status::CapacityExceeded:  return "CapacityExceeded";
+      case Status::BudgetExceeded:    return "BudgetExceeded";
+      case Status::InvariantViolated: return "InvariantViolated";
+    }
+    return "?";
+  }
   Status      status         = Status::Ok;
   const char* status_site    = nullptr;   // string literal at the trip site
   int         status_witness = -1;        // offending h / v / size
