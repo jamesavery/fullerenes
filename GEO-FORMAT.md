@@ -492,3 +492,31 @@ worst-case position errors in edge lengths, with a scale per record.
   lattice residuals against positions predicted from already-decoded
   neighbours, which makes the needed width independent of the cage's size and
   shape.
+
+### Full-space validation
+
+`benchmarks/geo_validate.cc` appends the cubic Alexandrov embedding of every
+isomer (`realize_cubic`: the 20–60 cone positions, centred on their bounding
+box, and the κ = 0 iDT) to a u8, a u16 and an f64 archive, with record_n,
+N = 60 and degrees 3..66 (which cover every simple triangulation on at most 60
+vertices), and then reads all three back. Errors are in bond lengths.
+
+| | C60 | C80 | C100 |
+|---|---|---|---|
+| isomers, all stored | 1,812 | 31,924 | 285,914 |
+| u8 / u16 / f64 file | 0.78 / 1.10 / 3.06 MB | 13.7 / 19.4 / 53.9 MB | 122 / 174 / 483 MB |
+| u8 worst / median error | 1.5e-2 / 1.1e-2 | 2.1e-2 / 1.3e-2 | 2.7e-2 / 1.5e-2 |
+| u16 worst / median error | 5.9e-5 / 4.2e-5 | 8.4e-5 / 5.0e-5 | 1.1e-4 / 5.7e-5 |
+| cone-angle error u8 / u16 / f64 (rad) | 0.063 / 2.4e-4 / 3.2e-10 | 0.085 / 3.6e-4 / 1.8e-9 | 0.11 / 4.2e-4 / 2.4e-9 |
+
+Records are 428 B (u8), 608 B (u16) and 1688 B (f64). In all three spaces every
+checksum verified, every record decoded, the connectivity was identical across
+the archives, every f64 record equalled a fingerprint of the original taken at
+write time, and no coordinate error exceeded σ/2. The cone-angle error compares
+the defects of each record rebuilt as a DelaunayTriangulation with chord lengths
+against the exact p·π/15; no archive's chord metric was refused. Writing is
+deterministic: 1 and 16 threads, a stopped-and-resumed run and a run resumed
+from a torn sidecar gave identical files. Injected corruption in copies of the
+C80 and C100 u8 archives — random bit flips in the records (2000 and 200),
+every one of the 256 header bits, 200 swapped record pairs, and a count lowered
+by one — was caught every time, by verify_geo or by the header checks.

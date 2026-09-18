@@ -1,3 +1,7 @@
+# OpenMP is looked up in src/c++ only, whose variables do not reach this directory;
+# without this the if(OpenMP_CXX_FOUND) blocks below never fire.
+find_package(OpenMP)
+
 add_executable(gc-benchmark gc-benchmark.cc)
 target_link_libraries(gc-benchmark fullerenes)
 
@@ -42,6 +46,12 @@ add_executable(geo_measure geo_measure.cc)
 target_link_libraries(geo_measure fullerenes)
 if(OpenMP_CXX_FOUND)
   target_link_libraries(geo_measure OpenMP::OpenMP_CXX)
+endif()
+
+add_executable(geo_validate geo_validate.cc)
+target_link_libraries(geo_validate fullerenes)
+if(OpenMP_CXX_FOUND)
+  target_link_libraries(geo_validate OpenMP::OpenMP_CXX)
 endif()
 
 add_executable(diag_selfloop diag_selfloop.cc)
