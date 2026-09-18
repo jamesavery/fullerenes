@@ -194,6 +194,14 @@ def test_errors(tmp_path):
     with pytest.raises(RuntimeError):                   # C20 has pentagons
         P.to_geo(str(fresh), options=fl.GeoOptions(triangulation=True))
 
+    bad_width = tmp_path / "bad-width.geo"               # the width byte, reported as a number
+    assert P.to_geo(str(bad_width), options=_fixed(12))
+    data = bytearray(bad_width.read_bytes())
+    data[4] = 0x88
+    bad_width.write_bytes(bytes(data))
+    with pytest.raises(RuntimeError, match="width 136 for"):
+        fl.Polyhedron.verify_geo(str(bad_width))
+
     garbage = tmp_path / "garbage.geo"
     garbage.write_bytes(b"\x30" + bytes(40))            # version 1
     with pytest.raises(RuntimeError, match="version"):

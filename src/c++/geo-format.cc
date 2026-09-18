@@ -109,7 +109,7 @@ void validate(const geo_options& o) {
   }
   if (o.type == geo_type::FIXED) {
     if (o.width < 2 || o.width > 30)
-      bad_arg("fixed-point width " + to_string(o.width) + " outside 2..30");
+      bad_arg("fixed-point width " + to_string(int(o.width)) + " outside 2..30");
     if (!(std::isfinite(o.scale) && o.scale >= 0)) bad_arg("the file scale must be finite and >= 0");
   } else {
     if (o.width != 0) bad_arg("a width needs fixed point");
@@ -306,7 +306,7 @@ geo_header geo::parse_header(std::span<const uint8_t, geo_header::size> b) {
   const bool fixed = o.type == geo_type::FIXED;
   if (o.type == geo_type::NONE && !o.graph) bad("type 1 (no coordinates) without a graph");
   if (fixed ? (o.width < 2 || o.width > 30) : o.width != 0)
-    bad("width " + to_string(o.width) + " for coordinate type " + to_string(int(o.type)));
+    bad("width " + to_string(int(o.width)) + " for coordinate type " + to_string(int(o.type)));
   if (!fixed && (record_scale || o.offset)) bad("a scale or offset flag without fixed point");
   if (o.triangulation && !o.graph) bad("the triangulation flag without a graph");
   if (!o.graph && (o.deg_min != 0 || o.deg_bits != 0)) bad("degree fields without a graph");

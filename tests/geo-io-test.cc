@@ -608,6 +608,23 @@ TEST(GeoFormat, HeaderRejections) {
   rejects(Code::MalformedFile, truncated);
   rejects(Code::MalformedFile, Bytes(20, 0));
   rejects(Code::UnsupportedFormat, Bytes(32, 0));    // a zero header (an interrupted write)
+
+  // The width byte is reported as a number: the library's generic to_string template
+  // would print a uint8_t as a raw character, which is not even valid UTF-8 for 136.
+  FILE* f = file_with(with(4, 136));
+  try {
+    Polyhedron::from_geo(f);
+    ADD_FAILURE() << "width 136 accepted";
+  } catch (const mesh_io_error& e) {
+    EXPECT_NE(std::string(e.what()).find("width 136 for"), std::string::npos) << e.what();
+  }
+  fclose(f);
+  try {
+    geo::resolve(fixed_options(31), {});
+    ADD_FAILURE() << "width 31 accepted";
+  } catch (const std::invalid_argument& e) {
+    EXPECT_NE(std::string(e.what()).find("width 31 outside"), std::string::npos) << e.what();
+  }
 }
 
 TEST(GeoFormat, RecordRejections) {
