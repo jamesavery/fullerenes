@@ -163,6 +163,12 @@ enum class Refusal : int {
 struct SignTrace {
   int rung = -1;
   int bisections = 0;
+  // Which floating-point rung of the ladder decided, when one did: 1 =
+  // single, 2 = double, 0 = none (the exact evaluation decided, and `rung`
+  // names which of ITS steps did).  The two vocabularies are separate
+  // because a float rung and the fixed-point evaluation are different
+  // machines, not different steps of one.
+  int fp_rung = 0;
   Refusal refusal = Refusal::None;
 #ifdef FULLERENES_SIGN_FILTER_CHECK
   // The differential's per-isomer counters, when one is being run (see
@@ -860,7 +866,18 @@ template <class Coef>
   return sign_from_int(FixedU<P::kAccLimbs>::cmp(pos, neg));
 }
 
-#ifdef FULLERENES_SIGN_FILTER_CHECK
+// The coefficient height H = max |b_k|, and the coefficients as doubles.
+template <class Coef>
+inline double coef_height(const Real30T<Coef>& v, double coef[4]) {
+  double H = 0.0;
+  for (int k = 0; k < 4; k++) {
+    coef[k] = (double)v.a[k];
+    const double m = std::fabs(coef[k]);
+    if (m > H) H = m;
+  }
+  return H;
+}
+
 // One rung: evaluate B at the working precision by Horner and claim the
 // sign iff |value| clears the certified bound (SignFilterCounters' banner
 // carries the derivation).  A non-finite value means the side condition
@@ -874,6 +891,8 @@ inline bool filter_rung(const Real30T<Coef>& v, double H, double& value, double&
   return std::isfinite(value) && std::isfinite(bound) && std::fabs(value) > bound;
 }
 
+#ifdef FULLERENES_SIGN_FILTER_CHECK
+
 inline void keep_filter_witness(SignFilterCounters& c, int rung, int filter, int oracle,
                                 double value, double bound, const double coef[4]) {
   if (c.witness_rung) return;
@@ -886,12 +905,8 @@ inline void keep_filter_witness(SignFilterCounters& c, int rung, int filter, int
 // declined, and every claim checked against the oracle's sign.
 template <class Coef>
 inline void check_sign_filter(const Real30T<Coef>& v, Sign oracle, SignFilterCounters& c) {
-  double H = 0.0, coef[4];
-  for (int k = 0; k < 4; k++) {
-    coef[k] = (double)v.a[k];
-    const double m = std::fabs(coef[k]);
-    if (m > H) H = m;
-  }
+  double coef[4];
+  const double H = coef_height(v, coef);
   const int o = (int)oracle;
   double value = 0, bound = 0;
   if (filter_rung<float>(v, H, value, bound)) {
@@ -931,6 +946,30 @@ inline SignOr sign_real(const Real30T<Coef>& v, SignTrace* tr = nullptr) {
 #endif
     return Sign::Zero;
   }
+#ifndef FULLERENES_NO_SIGN_FILTER
+  // THE LADDER.  Single precision, then double, each claiming the sign only
+  // when the evaluation clears the certified bound on its own error (the
+  // derivation is at SignFilterCounters; with the check compiled in, every
+  // claim is compared against the oracle below rather than returned).  A
+  // rung that declines costs a Horner and a compare; the exact evaluation
+  // behind it is a 320-bit fixed-point sum, so declining is cheap and
+  // deciding is the win.  Exactness is preserved BY THE BOUND, never by a
+  // tolerance: a rung answers only where it has proved the sign.
+  {
+    double coef[4];
+    const double H = detail::coef_height(v, coef);
+    double value = 0, bound = 0;
+    int fp = 0;
+    if (detail::filter_rung<float>(v, H, value, bound)) fp = 1;
+    else if (detail::filter_rung<double>(v, H, value, bound)) fp = 2;
+#ifndef FULLERENES_SIGN_FILTER_CHECK
+    if (fp) {
+      if (tr) tr->fp_rung = fp;
+      return value > 0 ? Sign::Positive : Sign::Negative;
+    }
+#endif
+  }
+#endif
   const Sign s = detail::sign_of_fixed_eval<Coef>(v.a);
   if (tr) tr->rung = 1;
 #ifdef FULLERENES_SIGN_FILTER_CHECK
