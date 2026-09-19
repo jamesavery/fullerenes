@@ -543,6 +543,11 @@ struct FullereneGraphView : CubicGraphView {
     // pointwise and end-to-end by the parity tests in
     // claude-projects/unfortran/tests (which link the Fortran archives
     // directly -- libfullerenes itself is Fortran-free).
+    // opt_method 10 and above select a DERIVED-REST-VALUE field by variant instead of one of
+    // the legacy Wu variants -- corner angles and dihedral folds computed from the bond rest
+    // lengths rather than tabulated, plus face flatness and vertex Gaussian curvature.  The
+    // constants and what each scores against GFN2-xTB are in dwu_forcefield.hh:
+    //   10 extwu's constants   11 fitted to 2,502 xTB geometries   12 measured from xTB Hessians
     vector<coord3d> optimized_geometry(std::span<const coord3d> initial_geometry,
                                        int opt_method=3, double ftol=1e-12) const;
 

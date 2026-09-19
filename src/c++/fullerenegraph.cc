@@ -9,6 +9,7 @@
 #include "fullerenes/layout2d.hh"
 #include "fullerenes/eisenstein_paint_geometry.hh"
 #include "fullerenes/wu_forcefield.hh"
+#include "fullerenes/dwu_forcefield.hh"
 
 // Creates the m-point halma-fullerene from the current fullerene C_n with n(1+m)^2 vertices. (I.e. 4,9,16,25,36,... times)
 FullereneGraph FullereneGraphView::halma_fullerene(const int m, const bool) const {
@@ -177,6 +178,37 @@ vector<coord3d> FullereneGraphView::optimized_geometry(std::span<const coord3d> 
 {
   vector<coord3d> coordinates(points.begin(),points.end());
   wu::separate_coincident(coordinates);
+
+  // opt_method 10 and above select a DERIVED-REST-VALUE field (dwu_forcefield.hh) by variant
+  // instead of one of the legacy Wu variants: every corner angle and dihedral fold follows from
+  // the bond rest lengths rather than from a table, and the field carries face flatness and a
+  // Gaussian-curvature term.  The numbering is additive so 1..6 keep their meaning exactly.
+  //
+  //   10  extwu's published constants in that field   (0.1992 A is the published field itself,
+  //                                                    opt_method 3, which this is not)
+  //   11  discfull_no666 -- fitted to 2,502 xTB geometries, weighted RMSD 0.0332 A
+  //   12  hessian12      -- 12 constants measured from 421 xTB Hessians, 0.0398 A with nothing
+  //                         fitted to geometry, and isomer energies at r = 0.97
+  if (opt_method >= 10) {
+    static const dwu::Parameters::Variant variants[] = {
+      dwu::Parameters::Variant::extwu_constants,
+      dwu::Parameters::Variant::discfull_no666,
+      dwu::Parameters::Variant::hessian12,
+    };
+    const int i = opt_method - 10;
+    if (i < 0 || i >= int(sizeof(variants) / sizeof(variants[0])))
+      throw std::runtime_error("FullereneGraphView::optimized_geometry: opt_method " +
+                               std::to_string(opt_method) + " selects no force-field variant; "
+                               "10 = extwu constants, 11 = discfull_no666, 12 = hessian12");
+    const dwu::Parameters P = dwu::Parameters::named(variants[i]);
+    minimize::Outcome o = dwu::optimize(dwu::forcefield(*this, P), coordinates, ftol);
+    if (!o.converged)
+      fprintf(stderr, "FullereneGraphView::optimized_geometry(%s): iteration budget exhausted "
+              "at E=%g, |grad|_inf=%g -- convergence, not the budget, is the problem\n",
+              std::string(dwu::Parameters::variant_name(variants[i])).c_str(), o.f, o.gmax);
+    return coordinates;
+  }
+
   minimize::Outcome out = wu::optimize(wu::forcefield(*this, opt_method), coordinates, ftol);
   if (!out.converged)
     fprintf(stderr, "FullereneGraphView::optimized_geometry: iteration budget "

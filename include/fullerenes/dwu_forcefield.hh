@@ -92,6 +92,7 @@
 #include <map>
 #include <span>
 #include <stdexcept>
+#include <string_view>
 #include <vector>
 
 namespace dwu {
@@ -177,6 +178,102 @@ struct Parameters {
     // Quoted to the precision at which they matter; claude-projects/forcefield-fit/tools/
     // dwu_check re-scores this header against the corpus the fit used, and should be run
     // after any change to these numbers.
+    // ------------------------------------------------------------------ variants ----
+    // The parameter sets worth switching between, by name.  Selectable so a caller can
+    // compare them on one geometry without rebuilding, and so the batch GPU flow can be
+    // told which one to use.
+    //
+    // A CAVEAT that matters for comparisons: this field always DERIVES the corner angles
+    // and dihedral rest values from the bond rest lengths, so `extwu_constants` is extwu's
+    // FORCE CONSTANTS in the derived-rest-value field, not the published field verbatim.
+    // The published field, with its tabulated 108/120 degree angles and tabulated dihedral
+    // folds, is wu::forcefield (wu_forcefield.hh) and stays reachable as opt_method 3.
+    // On the 2,491-cage GFN2-xTB corpus the published field scores 0.1992 A.
+    enum class Variant {
+        extwu_constants,   // the published constants, derived rest geometry
+        discfull_no666,    // fitted to 2,502 xTB GEOMETRIES; the best geometry available
+        hessian12,         // 12 constants measured from 421 xTB HESSIANS, flatness included
+    };
+
+    static constexpr std::string_view variant_name(Variant v) {
+        switch (v) {
+            case Variant::extwu_constants: return "extwu_constants";
+            case Variant::discfull_no666:  return "discfull_no666";
+            case Variant::hessian12:       return "hessian12";
+        }
+        return "";
+    }
+
+    // Throws on an unknown name rather than silently returning a default: a typo in a batch
+    // driver's configuration would otherwise run the wrong field and report it as the right one.
+    static Parameters named(std::string_view v) {
+        if (v == "extwu_constants" || v == "extwu") return extwu_constants();
+        if (v == "discfull_no666"  || v == "geometry") return discfull_no666();
+        if (v == "hessian12"       || v == "hessian")  return hessian12();
+        if (v == "fitted") return fitted();
+        throw std::runtime_error("dwu::Parameters::named: unknown variant '" + std::string(v) +
+                                 "'; known: extwu_constants, discfull_no666, hessian12, fitted");
+    }
+    static Parameters named(Variant v) { return named(variant_name(v)); }
+
+    // extwu's published constants (wu::Parameters::extwu), with this field's derived rest
+    // angles and folds.  Flatness and curvature off, so this is the nine-class Wu form.
+    static Parameters extwu_constants() {
+        Parameters P;
+        P.R55 = Field::constant(1.479);  P.R56 = Field::constant(1.458);
+        P.R66 = Field::constant(1.401);
+        P.fR55 = 260.0;  P.fR56 = 390.0;  P.fR66 = 450.0;
+        P.fA5  = 100.0;  P.fA6  = 100.0;
+        P.fD555 = 35.0;  P.fD556 = 65.0;  P.fD566 = 85.0;  P.fD666 = 270.0;
+        P.fFlat5 = 0.0;  P.fFlat6 = 0.0;  P.fK = 0.0;
+        return P;
+    }
+
+    // Fitted to 2,502 GFN2-xTB GEOMETRIES (the full corpus, non-IPR included): weighted
+    // RMSD 0.0332 A, worst per-atom deviation 0.0691 A.  The best geometry of any set here.
+    // Its force constants are NOT independently meaningful -- geometry cannot determine
+    // their overall scale, so fR66 is pinned at 450 and the rest are ratios to it, and
+    // several (fD566 = 5.5 against a Hessian-measured 33) price strain rather than
+    // stiffness.  Use it when the geometry is what matters.
+    static Parameters discfull_no666() {
+        Parameters P;
+        P.R55 = Field::constant(1.45850);
+        P.R56 = Field::constant(1.41957);
+        P.R66 = Field{{0, 1}, {1.43890, 1.42100}, 1.41199, 0.04260, 2.94246, 2};
+        P.fR55 = 786.318;  P.fR56 = 319.729;  P.fR66 = 450.0;   // fR66: the gauge
+        P.fA5  = 63.1448;  P.fA6  = 39.0497;
+        P.fD555 = 114.667; P.fD556 = 117.491; P.fD566 = 5.53117; P.fD666 = 0.0;
+        P.fFlat5 = 118.602; P.fFlat6 = 62.1396;
+        P.fK     = 0.002709;
+        return P;
+    }
+
+    // Force constants MEASURED from 421 GFN2-xTB Hessians (C60-C240, 168 non-IPR), on the
+    // rest values of discfull_no666, which the Hessian barely constrains and geometry does.
+    // Twelve constants by non-negative linear least squares: the field's Hessian is exactly
+    // linear in them at fixed geometry, so this is a measurement rather than a fit.
+    //
+    // Scored with NOTHING fitted to geometry: weighted RMSD 0.0398 A over 2,491 cages, and
+    // isomer energy differences within a size that track xTB at r = 0.97 with a slope of
+    // 1.72.  Both are the best of any Hessian-derived set, and the energy correlation is the
+    // best of ANY set here.  The gauge comes out measured: fR66 = 449.3 N/m against the 450
+    // that had to be assumed.  Use it when energies, frequencies or physically meaningful
+    // constants matter.
+    //
+    // The three pentagon dihedral constants and fK come out at zero, and that is a statement
+    // about what one Hessian can separate, not about the physics: the flatness term carries
+    // the same out-of-plane curvature and the two are not distinguishable at a single
+    // geometry (DESIGN-ff-fit.md 7A.6).
+    static Parameters hessian12() {
+        Parameters P = discfull_no666();                 // rest values: geometry determines these
+        P.fR55 = 393.099;  P.fR56 = 448.780;  P.fR66 = 449.317;
+        P.fA5  = 82.6061;  P.fA6  = 54.3950;
+        P.fD555 = 0.0;     P.fD556 = 0.0;     P.fD566 = 0.0;   P.fD666 = 11.6813;
+        P.fFlat5 = 87.0851; P.fFlat6 = 79.0103;
+        P.fK     = 0.0;
+        return P;
+    }
+
     static Parameters fitted() {
         Parameters P;
         P.R55 = Field::constant(1.479);                  // extwu; no IPR instances
