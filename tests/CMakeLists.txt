@@ -34,6 +34,11 @@ if(GTest_FOUND)
   target_link_libraries(surface-geodesics-test fullerenes buckygen GTest::GTest GTest::Main)
   add_test(NAME surface-geodesics-test COMMAND surface-geodesics-test)
 
+  # Buckygen supplies the cages, so this needs no isomer database.
+  add_executable(dwu-forcefield-test dwu-forcefield-test.cc)
+  target_link_libraries(dwu-forcefield-test fullerenes buckygen GTest::GTest GTest::Main)
+  add_test(NAME dwu-forcefield-test COMMAND dwu-forcefield-test)
+
   add_executable(unfold-straighten-test unfold-straighten-test.cc)
   target_link_libraries(unfold-straighten-test fullerenes buckygen GTest::GTest GTest::Main)
   add_test(NAME unfold-straighten-test COMMAND unfold-straighten-test)
