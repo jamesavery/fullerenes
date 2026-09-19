@@ -172,6 +172,14 @@ struct CyclotomicMetricT : CarryViewsT<S> {
   using Zs = zeta_store_t<S>;
   using Zr = Zeta30T<R>;
 
+#ifdef FULLERENES_SIGN_FILTER_CHECK
+  // The floating-point filter differential's counters for THIS isomer, or
+  // null.  Bound by the caller into every trace the predicates below make,
+  // so the check observes the same predicates production runs.  Instrument
+  // only; absent from a production or device build.
+  SignFilterCounters* sign_ctr = nullptr;
+#endif
+
   // Flip transport, armed by flipped() and applied by the set_edge_length
   // the SAME flip issues (flip_edge calls them back to back on one h; a
   // plan-refused flip leaves a stale entry that the next flipped() simply
@@ -276,6 +284,7 @@ struct CyclotomicMetricT : CarryViewsT<S> {
     const auto D = diamond_of(V, h);
     if (!D) return SignOr{};
     SignTrace tr;
+    FULLERENES_BIND_SIGN_CTR(tr, sign_ctr);
     return decided(V, D->delaunay_form_sign(&tr), tr,
                    "cyclotomic delaunay form: sign refused", h);
   }
@@ -291,6 +300,8 @@ struct CyclotomicMetricT : CarryViewsT<S> {
     const auto D = diamond_of(V, h);
     if (!D) return false;
     SignTrace tu, tw;
+    FULLERENES_BIND_SIGN_CTR(tu, sign_ctr);
+    FULLERENES_BIND_SIGN_CTR(tw, sign_ctr);
     const SignOr u = decided(V, D->convex_at_origin_sign(&tu), tu,
                              "cyclotomic convex: sign refused", h);
     const SignOr w = decided(V, D->reversed().convex_at_origin_sign(&tw), tw,
@@ -306,6 +317,7 @@ struct CyclotomicMetricT : CarryViewsT<S> {
   // @post on Ok: result == sign(lsq[a] - lsq[b])
   int compare_lsq(DelaunayView& V, int a, int b) const {
     SignTrace tr;
+    FULLERENES_BIND_SIGN_CTR(tr, sign_ctr);
     const SignOr s = decided(V, compare(L(a), L(b), &tr), tr,
                              "cyclotomic compare_lsq: sign refused", a);
     return s ? (int)*s : 0;
@@ -405,11 +417,13 @@ struct CyclotomicMetricT : CarryViewsT<S> {
   Length ear(DelaunayView& V, const FanPolygon&, int pp, int pi, int pn) {
     const Zr qp = Qd(pp), qi = Qd(pi), qn = Qd(pn);
     SignTrace tr;
+    FULLERENES_BIND_SIGN_CTR(tr, sign_ctr);
     const SignOr s = decided(V, sign_real(wedge(qi - qp, qn - qp), &tr), tr,
                              "cyclotomic ear: CCW sign refused", pi);
     if (!s) return {0, 0};
     if (*s != Sign::Positive) return {0, 0};
     SignTrace ts;
+    FULLERENES_BIND_SIGN_CTR(ts, sign_ctr);
     if (!sector_at_most_pi(qp, qn, ts)) {
       if (ts.refusal != Refusal::None)
         refuse(V, ts.refusal, "cyclotomic ear: sector sign refused", pi);
@@ -460,6 +474,7 @@ struct CyclotomicMetricT : CarryViewsT<S> {
         return;
       }
       SignTrace tr;
+      FULLERENES_BIND_SIGN_CTR(tr, sign_ctr);
       const SignOr s = decided(V, sign_real(*w, &tr), tr,
                                "cyclotomic commit_star: ear-face wedge sign refused", v);
       if (!s) return;
@@ -511,6 +526,7 @@ struct CyclotomicMetricT : CarryViewsT<S> {
       qt = Zr{*qx, *qy};
     }
     SignTrace ts;
+    FULLERENES_BIND_SIGN_CTR(ts, sign_ctr);
     const bool le = sector_at_most_pi(q0, qt, ts);
     if (ts.refusal != Refusal::None) {
       refuse(V, ts.refusal, "cyclotomic first_tie_side: sector sign refused", h_loop);
@@ -536,10 +552,20 @@ struct CarryStoreT {
   std::span<signed char> curv_k;
   std::span<zeta_store_t<S>> dev;
 
+#ifdef FULLERENES_SIGN_FILTER_CHECK
+  // Carried so a caller can arm the filter differential without changing
+  // any signature between here and the predicates (instrument only).
+  SignFilterCounters* sign_ctr = nullptr;
+#endif
+
   CarryViewsT<S> views() const { return {lsq, f_wedge, curv_k, dev, diag_pend}; }
   // A fresh policy over this store: the views, and the transport state at
   // its defaults (pend disarmed, the ear FIFO empty).
-  CyclotomicMetricT<S, R> metric() const { return {views()}; }
+  CyclotomicMetricT<S, R> metric() const {
+    CyclotomicMetricT<S, R> m{views()};
+    FULLERENES_BIND_SIGN_CTR_STORE(m, sign_ctr);
+    return m;
+  }
 };
 
 // A refused derivation: what failed and the id it failed on; ok() when the

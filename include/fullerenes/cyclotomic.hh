@@ -164,7 +164,68 @@ struct SignTrace {
   int rung = -1;
   int bisections = 0;
   Refusal refusal = Refusal::None;
+#ifdef FULLERENES_SIGN_FILTER_CHECK
+  // The differential's per-isomer counters, when one is being run (see
+  // SignFilterCounters below).  A raw pointer into the caller's storage:
+  // device-legal, nothing owned, null when no check is running.
+  struct SignFilterCounters* ctr = nullptr;
+#endif
 };
+
+#ifdef FULLERENES_SIGN_FILTER_CHECK
+// ── THE FLOATING-POINT FILTER DIFFERENTIAL (instrument, compiled in only
+//    under this macro; production and device builds carry none of it).
+//
+//    A ladder in front of the exact oracle would evaluate B(gamma) in
+//    single precision and return the sign whenever |value| exceeds a
+//    CERTIFIED bound on that evaluation's error, falling through to double
+//    and then to the oracle otherwise -- never a tolerance, always a
+//    proof.  This counts what each rung would claim AND checks every claim
+//    against the sign the oracle actually returned: a rung may decline
+//    (the fall-through the ladder is built around), but a rung that
+//    answers must answer correctly.  disagree32 / disagree64 must stay 0;
+//    one of them non-zero falsifies the bound.
+//
+//    THE BOUND.  With H = max|b_k| (so H >= 1 for B != 0), gamma < 2 and
+//    the power basis of degree 3:
+//      - argument:    |B'| <= 17 H on [0,2] and |gamma~ - gamma| <= 2.01 u
+//                     (the stored constant is rounded to double and then to
+//                     the working precision -- a double rounding), so
+//                     <= 34.2 H u;
+//      - coefficients: fl(b_k) = b_k (1 + delta), so <= 15 H u;
+//      - Horner:      Higham Thm 5.1, gamma_6 * sum |b_k| gamma^k
+//                     <= 6.01 u * 15 H <= 90.2 H u.
+//    Total <= 139.4 H u = 69.7 H eps; the constant below is 256, a factor
+//    of ~3.7 of slack.  No cancellation is assumed anywhere -- every term
+//    is coefficient-wise -- which is what makes the bound sound however
+//    badly B(gamma) cancels.
+//
+//    SIDE CONDITION.  The derivation needs 15 H representable in the
+//    working precision.  At the batch tier (Stored30<int32_t> over Real30,
+//    H <= 2^63) 15 H ~ 1.4e20 against float's 3.4e38 -- safe by eighteen
+//    orders.  At the 128-bit tier H can reach 2^127 and 15 H OVERFLOWS, so
+//    a non-finite evaluation is never trusted: it falls through instead.
+//
+//    INCOMPLETE BY CONSTRUCTION.  A nonzero B has |B(gamma)| >= (15H)^-3
+//    (Liouville), which is far below either float threshold, so ring
+//    elements provably exist that no float rung can decide.  The oracle is
+//    not vestigial and the fall-through is not padding. ──
+struct SignFilterCounters {
+  long long zero = 0;          // decided by coordinates, before any rung
+  long long claim32 = 0, agree32 = 0, disagree32 = 0;
+  long long claim64 = 0, agree64 = 0, disagree64 = 0;
+  long long fell_through = 0;  // reached the oracle with no rung deciding
+  long long nonfinite = 0;     // the side condition refused a rung
+  // The first disagreement, kept whole so it can be reproduced.
+  int  witness_rung = 0, witness_filter = 0, witness_oracle = 0;
+  double witness_value = 0, witness_bound = 0, witness_coef[4] = {0, 0, 0, 0};
+};
+#define FULLERENES_BIND_SIGN_CTR(trace, counters) ((trace).ctr = (counters))
+#define FULLERENES_BIND_SIGN_CTR_STORE(policy, counters) ((policy).sign_ctr = (counters))
+#else
+#define FULLERENES_BIND_SIGN_CTR(trace, counters) ((void)0)
+#define FULLERENES_BIND_SIGN_CTR_STORE(policy, counters) ((void)0)
+#endif
 
 namespace detail {
 
@@ -799,6 +860,59 @@ template <class Coef>
   return sign_from_int(FixedU<P::kAccLimbs>::cmp(pos, neg));
 }
 
+#ifdef FULLERENES_SIGN_FILTER_CHECK
+// One rung: evaluate B at the working precision by Horner and claim the
+// sign iff |value| clears the certified bound (SignFilterCounters' banner
+// carries the derivation).  A non-finite value means the side condition
+// (15 H representable) failed -- claim nothing.
+template <class F, class Coef>
+inline bool filter_rung(const Real30T<Coef>& v, double H, double& value, double& bound) {
+  const F g = (F)kGammaDouble;
+  const F x = (((F)v.a[3] * g + (F)v.a[2]) * g + (F)v.a[1]) * g + (F)v.a[0];
+  value = (double)x;
+  bound = 256.0 * H * (double)std::numeric_limits<F>::epsilon();
+  return std::isfinite(value) && std::isfinite(bound) && std::fabs(value) > bound;
+}
+
+inline void keep_filter_witness(SignFilterCounters& c, int rung, int filter, int oracle,
+                                double value, double bound, const double coef[4]) {
+  if (c.witness_rung) return;
+  c.witness_rung = rung; c.witness_filter = filter; c.witness_oracle = oracle;
+  c.witness_value = value; c.witness_bound = bound;
+  for (int k = 0; k < 4; k++) c.witness_coef[k] = coef[k];
+}
+
+// The ladder as a ladder: single first, double only on what single
+// declined, and every claim checked against the oracle's sign.
+template <class Coef>
+inline void check_sign_filter(const Real30T<Coef>& v, Sign oracle, SignFilterCounters& c) {
+  double H = 0.0, coef[4];
+  for (int k = 0; k < 4; k++) {
+    coef[k] = (double)v.a[k];
+    const double m = std::fabs(coef[k]);
+    if (m > H) H = m;
+  }
+  const int o = (int)oracle;
+  double value = 0, bound = 0;
+  if (filter_rung<float>(v, H, value, bound)) {
+    c.claim32++;
+    const int f = value > 0 ? 1 : -1;
+    if (f == o) c.agree32++;
+    else { c.disagree32++; keep_filter_witness(c, 1, f, o, value, bound, coef); }
+    return;
+  }
+  if (!std::isfinite(value)) c.nonfinite++;
+  if (filter_rung<double>(v, H, value, bound)) {
+    c.claim64++;
+    const int f = value > 0 ? 1 : -1;
+    if (f == o) c.agree64++;
+    else { c.disagree64++; keep_filter_witness(c, 2, f, o, value, bound, coef); }
+    return;
+  }
+  c.fell_through++;
+}
+#endif
+
 }  // namespace detail
 
 // Exact sign of a ring element; nullopt = refused by name (see Refusal;
@@ -812,10 +926,18 @@ inline SignOr sign_real(const Real30T<Coef>& v, SignTrace* tr = nullptr) {
   }
   if (v.is_zero()) {
     if (tr) tr->rung = 0;
+#ifdef FULLERENES_SIGN_FILTER_CHECK
+    if (tr && tr->ctr) tr->ctr->zero++;
+#endif
     return Sign::Zero;
   }
   const Sign s = detail::sign_of_fixed_eval<Coef>(v.a);
   if (tr) tr->rung = 1;
+#ifdef FULLERENES_SIGN_FILTER_CHECK
+  // Checked against the sign this call RETURNS, so it runs after the
+  // oracle.  The oracle still decides: this only observes.
+  if (tr && tr->ctr && s != Sign::Zero) detail::check_sign_filter(v, s, *tr->ctr);
+#endif
   if (s == Sign::Zero) {   // impossible for a nonzero element (oracle banner)
     if (tr) tr->refusal = Refusal::Undecided;
     return std::nullopt;
