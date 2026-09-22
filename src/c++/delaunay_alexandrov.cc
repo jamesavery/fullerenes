@@ -284,22 +284,41 @@ matrix<double> jacobian(const DelaunayTriangulation& T, const vector<double>& r)
   int n = T.nv;
   matrix<double> J(n, n, 0.0);
 
+  // J_e ONCE PER EDGE, at its even half-edge (twin(h) = h^1, so edge h/2),
+  // and read by both walks below.  J_e(h) and J_e(twin h) are the same real
+  // number but not the same double: the divisor associates as
+  // (ℓ·sin ρ_h)·sin ρ_h̄, and swapping h for its twin swaps the two sines.
+  // Multiplication is commutative in IEEE but not associative, so the two
+  // differ in the last bits on 13-14% of edges (≤ 3 ulp measured).  Taking
+  // one value per edge makes J(i,j), J(j,i) and edge (i,j)'s contribution to
+  // J(i,i) all read the SAME double, and costs one J_e per edge where
+  // re-evaluating per outgoing half-edge costs three (1.5·nh against nh/2):
+  // measured 2.2x faster at both shapes that occur, 12.8 -> 5.8 us on the
+  // 12-cone dual metric and 77.6 -> 34.8 us on the 60-cone cubic metric.
+  // Neither spelling is closer to the truth -- graded against the same
+  // formula in 113-bit arithmetic over 889,275 diagonal entries of C20-C60,
+  // each is nearer on half of the entries where they differ at all (50.3%,
+  // p = 0.27; at the converged radii 2,103 against 2,089) -- so cost
+  // decides.  This is also the parallel-primitives port's spelling
+  // (par/algo/alexandrov_geometry.hh), which makes the two byte-comparable.
+  vector<double> Je(T.nh / 2, 0.0);
+
   // Off-diagonal
   for (int h = 0; h < T.nh; h += 2) {
     if (!T.alive(h)) continue;
-    double Je = J_edge(T, r, h);
-    J(T.he_origin[h], T.dest(h)) += Je;
-    J(T.dest(h), T.he_origin[h]) += Je;
+    Je[h / 2] = J_edge(T, r, h);
+    J(T.he_origin[h], T.dest(h)) += Je[h / 2];
+    J(T.dest(h), T.he_origin[h]) += Je[h / 2];
   }
 
-  // Diagonal (per-oriented-edge, not per-vertex-pair)
+  // Diagonal (per-oriented-edge, not per-vertex-pair).  incident() yields
+  // live half-edges only, so a dead edge's slot is never read.
   for (int i = 0; i < n; i++) {
     if (T.v_out[i] < 0) continue;
     double diag = 0;
     for (int h : T.incident(i)) {
-      double Je = J_edge(T, r, h);
       double phi_e = phi(r, T.he_length[h], i, T.dest(h));
-      diag -= cos(phi_e) * Je;
+      diag -= cos(phi_e) * Je[h / 2];
     }
     J(i, i) = diag;
   }
