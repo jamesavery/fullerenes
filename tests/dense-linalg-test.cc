@@ -6,8 +6,11 @@
 #include "fullerenes/dense_linalg.hh"
 
 #include <gtest/gtest.h>
+#include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <limits>
+#include <numeric>
 #include <random>
 #include <vector>
 
@@ -21,6 +24,12 @@ using LinAlg::V;
 // entire value is being a second, unchanging implementation.  A frozen BODY
 // compiled in this TU (rather than stored hex) cancels FP-contraction
 // differences across compilers and architectures.
+// FROZEN 2026-09-24 in addition: jacobi_eig @ e10921f3, the pre-promotion
+// cyclic Jacobi body verbatim -- the oracle for the view-level rotation
+// family (dense_linalg_view.hh) that the owner jacobi_eig now composes.
+// (What the in-TU body cancels is cross-compiler contraction; the library
+// body compiles in its own translation unit, so its agreement with this
+// one also rests on the two sharing the one global CMAKE_CXX_FLAGS.)
 // ============================================================================
 namespace frozen {
 
@@ -117,22 +126,133 @@ static matrix<double> matmul(const matrix<double>& A, const matrix<double>& B)
   return C;
 }
 
+// The pre-promotion jacobi_eig, verbatim (dense_linalg.cc @ e10921f3).
+static bool jacobi_eig(std::vector<double> A, int n, std::vector<double>& lam,
+                       std::vector<double>* V_out)
+{
+  constexpr int MAX_SWEEPS = 60;
+
+  std::vector<double> Vacc;
+  if (V_out) {
+    Vacc.assign(size_t(n) * n, 0.0);
+    for (int i = 0; i < n; i++) Vacc[size_t(i) * n + i] = 1.0;
+  }
+
+  double anorm = 0;
+  for (size_t x = 0; x < A.size(); x++) anorm = std::max(anorm, std::fabs(A[x]));
+  const double tol = 1e-15 * std::max(anorm, 1e-300);
+
+  auto at = [&](int i, int j) -> double& { return A[size_t(i) * n + j]; };
+
+  for (int sweep = 0; sweep < MAX_SWEEPS; sweep++) {
+    double off = 0;
+    for (int p = 0; p < n; p++)
+      for (int q = p + 1; q < n; q++) off = std::max(off, std::fabs(at(p, q)));
+    if (off <= tol) break;
+    if (sweep == MAX_SWEEPS - 1) return false;   // guard trip = bug
+
+    for (int p = 0; p < n; p++)
+      for (int q = p + 1; q < n; q++) {
+        double apq = at(p, q);
+        if (std::fabs(apq) <= tol) continue;
+        double theta = (at(q, q) - at(p, p)) / (2 * apq);
+        double t = (theta >= 0 ? 1.0 : -1.0) /
+                   (std::fabs(theta) + std::sqrt(theta * theta + 1));
+        double c = 1.0 / std::sqrt(t * t + 1), s = t * c;
+
+        for (int i = 0; i < n; i++) {      // rotate rows/cols p,q of A
+          double aip = at(i, p), aiq = at(i, q);
+          at(i, p) = c * aip - s * aiq;
+          at(i, q) = s * aip + c * aiq;
+        }
+        for (int i = 0; i < n; i++) {
+          double api = at(p, i), aqi = at(q, i);
+          at(p, i) = c * api - s * aqi;
+          at(q, i) = s * api + c * aqi;
+        }
+        if (V_out)
+          for (int i = 0; i < n; i++) {    // accumulate: Vacc row = eigvecᵀ
+            double vpi = Vacc[size_t(p) * n + i], vqi = Vacc[size_t(q) * n + i];
+            Vacc[size_t(p) * n + i] = c * vpi - s * vqi;
+            Vacc[size_t(q) * n + i] = s * vpi + c * vqi;
+          }
+      }
+  }
+
+  std::vector<int> order(n);
+  std::iota(order.begin(), order.end(), 0);
+  std::sort(order.begin(), order.end(),
+            [&](int x, int y) { return at(x, x) < at(y, y); });
+  lam.assign(n, 0);
+  for (int m = 0; m < n; m++) lam[m] = at(order[m], order[m]);
+  if (V_out) {
+    V_out->assign(size_t(n) * n, 0.0);
+    for (int m = 0; m < n; m++)
+      for (int i = 0; i < n; i++)
+        (*V_out)[size_t(m) * n + i] = Vacc[size_t(order[m]) * n + i];
+  }
+  return true;
+}
+
 }  // namespace frozen
 
 namespace {
 
+// Random m x n entries in [-1, 1), row-major draw order.  (Its own name:
+// an overload of random_matrix would be ambiguous against the (n, seed,
+// symmetric) form for an int seed and a bool literal.)
+matrix<double> random_rectangular(int m, int n, unsigned seed)
+{
+  mt19937 rng(seed);
+  uniform_real_distribution<double> u(-1.0, 1.0);
+  matrix<double> A(m, n, 0.0);
+  for (int i = 0; i < m; i++)
+    for (int j = 0; j < n; j++) A(i, j) = u(rng);
+  return A;
+}
+
+// Square; symmetric draws the upper triangle only and mirrors it (a
+// different draw sequence from the full square, kept as the historical
+// inputs of the tests below).
 matrix<double> random_matrix(int n, unsigned seed, bool symmetric)
 {
+  if (!symmetric) return random_rectangular(n, n, seed);
   mt19937 rng(seed);
   uniform_real_distribution<double> u(-1.0, 1.0);
   matrix<double> A(n, n, 0.0);
   for (int i = 0; i < n; i++)
-    for (int j = symmetric ? i : 0; j < n; j++) {
+    for (int j = i; j < n; j++) {
       A(i, j) = u(rng);
-      if (symmetric) A(j, i) = A(i, j);
+      A(j, i) = A(i, j);
     }
   return A;
 }
+
+matrix<double> transpose_of(const matrix<double>& A)
+{
+  matrix<double> At(A.n, A.m, 0.0);
+  for (int i = 0; i < A.m; i++) for (int j = 0; j < A.n; j++) At(j, i) = A(i, j);
+  return At;
+}
+
+// The eigenpair residual of eigenvectors held as ROWS of V:
+// max over m, j of | (row m of V) A - lambda_m (row m of V) |_j, in double.
+template <class TV, class TA>
+double row_residual(LinAlg::MatView<TV> V, const std::vector<double>& lambda,
+                    LinAlg::MatView<TA> A)
+{
+  const int n = V.m;
+  double res = 0;
+  for (int m = 0; m < n; m++)
+    for (int j = 0; j < n; j++) {
+      double acc = 0;
+      for (int i = 0; i < n; i++) acc += (double)V(m, i) * (double)A(i, j);
+      res = std::max(res, std::fabs(acc - lambda[m] * (double)V(m, j)));
+    }
+  return res;
+}
+// The bar every double eigenpair residual in this file is held to.
+constexpr double kEigenpairResidualBar = 1e-12;
 
 V random_vector(int n, unsigned seed)
 {
@@ -276,17 +396,12 @@ TEST(DenseLinalg, JacobiEigenpairsSatisfyDefinition)
     matrix<double> A = random_matrix(n, 4242 + n, /*symmetric=*/true);
     auto d = LinAlg::SymEigen::decompose(A);
     ASSERT_EQ((int)d.lambda.size(), n);
-    // ||A q_i - lambda_i q_i||_inf small, eigenvalues ascending.
-    double res = 0;
-    for (int i = 0; i < n; i++) {
-      if (i + 1 < n) EXPECT_LE(d.lambda[i], d.lambda[i + 1]);
-      for (int r = 0; r < n; r++) {
-        double acc = 0;
-        for (int c = 0; c < n; c++) acc += A(r, c) * d.Q(c, i);
-        res = max(res, fabs(acc - d.lambda[i] * d.Q(r, i)));
-      }
-    }
-    EXPECT_LT(res, 1e-12) << "n = " << n;
+    // Eigenvalues ascending; ||A q_i - lambda_i q_i||_inf small.  SymEigen's
+    // Q holds the eigenvectors as COLUMNS, row_residual takes rows.
+    for (int i = 0; i + 1 < n; i++) EXPECT_LE(d.lambda[i], d.lambda[i + 1]);
+    const double res = row_residual(LinAlg::view_of(transpose_of(d.Q)), d.lambda,
+                                    LinAlg::view_of(A));
+    EXPECT_LT(res, kEigenpairResidualBar) << "n = " << n;
   }
 }
 
@@ -359,6 +474,7 @@ matrix<double> singular_late_exact()
 void expect_bits_equal(const V& a, const V& b, const char* tag)
 {
   ASSERT_EQ(a.size(), b.size()) << tag;
+  if (a.empty()) return;                     // equal, and memcmp wants real pointers
   EXPECT_EQ(memcmp(a.data(), b.data(), a.size() * sizeof(double)), 0) << tag;
 }
 
@@ -418,6 +534,20 @@ TEST(DenseLinalgFrozenOracle, MatmulBitIdenticalToHistory)
         << "view matmul must be bit-identical to the frozen product, n = " << n;
     ASSERT_EQ(memcmp(&Cf[0], &Cd[0], (size_t)n * n * sizeof(double)), 0)
         << "operator* must delegate to the same body, n = " << n;
+  }
+  // Rectangular operands pin the m x kk x n bookkeeping of the one product
+  // body against the frozen loop (the square cases above cannot tell m
+  // from kk from n).
+  struct Shape { int m, k, n; };
+  for (Shape s : {Shape{3, 4, 5}, Shape{17, 9, 13}, Shape{1, 7, 1}}) {
+    matrix<double> A = random_rectangular(s.m, s.k, 301 + s.m);
+    matrix<double> B = random_rectangular(s.k, s.n, 302 + s.n);
+    matrix<double> Cf = frozen::matmul(A, B);
+    std::vector<double> out((size_t)s.m * s.n);
+    LinAlg::matmul(LinAlg::view_of(A), LinAlg::view_of(B), out);
+    ASSERT_EQ(memcmp(&Cf[0], out.data(), out.size() * sizeof(double)), 0)
+        << "view matmul must be bit-identical to the frozen product, m k n = "
+        << s.m << ' ' << s.k << ' ' << s.n;
   }
 }
 
@@ -590,4 +720,163 @@ TEST(DenseLinalgView, PivotKeyOrderMatchesScan)
       EXPECT_EQ(pivot_by_key<double>(M, c), LinAlg::pivot_row<double>(M, c))
           << "random n = " << n << ", column " << c;
   }
+}
+
+// ============================================================================
+// The Jacobi rotation family and the transposed products (promoted
+// 2026-09-24): jacobi_eig against its frozen self, bitwise; A B^T and A^T B
+// against the plain product on materialised transposes, bitwise; the float
+// instantiation against the eigenpair definition to a counted bound; the
+// accumulator's warm start.
+// ============================================================================
+namespace {
+
+// (matrix<double> is a std::vector<double>, so it binds to jacobi_eig's
+// by-value flat argument as a copy of its row-major storage.)
+void expect_jacobi_matches_frozen(const matrix<double>& A, bool vectors, const char* tag)
+{
+  const int n = A.m;
+  std::vector<double> lam_n, lam_f, V_n, V_f;
+  const bool ok_n = LinAlg::jacobi_eig(A, n, lam_n, vectors ? &V_n : nullptr);
+  const bool ok_f = frozen::jacobi_eig(A, n, lam_f, vectors ? &V_f : nullptr);
+  EXPECT_EQ(ok_n, ok_f) << tag;
+  expect_bits_equal(lam_n, lam_f, tag);
+  if (vectors) expect_bits_equal(V_n, V_f, tag);
+}
+
+// Two random symmetric blocks on the diagonal, exact zeros elsewhere: a
+// rotation inside a block leaves the cross-block entries exactly zero, so
+// every cross-block pair takes the skip in every sweep.
+matrix<double> block_diagonal(int n1, int n2, unsigned seed)
+{
+  matrix<double> A(n1 + n2, n1 + n2, 0.0);
+  const matrix<double> B1 = random_matrix(n1, seed, true);
+  const matrix<double> B2 = random_matrix(n2, seed + 1, true);
+  for (int i = 0; i < n1; i++) for (int j = 0; j < n1; j++) A(i, j) = B1(i, j);
+  for (int i = 0; i < n2; i++) for (int j = 0; j < n2; j++) A(n1 + i, n1 + j) = B2(i, j);
+  return A;
+}
+
+}  // namespace
+
+TEST(DenseLinalgFrozenOracle, JacobiEigBitIdenticalToHistory)
+{
+  for (int n : {3, 12, 60, 128, 240}) {
+    expect_jacobi_matches_frozen(random_matrix(n, 700 + n, true), /*vectors=*/true,  "random+V");
+    expect_jacobi_matches_frozen(random_matrix(n, 800 + n, true), /*vectors=*/false, "random");
+  }
+  for (int n : {8, 30}) expect_jacobi_matches_frozen(hilbert(n), true, "hilbert");
+  {  // exactly diagonal: converged at the first test, no sweep
+    matrix<double> D(20, 20, 0.0);
+    for (int i = 0; i < 20; i++) D(i, i) = 20 - i;
+    expect_jacobi_matches_frozen(D, true, "diagonal");
+  }
+  expect_jacobi_matches_frozen(block_diagonal(20, 20, 900), true, "block-diagonal");
+  {
+    V D(50);
+    for (int k = 0; k < 50; k++) D[k] = (k % 2 ? 1.0 : -1.0) * (1.0 + k);
+    expect_jacobi_matches_frozen(qdqt(D, 950), true, "qdqt");
+  }
+  // Non-symmetric inputs trip the sweep guard: both bodies return false and
+  // neither writes lam or V (compared as the empty vectors they stay).
+  for (int n : {2, 4, 6})
+    expect_jacobi_matches_frozen(random_matrix(n, 990 + n, /*symmetric=*/false), true, "guard-trip");
+  // No pair to rotate: converged at the first test.
+  expect_jacobi_matches_frozen(matrix<double>(0, 0, 0.0), true, "n=0");
+  expect_jacobi_matches_frozen(matrix<double>(1, 1, V{2.5}), true, "n=1");
+}
+
+TEST(DenseLinalgView, TransposedProductsBitIdenticalToMatmul)
+{
+  // A B^T against A (B^T) and A^T B against (A^T) B: the same products in
+  // the same k order, so the claim is equal bits.  The plain product's own
+  // pin is MatmulBitIdenticalToHistory.
+  struct Shape { int m, k, n; };
+  for (Shape s : {Shape{3, 4, 5}, Shape{17, 9, 13}, Shape{60, 60, 60}, Shape{1, 7, 1}}) {
+    std::vector<double> got((size_t)s.m * s.n), ref((size_t)s.m * s.n);
+
+    const matrix<double> A  = random_rectangular(s.m, s.k, 1000 + s.m);   // m x k
+    const matrix<double> Bt = random_rectangular(s.n, s.k, 2000 + s.n);   // n x k, B = Bt^T
+    LinAlg::matmul_nt(LinAlg::view_of(A), LinAlg::view_of(Bt), got);
+    LinAlg::matmul(LinAlg::view_of(A), LinAlg::view_of(transpose_of(Bt)), ref);
+    EXPECT_EQ(memcmp(got.data(), ref.data(), got.size() * sizeof(double)), 0)
+        << "A B^T, m k n = " << s.m << ' ' << s.k << ' ' << s.n;
+
+    const matrix<double> At = random_rectangular(s.k, s.m, 3000 + s.m);   // k x m, A = At^T
+    const matrix<double> B  = random_rectangular(s.k, s.n, 4000 + s.n);   // k x n
+    LinAlg::matmul_tn(LinAlg::view_of(At), LinAlg::view_of(B), got);
+    LinAlg::matmul(LinAlg::view_of(transpose_of(At)), LinAlg::view_of(B), ref);
+    EXPECT_EQ(memcmp(got.data(), ref.data(), got.size() * sizeof(double)), 0)
+        << "A^T B, m k n = " << s.m << ' ' << s.k << ' ' << s.n;
+  }
+}
+
+TEST(DenseLinalgView, JacobiFamilyFloatSatisfiesDefinition)
+{
+  // The float instantiation has no history to freeze; the claim is the
+  // eigenpair definition.  A rigorous rounding count gives no usable bound
+  // at these sizes (every entry receives 2(n - 1) rotation writes per
+  // sweep, and errors migrate between entries under later rotations), so
+  // the bar has the first-order FORM n (tol + K S eps max|A|), S the sweeps
+  // performed, with K = 10 an EMPIRICAL constant: the residual measured at
+  // n = 12, 60, 128 and 240 lies 18 to 31 times below it.  The bar's job
+  // is to catch a broken instantiation, whose residual is of order
+  // n max|A|, not to certify precision.
+  using LinAlg::MatView;
+  const float eps = std::numeric_limits<float>::epsilon();
+  for (int n : {12, 60, 240}) {
+    const matrix<double> Ad = random_matrix(n, 5000 + n, true);
+    std::vector<float> A((size_t)n * n), Vf((size_t)n * n, 0.0f);
+    float anorm = 0;
+    for (int i = 0; i < n; i++)
+      for (int j = 0; j < n; j++) {
+        A[(size_t)i * n + j] = (float)Ad(i, j);
+        anorm = std::max(anorm, std::fabs(A[(size_t)i * n + j]));
+      }
+    const std::vector<float> A0 = A;                  // the matrix decomposed
+    for (int i = 0; i < n; i++) Vf[(size_t)i * n + i] = 1.0f;
+    const float tol = 4.5f * eps * anorm;             // jacobi_eig's 1e-15 is 4.5 eps64
+    const MatView<float> Av{A, n, n, n}, Vv{Vf, n, n, n};
+    const LinAlg::JacobiResult run = LinAlg::jacobi_diagonalize(Av, Vv, tol, 60);
+    ASSERT_TRUE(run.converged) << "n = " << n;
+    EXPECT_LE(LinAlg::off_diagonal_max<float>(MatView<const float>{Av}), tol);
+    std::vector<double> lambda(n);
+    for (int m = 0; m < n; m++) lambda[m] = Av(m, m);
+    const MatView<const float> A0v{A0, n, n, n};
+    const double res   = row_residual(Vv, lambda, A0v);
+    const double bound = n * ((double)tol + 10.0 * run.sweeps * eps * anorm);
+    EXPECT_LE(res, bound) << "n = " << n << ", sweeps = " << run.sweeps;
+  }
+}
+
+TEST(DenseLinalgView, JacobiAccumulatorWarmStart)
+{
+  // jacobi_diagonalize accumulates into whatever V holds.  From an
+  // eigenbasis V of A (rows), M = V A V^T is diagonal to rounding, and a
+  // second run on (M, V) must leave V an eigenbasis of A within a sweep or
+  // two -- the warm start a self-consistent-field iteration performs,
+  // re-diagonalising each cycle's matrix in the previous cycle's
+  // eigenbasis.  M is formed through the plain and the transposed product.
+  using LinAlg::MatView;
+  const int n = 60;
+  const matrix<double> Am = random_matrix(n, 6000, true);
+  std::vector<double> A = Am, Vd((size_t)n * n, 0.0);
+  for (int i = 0; i < n; i++) Vd[(size_t)i * n + i] = 1.0;
+  double anorm = 0;
+  for (double x : A) anorm = std::max(anorm, std::fabs(x));
+  const double tol = 1e-15 * anorm;
+  const MatView<double> Av{A, n, n, n}, Vv{Vd, n, n, n};
+  ASSERT_TRUE(LinAlg::jacobi_diagonalize(Av, Vv, tol, 60).converged);
+
+  std::vector<double> T1((size_t)n * n), M((size_t)n * n);
+  LinAlg::matmul(MatView<const double>{Vv}, LinAlg::view_of(Am), T1);
+  LinAlg::matmul_nt(MatView<const double>{T1, n, n, n}, MatView<const double>{Vv}, M);
+  const MatView<double> Mv{M, n, n, n};
+  const LinAlg::JacobiResult again = LinAlg::jacobi_diagonalize(Mv, Vv, tol, 60);
+  ASSERT_TRUE(again.converged);
+  EXPECT_LE(again.sweeps, 3) << "a warm start from an eigenbasis should need at most a few sweeps";
+
+  std::vector<double> lambda(n);
+  for (int m = 0; m < n; m++) lambda[m] = Mv(m, m);
+  EXPECT_LT(row_residual(Vv, lambda, LinAlg::view_of(Am)), kEigenpairResidualBar);
 }

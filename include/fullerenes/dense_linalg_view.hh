@@ -9,10 +9,12 @@
 // BLAS/LAPACK-free by design -- dense_linalg.hh's banner records why.
 //
 // Every body is the historical dense_linalg.cc / matrix.hh loop, moved --
-// with two stated exceptions: negate() is NEW at this level (the
-// device-legal span form of auxiliary.hh's vector unary minus), and
-// matvec() generalized its loop bounds from the square A.m to the honest
-// m x n (identical on every square input).  The independent pins are
+// with three stated exceptions: negate() is NEW at this level (the
+// device-legal span form of auxiliary.hh's vector unary minus), matvec()
+// generalized its loop bounds from the square A.m to the honest m x n
+// (identical on every square input), and the transposed products
+// matmul_nt / matmul_tn are new (pinned against the plain product on
+// materialised transposes).  The independent pins are
 // dense-linalg-test's frozen historical oracle (the pre-promotion bodies,
 // byte-compared), its strided-vs-packed leg, and -- for the batch port's
 // BINDING layer only -- the Alexandrov pilot's 5,771 + 100 isomer corpus.
@@ -43,8 +45,12 @@
 // 2.2) is the future batched-engine surface.  This view is the lib-internal
 // solver vocabulary; unification is the 2.2 engine's decision to make.
 //
-// (The symmetric-eigen family -- jacobi_eig, SymEigen -- stays owner-level
-// in dense_linalg.cc: all its consumers are host-only.)
+// The cyclic Jacobi eigensolver's rotation family is at this level since
+// 2026-09-24 (jacobi_negligible, jacobi_rotation, rotate_pair, rotate_columns,
+// rotate_rows, off_diagonal_max, jacobi_sweep, jacobi_diagonalize): the owner
+// jacobi_eig in dense_linalg.cc composes them in its historical order, and
+// the double instantiation is that loop VERBATIM (dense-linalg-test's
+// frozen jacobi_eig oracle, byte-compared).  SymEigen stays owner-level.
 
 #include <algorithm>
 #include <bit>
@@ -209,23 +215,57 @@ inline void matvec(MatView<const T> A, in_<T> v, out_<T> out) {
   }
 }
 
+// op(A) for the product body below: entry (i, k) of A, or of A^T when Trans
+// is set (BLAS's op argument, resolved at compile time).
+template <bool Trans, class T>
+inline T op_entry(MatView<const T> A, int i, int k) {
+  if constexpr (Trans) return A(k, i);
+  else                 return A(i, k);
+}
+
 // @anchor matmul-ijk-order
-// out := A * B, packed row-major A.m x B.n.  The i-j-k loop with a
-// k-ascending scalar accumulator.  LOAD-BEARING: the Alexandrov solver's
-// byte gates are validated against this association, and
-// matrix<double>::operator* delegates here.  Do not reassociate, block,
-// or vectorize this loop.
-// @pre A.n == B.m, out.size() >= A.m * B.n
+// out := op(A) * op(B), packed row-major, op = transpose where the flag is
+// set.  ONE body for the products: the i-j-k loop with a k-ascending scalar
+// accumulator, a transposition being an index swap in the operand read and
+// nothing else.  LOAD-BEARING: the Alexandrov solver's byte gates are
+// validated against this association, matrix<double>::operator* delegates
+// to the plain instance, and dense-linalg-test's frozen product oracle pins
+// it.  Do not reassociate, block, or vectorize this loop.
+// The two inputs may be the same matrix (R^T R); out is disjoint from both.
+// @pre op(A) is m x kk and op(B) is kk x n; out.size() >= m * n
+template <bool TransA, bool TransB, class T>
+inline void matmul_op(MatView<const T> A, std::type_identity_t<MatView<const T>> B,
+                      out_<T> out) {
+  const int m  = TransA ? A.n : A.m;
+  const int kk = TransA ? A.m : A.n;
+  const int n  = TransB ? B.m : B.n;
+  const MatView<T> C{out, m, n, n};
+  for (int i = 0; i < m; i++)
+    for (int j = 0; j < n; j++) {
+      T x = 0;
+      for (int k = 0; k < kk; k++)
+        x += op_entry<TransA>(A, i, k) * op_entry<TransB>(B, k, j);
+      C(i, j) = x;
+    }
+}
+
+// out := A * B  (the historical matmul).  @pre A.n == B.m, out.size() >= A.m * B.n
 template <class T = double>
 inline void matmul(MatView<const T> A, std::type_identity_t<MatView<const T>> B,
                    out_<T> out) {
-  const MatView<T> C{out, A.m, B.n, B.n};
-  for (int i = 0; i < A.m; i++)
-    for (int j = 0; j < B.n; j++) {
-      T x = 0;
-      for (int k = 0; k < A.n; k++) x += A(i, k) * B(k, j);
-      C(i, j) = x;
-    }
+  matmul_op<false, false, T>(A, B, out);
+}
+// out := A * B^T.  @pre A.n == B.n, out.size() >= A.m * B.m
+template <class T = double>
+inline void matmul_nt(MatView<const T> A, std::type_identity_t<MatView<const T>> B,
+                      out_<T> out) {
+  matmul_op<false, true, T>(A, B, out);
+}
+// out := A^T * B.  @pre A.m == B.m, out.size() >= A.n * B.n
+template <class T = double>
+inline void matmul_tn(MatView<const T> A, std::type_identity_t<MatView<const T>> B,
+                      out_<T> out) {
+  matmul_op<true, false, T>(A, B, out);
 }
 
 // --- LU with partial pivoting: THE shared core ---
@@ -402,6 +442,126 @@ inline LuStatus solve_shifted(MatView<const T> A, in_<T> b, T lambda,
     for (int j = 0; j < n; j++) S(i, j) = A(i, j);
   for (int i = 0; i < n; i++) S(i, i) += lambda;
   return solve<T>(MatView<const T>{S}, b, M, x);
+}
+
+// --- Symmetric eigendecomposition: the cyclic Jacobi family, step by step.
+//     jacobi_eig (dense_linalg.cc) is the sequential composition of these
+//     words in its historical order.  A lane-parallel lowering that rotates
+//     DISJOINT pairs concurrently (the tournament-scheduled sweep of a
+//     batched eigensolver) composes the SAME value statements, so its
+//     per-element arithmetic is that of the sequential body; but rotations
+//     on disjoint pairs, which commute as matrices, meet in the entries at
+//     the intersection of one rotation's rows and the other's columns, and
+//     the two orders of applying them round differently -- hence agreement
+//     to a tolerance, not to the bit.  Conventions: the accumulator V holds
+//     eigenvector m as ROW m; the rotation J of a pair (p, q) acts as
+//     A <- J^T A J and V <- J^T V. ---
+
+// jacobi_negligible: |x| <= tol, the one predicate of the family -- it
+// decides which pairs a sweep leaves alone and when the off-diagonal is
+// done.  @pre tol >= 0 (so an exact zero is always negligible)
+template <class T>
+inline bool jacobi_negligible(T x, T tol) { return std::fabs(x) <= tol; }
+
+template <class T>
+struct Rotation { T c, s; };
+
+// jacobi_rotation: the stable plane rotation annihilating a_pq, as (c, s):
+// theta = (a_qq - a_pp) / (2 a_pq), t = sign(theta) / (|theta| + sqrt(theta^2 + 1)),
+// c = 1 / sqrt(t^2 + 1), s = t c.  @pre a_pq != 0
+template <class T>
+inline Rotation<T> jacobi_rotation(T a_pp, T a_qq, T a_pq) {
+  const T theta = (a_qq - a_pp) / (2 * a_pq);
+  const T t = (theta >= 0 ? T(1) : T(-1)) /
+              (std::fabs(theta) + std::sqrt(theta * theta + 1));
+  const T c = T(1) / std::sqrt(t * t + 1);
+  return {c, t * c};
+}
+
+// rotate_pair: the one arithmetic statement of a plane rotation, on the
+// coordinate pair (x, y) at positions (p, q):  x' = c x - s y,  y' = s x + c y.
+template <class T>
+inline void rotate_pair(T& x, T& y, T c, T s) {
+  const T x0 = x, y0 = y;
+  x = c * x0 - s * y0;
+  y = s * x0 + c * y0;
+}
+
+// rotate_columns: A <- A J, the rotation applied to columns p and q of every
+// row.  rotate_rows: A <- J^T A, applied to rows p and q over every column;
+// the eigenvector accumulator's update is this word on V.
+// @pre 0 <= p, q < the rotated dimension and p != q (p == q would write one
+//      entry twice)
+template <class T>
+inline void rotate_columns(MatView<T> A, int p, int q, T c, T s) {
+  for (int i = 0; i < A.m; i++) rotate_pair(A(i, p), A(i, q), c, s);
+}
+template <class T>
+inline void rotate_rows(MatView<T> A, int p, int q, T c, T s) {
+  for (int i = 0; i < A.n; i++) rotate_pair(A(p, i), A(q, i), c, s);
+}
+
+// off_diagonal_max: max |a_pq| over the strict upper triangle, the
+// historical convergence measure.  Unlike max_abs, a NaN entry is IGNORED
+// here (std::max keeps the running value), so a NaN matrix reports
+// convergence; byte-identity to the frozen jacobi_eig oracle fixes this.
+// @pre A.m == A.n, A symmetric
+template <class T>
+inline T off_diagonal_max(MatView<const T> A) {
+  T off = 0;
+  for (int p = 0; p < A.m; p++)
+    for (int q = p + 1; q < A.n; q++) off = std::max(off, std::fabs(A(p, q)));
+  return off;
+}
+
+// jacobi_sweep: one cyclic sweep, every pair (p, q) with p < q in row-major
+// order.  A pair whose entry is negligible is skipped and WRITTEN NOT AT
+// ALL -- the historical continue; applying the identity rotation instead
+// would not be byte-safe, since 0 * x + y turns a negative zero positive.
+// (With tol >= 0 an exact zero a_pq always skips, so jacobi_rotation never
+// divides by zero.)  The rest are rotated: columns, then rows, then the
+// accumulator when V is non-empty (V.m == 0 means no vectors are wanted).
+// @pre A.m == A.n; V.m == 0 or (V.m == A.n and V.n == A.n); tol >= 0
+template <class T>
+inline void jacobi_sweep(MatView<T> A, MatView<T> V, T tol) {
+  const int n = A.n;
+  for (int p = 0; p < n; p++)
+    for (int q = p + 1; q < n; q++) {
+      const T a_pq = A(p, q);
+      if (jacobi_negligible(a_pq, tol)) continue;
+      const Rotation<T> r = jacobi_rotation(A(p, p), A(q, q), a_pq);
+      rotate_columns(A, p, q, r.c, r.s);
+      rotate_rows(A, p, q, r.c, r.s);
+      if (V.m) rotate_rows(V, p, q, r.c, r.s);
+    }
+}
+
+// jacobi_diagonalize: cyclic Jacobi, the historical sweep loop.  Before
+// each sweep the off-diagonal maximum is tested; converged when it is
+// negligible, with the diagonal of A the eigenvalues (UNSORTED: entry m
+// stays paired with row m of V) and V the accumulated rotations applied to
+// whatever the caller put in it -- the identity for a fresh
+// eigendecomposition, a previous eigenbasis for a warm start.  tol is the
+// caller's negligibility scale (the owner jacobi_eig uses
+// 1e-15 * max(max|A|, 1e-300)).  The guard is the historical one: the
+// sweep that would be the max_sweeps-th is refused (at most max_sweeps - 1
+// sweeps run), and a trip means a non-symmetric or non-finite input.
+// sweeps counts the sweeps performed.  Two conventions to know: a NaN
+// off-diagonal is not seen by off_diagonal_max, so a NaN matrix reports
+// convergence with NaN eigenvalues (the historical behaviour, unlike
+// max_abs); and max_sweeps <= 0 reports not converged, where the
+// historical loop fell through as converged (unreachable from the owner,
+// whose guard is 60).
+// @pre as jacobi_sweep
+struct JacobiResult { bool converged = false; int sweeps = 0; };
+template <class T>
+inline JacobiResult jacobi_diagonalize(MatView<T> A, MatView<T> V, T tol, int max_sweeps) {
+  for (int sweep = 0; sweep < max_sweeps; sweep++) {
+    if (jacobi_negligible(off_diagonal_max(MatView<const T>{A}), tol)) return {true, sweep};
+    if (sweep == max_sweeps - 1) return {false, sweep};
+    jacobi_sweep(A, V, tol);
+  }
+  return {false, 0};   // max_sweeps <= 0: nothing was tested
 }
 
 }  // namespace LinAlg

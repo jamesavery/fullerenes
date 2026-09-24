@@ -29,8 +29,8 @@
 // singular behaviour.  The vector reductions (dot, norm, sum_sq, max_abs,
 // energy, is_usable_step, negate) have NO owner overloads: std::vector
 // converts implicitly to std::span, so the view functions serve owner
-// callers directly.  The symmetric-eigen family (jacobi_eig, SymEigen) is
-// owner-only.
+// callers directly.  jacobi_eig composes the view-level Jacobi rotation
+// family (jacobi_diagonalize and its words); SymEigen is owner-only.
 
 namespace LinAlg {
 

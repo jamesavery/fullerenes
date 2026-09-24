@@ -26,54 +26,31 @@ bool jacobi_eig(std::vector<double> A, int n, std::vector<double>& lam,
     for (int i = 0; i < n; i++) Vacc[size_t(i) * n + i] = 1.0;
   }
 
+  // The negligibility scale: 1e-15 of the largest entry, floored at 1e-300.
+  // A hand loop rather than max_abs, whose NaN policy (+inf) would declare
+  // instant convergence on NaN input and change this body's bytes there.
   double anorm = 0;
   for (size_t x = 0; x < A.size(); x++) anorm = std::max(anorm, std::fabs(A[x]));
   const double tol = 1e-15 * std::max(anorm, 1e-300);
 
-  auto at = [&](int i, int j) -> double& { return A[size_t(i) * n + j]; };
-
-  for (int sweep = 0; sweep < MAX_SWEEPS; sweep++) {
-    double off = 0;
-    for (int p = 0; p < n; p++)
-      for (int q = p + 1; q < n; q++) off = std::max(off, std::fabs(at(p, q)));
-    if (off <= tol) break;
-    if (sweep == MAX_SWEEPS - 1) return false;   // guard trip = bug
-
-    for (int p = 0; p < n; p++)
-      for (int q = p + 1; q < n; q++) {
-        double apq = at(p, q);
-        if (std::fabs(apq) <= tol) continue;
-        double theta = (at(q, q) - at(p, p)) / (2 * apq);
-        double t = (theta >= 0 ? 1.0 : -1.0) /
-                   (std::fabs(theta) + std::sqrt(theta * theta + 1));
-        double c = 1.0 / std::sqrt(t * t + 1), s = t * c;
-
-        for (int i = 0; i < n; i++) {      // rotate rows/cols p,q of A
-          double aip = at(i, p), aiq = at(i, q);
-          at(i, p) = c * aip - s * aiq;
-          at(i, q) = s * aip + c * aiq;
-        }
-        for (int i = 0; i < n; i++) {
-          double api = at(p, i), aqi = at(q, i);
-          at(p, i) = c * api - s * aqi;
-          at(q, i) = s * api + c * aqi;
-        }
-        if (V_out)
-          for (int i = 0; i < n; i++) {    // accumulate: Vacc row = eigvecᵀ
-            double vpi = Vacc[size_t(p) * n + i], vqi = Vacc[size_t(q) * n + i];
-            Vacc[size_t(p) * n + i] = c * vpi - s * vqi;
-            Vacc[size_t(q) * n + i] = s * vpi + c * vqi;
-          }
-      }
-  }
+  // The sweep loop is the view-level jacobi_diagonalize
+  // (dense_linalg_view.hh), composed in the historical order -- columns,
+  // rows, accumulator -- so this body is byte-identical to its
+  // pre-promotion self (the frozen oracle in dense-linalg-test).  Vv is
+  // EMPTY (m = 0) when no vectors are requested; the accumulator is then
+  // left alone.
+  const MatView<double> Av{A, n, n, n};
+  const MatView<double> Vv{Vacc, V_out ? n : 0, n, n};
+  if (!jacobi_diagonalize(Av, Vv, tol, MAX_SWEEPS).converged)
+    return false;   // guard trip = bug (non-symmetric input)
 
   // Sort ascending, permuting eigenvector rows along.
   std::vector<int> order(n);
   std::iota(order.begin(), order.end(), 0);
   std::sort(order.begin(), order.end(),
-            [&](int x, int y) { return at(x, x) < at(y, y); });
+            [&](int x, int y) { return Av(x, x) < Av(y, y); });
   lam.assign(n, 0);
-  for (int m = 0; m < n; m++) lam[m] = at(order[m], order[m]);
+  for (int m = 0; m < n; m++) lam[m] = Av(order[m], order[m]);
   if (V_out) {
     V_out->assign(size_t(n) * n, 0.0);
     for (int m = 0; m < n; m++)
