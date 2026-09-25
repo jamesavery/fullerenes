@@ -26,7 +26,7 @@ using namespace std;
 
 namespace {
 
-// The dual triangulation of a canonically named isomer ("C<N>-[GS:...]-fullerene").
+// The dual triangulation of a canonically named isomer ("C<N>-[...]-fullerene").
 Triangulation dual_of(const string& name) {
   const string spiral = name.substr(name.find('-') + 1);
   return Triangulation(spiral_nomenclature(spiral));
@@ -43,15 +43,15 @@ AlexandrovSolver solve_dual(const Triangulation& T) {
 
 struct Flat { const char* name; int carbons; };
 const Flat kFlat[] = {
-    {"C96-[GS:1,2,12,17,23,29,35,40,41,45,49,50]-fullerene", 96},
-    {"C120-[GS:1,2,12,17,23,35,41,52,53,57,61,62]-fullerene", 120},
-    {"C170-[GS:1,2,12,17,23,54,61,67,78,82,86,87]-fullerene", 170},
-    {"C180-[GS:1,11,16,30,38,54,62,78,80,85,90,92]-fullerene", 180},
-    {"C384-[GS:1,16,40,71,83,119,131,164,166,174,192,194]-fullerene", 384},
+    {"C96-[1,2,12,17,23,29,35,40,41,45,49,50]-fullerene", 96},
+    {"C120-[1,2,12,17,23,35,41,52,53,57,61,62]-fullerene", 120},
+    {"C170-[1,2,12,17,23,54,61,67,78,82,86,87]-fullerene", 170},
+    {"C180-[1,11,16,30,38,54,62,78,80,85,90,92]-fullerene", 180},
+    {"C384-[1,16,40,71,83,119,131,164,166,174,192,194]-fullerene", 384},
 };
 const char* const kOrdinary[] = {
-    "C20-[GS:1,2,3,4,5,6,7,8,9,10,11,12]-fullerene",
-    "C60-[GS:1,7,9,11,13,15,18,20,22,24,26,32]-fullerene",
+    "C20-[1,2,3,4,5,6,7,8,9,10,11,12]-fullerene",
+    "C60-[1,7,9,11,13,15,18,20,22,24,26,32]-fullerene",
 };
 
 }  // namespace

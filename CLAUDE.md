@@ -92,30 +92,28 @@ Fullerene topology is compactly encoded as spiral indices and jump sequences. Th
 
 #### Canonical fullerene names from a dual triangulation
 
-To produce the canonical, vendor-neutral name of a fullerene given its dual `Triangulation T` (e.g. as returned by `BuckyGen::next_fullerene`):
+The canonical name is the name of the FULLERENE, i.e. the cubic graph. Given its dual `Triangulation T` (e.g. as returned by `BuckyGen::next_fullerene`), the dual's canonical vertex spiral is the fullerene's canonical face spiral, so name it straight from the dual:
 
 ```cpp
 #include "fullerenes/spiral.hh"
 
-spiral_nomenclature sn(T,
-                       spiral_nomenclature::FULLERENE,        // naming_scheme
-                       spiral_nomenclature::TRIANGULATION,    // construction_scheme
-                       /*rarest_special_start=*/true);        // -> CANONICAL_GENERALIZED_SPIRAL
-std::string name = sn.to_string();   // e.g. "[GS:1,2,4,9,15,17,20,22,24,28,29,31]-fullerene"
+spiral_nomenclature sn = spiral_nomenclature::fullerene_from_dual(T);   // GS search
+std::string name = sn.to_string();   // e.g. "[1,7,9,11,13,15,18,20,22,24,26,32]-fullerene" (Ih-C60)
 ```
 
 For tooling output, **prefix the carbon count** so the size is visible at a glance:
 ```cpp
 std::string tagged = "C" + std::to_string(N_carbon) + "-" + sn.to_string();
-// -> "C60-[GS:1,2,4,9,15,17,20,22,24,28,29,31]-fullerene"
+// -> "C60-[1,7,9,11,13,15,18,20,22,24,26,32]-fullerene"
 ```
+(`FullereneDualView::name()` returns the same object; in claude-projects use `fullerene_shared::canonical_name(T)`, which adds the prefix.)
 
 Notes:
-- Pass the **dual triangulation** (the deg-5/6 graph) directly. `construction_scheme=TRIANGULATION` returns it unchanged inside the constructor. If you only have the cubic fullerene graph, use `construction_scheme=CUBIC` instead.
-- `rarest_special_start=true` selects `CANONICAL_GENERALIZED_SPIRAL` (`GS`); `false` selects `COMPATIBILITY_CANONICAL_SPIRAL` (`CS`).
+- The construction scheme in a name says WHICH graph it describes: no tag = the cubic graph, `T` = the triangulation, `LF` = a leapfrog. The fullerene name has no `T`. `spiral_nomenclature(T, FULLERENE, TRIANGULATION)` names the dual triangulation itself and writes `[T:...]` -- a different graph with the same spiral numbers; use it only when the triangulation is the end product.
+- The search scheme is written only when it is not the default: the canonical generalized spiral (GS search, `rarest_special_start=true`, starts at vertices of degree != 6) is never written, with or without jumps (`[<jumps>; <pentagons>]-fullerene`); the compatibility spiral (CS search, `false`, all starts) is always written, `[CS:...]`. An untagged name parses to the GS scheme; the legacy tags `GS:` and `[T,GS:...]` are still accepted. The grammar and its rules are stated once in `include/fullerenes/spiral.hh` ("The name grammar").
 - The name encodes the 12 pentagon positions in the canonical spiral (plus jumps if the graph requires them).
 - The spiral is canonical: the same isomer always names the same way regardless of vertex labelling, so two runs that disagree on the buckygen index can still be cross-referenced.
-- To reconstruct a `FullereneGraph` from a name string, parse it via `spiral_nomenclature(const string&)` and feed the `general_spiral` to the existing fullerene constructors. (The `C<N>-` prefix is for human readability; strip it before parsing.)
+- To reconstruct from a name string, parse it via `spiral_nomenclature(const string&)`: `Triangulation(sn)` is the dual triangulation (for a `T` name, the named graph itself), `FullereneGraph(sn)` its dual, `PlanarGraph(sn)` the named graph. (The `C<N>-` prefix is for human readability; strip it before parsing.)
 - Build deps: link `libfullerenes.so` and (if you're enumerating) `libbuckygen.a`.
 - Thread safety: each `spiral_nomenclature` object is independent, but compute names *outside* the OpenMP parallel region — name construction is not cheap, and a single-threaded post-pass keeps the hot loop tight.
 

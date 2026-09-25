@@ -64,8 +64,7 @@ int main()
 
     // Time spiral computation: graph -> canonical spiral
     auto t0 = steady_clock::now();
-    spiral_nomenclature sn(graph, spiral_nomenclature::FULLERENE,
-                           spiral_nomenclature::TRIANGULATION, true);
+    spiral_nomenclature sn = spiral_nomenclature::fullerene_from_dual(graph);
     string spiral_str = sn.to_string();
     auto t1 = steady_clock::now();
     double time_spiral_us = duration<double, micro>(t1 - t0).count();

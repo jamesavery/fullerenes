@@ -388,6 +388,23 @@ TEST(TriangulationView, FromGraphView) {
     EXPECT_EQ(int(tris.size()), 2 * T_view.N - 4);
 }
 
+// is_fullerene_dual: every degree 5 or 6, exactly twelve 5s.  On a sphere the
+// second condition follows from the first by Euler's relation, so the
+// wrong-count case is the seven-vertex torus K7 (all degrees 6).
+TEST(TriangulationView, IsFullereneDual) {
+    vector<int> C60_spiral(32, 6);
+    for (int p : {1,7,9,11,13,15,18,20,22,24,26,32}) C60_spiral[p-1] = 5;
+    EXPECT_TRUE(Triangulation(C60_spiral).is_fullerene_dual());
+    EXPECT_TRUE(Triangulation(FullereneGraph::C20().dual_graph()).is_fullerene_dual());
+
+    EXPECT_FALSE(Triangulation(vector<int>{4,4,4,4,4,4}).is_fullerene_dual());   // octahedron
+
+    const Triangulation K7(Graph{{1,3,2,6,4,5}, {2,4,3,0,5,6}, {3,5,4,1,6,0},
+                                 {4,6,5,2,0,1}, {5,0,6,3,1,2}, {6,1,0,4,2,3},
+                                 {0,2,1,5,3,4}});
+    EXPECT_FALSE(K7.is_fullerene_dual());
+}
+
 // ---------------------------------------------------------------------------
 // Fill constructor
 // ---------------------------------------------------------------------------

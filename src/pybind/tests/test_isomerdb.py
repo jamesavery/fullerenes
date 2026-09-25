@@ -41,7 +41,7 @@ def test_ipr_c60_is_buckminsterfullerene():
     fg = ipr.make_isomer(0)
     assert fg.N == 60 and fg.is_a_fullerene()
     # canonical name's pentagon indices echo the database RSPI
-    assert fg.name() == "C60-[GS:1,7,9,11,13,15,18,20,22,24,26,32]-fullerene"
+    assert fg.name() == "C60-[1,7,9,11,13,15,18,20,22,24,26,32]-fullerene"
 
 
 @requires_db

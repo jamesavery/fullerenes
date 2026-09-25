@@ -77,7 +77,7 @@ int main(int ac, char **av)
       auto [a,b,c,d,e] = abcde;
       int Nf = a+4*b+c+4*d+e+12;
       int N  = (Nf-2)*2;
-      cout << "C"<<N<<"-[GS:"<<rspi<<"]-fullerene\n";
+      cout << "C"<<N<<"-["<<rspi<<"]-fullerene\n";   // a regular (jump-free) spiral: no search tag
     }      
   
   return 0;

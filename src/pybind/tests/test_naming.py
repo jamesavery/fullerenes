@@ -22,7 +22,10 @@ def test_rspi_round_trips_through_from_rspi():
 
 def test_name_prefix_and_format():
     name = next(iter(fl.buckygen(60))).name()
-    assert name.startswith("C60-[GS:") and name.endswith("]-fullerene")
+    # The fullerene (cubic graph) is named: no "T"; a jump-free spiral has no
+    # search tag.
+    assert name.startswith("C60-[") and name.endswith("]-fullerene")
+    assert "T" not in name[4:] and "GS:" not in name
 
 
 def test_enumerated_names_are_distinct():

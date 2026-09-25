@@ -110,7 +110,7 @@ TEST(PolytopeGate, CensusAgreesWithTesselationOnBothMetrics) {
 }
 
 TEST(PolytopeGate, IcosahedralC60PassesOnBothMetrics) {
-  const string name = "[GS:1,7,9,11,13,15,18,20,22,24,26,32]-fullerene";
+  const string name = "[1,7,9,11,13,15,18,20,22,24,26,32]-fullerene";
   const Triangulation T{spiral_nomenclature(name)};
   for (const Solved& s : {solve_dual(T), solve_cubic(T)}) {
     ASSERT_FALSE(s.pos.empty());
@@ -126,7 +126,7 @@ TEST(PolytopeGate, IcosahedralC60PassesOnBothMetrics) {
 }
 
 TEST(PolytopeGate, BrokenGeometryFailsWithItsOwnProperty) {
-  const string name = "[GS:1,7,9,11,13,15,18,20,22,24,26,32]-fullerene";
+  const string name = "[1,7,9,11,13,15,18,20,22,24,26,32]-fullerene";
   const Triangulation T{spiral_nomenclature(name)};
   const Solved s = solve_dual(T);
   ASSERT_FALSE(s.pos.empty());

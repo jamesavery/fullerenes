@@ -62,8 +62,7 @@ int main()
 
     Triangulation result = C28dual.GCtransform(e.k, e.l);
 
-    spiral_nomenclature sn(result, spiral_nomenclature::FULLERENE,
-                           spiral_nomenclature::TRIANGULATION, true);
+    spiral_nomenclature sn = spiral_nomenclature::fullerene_from_dual(result);
     string spiral_str = sn.to_string();
 
     fprintf(stderr, "%s\n", spiral_str.c_str());

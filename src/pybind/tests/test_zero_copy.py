@@ -34,7 +34,7 @@ def test_owned_view_survives_owner_gc():
 def test_real_methods_run_through_the_view():
     fg = fl.FullereneGraph.C20()
     assert fg.is_a_fullerene()
-    assert fg.name() == "C20-[GS:1,2,3,4,5,6,7,8,9,10,11,12]-fullerene"
+    assert fg.name() == "C20-[1,2,3,4,5,6,7,8,9,10,11,12]-fullerene"
     assert fg.adjacency()[0] == [1, 4, 7]
 
 

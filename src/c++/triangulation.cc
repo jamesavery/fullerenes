@@ -312,8 +312,21 @@ private:
 
 // Windup: construct an oriented triangulation from a face-degree sequence.
 // Mirrors Haskell reference: windupGeneralSpiral spiral jumps = init2 >> foldl' stepK >> closeLast
+// Rows wide enough for the largest degree the spiral lists (a vertex of the
+// wound-up triangulation has its spiral degree), and never narrower than the
+// default stride.
+static uint8_t spiral_row_capacity(const vector<int>& spiral_string)
+{
+  int d_max = TriangulationView::default_dmax;
+  for(int d: spiral_string) d_max = max(d_max, d);
+  if(d_max > 255)
+    throw std::invalid_argument("Triangulation from spiral: vertex degree "
+                                + std::to_string(d_max) + " > 255");
+  return uint8_t(d_max);
+}
+
 Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t& j, const bool best_effort):
-  base_t(int(spiral_string.size()))
+  base_t(int(spiral_string.size()), spiral_row_capacity(spiral_string))
 {
   jumplist_t jumps = j;
 
@@ -511,7 +524,8 @@ bool TriangulationView::get_spiral(const node_t f1, const node_t f2, const node_
 
 // ── Layer 2: RemainingGraph ─────────────────────────────────────────
 // Tracks which nodes and edges are still present during spiral extraction
-// using a per-node bitmask into the original neighbour list (max degree 16).
+// using a per-node bitmask into the original neighbour list, one bit per
+// neighbour, so the degree is at most SpiralSearchFailed::degree_limit.
 //
 // Removing node v clears its bit in each neighbour's active mask,
 // effectively deleting all edges incident to v. The last remaining
@@ -522,10 +536,15 @@ struct RemainingGraph {
   int count;
   node_t last_nbr = -1;
 
+  static_assert(SpiralSearchFailed::degree_limit <= 16, "active holds one bit per neighbour in a uint16_t");
+
+  // @throws SpiralSearchFailed (DEGREE_LIMIT) if a vertex of t has degree
+  //         above SpiralSearchFailed::degree_limit.
   explicit RemainingGraph(const TriangulationView& t)
     : tri(t), count(t.N), active(t.N)
   {
-    assert(t.max_degree() <= 16);
+    if(const int d = t.max_degree(); d > SpiralSearchFailed::degree_limit)
+      throw SpiralSearchFailed::degree_exceeded(t.N, d);
     for(int u = 0; u < count; u++)
       active[u] = (1u << t.degree(u)) - 1;
   }
@@ -556,7 +575,7 @@ struct RemainingGraph {
     int n = __builtin_popcount(m);
     if(n < 2) return false;
 
-    node_t nbrs[16];
+    node_t nbrs[SpiralSearchFailed::degree_limit];
     int k = 0;
     for(uint16_t t = m; t; t &= t-1)
       nbrs[k++] = tri.nbrs(v)[__builtin_ctz(t)];
@@ -754,8 +773,9 @@ bool TriangulationView::get_spiral(vector<int>& spiral, jumplist_t& jumps, const
 general_spiral TriangulationView::get_general_spiral(const bool only_rarest_special, const bool CW_only) const
 {
   general_spiral gs;
-  bool success = get_spiral(gs.spiral_code,gs.jumps,only_rarest_special,true,CW_only);
-  assert(success); 		// General spirals should *always* succeed
+  // General spirals always exist, so a failed search is never a legitimate outcome.
+  if(!get_spiral(gs.spiral_code,gs.jumps,only_rarest_special,true,CW_only))
+    throw SpiralSearchFailed(N, -1, -1, -1, only_rarest_special, CW_only);
   return gs;
 }
 
@@ -806,7 +826,7 @@ bool TriangulationView::get_spiral(vector<int> &spiral, jumplist_t &jumps, vecto
           if(!get_spiral_implementation(u,v,w[k], spiral_tmp,jumps_tmp,permutation_tmp,
                                         use_general))
           {
-            if(use_general){ fprintf(stderr, "General spiral failed -- this should never happen!\n"); abort(); }
+            if(use_general) throw SpiralSearchFailed(N, u, v, w[k], only_rarest_special, CW_only);
             continue;
           }
           found = true;
@@ -1556,9 +1576,7 @@ Permutation TriangulationView::sort_flat_last() const
 
 spiral_nomenclature FullereneDualView::name(bool rarest_start) const
 {
-  return spiral_nomenclature(dual_graph(), spiral_nomenclature::FULLERENE,
-			     spiral_nomenclature::CUBIC,
-			     rarest_start);  
+  return spiral_nomenclature::fullerene_from_dual(*this, rarest_start);
 }
 
 // The two-bin histogram of same_degree_neighbours over the pentagons (degree
@@ -1723,9 +1741,7 @@ vector<general_spiral> FullereneDual::isomer_search(const Triangulation::predica
 
     if(predicate(G)){
       spirals.push_back(FullereneDual(G).get_rspi());
-      spiral_nomenclature name(G, spiral_nomenclature::FULLERENE,spiral_nomenclature::TRIANGULATION);
-      //      spirals.push_back(name.to_string());
-      cerr << name.to_string() << endl;
+      cerr << G.name().to_string() << endl;
     }
   }
   BuckyGen::stop(Q);

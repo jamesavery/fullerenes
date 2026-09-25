@@ -61,7 +61,7 @@ f.symmetries(60)                  # point groups present among the isomers
 with f.buckygen(60) as gen:
     for dual in gen:
         fg = dual.dual()          # FullereneGraph
-        print(dual.name())        # canonical spiral name, e.g. [GS:...]-fullerene
+        print(dual.name())        # canonical spiral name, e.g. [...]-fullerene
         break
 
 # Build and inspect a graph:

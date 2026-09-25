@@ -58,9 +58,7 @@ int main(int argc, char** argv) {
   }
   BuckyGen::stop(Q);
 
-  spiral_nomenclature sn(T, spiral_nomenclature::FULLERENE,
-                            spiral_nomenclature::TRIANGULATION,
-                            /*rarest_special_start=*/true);
+  spiral_nomenclature sn = spiral_nomenclature::fullerene_from_dual(T);
   string name = "C" + to_string(N) + "-" + sn.to_string();
 
   auto D = DelaunayTriangulation::compute(T);

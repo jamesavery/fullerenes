@@ -171,7 +171,7 @@ import fullerenes as fl
 
 # Lazily enumerate every C60 isomer as a dual triangulation:
 for dual in fl.buckygen(60):
-    name = dual.name()           # canonical: "C60-[GS:1,7,9,...]-fullerene"
+    name = dual.name()           # canonical: "C60-[1,7,9,...]-fullerene"
     if dual.is_a_fullerene():
         cubic = dual.dual()      # back to the 3-valent cage graph
 
@@ -307,8 +307,8 @@ Only the zero-copy machinery is hand-written, and it changes only if the
 \item \texttt{np\_interop.hh} --- the keep-alive \code{py::array_t} makers, \code{require_array}
   (exact dtype/shape/contiguity, no implicit conversion), \code{infer_deg}, and the layout
   \code{static_assert}s;
-\item \texttt{naming.hh} --- the single \code{canonical_name} helper for the
-  \texttt{C<N>-[GS:\ldots]} convention;
+\item \texttt{naming.hh} --- the \code{canonical_name} helper, \texttt{C<N>-} followed by
+  the fullerene's spiral name (grammar in \texttt{spiral.hh});
 \item a few special-cased methods in the per-class \texttt{.cc} / \texttt{module.cc}: the
   buckygen generator, file-path I/O, the optimisers (with view-mode copy-back), and the
   geodesics family.

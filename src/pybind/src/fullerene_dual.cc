@@ -102,7 +102,7 @@ void register_fullerene_dual(py::module_& m) {
 
     cls.def("name", [](PyFD& w) {
         return pyf::canonical_name(w.view());
-    }, "Canonical generalized-spiral name, e.g. 'C60-[GS:...]-fullerene'.");
+    }, "Canonical generalized-spiral name, e.g. 'C60-[...]-fullerene'.");
 
     cls.def("dual", [](PyFD& w) {
         FullereneDualView v = w.view();

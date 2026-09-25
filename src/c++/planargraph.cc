@@ -36,31 +36,23 @@ PlanarGraph::PlanarGraph(const spiral_nomenclature &fsn){
 //  1. If G is a triangulation, it is G
 //  2. If G is cubic, it is its dual
 //  3. If G is non-cubic and non-triangulation, it is G's leapfrog dual
-PlanarGraph PlanarGraphView::enveloping_triangulation(construction_scheme_t &scheme) const
+PlanarGraphView::construction_scheme_t PlanarGraphView::enveloping_scheme() const
 {
-  if(is_triangulation()){
-    scheme = spiral_nomenclature::TRIANGULATION;
-    return *this;
-  } else if(is_cubic()){
-    scheme = spiral_nomenclature::CUBIC;
-    return dual_graph();
-  } else {
-    scheme = spiral_nomenclature::LEAPFROG;
-    return leapfrog_dual();
-  }
+  if(is_triangulation()) return spiral_nomenclature::TRIANGULATION;
+  if(is_cubic())         return spiral_nomenclature::CUBIC;
+  return spiral_nomenclature::LEAPFROG;
 }
 
-PlanarGraph PlanarGraphView::enveloping_triangulation(const construction_scheme_t &scheme) const
+PlanarGraph PlanarGraphView::enveloping_triangulation(construction_scheme_t scheme) const
 {
   switch(scheme){
-  case spiral_nomenclature::TRIANGULATION:
-    return *this;
-  case spiral_nomenclature::CUBIC:
-    return dual_graph();
-  case spiral_nomenclature::LEAPFROG:
-  default:
-    return leapfrog_dual();
+  case spiral_nomenclature::TRIANGULATION: return *this;
+  case spiral_nomenclature::CUBIC:         return dual_graph();
+  case spiral_nomenclature::LEAPFROG:      return leapfrog_dual();
+  case spiral_nomenclature::CS_NONE:       break;
   }
+  throw std::invalid_argument("enveloping_triangulation: no construction scheme given "
+                              "(enveloping_scheme() selects one from the graph's shape)");
 }
 
 bool PlanarGraphView::is_cubic() const {
@@ -189,7 +181,16 @@ PlanarGraph PlanarGraphView::leapfrog_dual() const
   vector<face_t> faces = compute_faces_oriented();
   size_t Nf = faces.size();
 
-  PlanarGraph lf(N+Nf);
+  // A vertex of degree d gains d face-center neighbours; a face-center has
+  // one neighbour per face vertex.  Rows are sized for both.
+  int row_capacity = 0;
+  for(node_t u=0;u<N;u++)            row_capacity = max(row_capacity, 2*int(degree(u)));
+  for(const face_t &f: faces)        row_capacity = max(row_capacity, int(f.size()));
+  if(row_capacity > 255)
+    throw std::invalid_argument("leapfrog_dual: a vertex or face of the leapfrog dual has "
+                                + std::to_string(row_capacity) + " > 255 neighbours");
+
+  PlanarGraph lf(N+Nf, row_capacity);
 
   // Start with all the existing nodes
   for(node_t u=0;u<N;u++) lf.assign_row(u, (*this)[u]);

@@ -7,8 +7,8 @@
 #include <fstream>
 
 vector<int> rspi_c240_ih = {0,32,36,40,44,48,74,78,82,86,90,121};
-string spiralcode_c240_ih = "[GS: 1,33,37,41,45,49,75,79,83,87,91,122]-fullerene";
-string spiralcode_c60_ih  = "[GS: 1,7,9,11,13,15,18,20,22,24,26,32]-fullerene";
+string spiralcode_c240_ih = "[1,33,37,41,45,49,75,79,83,87,91,122]-fullerene";
+string spiralcode_c60_ih  = "[1,7,9,11,13,15,18,20,22,24,26,32]-fullerene";
 
 polygon C240_unfolding_outline{vector<Eisenstein>{{
   {0,14},   {0,16},   {2,16},   {4,16},  

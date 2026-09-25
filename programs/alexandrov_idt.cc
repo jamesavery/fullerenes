@@ -4,7 +4,7 @@
 //
 // Usage: alexandrov_idt "<canonical name>" [cubic|dual] [output.ply]
 //
-//   canonical name  e.g. "C60-[GS:1,7,9,11,13,15,18,20,22,24,26,32]-fullerene"
+//   canonical name  e.g. "C60-[1,7,9,11,13,15,18,20,22,24,26,32]-fullerene"
 //                   (the human-readable C<N>- prefix is optional)
 //   cubic | dual    which metric to embed (default: cubic).  These are
 //                   reserved keywords; the two trailing positionals (metric,
@@ -103,8 +103,8 @@ void usage(FILE* out, const char* prog)
         "usage: %s \"<canonical name>\" [cubic|dual] [output.ply]\n"
         "  metric selector defaults to cubic; the two trailing positionals\n"
         "  (metric, output path) may appear in either order.\n"
-        "  e.g. %s \"C60-[GS:1,7,9,11,13,15,18,20,22,24,26,32]-fullerene\"\n"
-        "       %s \"C20-[GS:1,2,3,4,5,6,7,8,9,10,11,12]-fullerene\" dual\n",
+        "  e.g. %s \"C60-[1,7,9,11,13,15,18,20,22,24,26,32]-fullerene\"\n"
+        "       %s \"C20-[1,2,3,4,5,6,7,8,9,10,11,12]-fullerene\" dual\n",
         prog, prog, prog);
 }
 

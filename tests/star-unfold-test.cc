@@ -78,7 +78,7 @@ TEST(StarUnfold, C60C70ByName) {
 // intrinsically degenerate.
 TEST(StarUnfold, DegenerateMultiEdgeC96) {
     const Triangulation T = from_name(
-        "[GS:1,2,12,17,23,29,35,40,41,45,49,50]-fullerene");
+        "[1,2,12,17,23,29,35,40,41,45,49,50]-fullerene");
     expect_star_postconditions(T, 0);
     EXPECT_TRUE(T.star_unfold(0).cuts_globally_shortest);
 }

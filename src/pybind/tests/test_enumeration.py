@@ -22,7 +22,7 @@ def test_yields_named_duals():
     first = next(iter(g))
     assert type(first).__name__ == "FullereneDual"
     assert first.N == 32                      # C60 dual has N/2+2 = 32 vertices
-    assert first.name().startswith("C60-[GS:")
+    assert first.name().startswith("C60-[1,")
 
 
 def test_context_manager_and_close():

@@ -413,8 +413,16 @@ struct PlanarGraphView : GraphView {
     // --- Dual and derived graphs (return owned types) ---
     PlanarGraph dual_graph(unsigned int Fmax=INT_MAX) const;
     PlanarGraph leapfrog_dual() const;
-    PlanarGraph enveloping_triangulation(construction_scheme_t& scheme) const;
-    PlanarGraph enveloping_triangulation(const construction_scheme_t& scheme) const;
+    // The construction scheme this graph's shape selects (spiral.hh, 1.):
+    // TRIANGULATION if it is a triangulation, CUBIC if it is cubic, LEAPFROG
+    // otherwise.
+    construction_scheme_t enveloping_scheme() const;
+    // The triangulation that envelopes this graph under `scheme`: the graph
+    // itself (TRIANGULATION), its dual (CUBIC), or its leapfrog dual (LEAPFROG).
+    // The scheme is not checked against the graph's shape.
+    // @throws std::invalid_argument when scheme is CS_NONE (no envelope named;
+    //         enveloping_scheme() chooses one).
+    PlanarGraph enveloping_triangulation(construction_scheme_t scheme) const;
 
     // --- Combinatorics ---
     size_t count_perfect_matchings() const;
@@ -488,6 +496,8 @@ struct CubicGraphView : PlanarGraphView {
     bool get_spiral_from_cg(node_t f1, node_t f2, node_t f3,
                             vector<int>& spiral, jumplist_t& jumps,
                             bool general=true) const;
+    // Searches the dual triangulation for the canonical spiral.
+    // @throws SpiralSearchFailed as TriangulationView::get_spiral does.
     bool get_spiral_from_cg(vector<int>& spiral, jumplist_t& jumps,
                             bool canonical=true, bool general=true,
                             bool pentagon_start=true) const;
@@ -516,6 +526,8 @@ struct FullereneGraphView : CubicGraphView {
     bool get_rspi_from_fg(node_t f1, node_t f2, node_t f3,
                           vector<int>& rspi, jumplist_t& jumps,
                           bool general=true) const;
+    // Searches the dual triangulation for the canonical spiral.
+    // @throws SpiralSearchFailed as TriangulationView::get_spiral does.
     bool get_rspi_from_fg(vector<int>& rspi, jumplist_t& jumps,
                           bool general=true, bool pentagon_start=true) const;
 
@@ -642,6 +654,19 @@ struct TriangulationView : PlanarGraphView {
         return max_deg;
     }
 
+    // Whether this is the dual of a fullerene by degrees: every vertex has
+    // degree 5 or 6 and exactly twelve have degree 5.  Allocates nothing and
+    // never throws.
+    bool is_fullerene_dual() const {
+        int n5 = 0;
+        for (node_t u = 0; u < N; u++) {
+            const int d = degree(u);
+            if (d != 5 && d != 6) return false;
+            n5 += (d == 5);
+        }
+        return n5 == 12;
+    }
+
     vector<uint8_t> n_degrees() const {
         vector<uint8_t> nd(max_degree(),0);
         for (node_t u=0; u<N; u++) nd[degree(u)-1]++;
@@ -656,6 +681,13 @@ struct TriangulationView : PlanarGraphView {
     Triangulation halma_transform(int m, vector<map<edge_t,node_t>>* face_grids = nullptr) const;
 
     // --- Spiral methods ---
+    // The canonical-spiral searches (the two get_spiral overloads without a
+    // starting triple) try regular spirals first; if none closes and general
+    // is set, they try general spirals from every starting triple.
+    // @throws SpiralSearchFailed (spiral.hh) if a general spiral from some
+    //         starting triple does not close (NO_SPIRAL; get_general_spiral
+    //         also when there is no starting triple to try), or if a vertex
+    //         degree exceeds SpiralSearchFailed::degree_limit (DEGREE_LIMIT).
     bool get_spiral_implementation(node_t f1, node_t f2, node_t f3,
                                    vector<int>& v, jumplist_t& j,
                                    vector<node_t>& permutation, bool general=true,
@@ -1098,10 +1130,14 @@ struct FullereneDualView : TriangulationView {
 
     bool get_rspi(node_t f1, node_t f2, node_t f3,
                   vector<int>& r, jumplist_t& j, bool general=true) const;
+    // The canonical searches below (no starting triple) and name() throw
+    // SpiralSearchFailed as TriangulationView::get_spiral does.
     bool get_rspi(vector<int>& r, jumplist_t& j,
                   bool general=true, bool pentagon_start=true) const;
     general_spiral get_rspi(bool rarest_start=true) const;
 
+    // Returns the name of the fullerene this is the dual of (no "T"):
+    // spiral_nomenclature::fullerene_from_dual(*this, rarest_start).
     spiral_nomenclature name(bool rarest_start=true) const;
 };
 

@@ -124,9 +124,7 @@ void expect_resolves_and_locates(const SurfaceParametrization& P, const char* ta
 // reconstruction invents its own vertex numbering, so only a canonical
 // name compares the two SURFACES rather than two labellings.
 std::string canonical_name(const Triangulation& T) {
-    return spiral_nomenclature(T, spiral_nomenclature::FULLERENE,
-                               spiral_nomenclature::TRIANGULATION,
-                               /*rarest_special_start=*/true).to_string();
+    return spiral_nomenclature::fullerene_from_dual(T).to_string();
 }
 
 void expect_reconstructs_dual(const Charted& c, const char* tag) {

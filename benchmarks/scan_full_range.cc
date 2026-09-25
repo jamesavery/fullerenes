@@ -119,10 +119,7 @@ int main(int argc, char** argv) {
       try {
         solver.D = DelaunayTriangulation::compute(all[i]);
         // Canonical spiral name (cheap relative to solve).
-        spiral_nomenclature sn(all[i],
-                                spiral_nomenclature::FULLERENE,
-                                spiral_nomenclature::TRIANGULATION,
-                                /*rarest_special_start=*/true);
+        spiral_nomenclature sn = spiral_nomenclature::fullerene_from_dual(all[i]);
         spiral_name = "C" + to_string(N) + "-" + sn.to_string();
       } catch (...) {
         std::lock_guard<std::mutex> lk(out_mtx);

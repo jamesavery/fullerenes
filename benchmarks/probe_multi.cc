@@ -2,7 +2,7 @@
 // diagnostics at the converged (T(0), r(0)).
 //
 // Usage: probe_multi <spiral_name>
-// e.g.:  probe_multi 'C134-[GS:1,2,12,17,36,43,50,56,57,62,67,69]-fullerene'
+// e.g.:  probe_multi 'C134-[1,2,12,17,36,43,50,56,57,62,67,69]-fullerene'
 
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/delaunay.hh"
