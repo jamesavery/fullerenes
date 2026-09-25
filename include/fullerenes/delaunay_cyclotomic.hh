@@ -542,9 +542,7 @@ struct CyclotomicMetricT : CarryViewsT<S> {
 // a view body that fills a store and reports a refusal by name (no
 // allocation, no exceptions -- callable from a GPU work-item over a
 // per-isomer arena), and the owner that allocates, calls it, and converts
-// a refusal to the documented throw.  Sizes: lsq / diag_pend at the
-// half-edge capacity, f_wedge at the face capacity, curv_k at the vertex
-// capacity, dev at the half-edge capacity + 1.
+// a refusal to the documented throw.  Sizes: carry_capacities below.
 // ---------------------------------------------------------------------------
 template <class S, class R>
 struct CarryStoreT {
@@ -576,12 +574,28 @@ struct CarryRefusal {
   bool ok() const { return what == nullptr; }
 };
 
+// The carry's sizes over a DCEL with nv vertices, nh half-edges and nf
+// faces: lsq and diag_pend one entry per half-edge, f_wedge one per face,
+// curv_k one per vertex, dev one per half-edge plus one.
+struct CarryCapacities {
+  std::size_t lsq, f_wedge, diag_pend, curv_k, dev;
+};
+constexpr CarryCapacities carry_capacities(long nv, long nh, long nf) {
+  return {std::size_t(nh), std::size_t(nf), std::size_t(nh), std::size_t(nv), std::size_t(nh + 1)};
+}
+// The carry's sizes at V's capacities: the storage a carry needs for the
+// whole lifetime of V (the view never grows past its capacities).
+inline CarryCapacities carry_capacities(const DelaunayView& V) {
+  return carry_capacities(V.nv_cap, V.nh_cap, V.nf_cap);
+}
+
 // Derive + VERIFY the cyclotomic carry from a FRESH kis DCEL into a store
 // (see the file banner's entry boundary).  n_centres = the face-centre
 // vertex count (kis ids < n_centres); centre_size[c] = that face's size,
 // 5 or 6 (any integer element type).  The first mismatch is returned by
 // name; the store is then partially written and must not be used.
-// @pre  every store span holds its capacity above; V is a fresh kis DCEL
+// @pre  every store span holds at least carry_capacities(V.nv, V.nh, V.nf);
+//       V is a fresh kis DCEL
 template <class Size, class S, class R>
 inline CarryRefusal derive_cyclotomic_kis_carry_into(
     CarryStoreT<S, R> c, const DelaunayView& V, int n_centres,
@@ -589,9 +603,10 @@ inline CarryRefusal derive_cyclotomic_kis_carry_into(
   if (n_centres <= 0 || n_centres >= V.nv ||
       (long)centre_size.size() < n_centres)
     return {"centre bookkeeping does not match the DCEL", n_centres};
-  if ((long)c.lsq.size() < V.nh || (long)c.f_wedge.size() < V.nf ||
-      (long)c.curv_k.size() < V.nv || (long)c.dev.size() < V.nh + 1 ||
-      (long)c.diag_pend.size() < V.nh)
+  const CarryCapacities need = carry_capacities(V.nv, V.nh, V.nf);
+  if (c.lsq.size() < need.lsq || c.f_wedge.size() < need.f_wedge ||
+      c.curv_k.size() < need.curv_k || c.dev.size() < need.dev ||
+      c.diag_pend.size() < need.diag_pend)
     return {"carry store smaller than the DCEL", V.nh};
   for (auto& q : c.lsq) q = S{};
   for (auto& q : c.f_wedge) q = S{};
@@ -670,6 +685,12 @@ struct CyclotomicKisCarryT {
   std::vector<signed char> curv_k;
   std::vector<zeta_store_t<S>> dev;
 
+  CyclotomicKisCarryT() = default;
+  // Storage at the given sizes, every entry at its zero value.
+  explicit CyclotomicKisCarryT(const CarryCapacities& cap)
+      : lsq(cap.lsq, S{}), f_wedge(cap.f_wedge, S{}), diag_pend(cap.diag_pend, S{}),
+        curv_k(cap.curv_k, 0), dev(cap.dev, zeta_store_t<S>{}) {}
+
   CarryStoreT<S, R> store() { return {lsq, f_wedge, diag_pend, curv_k, dev}; }
   // A fresh policy over this carry: the views, and the transport state at
   // its defaults (pend disarmed, the ear FIFO empty).
@@ -684,12 +705,7 @@ template <class S = Real30, class R = Real30>
 inline CyclotomicKisCarryT<S, R> derive_cyclotomic_kis_carry(
     const DelaunayView& V, int n_centres, std::span<const int> centre_size,
     const char* op = "derive_cyclotomic_kis_carry") {
-  CyclotomicKisCarryT<S, R> c;
-  c.lsq.assign(V.he_length.size(), S{});
-  c.f_wedge.assign(V.f_he.size(), S{});
-  c.curv_k.assign((std::size_t)V.nv, 0);
-  c.dev.assign(V.he_length.size() + 1, zeta_store_t<S>{});
-  c.diag_pend.assign(V.he_length.size(), S{});
+  CyclotomicKisCarryT<S, R> c(carry_capacities(V));
   const CarryRefusal r =
       derive_cyclotomic_kis_carry_into<int, S, R>(c.store(), V, n_centres, centre_size);
   if (!r.ok())
