@@ -253,6 +253,7 @@ bool next_fullerene(buckygen_queue& Q, TriangulationView dst)
   while(true){
     ssize_t length = msgrcv(Q.qid, (void*)&msg, sizeof(msg)-sizeof(long), -2, 0);
     if(length < 0){
+      if(errno == EINTR) continue;   // a delivered signal interrupted the wait, not the stream
       fprintf(stderr,"In BuckyGen::next_fullerene: %s\n",strerror(errno));
       return false;
     } else if(msg.mtype == WORKER_FINISHED) {	// No more graphs to generate
@@ -355,6 +356,7 @@ bool next_fullerene(buckygen_queue& Q, FullereneDualView dst)
       ssize_t length = msgrcv(H.qid, (void*)&msg, sizeof(msg)-sizeof(long), -2, 0);
 
       if(length < 0){
+	if(errno == EINTR) continue;   // a delivered signal interrupted the wait, not the stream
 	fprintf(stderr,"In BuckyHerd::next_fullerene: %s\n",strerror(errno));
 	return false;
       } else if(msg.mtype == GRAPH_READY) {	// One chunk of a graph
