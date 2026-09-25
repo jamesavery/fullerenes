@@ -1355,24 +1355,26 @@ struct DelaunayView {
     return lawson_sweep_drain(S, in_stack, m, tr);
   }
 
-  // fanned + periodic_completed + ambiguous + nondisk = the cocircular cells
-  // with interior (tight) edges; flips = tight flips performed.  Single-face
-  // cells carry no interior edge, are already canonical, and are not counted.
-  // fanned counts the ordinary one-minimum fans, periodic_completed the
+  // fanned + periodic_completed = the cocircular cells with interior (tight)
+  // edges; flips = tight flips performed.  Single-face cells carry no
+  // interior edge, are already canonical, and are not counted.  fanned
+  // counts the ordinary one-minimum fans, periodic_completed the
   // two-minimum cells completed by the symmetric split.  On a convex
   // polyhedral metric -- a sphere with every cone angle at most 2*pi, which
   // by Alexandrov's realisation theorem is the same class, and which every
   // fullerene surface is, dual or flattened kis, before and after
-  // flat-vertex removal -- those two are the only cases, so ambiguous is
-  // zero there; it survives for the flat-torus words a cell of three or
-  // four least rotations can have.
+  // flat-vertex removal -- those two are the only cases.  A cell the
+  // completion cannot complete (an ambiguous or non-disk cell) is a named
+  // failure of canonical_completion, never a count.  When canonical_completion
+  // trips (status != Ok on return), the stats it returns are PARTIAL: they
+  // count the cells completed before the trip and the flips performed up to
+  // it, and the complex is left as those flips made it.
   struct CompletionStats {
-    int fanned = 0, periodic_completed = 0, ambiguous = 0, nondisk = 0, flips = 0;
+    int fanned = 0, periodic_completed = 0, flips = 0;
     bool operator==(const CompletionStats&) const = default;
     CompletionStats& operator+=(const CompletionStats& o) {
       fanned += o.fanned; periodic_completed += o.periodic_completed;
-      ambiguous += o.ambiguous;
-      nondisk += o.nondisk; flips += o.flips;
+      flips += o.flips;
       return *this;
     }
   };
@@ -1421,18 +1423,20 @@ struct DelaunayView {
   // kis.  CANONICAL-TOTALITY-DESIGN.md carries the theorem, the
   // multiplicity bound, and the flip-count argument.
   //
-  // AMBIGUOUS CELLS: three or four least rotations remain uncompleted, and
-  // are COUNTED rather than guessed at.  They need zero total curvature,
-  // so no convex polyhedral metric admits them; the words that do describe
-  // a one-cell flat torus (a regular hexagon or a square with opposite
-  // sides identified), whose completions the design gives but which this
-  // body does not yet implement.
+  // AMBIGUOUS CELLS: a cell with three or four least rotations is REFUSED
+  // by name (InvariantViolated), never guessed at and never skipped: a
+  // skipped cell would leave a complex that is not a function of its
+  // labels, handed downstream as if it were.  Such cells need zero total
+  // curvature, so no convex polyhedral metric admits them; the words that
+  // do describe a one-cell flat torus (a regular hexagon or a square with
+  // opposite sides identified), whose completions the design gives but
+  // which this body does not implement.
   //
   // NON-DISK COMPONENTS: the fan conversion is correct exactly on
   // triangulated disks without interior vertices, where the boundary walk
   // crosses each of the d-3 interior edges once from each side.  A
-  // component failing that Euler count (X != 2*(d-3)) is COUNTED as
-  // nondisk and left untouched, before any flip.  The count is NECESSARY,
+  // component failing that Euler count (X != 2*(d-3)) is REFUSED by name
+  // (InvariantViolated) before any flip.  The count is NECESSARY,
   // not sufficient (interior vertices of total degree 6n cancel in it);
   // correctness on accepted cells rests on the geometry: by the
   // empty-circumdisk property a cocircular cell of a Delaunay complex has
@@ -1458,9 +1462,18 @@ struct DelaunayView {
   //       removal whose post-condition it is.  On a non-Delaunay complex
   //       tight components are not inscribed polygons and flips may be
   //       refused.
-  // @post on Ok: every fanned cell is the canonical fan; the tesselation
-  //       is unchanged; the complex is Delaunay; a second call flips
-  //       nothing (idempotent).
+  // @post on Ok: every cell with interior edges is completed -- the
+  //       canonical fan, or the symmetric split of a two-minimum cell;
+  //       the tesselation is unchanged; the
+  //       complex is Delaunay; a second call flips nothing (idempotent).
+  // @error InvariantViolated, site "canonical_completion: ambiguous cell
+  //        (more than two least corners)", witness the cell's least
+  //        boundary half-edge: a cell word with three or four least
+  //        rotations (not a convex polyhedral metric).
+  // @error InvariantViolated, site "canonical_completion: cell fails the
+  //        disk gate (non-disk component)", same witness: a tight
+  //        component failing the disk Euler count (a corrupt complex or
+  //        carry, or a cell that does not develop injectively).
   // @error InvariantViolated: a cell-boundary walk that fails to close, or
   //        a tight flip refused (both mean a corrupt complex or carry).
   // @error BudgetExceeded: a fan conversion exceeding its 2d+3 step bound
@@ -2388,7 +2401,11 @@ DelaunayView::canonical_completion(Metric&& m, Transport&& tr) {
     if (C.crossings == 0) continue;   // single-face cell: already canonical
     if (C.hmin != h0) continue;       // each cell processed once
     // A non-disk component is refused by name BEFORE any flip.
-    if (!C.passes_disk_gate()) { st.nondisk++; continue; }
+    if (!C.passes_disk_gate()) {
+      trip(Status::InvariantViolated,
+           "canonical_completion: cell fails the disk gate (non-disk component)", h0);
+      return st;
+    }
 
     // The canonical corner: the least rotation of the boundary word.  One
     // minimum gives the ordinary fan; two give the symmetric split, which
@@ -2397,7 +2414,11 @@ DelaunayView::canonical_completion(Metric&& m, Transport&& tr) {
         delaunay_detail::least_rotation(h0, C.d, advance, corner_entry_cmp);
     if (status != Status::Ok) return st;
 
-    if (multiplicity > 2) { st.ambiguous++; continue; }
+    if (multiplicity > 2) {
+      trip(Status::InvariantViolated,
+           "canonical_completion: ambiguous cell (more than two least corners)", h0);
+      return st;
+    }
 
     if (multiplicity == 2) {
       st.flips += complete_two_minima(C, corner, tight, m, tr);

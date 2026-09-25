@@ -741,15 +741,14 @@ struct AlexandrovIDTCubic {
   // @post every cocircular cell is triangulated canonically: the fan from
   //       its unique least-rotation corner, or, when exactly two corners tie,
   //       the symmetric split about the diameter joining them (result.fanned
-  //       and result.periodic_completed count the two).  Only a word with
-  //       three or four least corners, or a failed disk gate, is refused --
-  //       result.ambiguous / result.nondisk, neither of which can occur on a
-  //       cone surface
+  //       and result.periodic_completed count the two)
   // @throws std::logic_error when a cone guard trips (a flat vertex
   //         survived removal, kappa != k*pi/15, or total curvature != 4pi
   //         -- all "can't happen" on a correct kis metric);
   //         std::runtime_error when the exact predicates refuse a decision
-  //         or a completion invariant trips (the throw set of
+  //         or the completion refuses a cell -- a word with three or four
+  //         least corners, or a failed disk gate, neither of which can
+  //         occur on a convex polyhedral metric (the throw set of
   //         remove_and_complete_cyclotomic_kis)
   DelaunayView::CompletionStats build(const TriangulationView& T);
 

@@ -1010,6 +1010,111 @@ TEST(DCELExactStatus, ExactDriverRejectsInsertedVertices) {
 }
 
 // ============================================================================
+// DCELCompletionRefusal: a cell the canonical completion cannot complete is a
+// named failure of the one shared body (DelaunayView::canonical_completion),
+// which every owner and batch pipeline inherits -- never counted and skipped.
+// ============================================================================
+
+// A one-cell flat torus: the regular unit hexagon with opposite sides
+// identified, as an .idt record (format legend: delaunay.cc, to_ascii).
+// Its corners fall into two vertex classes, a = 0 (hexagon corners P0, P2,
+// P4) and b = 1 (P1, P3, P5), each flat (three corners of 2pi/3).  Edges
+// 0-2 are the three sides, squared length 1, each glued to its opposite
+// side (half-edge 2k runs P_k -> P_{k+1}, its twin P_{k+3} -> P_{k+4});
+// edges 3-5 are the fan from P0, squared lengths 3, 4, 3, all tight, since
+// the four triangles are inscribed in the hexagon's circumcircle.
+// V - E + F = 2 - 6 + 4 = 0.  The one cell's boundary word reads
+// (a,1)(b,1) three times, so three corners attain its least rotation --
+// the ambiguous case, which needs zero total curvature and so no convex
+// polyhedral metric admits.
+static const char* kHexagonTorusOneCell =
+    "iDT-DCEL 1\n"
+    "2 4 6\n"
+    "6\n"
+    "6\n"
+    "0 1 2 11 1\n"
+    "1 0 7 5 1\n"
+    "0 1 9 10 1\n"
+    "0 0 4 0 1.7320508075688772\n"
+    "0 1 1 6 2\n"
+    "0 0 3 8 1.7320508075688772\n";
+
+static DelaunayTriangulation read_idt(const char* text) {
+  FILE* f = std::tmpfile();
+  if (f == nullptr) throw std::runtime_error("read_idt: tmpfile");
+  std::fputs(text, f);
+  std::rewind(f);
+  DelaunayTriangulation D = DelaunayTriangulation::from_ascii(f);
+  std::fclose(f);
+  return D;
+}
+
+TEST(DCELCompletionRefusal, AmbiguousCellTripsByName) {
+  DelaunayTriangulation D = read_idt(kHexagonTorusOneCell);
+  ASSERT_TRUE(D.is_delaunay());
+  std::vector<long long> Lsq = D.verified_exact_lsq_carry();
+  const ExactIntegerMetric m{std::span<long long>(Lsq)};
+  int n_tight = 0;
+  for (int h : D.edges()) n_tight += m.cocircular(D, h);
+  ASSERT_EQ(n_tight, 3) << "the fan diagonals are the cell's only interior edges";
+
+  D.DelaunayView::canonical_completion(m);
+  EXPECT_EQ(D.status, DelaunayView::Status::InvariantViolated);
+  ASSERT_NE(D.status_site, nullptr);
+  EXPECT_NE(std::string(D.status_site).find("ambiguous cell"), std::string::npos)
+      << D.status_site;
+  EXPECT_EQ(D.status_witness, 0) << "the cell's least boundary half-edge";
+}
+
+TEST(DCELCompletionRefusal, OwnerThrowsOnAmbiguousCell) {
+  DelaunayTriangulation D = read_idt(kHexagonTorusOneCell);
+  try {
+    D.canonical_completion_exact();
+    ADD_FAILURE() << "canonical_completion_exact completed an ambiguous cell";
+  } catch (const std::runtime_error& e) {
+    EXPECT_NE(std::string(e.what()).find("ambiguous cell"), std::string::npos) << e.what();
+  }
+}
+
+// The disk gate is the backstop for a corrupt carry, which no consistent
+// geometric complex supplies; this policy supplies one by DECLARING the
+// tight set (everything else delegates to the exact carry).
+struct DeclaredTightMetric {
+  ExactIntegerMetric exact;
+  std::vector<char> tight;   // per half-edge
+  bool cocircular(const DelaunayView&, int h) const { return tight[h] != 0; }
+  int compare_lsq(const DelaunayView& V, int a, int b) const {
+    return exact.compare_lsq(V, a, b);
+  }
+  bool convex(const DelaunayView& V, int h) const { return exact.convex(V, h); }
+  std::optional<Length> flipped(DelaunayView& V, int h) const { return exact.flipped(V, h); }
+  void set_edge_length(DelaunayView& V, int h, Length l) const {
+    exact.set_edge_length(V, h, l);
+  }
+};
+
+TEST(DCELCompletionRefusal, NonDiskCellTripsByName) {
+  // Every edge declared tight but side 0: the component is the torus cut
+  // along one edge, whose boundary walk has d = 2 corners and crosses the
+  // other ten half-edges -- not the 2(d-3) of a triangulated disk.
+  DelaunayTriangulation D = read_idt(kHexagonTorusOneCell);
+  std::vector<long long> Lsq = D.verified_exact_lsq_carry();
+  DeclaredTightMetric m{ExactIntegerMetric{std::span<long long>(Lsq)},
+                        std::vector<char>((std::size_t)D.nh, 1)};
+  m.tight[0] = m.tight[1] = 0;
+
+  const std::vector<int> next_before(D.he_next.begin(), D.he_next.end());
+  D.DelaunayView::canonical_completion(m);
+  EXPECT_EQ(D.status, DelaunayView::Status::InvariantViolated);
+  ASSERT_NE(D.status_site, nullptr);
+  EXPECT_NE(std::string(D.status_site).find("non-disk"), std::string::npos)
+      << D.status_site;
+  EXPECT_EQ(D.status_witness, 0);
+  EXPECT_TRUE(std::equal(next_before.begin(), next_before.end(), D.he_next.begin()))
+      << "the gate refuses before any flip";
+}
+
+// ============================================================================
 // DCELOwnership: the owner's span/storage aliasing contract.
 //
 // Each test states one claim about the Owned-view pattern (delaunay.hh

@@ -535,19 +535,20 @@ struct DelaunayTriangulation : DelaunayView, DelaunayStorage {
   // polyhedral metric, so every fullerene completes.  Exact regime (derives and verifies the
   // Lsq carry exactly as remove_flat_vertices_exact; same loud
   // preconditions), and checks the is_delaunay() precondition itself.
-  // Tesselation-invariant, Delaunay-preserving, idempotent.  Refusal
-  // classes, counted per cell and left untouched, never guessed at:
-  // .ambiguous (three or four minima -- impossible on a convex polyhedral
-  // metric, reachable only on a one-cell flat torus) and .nondisk (a
-  // component failing the
-  // disk Euler count -- on a Delaunay complex with embedded cells the class
-  // is provably empty by the empty-circumdisk property; the gate is the
-  // fail-loud backstop beyond that scope).
+  // Tesselation-invariant, Delaunay-preserving, idempotent.  A cell it
+  // cannot complete is a named failure, never counted and skipped: an
+  // ambiguous cell (three or four minima -- impossible on a convex
+  // polyhedral metric, reachable only on a one-cell flat torus) or a
+  // non-disk component (failing the disk Euler count -- on a Delaunay
+  // complex with embedded cells the class is provably empty by the
+  // empty-circumdisk property; the gate is the fail-loud backstop beyond
+  // that scope).
   // Transport-hooked: with tracking active, tracked points ride the flips.
   // NOT transactional: a throw can leave the complex part-completed with
   // the status latched.
   // @throws std::runtime_error on a non-Delaunay complex, a non-exact
-  //         metric, a walk that fails to close, a refused tight flip, or
+  //         metric, an ambiguous or non-disk cell (the message names
+  //         which), a walk that fails to close, a refused tight flip, or
   //         the fan-conversion step budget (via the Status latch).
   DelaunayView::CompletionStats canonical_completion_exact();
 

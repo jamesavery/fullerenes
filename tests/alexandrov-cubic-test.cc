@@ -146,8 +146,8 @@ TEST(AlexandrovCubicExact, C60IhIsTruncatedIcosahedron)
 
 // Both regimes keep the same cones (the reduced triangulations are
 // compared corpus-wide by tools/bench_cubic_regimes); the exact build
-// reports its completion, which refuses no cell and, these kis surfaces
-// carrying cocircular pentagon cells, always fans.
+// returns, so its completion refused no cell (a refused cell throws), and,
+// these kis surfaces carrying cocircular pentagon cells, it always fans.
 TEST(AlexandrovCubicExact, RegimesAgreeOnConesAndCompletionFans)
 {
   for (int N : {20, 36, 40}) {
@@ -157,8 +157,6 @@ TEST(AlexandrovCubicExact, RegimesAgreeOnConesAndCompletionFans)
     const auto completion = exact.build(T);
     EXPECT_EQ(banded.solver.D.nv, exact.solver.D.nv) << "C" << N;
     EXPECT_EQ(sorted(banded.cone_kis_vertex), sorted(exact.cone_kis_vertex)) << "C" << N;
-    EXPECT_EQ(completion.ambiguous, 0) << "C" << N;
-    EXPECT_EQ(completion.nondisk, 0) << "C" << N;
     EXPECT_GT(completion.flips, 0) << "C" << N;
   }
 }
